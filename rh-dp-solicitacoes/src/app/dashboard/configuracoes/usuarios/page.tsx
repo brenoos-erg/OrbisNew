@@ -12,17 +12,21 @@ type UserRow = {
   costCenter?: string | null
 }
 
-const LABEL = 'block text-xs font-semibold text-black uppercase tracking-wide'
+const LABEL =
+  'block text-xs font-semibold text-black uppercase tracking-wide'
 const INPUT =
   'mt-1 w-full rounded-md border border-blue-500/70 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150'
 
 function toLoginFromName(fullName: string) {
   if (!fullName.trim()) return ''
   const parts = fullName
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().split(/\s+/).filter(Boolean)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
   const first = parts[0] || ''
-  const last  = parts.length > 1 ? parts[parts.length - 1] : ''
+  const last = parts.length > 1 ? parts[parts.length - 1] : ''
   return [first, last].filter(Boolean).join('.').replace(/[^a-z.]/g, '')
 }
 
@@ -161,33 +165,50 @@ export default function Page() {
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">Configurações</h1>
       <p className="text-sm text-slate-500 mb-6">Cadastro e manutenção de usuários.</p>
 
-      <form onSubmit={onSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <form onSubmit={onSubmit} autoComplete="off" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* HONEYPOTS anti-autofill */}
+        <input type="text" name="email" autoComplete="email" tabIndex={-1} aria-hidden="true" className="hidden" />
+        <input type="password" name="password" autoComplete="new-password" tabIndex={-1} aria-hidden="true" className="hidden" />
+
         {/* ESQUERDA */}
         <div className="lg:col-span-5 space-y-5">
           <div>
             <label className={LABEL}>Nome completo</label>
-            <input className={INPUT} value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder=""/>
+            <input className={INPUT} value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder="" />
           </div>
 
           <div>
             <label className={LABEL}>E-mail</label>
-            <input type="email" className={INPUT} value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="email@empresa.com"/>
+            <input
+              type="email"
+              id="userEmail"
+              name="manual_email"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              inputMode="email"
+              className={INPUT}
+              placeholder="email@empresa.com"
+              value={email}
+              onChange={(e)=>setEmail(e.target.value)}
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LABEL}>Telefone</label>
-              <input className={INPUT} value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="(31) 99999-0000"/>
+              <input className={INPUT} value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="(31) 99999-0000" />
             </div>
             <div>
               <label className={LABEL}>Centro de Custo</label>
-              <input className={INPUT} value={costCenter} onChange={(e)=>setCostCenter(e.target.value)} placeholder="Ex.: TI"/>
+              <input className={INPUT} value={costCenter} onChange={(e)=>setCostCenter(e.target.value)} placeholder="Ex.: TI" />
             </div>
           </div>
 
           <div>
             <label className={LABEL}>Login (gerado automaticamente)</label>
-            <input className={INPUT} value={login} onChange={(e)=>setLogin(e.target.value)} placeholder="breno.sousa"/>
+            <input className={INPUT} value={login} onChange={(e)=>setLogin(e.target.value)} placeholder="breno.sousa" />
             <p className="mt-1 text-[11px] text-slate-500">
               Padrão: primeiro nome + último sobrenome (sem acento), ex.: <b>breno.sousa</b>.
             </p>
@@ -198,6 +219,12 @@ export default function Page() {
               <label className="mb-1 block text-sm font-medium text-slate-700">Senha (opcional)</label>
               <input
                 type="password"
+                id="userPassword"
+                name="manual_password"
+                autoComplete="new-password"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 className={
                   'w-full rounded-lg border bg-white px-4 py-3 text-sm outline-none ' +
                   (firstAccess
@@ -211,20 +238,34 @@ export default function Page() {
               />
             </div>
             <div className="flex items-center mt-6">
-              <input id="firstAccess" type="checkbox" className="h-4 w-4 text-orange-600 border-gray-300 rounded"
-                     checked={firstAccess} onChange={(e)=>setFirstAccess(e.target.checked)} />
-              <label htmlFor="firstAccess" className="ml-2 text-sm text-slate-700">Usuário definirá a senha no primeiro acesso</label>
+              <input
+                id="firstAccess"
+                type="checkbox"
+                className="h-4 w-4 text-orange-600 border-gray-300 rounded"
+                checked={firstAccess}
+                onChange={(e)=>setFirstAccess(e.target.checked)}
+              />
+              <label htmlFor="firstAccess" className="ml-2 text-sm text-slate-700">
+                Usuário definirá a senha no primeiro acesso
+              </label>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <button type="submit" disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow disabled:opacity-60"
+            >
               <Save className="h-4 w-4" />
               {submitting ? 'Registrando…' : 'Registrar Usuário'}
             </button>
-            <button type="button" onClick={load} disabled={loading}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm hover:bg-slate-50 disabled:opacity-60">
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm hover:bg-slate-50 disabled:opacity-60"
+            >
               <PlusCircle className="h-4 w-4" />
               {loading ? 'Recarregando…' : 'Recarregar'}
             </button>
@@ -237,7 +278,7 @@ export default function Page() {
             <div className="text-sm font-semibold text-slate-700 mb-3">Últimos usuários</div>
 
             <div className="max-h-[620px] overflow-auto overflow-x-auto">
-                <table className="w-full text-sm">  {/* remove table-fixed */}
+              <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="text-left text-slate-500">
                     <th className="py-2 w-[34%]">Nome</th>
@@ -259,12 +300,18 @@ export default function Page() {
                         <td className="py-2 pr-3 break-all">{u.email}</td>
                         <td className="py-2">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => openEdit(u)}
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50" title="Editar">
+                            <button
+                              onClick={() => openEdit(u)}
+                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50"
+                              title="Editar"
+                            >
                               <Pencil size={16}/> Editar
                             </button>
-                            <button onClick={() => handleDelete(u)}
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600" title="Excluir">
+                            <button
+                              onClick={() => handleDelete(u)}
+                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
+                              title="Excluir"
+                            >
                               <Trash2 size={16}/> Excluir
                             </button>
                           </div>
@@ -315,9 +362,13 @@ export default function Page() {
               </div>
               <div className="sm:col-span-2">
                 <label className={LABEL}>Nova Senha (opcional)</label>
-                <input type="password" className={INPUT}
-                       placeholder="Deixe em branco para não alterar"
-                       value={editPassword} onChange={(e)=>setEditPassword(e.target.value)} />
+                <input
+                  type="password"
+                  className={INPUT}
+                  placeholder="Deixe em branco para não alterar"
+                  value={editPassword}
+                  onChange={(e)=>setEditPassword(e.target.value)}
+                />
               </div>
             </div>
 
@@ -325,8 +376,10 @@ export default function Page() {
               <button onClick={closeEdit} className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm">
                 <X size={16}/> Cancelar
               </button>
-              <button onClick={submitEdit}
-                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+              <button
+                onClick={submitEdit}
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
                 <Check size={16}/> Salvar alterações
               </button>
             </div>

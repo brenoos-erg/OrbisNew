@@ -2,65 +2,117 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
 
+// helper: admin client (server-only)
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw new Error('NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausentes')
+  if (!url || !key) throw new Error('SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausentes')
   return createClient(url, key)
 }
 
-export async function PATCH(_: Request, { params }: { params: { id: string } }) {
-  const id = params.id
+// PATCH /api/configuracoes/usuarios/[id]
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const body = await _.json()
-    const data: any = {
-      fullName: (body.fullName ?? '').trim(),
-      email: (body.email ?? '').trim().toLowerCase(),
-      login: (body.login ?? '').trim().toLowerCase(),
-      phone: (body.phone ?? '').trim() || null,
-      costCenter: (body.costCenter ?? '').trim() || null,
+    const body = await req.json()
+    const id = params.id
+
+    // dados opcionais
+    const fullName   = (body.fullName ?? '').trim()
+    const email      = (body.email ?? '').trim().toLowerCase()
+    const login      = (body.login ?? '').trim().toLowerCase()
+    const phone      = (body.phone ?? '').trim() || null
+    const costCenter = (body.costCenter ?? '').trim() || null
+    const password   = (body.password ?? '').trim() // se vier, troca a senha no Auth
+
+    // usuário atual pra pegar authId
+    const current = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, authId: true }
+    })
+    if (!current) {
+      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
-    const userBefore = await prisma.user.findUnique({ where: { id }, select: { authId: true } })
-    if (!userBefore) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
-
+    // Atualiza no banco público
     const updated = await prisma.user.update({
       where: { id },
-      data,
+      data: {
+        ...(fullName   ? { fullName }   : {}),
+        ...(email      ? { email }      : {}),
+        ...(login      ? { login }      : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(costCenter !== undefined ? { costCenter } : {}),
+      },
       select: { id: true, fullName: true, email: true, login: true, phone: true, costCenter: true, authId: true },
     })
 
-    // Atualiza Auth (e senha, se enviada)
+    // Se tem authId, reflete no Supabase Auth
     if (updated.authId) {
       const admin = getSupabaseAdmin()
+      // atualiza email/metadata
       await admin.auth.admin.updateUserById(updated.authId, {
-        email: updated.email,
-        user_metadata: { fullName: updated.fullName, login: updated.login, phone: updated.phone, costCenter: updated.costCenter },
-        password: body.password ? String(body.password) : undefined,
+        ...(email ? { email } : {}),
+        ...(password ? { password } : {}),
+        user_metadata: {
+          ...(fullName ? { fullName } : {}),
+          ...(login ? { login } : {}),
+          ...(phone !== undefined ? { phone } : {}),
+          ...(costCenter !== undefined ? { costCenter } : {}),
+        },
       })
     }
 
-    return NextResponse.json(updated)
+    return NextResponse.json({
+      id: updated.id,
+      fullName: updated.fullName,
+      email: updated.email,
+      login: updated.login ?? '',
+      phone: updated.phone ?? '',
+      costCenter: updated.costCenter ?? ''
+    })
   } catch (e: any) {
-    console.error('PATCH /configuracoes/usuarios/[id]', e)
-    return NextResponse.json({ error: e?.message || 'Erro ao atualizar.' }, { status: 500 })
+    // conflito de unique, etc.
+    if (e?.code === 'P2002') {
+      const alvo = Array.isArray(e?.meta?.target) ? e.meta.target.join(', ') : (e?.meta?.target ?? 'campo único')
+      return NextResponse.json({ error: `Violação de UNIQUE: ${alvo}` }, { status: 409 })
+    }
+    console.error('PATCH /configuracoes/usuarios/[id] error', e)
+    return NextResponse.json({ error: e?.message || 'Erro ao atualizar usuário.' }, { status: 500 })
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  const id = params.id
+// DELETE /api/configuracoes/usuarios/[id]
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const found = await prisma.user.findUnique({ where: { id }, select: { authId: true } })
-    if (!found) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+    const { id } = params
 
-    await prisma.user.delete({ where: { id } })
-    if (found.authId) {
-      const admin = getSupabaseAdmin()
-      await admin.auth.admin.deleteUser(found.authId).catch(() => {})
+    // busca para recuperar o authId antes de apagar
+    const existing = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, authId: true }
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
+
+    // apaga do público primeiro
+    await prisma.user.delete({ where: { id } })
+
+    // tenta apagar do Auth (se tinha authId)
+    if (existing.authId) {
+      const admin = getSupabaseAdmin()
+      await admin.auth.admin.deleteUser(existing.authId).catch(() => {})
+    }
+
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
-    console.error('DELETE /configuracoes/usuarios/[id]', e)
-    return NextResponse.json({ error: e?.message || 'Erro ao excluir.' }, { status: 500 })
+  } catch (e) {
+    console.error('DELETE /configuracoes/usuarios/[id] error', e)
+    return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
   }
 }
