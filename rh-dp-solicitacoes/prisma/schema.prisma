@@ -1,22 +1,26 @@
-// -------- DATASOURCE / GENERATOR (deixe como já está no seu arquivo) --------
-// datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
-// generator client { provider = "prisma-client-js" }
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
+/**
+ * ===================== Enums =====================
+ */
 
-// -------- Enums existentes (mantenha) --------
 enum Role {
   COLABORADOR
   RH
   DP
   ADMIN
+}
+
+enum Setor {
+  RH
+  DP
 }
 
 enum Status {
@@ -28,98 +32,108 @@ enum Status {
   CONCLUIDA
 }
 
-enum Setor {
-  RH
-  DP
-}
-
-// -------- NOVO enum para status de usuário --------
 enum UserStatus {
   ATIVO
   INATIVO
 }
 
-// -------- USER (corrigido e com os novos campos) --------
-model User {
-  id                String     @id @default(uuid()) @db.Uuid
-  authId            String?    @unique @db.Uuid // vínculo com auth.users (Supabase)
-  // cadastro
-  login             String     @unique // ex.: b.sousa
-  fullName          String
-  email             String     @unique
-  phone             String? // número de telefone
-  costCenter        String? // centro de custo
-  status            UserStatus @default(ATIVO) // controle de acesso
-  passwordExpiresAt DateTime? // expiração da senha
-  // housekeeping
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-
-  // relações
-  solicitacoesCriadas   Solicitation[] @relation("Autor")
-  solicitacoesAssumidas Solicitation[] @relation("Responsavel")
-  comentarios           Comment[]
-  eventos               Event[]
-}
-
-// -------- RESTANTE (ajuste nos FKs para @db.Uuid onde aponta para User.id) --------
-model TipoSolicitacao {
-  id           String         @id @default(cuid())
-  nome         String         @unique
-  descricao    String?
-  schemaJson   Json
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  solicitacoes Solicitation[]
-}
-
-model Solicitation {
-  id            String          @id @default(cuid())
-  titulo        String
-  descricao     String
-  setorDestino  Setor
-  status        Status          @default(ABERTA)
-  autorId       String          @db.Uuid
-  autor         User            @relation("Autor", fields: [autorId], references: [id])
-  responsavelId String?         @db.Uuid
-  responsavel   User?           @relation("Responsavel", fields: [responsavelId], references: [id])
-  tipoId        String
-  tipo          TipoSolicitacao @relation(fields: [tipoId], references: [id])
-  payload       Json
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  comentarios   Comment[]
-  anexos        Attachment[]
-  eventos       Event[]
-}
-
-model Comment {
-  id             String       @id @default(cuid())
-  solicitationId String
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
-  autorId        String       @db.Uuid
-  autor          User         @relation(fields: [autorId], references: [id])
-  texto          String
-  createdAt      DateTime     @default(now())
-}
+/**
+ * ===================== Models =====================
+ */
 
 model Attachment {
-  id             String       @id @default(cuid())
+  id             String   @id
   solicitationId String
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
   filename       String
   url            String
   mimeType       String
   sizeBytes      Int
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
+
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+model Comment {
+  id             String   @id
+  solicitationId String
+  autorId        String
+  texto          String
+  createdAt      DateTime @default(now())
+
+  // lado que aponta para Solicitation
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
+
+  // lado que aponta para User (autor do comentário)
+  autor User @relation(name: "CommentAutor", fields: [autorId], references: [id])
 }
 
 model Event {
-  id             String       @id @default(cuid())
+  id             String   @id
   solicitationId String
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
-  actorId        String       @db.Uuid
-  actor          User         @relation(fields: [actorId], references: [id])
+  actorId        String
   tipo           String
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
+
+  // lado que aponta para Solicitation
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
+
+  // lado que aponta para User (quem executou a ação)
+  actor User @relation(name: "EventActor", fields: [actorId], references: [id])
+}
+
+model TipoSolicitacao {
+  id         String   @id
+  nome       String   @unique
+  descricao  String?
+  schemaJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+
+  solicitacoes Solicitation[]
+}
+
+model Solicitation {
+  id            String   @id
+  titulo        String
+  descricao     String
+  setorDestino  Setor
+  status        Status   @default(ABERTA)
+  autorId       String
+  responsavelId String?
+  tipoId        String
+  payload       Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // relações
+  tipo TipoSolicitacao @relation(fields: [tipoId], references: [id])
+
+  // autor / responsável
+  autor       User  @relation(name: "SolicitationAutor", fields: [autorId], references: [id])
+  responsavel User? @relation(name: "SolicitationResponsavel", fields: [responsavelId], references: [id])
+
+  comentarios Comment[]
+  anexos      Attachment[]
+  eventos     Event[]
+}
+
+model User {
+  id         String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email      String     @unique
+  fullName   String // se sua coluna no banco ainda for "name", mapeie: @map("name")
+  login      String?    @unique(map: "user_login_key")
+  phone      String?
+  costCenter String?
+  status     UserStatus @default(ATIVO)
+  authId     String?    @db.Uuid
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  // lados opostos das relações (obrigatórios para evitar P1012)
+  solicitacoesCriadas   Solicitation[] @relation("SolicitationAutor")
+  solicitacoesAssumidas Solicitation[] @relation("SolicitationResponsavel")
+  comments              Comment[]      @relation("CommentAutor")
+  events                Event[]        @relation("EventActor")
+
+  @@map("User") // mantém apontando para a tabela pública "User"
 }

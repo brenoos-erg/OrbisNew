@@ -1,47 +1,16 @@
-'use client'
+import Link from 'next/link'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
-
-export default function Dashboard() {
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        window.location.href = '/login'
-      } else {
-        setUser(data.user)
-      }
-    })
-  }, [])
-
-  if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center text-slate-600">
-        Carregando...
-      </div>
-    )
-  }
-
+export default function DashboardHome() {
   return (
-    <div className="min-h-screen bg-slate-50 p-10">
-      <h1 className="text-2xl font-bold text-slate-800">
-        Bem-vindo, {user.email}
-      </h1>
-      <p className="mt-2 text-slate-600">
-        Você está autenticado com sucesso.
-      </p>
-
-      <button
-        onClick={async () => {
-          await supabase.auth.signOut()
-          window.location.href = '/login'
-        }}
-        className="mt-6 rounded-md bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-900"
+    <div className="max-w-3xl">
+      <h1 className="text-2xl font-semibold mb-2">Bem-vindo 👋</h1>
+      <p className="text-slate-600 mb-6">Use o menu ao lado para acessar as solicitações.</p>
+      <Link
+        href="/dashboard/solicitacoes"
+        className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800"
       >
-        Sair
-      </button>
+        Ir para Solicitações
+      </Link>
     </div>
   )
 }
