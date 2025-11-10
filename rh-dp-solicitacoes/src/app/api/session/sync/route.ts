@@ -1,32 +1,22 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { prisma } from '@/lib/prisma'
 
-const prisma = new PrismaClient()
+export const dynamic = 'force-dynamic'
 
 export async function POST() {
-  // cliente público (ok para pegar o user da sessão)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: async () => cookieStore })
 
-  const { data } = await supabase.auth.getUser()
-  const user = data.user
-  if (!user) return NextResponse.json({ ok: false }, { status: 401 })
+  const { data, error } = await supabase.auth.getUser()
+  const user = data?.user
+  if (error || !user) return NextResponse.json({ ok: false }, { status: 401 })
 
   await prisma.user.upsert({
     where: { email: user.email! },
-    update: {
-      name: user.user_metadata?.name ?? user.email!,
-      authId: user.id, // se você adicionou esse campo no Prisma
-    },
-    create: {
-      email: user.email!,
-      name: user.user_metadata?.name ?? user.email!,
-      role: 'COLABORADOR',
-      authId: user.id, // se existir no schema
-    },
+    update: { fullName: user.user_metadata?.name ?? user.email!, authId: user.id },
+    create: { email: user.email!, fullName: user.user_metadata?.name ?? user.email!, authId: user.id },
   })
 
   return NextResponse.json({ ok: true })

@@ -1,0 +1,16 @@
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+
+export async function POST() {
+  const cookieStore = await cookies()
+  const supabase = createRouteHandlerClient({ cookies: async () => cookieStore })
+
+  await supabase.auth.signOut({ scope: 'global' })
+
+  cookieStore.getAll().forEach((c) => {
+    if (c.name.startsWith('sb-')) cookieStore.set(c.name, '', { path: '/', maxAge: 0 })
+  })
+
+  return NextResponse.json({ ok: true })
+}

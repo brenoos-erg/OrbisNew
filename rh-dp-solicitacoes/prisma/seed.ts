@@ -1,37 +1,36 @@
 // prisma/seed.ts
-import { PrismaClient, Role, UserStatus } from '@prisma/client'
+import { PrismaClient, UserStatus } from '@prisma/client'
+import { randomUUID } from 'crypto'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  // Usuário admin no seu banco de aplicação (NÃO cria no Supabase Auth)
   await prisma.user.upsert({
     where: { email: 'admin@empresa.com' },
     update: {},
     create: {
-      // novos campos obrigatórios no seu schema
       login: 'admin',
       fullName: 'Administrador do Sistema',
       email: 'admin@empresa.com',
-
-      // opcionais / conforme seu schema
       phone: '+55 31 99999-9999',
       costCenter: 'CC-0001',
       status: UserStatus.ATIVO,
-      role: Role.ADMIN,
-      passwordExpiresAt: new Date('2026-12-31T23:59:59Z'),
-      // authId:  // (deixa vazio; será preenchido via trigger ou /api/session/sync)
+      // role removido
+      // authId vazio (será preenchido no /api/session/sync)
     },
   })
 
-  // (opcional) já criar alguns tipos de solicitação
   await prisma.tipoSolicitacao.upsert({
     where: { nome: 'Atualização cadastral' },
     update: {},
     create: {
+      id: randomUUID(),
       nome: 'Atualização cadastral',
       descricao: 'Alteração de dados pessoais/funcionais',
-      schemaJson: { campos: [{ name: 'novoEndereco', type: 'text', label: 'Novo endereço' }] },
+      schemaJson: {
+        campos: [{ name: 'novoEndereco', type: 'text', label: 'Novo endereço' }],
+      },
+      updatedAt: new Date(),
     },
   })
 
@@ -39,9 +38,13 @@ async function main() {
     where: { nome: 'Vale-transporte' },
     update: {},
     create: {
+      id: randomUUID(),
       nome: 'Vale-transporte',
       descricao: 'Inclusão/alteração de rotas',
-      schemaJson: { campos: [{ name: 'linha', type: 'text', label: 'Linha de ônibus' }] },
+      schemaJson: {
+        campos: [{ name: 'linha', type: 'text', label: 'Linha de ônibus' }],
+      },
+      updatedAt: new Date(),
     },
   })
 }
@@ -49,10 +52,10 @@ async function main() {
 main()
   .then(async () => {
     await prisma.$disconnect()
-    console.log('Seed concluído.')
+    console.log('✅ Seed concluído com sucesso.')
   })
   .catch(async (e) => {
-    console.error(e)
+    console.error('❌ Erro ao executar seed:', e)
     await prisma.$disconnect()
     process.exit(1)
   })
