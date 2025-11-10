@@ -1,8 +1,22 @@
-import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
-// helper: admin client (server-only)
+// sessão
+async function requireSession() {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data } = await supabase.auth.getSession()
+    return data.session
+  } catch (err) {
+    console.error('requireSession() failed', err)
+    return null
+  }
+}
+
+// admin client
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -10,24 +24,22 @@ function getSupabaseAdmin() {
   return createClient(url, key)
 }
 
-// PATCH /api/configuracoes/usuarios/[id]
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+// ============== PATCH: atualizar usuário =================
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   try {
     const body = await req.json()
     const id = params.id
 
-    // dados opcionais
     const fullName   = (body.fullName ?? '').trim()
     const email      = (body.email ?? '').trim().toLowerCase()
     const login      = (body.login ?? '').trim().toLowerCase()
     const phone      = (body.phone ?? '').trim() || null
     const costCenter = (body.costCenter ?? '').trim() || null
-    const password   = (body.password ?? '').trim() // se vier, troca a senha no Auth
+    const password   = (body.password ?? '').trim()
 
-    // usuário atual pra pegar authId
     const current = await prisma.user.findUnique({
       where: { id },
       select: { id: true, authId: true }
@@ -36,7 +48,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
-    // Atualiza no banco público
     const updated = await prisma.user.update({
       where: { id },
       data: {
@@ -49,10 +60,8 @@ export async function PATCH(
       select: { id: true, fullName: true, email: true, login: true, phone: true, costCenter: true, authId: true },
     })
 
-    // Se tem authId, reflete no Supabase Auth
     if (updated.authId) {
       const admin = getSupabaseAdmin()
-      // atualiza email/metadata
       await admin.auth.admin.updateUserById(updated.authId, {
         ...(email ? { email } : {}),
         ...(password ? { password } : {}),
@@ -74,7 +83,6 @@ export async function PATCH(
       costCenter: updated.costCenter ?? ''
     })
   } catch (e: any) {
-    // conflito de unique, etc.
     if (e?.code === 'P2002') {
       const alvo = Array.isArray(e?.meta?.target) ? e.meta.target.join(', ') : (e?.meta?.target ?? 'campo único')
       return NextResponse.json({ error: `Violação de UNIQUE: ${alvo}` }, { status: 409 })
@@ -84,15 +92,14 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/configuracoes/usuarios/[id]
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+// ============== DELETE: apagar usuário =================
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   try {
     const { id } = params
 
-    // busca para recuperar o authId antes de apagar
     const existing = await prisma.user.findUnique({
       where: { id },
       select: { id: true, authId: true }
@@ -101,10 +108,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
-    // apaga do público primeiro
     await prisma.user.delete({ where: { id } })
 
-    // tenta apagar do Auth (se tinha authId)
     if (existing.authId) {
       const admin = getSupabaseAdmin()
       await admin.auth.admin.deleteUser(existing.authId).catch(() => {})

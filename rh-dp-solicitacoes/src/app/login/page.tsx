@@ -96,9 +96,9 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-center text-xs text-orange-700">
-          <p className="font-medium">Usuários de Teste:</p>
-          <p>admin@empresa.com • coord@empresa.com • topo@empresa.com</p>
-          <p>Senha: 123456</p>
+          <p className="font-medium"></p>
+          <p>Caso ainda não tenha perfil de acesso, entrar em contato com o setor de TI</p>
+          <p>Numero (31) 99999-9999</p>
         </div>
       </div>
     </div>
