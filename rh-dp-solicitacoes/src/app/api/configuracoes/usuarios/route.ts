@@ -1,20 +1,36 @@
 // src/app/api/configuracoes/usuarios/route.ts
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-// Admin client – SÓ NO SERVIDOR
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// -------- sessão (leitura CORRETA dos cookies da request)
+async function requireSession() {
+  const cookieStore = cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+  const { data } = await supabase.auth.getSession()
+  return data.session ?? null
+}
 
-/** GET: lista usuários do Supabase Auth e enriquece com dados do Prisma (retorna ARRAY) */
+// -------- admin client (Service Role) só no servidor
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createClient(url, key)
+}
+
+/** GET: lista usuários do Auth e enriquece com dados do Prisma (retorna ARRAY) */
 export async function GET() {
+  // se quiser deixar público, comente as duas linhas abaixo
+  const session = await requireSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   try {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 50 })
+    const admin = getSupabaseAdmin()
+    const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 50 })
     if (error) {
       console.error('listUsers error', error)
       return NextResponse.json({ error: 'Falha ao listar usuários do Auth.' }, { status: 500 })
@@ -23,7 +39,7 @@ export async function GET() {
     const authUsers = data?.users ?? []
     const emails = authUsers.map(u => u.email).filter((e): e is string => !!e)
 
-    // busca correspondências no Prisma (para login/phone/costCenter)
+    // pega correspondências no Prisma (login/phone/costCenter)
     const existing = await prisma.user.findMany({
       where: { email: { in: emails } },
       select: { id: true, email: true, fullName: true, login: true, phone: true, costCenter: true },
@@ -45,7 +61,7 @@ export async function GET() {
         : String(meta.login ?? (u.email ? u.email.split('@')[0] : ''))
 
       return {
-        id: fromDb?.id ?? '',             // id do Prisma (se existir)
+        id: fromDb?.id ?? '', // id do Prisma (se existir)
         fullName,
         email: u.email ?? '',
         login,
@@ -56,7 +72,7 @@ export async function GET() {
 
     return NextResponse.json(rows)
   } catch (e: any) {
-    console.error('GET /api/configuracoes/usuarios error', e)
+    console.error('GET /configuracoes/usuarios error', e)
     return NextResponse.json({ error: e?.message || 'Erro interno' }, { status: 500 })
   }
 }
@@ -68,6 +84,9 @@ export async function GET() {
  * - firstAccess = false → cria com a senha informada (email confirmado)
  */
 export async function POST(req: Request) {
+  const session = await requireSession()
+  if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+
   try {
     const body = await req.json().catch(() => ({}))
 
@@ -83,13 +102,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'fullName, email e login são obrigatórios.' }, { status: 400 })
     }
 
+    const admin = getSupabaseAdmin()
     const user_metadata = { fullName, login, phone, costCenter }
     let authUserId: string | null = null
 
     if (firstAccess) {
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
         data: user_metadata,
-        // redirectTo: 'http://localhost:3000/login', // opcional
       })
       if (error) {
         console.error('inviteUserByEmail error', error)
@@ -97,7 +116,7 @@ export async function POST(req: Request) {
       }
       authUserId = data?.user?.id ?? null
     } else {
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      const { data, error } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -120,7 +139,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(created, { status: 201 })
   } catch (e: any) {
-    console.error('POST /api/configuracoes/usuarios error', e)
+    console.error('POST /configuracoes/usuarios error', e)
     if (e?.code === 'P2002') {
       return NextResponse.json({ error: 'Email ou login já cadastrado.' }, { status: 409 })
     }
