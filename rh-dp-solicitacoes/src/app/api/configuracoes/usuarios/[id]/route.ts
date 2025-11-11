@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const email      = (body.email ?? '').trim().toLowerCase()
     const login      = (body.login ?? '').trim().toLowerCase()
     const phone      = (body.phone ?? '').trim() || null
-    const costCenter = (body.costCenter ?? '').trim() || null
+    const costCenterId = (body.costCenterId ?? '').trim() || null
     const password   = (body.password ?? '').trim()
 
     // Atualiza no Prisma
@@ -33,24 +33,35 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         ...(email ? { email } : {}),
         ...(login ? { login } : {}),
         ...(phone !== undefined ? { phone } : {}),
-        ...(costCenter !== undefined ? { costCenter } : {}),
+        ...(costCenterId !== undefined ? { costCenterId } : {}),
       },
-      select: { id: true, fullName: true, email: true, login: true, phone: true, costCenter: true, authId: true },
+      select: {
+        id: true, fullName: true, email: true, login: true,
+        phone: true, costCenterId: true, authId: true
+      },
     })
 
     // Reflete no Auth (se houver authId)
     if (updated.authId) {
       const admin = getSupabaseAdmin()
-      await admin.auth.admin.updateUserById(updated.authId, {
-        ...(email ? { email } : {}),
-        ...(password ? { password } : {}),
-        user_metadata: {
-          ...(fullName ? { fullName } : {}),
-          ...(login ? { login } : {}),
-          ...(phone !== undefined ? { phone } : {}),
-          ...(costCenter !== undefined ? { costCenter } : {}),
-        },
-      })
+
+      const updates: Record<string, any> = {}
+      if (email) updates.email = email
+
+      const meta: Record<string, any> = {}
+      if (fullName) meta.fullName = fullName
+      if (login) meta.login = login
+      if (phone !== undefined) meta.phone = phone
+      if (costCenterId !== undefined) meta.costCenterId = costCenterId
+      if (Object.keys(meta).length > 0) updates.user_metadata = meta
+
+      const { error: upErr } = await admin.auth.admin.updateUserById(updated.authId, updates)
+      if (upErr) console.error('supabase admin update error', upErr)
+
+      if (password) {
+        const { error: passErr } = await admin.auth.admin.updateUserById(updated.authId, { password })
+        if (passErr) console.error('supabase admin set password error', passErr)
+      }
     }
 
     return NextResponse.json({
@@ -59,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       email: updated.email,
       login: updated.login ?? '',
       phone: updated.phone ?? '',
-      costCenter: updated.costCenter ?? '',
+      costCenterId: updated.costCenterId ?? '',
     })
   } catch (e: any) {
     if (e?.code === 'P2002') {

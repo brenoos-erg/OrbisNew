@@ -15,8 +15,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     area,
     managementType,
     groupName,
-    status,
-    notes,
+    status,   // 'ATIVADO' | 'INATIVO' (front)
+    notes,    // mapeado para observations
   } = body || {}
 
   if (!description?.trim()) {
@@ -33,8 +33,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       area: area?.trim() ?? null,
       managementType: managementType?.trim() ?? null,
       groupName: groupName?.trim() ?? null,
-      status: status === 'INATIVO' ? 'INATIVO' : 'ATIVADO',
-      notes: notes?.trim() ?? null,
+      status: status === 'INATIVO' ? 'INACTIVE' : 'ACTIVE', // enum correto
+      observations: notes?.trim() ?? null,                  // campo correto
     },
     select: { id: true, description: true },
   })

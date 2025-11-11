@@ -1,76 +1,98 @@
-// src/app/api/configuracoes/usuarios/[id]/route.ts
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-function getSupabaseAdmin(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  // como tipamos as envs no env.d.ts, não precisa mais de "!"
-  return createClient(url, key)
+// === GET: listar usuários ===
+export async function GET() {
+  const rows = await prisma.user.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      login: true,
+      phone: true,
+      costCenterId: true,
+      costCenter: { select: { description: true } },
+    },
+  })
+
+  const list = rows.map(r => ({
+    id: r.id,
+    fullName: r.fullName,
+    email: r.email,
+    login: r.login ?? '',
+    phone: r.phone ?? '',
+    costCenterId: r.costCenterId ?? null,
+    costCenterName: r.costCenter?.description ?? null,
+  }))
+
+  return NextResponse.json(list)
 }
 
-type PatchBody = {
-  fullName?: string
-  email?: string
-  login?: string
-  phone?: string | null
-  costCenterId?: string | null
-  password?: string
-}
-
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+// === POST: criar usuário ===
+export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as PatchBody
-    const id = params.id
-
+    const body = await req.json()
     const fullName = (body.fullName ?? '').trim()
-    const email    = (body.email ?? '').trim().toLowerCase()
-    const login    = (body.login ?? '').trim().toLowerCase()
-    const phone    = (body.phone ?? '') || null
-    const costCenterId = (body.costCenterId ?? '').trim() || null
+    const email = (body.email ?? '').trim().toLowerCase()
+    const login = (body.login ?? '').trim().toLowerCase()
+    const phone = (body.phone ?? '') || null
+    const costCenterId = (body.costCenterId ?? '') || null
     const password = (body.password ?? '').trim()
+    const firstAccess = !!body.firstAccess
 
-    // 1) Atualiza no Prisma
-    const updated = await prisma.user.update({
-      where: { id },
-      data: {
-        ...(fullName ? { fullName } : {}),
-        ...(email    ? { email }    : {}),
-        ...(login    ? { login }    : {}),
-        ...(phone !== undefined ? { phone } : {}),
-        ...(costCenterId !== undefined ? { costCenterId } : {}),
-      },
-      select: { id: true, email: true, fullName: true, login: true, phone: true, costCenterId: true, authId: true },
-    })
-
-    // 2) Reflete no Auth (se tiver authId)
-    if (updated.authId) {
-      const sb = getSupabaseAdmin()
-      const updates: Record<string, any> = {}
-
-      if (email) updates.email = email
-      if (fullName) updates.data = { ...(updates.data || {}), fullName }
-      if (login)    updates.data = { ...(updates.data || {}), login }
-      if (phone !== undefined) updates.data = { ...(updates.data || {}), phone }
-      if (costCenterId !== undefined) updates.data = { ...(updates.data || {}), costCenterId }
-
-      if (Object.keys(updates).length > 0) {
-        const { error } = await sb.auth.admin.updateUserById(updated.authId, updates)
-        if (error) console.error('supabase admin update error', error)
-      }
-
-      if (password) {
-        const { error } = await sb.auth.admin.updateUserById(updated.authId, { password })
-        if (error) console.error('supabase admin set password error', error)
-      }
+    if (!fullName || !email || !login) {
+      return NextResponse.json(
+        { error: 'Nome, e-mail e login são obrigatórios.' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ ok: true })
+    // Cria no Prisma
+    const created = await prisma.user.create({
+      data: { fullName, email, login, phone, costCenterId },
+      select: { id: true, fullName: true, email: true, login: true },
+    })
+
+    // Cria no Supabase Auth
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const authPassword = firstAccess ? undefined : password || undefined
+
+    const { data: authData, error } = await sb.auth.admin.createUser({
+      email,
+      password: authPassword,
+      email_confirm: true,
+      user_metadata: { fullName, login, phone, costCenterId },
+    })
+
+    if (error) {
+      await prisma.user.delete({ where: { id: created.id } })
+      return NextResponse.json(
+        { error: 'Falha ao criar no Auth: ' + error.message },
+        { status: 500 }
+      )
+    }
+
+    if (authData.user) {
+      await prisma.user.update({
+        where: { id: created.id },
+        data: { authId: authData.user.id as any },
+      })
+    }
+
+    return NextResponse.json(created, { status: 201 })
   } catch (e: any) {
-    console.error('PATCH /api/configuracoes/usuarios/[id] error', e)
-    return NextResponse.json({ error: e?.message || 'Erro interno' }, { status: 500 })
+    console.error('POST /api/configuracoes/usuarios error', e)
+    return NextResponse.json(
+      { error: e?.message || 'Erro ao criar usuário.' },
+      { status: 500 }
+    )
   }
 }

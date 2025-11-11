@@ -14,13 +14,25 @@ type UserRow = {
   costCenterName?: string | null
 }
 
-type CostCenter = { id: string; description: string }
+type CostCenter = {
+  id: string
+  description: string
+  code?: string | null
+  externalCode?: string | null
+}
 
 const LABEL =
   'block text-xs font-semibold text-black uppercase tracking-wide'
 const INPUT =
   'mt-1 w-full rounded-md border border-blue-500/70 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150'
 
+// Rótulo “número - nome”
+function ccLabel(cc: CostCenter) {
+  const num = cc.externalCode || cc.code || ''
+  return num ? `${num} - ${cc.description}` : cc.description
+}
+
+// Gera login a partir do nome
 function toLoginFromName(fullName: string) {
   if (!fullName.trim()) return ''
   const parts = fullName
@@ -56,7 +68,7 @@ export default function Page() {
   async function load() {
     setLoading(true)
     try {
-      // usuários (Auth + Prisma) → já retorna array com costCenterName/costCenterId
+      // usuários (Auth + Prisma) – já retorna costCenterName/costCenterId
       const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
       if (!r.ok) {
         const err: any = await r.json().catch(() => ({}))
@@ -65,10 +77,15 @@ export default function Page() {
       const list: UserRow[] = await r.json()
       setRows(list)
 
-      // centros de custo (para preencher selects)
-      const cr = await fetch('/api/configuracoes/centros-de-custo', { cache: 'no-store' })
+      // centros de custo (para preencher selects) – agora com code/externalCode
+      const cr = await fetch('/api/cost-centers?take=200&skip=0', { cache: 'no-store' })
       const cjson = await cr.json().catch(() => ({ rows: [] }))
-      setCostCenters((cjson.rows || []).map((c: any) => ({ id: c.id, description: c.description })))
+      setCostCenters((cjson.rows || []).map((c: any) => ({
+        id: c.id,
+        description: c.description,
+        code: c.code,
+        externalCode: c.externalCode,
+      })))
     } catch (e) {
       console.error('load() error', e)
       setRows([])
@@ -191,7 +208,7 @@ export default function Page() {
         <div className="lg:col-span-5 space-y-5">
           <div>
             <label className={LABEL}>Nome completo</label>
-            <input className={INPUT} value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder="" />
+            <input className={INPUT} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="" />
           </div>
 
           <div>
@@ -208,25 +225,25 @@ export default function Page() {
               className={INPUT}
               placeholder="email@empresa.com"
               value={email}
-              onChange={(e)=>setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LABEL}>Telefone</label>
-              <input className={INPUT} value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="(31) 99999-0000" />
+              <input className={INPUT} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(31) 99999-0000" />
             </div>
             <div>
               <label className={LABEL}>Centro de Custo</label>
               <select
                 className={INPUT}
                 value={costCenterId}
-                onChange={(e)=>setCostCenterId(e.target.value)}
+                onChange={(e) => setCostCenterId(e.target.value)}
               >
                 <option value="">Selecione...</option>
                 {costCenters.map(cc => (
-                  <option key={cc.id} value={cc.id}>{cc.description}</option>
+                  <option key={cc.id} value={cc.id}>{ccLabel(cc)}</option>
                 ))}
               </select>
             </div>
@@ -234,7 +251,7 @@ export default function Page() {
 
           <div>
             <label className={LABEL}>Login (gerado automaticamente)</label>
-            <input className={INPUT} value={login} onChange={(e)=>setLogin(e.target.value)} placeholder="breno.sousa" />
+            <input className={INPUT} value={login} onChange={(e) => setLogin(e.target.value)} placeholder="breno.sousa" />
             <p className="mt-1 text-[11px] text-slate-500">
               Padrão: primeiro nome + último sobrenome (sem acento), ex.: <b>breno.sousa</b>.
             </p>
@@ -259,7 +276,7 @@ export default function Page() {
                 }
                 placeholder="••••••••"
                 value={password}
-                onChange={(e)=>setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={firstAccess}
               />
             </div>
@@ -269,7 +286,7 @@ export default function Page() {
                 type="checkbox"
                 className="h-4 w-4 text-orange-600 border-gray-300 rounded"
                 checked={firstAccess}
-                onChange={(e)=>setFirstAccess(e.target.checked)}
+                onChange={(e) => setFirstAccess(e.target.checked)}
               />
               <label htmlFor="firstAccess" className="ml-2 text-sm text-slate-700">
                 Usuário definirá a senha no primeiro acesso
@@ -334,7 +351,7 @@ export default function Page() {
                               title="Editar"
                               disabled={!u.id} // se veio só do Auth e não existe no Prisma, não terá id
                             >
-                              <Pencil size={16}/> Editar
+                              <Pencil size={16} /> Editar
                             </button>
                             <button
                               onClick={() => handleDelete(u)}
@@ -342,7 +359,7 @@ export default function Page() {
                               title="Excluir"
                               disabled={!u.id}
                             >
-                              <Trash2 size={16}/> Excluir
+                              <Trash2 size={16} /> Excluir
                             </button>
                           </div>
                         </td>
@@ -366,36 +383,36 @@ export default function Page() {
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Editar usuário</h3>
-              <button onClick={closeEdit} className="rounded-md p-1 hover:bg-slate-100"><X size={18}/></button>
+              <button onClick={closeEdit} className="rounded-md p-1 hover:bg-slate-100"><X size={18} /></button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className={LABEL}>Nome completo</label>
-                <input className={INPUT} value={editFullName} onChange={(e)=>setEditFullName(e.target.value)} />
+                <input className={INPUT} value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
               </div>
               <div>
                 <label className={LABEL}>E-mail</label>
-                <input className={INPUT} value={editEmail} onChange={(e)=>setEditEmail(e.target.value)} />
+                <input className={INPUT} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
               </div>
               <div>
                 <label className={LABEL}>Login</label>
-                <input className={INPUT} value={editLogin} onChange={(e)=>setEditLogin(e.target.value)} />
+                <input className={INPUT} value={editLogin} onChange={(e) => setEditLogin(e.target.value)} />
               </div>
               <div>
                 <label className={LABEL}>Telefone</label>
-                <input className={INPUT} value={editPhone} onChange={(e)=>setEditPhone(e.target.value)} />
+                <input className={INPUT} value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
               </div>
               <div>
                 <label className={LABEL}>Centro de Custo</label>
                 <select
                   className={INPUT}
                   value={editCostCenterId}
-                  onChange={(e)=>setEditCostCenterId(e.target.value)}
+                  onChange={(e) => setEditCostCenterId(e.target.value)}
                 >
                   <option value="">Selecione...</option>
                   {costCenters.map(cc => (
-                    <option key={cc.id} value={cc.id}>{cc.description}</option>
+                    <option key={cc.id} value={cc.id}>{ccLabel(cc)}</option>
                   ))}
                 </select>
               </div>
@@ -406,20 +423,20 @@ export default function Page() {
                   className={INPUT}
                   placeholder="Deixe em branco para não alterar"
                   value={editPassword}
-                  onChange={(e)=>setEditPassword(e.target.value)}
+                  onChange={(e) => setEditPassword(e.target.value)}
                 />
               </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={closeEdit} className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm">
-                <X size={16}/> Cancelar
+                <X size={16} /> Cancelar
               </button>
               <button
                 onClick={submitEdit}
                 className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                <Check size={16}/> Salvar alterações
+                <Check size={16} /> Salvar alterações
               </button>
             </div>
           </div>

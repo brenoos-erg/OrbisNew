@@ -1,17 +1,19 @@
 // src/app/api/configuracoes/centros-de-custo/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-// GET: lista (com busca opcional e paginação opcional)
+// GET: lista (busca + paginação por take/skip)
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const q = (searchParams.get('q') || '').trim()
   const take = Math.min(Number(searchParams.get('take') || 100), 200)
   const skip = Math.max(Number(searchParams.get('skip') || 0), 0)
 
-  const where = q
+  // ✅ UMA ÚNICA DECLARAÇÃO, TIPADA, DENTRO DO GET
+  const where: Prisma.CostCenterWhereInput | undefined = q
     ? {
         OR: [
           { description: { contains: q, mode: 'insensitive' } },
@@ -23,7 +25,7 @@ export async function GET(req: Request) {
           { groupName: { contains: q, mode: 'insensitive' } },
         ],
       }
-    : {}
+    : undefined
 
   const [rows, total] = await Promise.all([
     prisma.costCenter.findMany({
@@ -40,16 +42,20 @@ export async function GET(req: Request) {
         area: true,
         managementType: true,
         groupName: true,
-        status: true,
-        notes: true,
+        status: true,       // CCStatus: ACTIVE/INACTIVE
+        observations: true, // campo no banco
         updatedAt: true,
       },
     }),
     prisma.costCenter.count({ where }),
   ])
 
-  return NextResponse.json({ rows, total })
+  return NextResponse.json({
+    rows: rows.map(r => ({ ...r, notes: r.observations })), // mantém compat c/ front
+    total,
+  })
 }
+
 
 // POST: cria
 export async function POST(req: Request) {
@@ -62,8 +68,8 @@ export async function POST(req: Request) {
     area,
     managementType,
     groupName,
-    status,
-    notes,
+    status,   // esperado do front: 'ATIVADO' | 'INATIVO'
+    notes,    // mapeado para observations
   } = body || {}
 
   if (!description?.trim()) {
@@ -79,8 +85,9 @@ export async function POST(req: Request) {
       area: area?.trim() || null,
       managementType: managementType?.trim() || null,
       groupName: groupName?.trim() || null,
-      status: status === 'INATIVO' ? 'INATIVO' : 'ATIVADO',
-      notes: notes?.trim() || null,
+      // CCStatus enum no banco (ACTIVE/INACTIVE)
+      status: status === 'INATIVO' ? 'INACTIVE' : 'ACTIVE',
+      observations: notes?.trim() || null,  // <- campo correto
     },
     select: { id: true, description: true },
   })
