@@ -51,13 +51,14 @@ export default function Page() {
   async function load() {
     setLoading(true)
     try {
+      // AGORA LISTA DIRETO DO AUTH (endpoint novo que retorna ARRAY):
       const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
       if (!r.ok) {
-        const err = await r.json().catch(() => ({}))
+        const err: any = await r.json().catch(() => ({}))
         throw new Error(err?.error || `GET falhou: ${r.status}`)
       }
-      const list: UserRow[] = await r.json()
-      setRows(list || [])
+      const list: UserRow[] = await r.json()     // <- array direto
+      setRows(list)
     } catch (e) {
       console.error('load() error', e)
       setRows([])
@@ -68,41 +69,44 @@ export default function Page() {
   useEffect(() => { load() }, [])
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!fullName || !email || !login) {
-      alert('Preencha Nome, E-mail e Login.')
-      return
-    }
-    try {
-      setSubmitting(true)
-      const r = await fetch('/api/configuracoes/usuarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          login: login.trim().toLowerCase(),
-          phone: phone.trim(),
-          costCenter: costCenter.trim(),
-          firstAccess,
-          password,
-        }),
-      })
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({} as any))
-        throw new Error(err?.error || `POST falhou: ${r.status}`)
-      }
-      setFullName(''); setEmail(''); setPhone(''); setCostCenter('')
-      setLogin(''); setPassword(''); setFirstAccess(false)
-      await load()
-      alert('Usuário registrado com sucesso!')
-    } catch (e: any) {
-      console.error('onSubmit error', e)
-      alert(e?.message || 'Erro ao registrar usuário.')
-    } finally {
-      setSubmitting(false)
-    }
+  e.preventDefault()
+  if (!fullName || !email || !login) {
+    alert('Preencha Nome, E-mail e Login.')
+    return
   }
+  try {
+    setSubmitting(true)
+
+    // 👉 agora cria no AUTH + PRISMA
+    const r = await fetch('/api/configuracoes/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        login: login.trim().toLowerCase(),
+        phone: phone.trim(),
+        costCenter: costCenter.trim(),
+        password: firstAccess ? '' : password, // quando firstAccess, senha vazia
+        firstAccess,                            // true = enviar convite
+      }),
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({} as any))
+      throw new Error(err?.error || `POST falhou: ${r.status}`)
+    }
+
+    setFullName(''); setEmail(''); setPhone(''); setCostCenter('')
+    setLogin(''); setPassword(''); setFirstAccess(false)
+    await load()
+    alert('Usuário criado com sucesso!')
+  } catch (e: any) {
+    console.error('onSubmit error', e)
+    alert(e?.message || 'Erro ao registrar usuário.')
+  } finally {
+    setSubmitting(false)
+  }
+}
 
   // ------- edição -------
   const [editing, setEditing] = useState<UserRow | null>(null)
@@ -126,6 +130,7 @@ export default function Page() {
 
   async function submitEdit() {
     if (!editing) return
+    // mantém PATCH/DELETE (já existentes) no /api/configuracoes/usuarios/[id]
     const r = await fetch(`/api/configuracoes/usuarios/${editing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -166,7 +171,7 @@ export default function Page() {
       <p className="text-sm text-slate-500 mb-6">Cadastro e manutenção de usuários.</p>
 
       <form onSubmit={onSubmit} autoComplete="off" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* HONEYPOTS anti-autofill */}
+        {/* HONEYPOTS */}
         <input type="text" name="email" autoComplete="email" tabIndex={-1} aria-hidden="true" className="hidden" />
         <input type="password" name="password" autoComplete="new-password" tabIndex={-1} aria-hidden="true" className="hidden" />
 
@@ -294,7 +299,7 @@ export default function Page() {
                     <tr><td className="py-6 text-slate-500" colSpan={4}>Nenhum usuário cadastrado.</td></tr>
                   ) : (
                     rows.map((u) => (
-                      <tr key={u.id} className="border-t">
+                      <tr key={u.id || u.email} className="border-t">
                         <td className="py-2 pr-3">{u.fullName}</td>
                         <td className="py-2 pr-3">{u.login}</td>
                         <td className="py-2 pr-3 break-all">{u.email}</td>
@@ -311,6 +316,7 @@ export default function Page() {
                               onClick={() => handleDelete(u)}
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
                               title="Excluir"
+                              disabled={!u.id} // se veio só do Auth e não existe no Prisma, não tem id p/ excluir
                             >
                               <Trash2 size={16}/> Excluir
                             </button>
