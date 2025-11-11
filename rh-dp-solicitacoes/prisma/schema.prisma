@@ -38,8 +38,8 @@ enum UserStatus {
 }
 
 enum CCStatus {
-  ATIVADO
-  INATIVO
+  ACTIVE
+  INACTIVE
 }
 
 /* =========================
@@ -84,23 +84,21 @@ model Event {
    CATALOGOS / CADASTROS
    ========================= */
 
-/// Centro de Custo (completo – como no ERP)
 model CostCenter {
-  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
-  description    String   // <- temporariamente opcional
-  code           String?   @unique
+  id             String    @id @default(uuid())
+  code           String?
   externalCode   String?
   abbreviation   String?
   area           String?
   managementType String?
-  groupName      String?
-  status         CCStatus @default(ATIVADO)
-  notes          String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users      User[]
+  // was: group String?
+  groupName      String?   @map("group_name")
+  status         CCStatus  @default(ACTIVE)
+  description    String
+  observations   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  users          User[]
 
   @@map("CostCenter")
 }
@@ -108,25 +106,25 @@ model CostCenter {
 
 /// Cargo / Posição
 model Position {
-  id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
-  name        String  @unique
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name        String   @unique
   description String?
 
-  users   User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  users      User[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@map("Position")
 }
 
 /// Líder (pessoa física cadastrada como líder)
 model Leader {
-  id        String @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id        String  @id @default(dbgenerated("(gen_random_uuid())::text"))
   fullName  String
   email     String? @unique
   phone     String?
 
-  members  User[]   @relation("UserLeader")
+  members   User[]  // Users que apontam para este líder
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,28 +137,28 @@ model Leader {
    ========================= */
 
 model TipoSolicitacao {
-  id           String         @id
-  nome         String         @unique
+  id           String   @id
+  nome         String   @unique
   descricao    String?
   schemaJson   Json
-  createdAt    DateTime       @default(now())
+  createdAt    DateTime @default(now())
   updatedAt    DateTime
 
   solicitacoes Solicitation[]
 }
 
 model Solicitation {
-  id            String          @id
+  id            String   @id
   titulo        String
   descricao     String
   setorDestino  Setor
-  status        Status          @default(ABERTA)
+  status        Status   @default(ABERTA)
   autorId       String
   responsavelId String?
   tipoId        String
   payload       Json
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   anexos        Attachment[]
   comentarios   Comment[]
@@ -176,31 +174,30 @@ model Solicitation {
    ========================= */
 
 model User {
-  id         String     @id @default(dbgenerated("(gen_random_uuid())::text"))
-  email      String     @unique
-  fullName   String
-  login      String?    @unique(map: "user_login_key")
-  phone      String?
-  status     UserStatus @default(ATIVO)
-  role       Role       @default(COLABORADOR)
+  id            String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email         String     @unique
+  fullName      String
+  login         String?    @unique(map: "user_login_key")
+  phone         String?
 
-  /// authId do Supabase (UUID) – opcional
-  authId     String?    @db.Uuid
+  // Centro de custo (FK)
+  costCenterId  String?
+  costCenter    CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  // Relacionamentos opcionais com os cadastros
-  costCenterId String?
-  positionId   String?
-  leaderId     String?
+  // Posição / Cargo (FK)
+  positionId    String?
+  position      Position?   @relation(fields: [positionId], references: [id])
 
-  costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
-  position     Position?   @relation(fields: [positionId], references: [id])
-  leader       Leader?     @relation("UserLeader", fields: [leaderId], references: [id])
+  // Líder (FK para Leader)
+  leaderId      String?
+  leader        Leader?     @relation(fields: [leaderId], references: [id])
 
-  // audit
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  status        UserStatus  @default(ATIVO)
+  role          Role        @default(COLABORADOR)
+  authId        String?     @db.Uuid
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  // relações existentes
   solicitacoesCriadas   Solicitation[] @relation("SolicitationAutor")
   solicitacoesAssumidas Solicitation[] @relation("SolicitationResponsavel")
   comments              Comment[]      @relation("CommentAutor")
