@@ -24,7 +24,6 @@ function getSupabaseAdmin() {
 
 /** GET: lista usuários do Auth e enriquece com dados do Prisma (retorna ARRAY) */
 export async function GET() {
-  // se quiser deixar público, comente as duas linhas abaixo
   const session = await requireSession()
   if (!session) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
@@ -80,7 +79,7 @@ export async function GET() {
 /**
  * POST: cria usuário NO AUTH e no PRISMA
  * Body: { fullName, email, login, phone?, costCenter?, password?, firstAccess? }
- * - firstAccess = true  → envia convite (usuário define a senha no link)
+ * - firstAccess = true  → cria com senha TEMPORÁRIA + mustChangePassword
  * - firstAccess = false → cria com a senha informada (email confirmado)
  */
 export async function POST(req: Request) {
@@ -107,14 +106,23 @@ export async function POST(req: Request) {
     let authUserId: string | null = null
 
     if (firstAccess) {
-      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: user_metadata,
+      // cria com senha TEMPORÁRIA e marca "mustChangePassword"
+      const tempPassword =
+        password && String(password).trim().length >= 6
+          ? String(password).trim()
+          : Math.random().toString(36).slice(2, 10)
+
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { ...user_metadata, mustChangePassword: true },
       })
       if (error) {
-        console.error('inviteUserByEmail error', error)
-        return NextResponse.json({ error: error.message || 'Falha ao convidar usuário.' }, { status: 500 })
+        console.error('createUser (firstAccess) error', error)
+        return NextResponse.json({ error: error.message || 'Falha ao criar usuário.' }, { status: 500 })
       }
-      authUserId = data?.user?.id ?? null
+      authUserId = data.user?.id ?? null
     } else {
       const { data, error } = await admin.auth.admin.createUser({
         email,

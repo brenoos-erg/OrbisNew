@@ -1,51 +1,75 @@
+// src/app/primeiro-acesso/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabaseBrowser } from '@/lib/supabase/client'
 import { KeyRound, Loader2 } from 'lucide-react'
 
 export default function PrimeiroAcessoPage() {
-  const [sessionChecked, setSessionChecked] = useState(false)
-  const [newPass, setNewPass] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [saving, setSaving] = useState(false)
+  const router = useRouter()
+  const search = useSearchParams()
+  const nextUrl = search.get('next') || '/dashboard'
+  const supabase = supabaseBrowser()
 
+  const [checking, setChecking] = useState(true)
+  const [pwd1, setPwd1] = useState('')
+  const [pwd2, setPwd2] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // garante que existe sessão; se não, manda pro login
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        window.location.href = '/login'
-      } else {
-        setSessionChecked(true)
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.replace(`/login?next=${encodeURIComponent('/primeiro-acesso')}`)
+        return
       }
-    })
+      setChecking(false)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (newPass.length < 6) {
-      alert('A senha precisa ter ao menos 6 caracteres.')
-      return
-    }
-    if (newPass !== confirm) {
-      alert('As senhas não conferem.')
-      return
-    }
-    setSaving(true)
-    // 1) atualiza senha
-    const { error } = await supabase.auth.updateUser({ password: novaSenha, data: { mustResetPassword: false } })
-    setSaving(false)
-    if (error) {
-      alert(error.message)
-      return
-    }
-    // 2) (Opcional) avisa backend para atualizar algo em public.User, se quiser
-    // await fetch('/api/users/clear-first-access', { method: 'POST' }).catch(() => {})
+    setError(null)
 
-    alert('Senha definida com sucesso!')
-    window.location.href = '/dashboard'
+    if (pwd1.length < 6) return setError('A nova senha deve ter ao menos 6 caracteres.')
+    if (pwd1 !== pwd2)  return setError('As senhas não coincidem.')
+
+    setSaving(true)
+
+    // 1) atualiza a senha e limpa o flag no user_metadata
+    const { error } = await supabase.auth.updateUser({
+      password: pwd1,
+      data: { mustChangePassword: false },
+    })
+    if (error) {
+      setSaving(false)
+      setError(error.message)
+      return
+    }
+
+    // 2) REFRESH da sessão -> cookie novo sem o flag
+    await supabase.auth.refreshSession()
+
+    // 3) (opcional) sincroniza backend
+    try { await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' }) } catch {}
+
+    setSaving(false)
+
+    // 4) navega
+    try {
+      router.replace(nextUrl)
+      router.refresh()
+    } finally {
+      // fallback hard pra garantir que o middleware leia o cookie novo
+      setTimeout(() => { window.location.replace(nextUrl) }, 50)
+    }
   }
 
-  if (!sessionChecked) return null
+  if (checking) return null
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
@@ -54,27 +78,34 @@ export default function PrimeiroAcessoPage() {
           <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-orange-50 grid place-items-center border border-orange-200">
             <KeyRound className="h-6 w-6 text-orange-600" />
           </div>
-          <h1 className="text-lg font-semibold text-slate-900">Definir nova senha</h1>
-          <p className="text-sm text-slate-500">Por favor, crie sua senha para continuar.</p>
+        <h1 className="text-lg font-semibold text-slate-900">Defina sua nova senha</h1>
+          <p className="text-sm text-slate-500">Crie uma nova senha para continuar.</p>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded bg-red-50 text-red-700 px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Nova senha</label>
             <input
               type="password"
-              value={newPass}
-              onChange={(e) => setNewPass(e.target.value)}
+              value={pwd1}
+              onChange={(e) => setPwd1(e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
               placeholder="••••••••"
+              autoFocus
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Confirmar nova senha</label>
             <input
               type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              value={pwd2}
+              onChange={(e) => setPwd2(e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
               placeholder="••••••••"
             />
@@ -86,7 +117,7 @@ export default function PrimeiroAcessoPage() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-950 disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {saving ? 'Salvando...' : 'Salvar senha'}
+            {saving ? 'Salvando…' : 'Salvar e entrar'}
           </button>
         </form>
       </div>

@@ -25,22 +25,29 @@ export default function LoginPage() {
   }, []) // eslint-disable-line
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setLoading(false)
-      alert(error.message)
-      return
-    }
+  e.preventDefault()
+  setLoading(true)
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) {
+    setLoading(false)
+    alert(error.message)
+    return
+  }
 
     // sincroniza sessão/usuário no backend
-    try { await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' }) } catch {}
+   try { await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' }) } catch {}
 
+  const { data: { user } } = await supabase.auth.getUser()
+  const must = (user?.user_metadata as any)?.mustChangePassword === true
+
+  if (must) {
+    router.replace(`/primeiro-acesso?next=${encodeURIComponent(nextUrl)}`)
+  } else {
     router.replace(nextUrl)
-    router.refresh()
-    // setLoading(false) // opcional (a navegação normalmente desmonta o componente)
   }
+  router.refresh()
+}
 
   if (loadingSession) return null
 
