@@ -29,22 +29,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   )
 
   // --- helpers de ativo ------------------------------------------------------
-  const isSolicRoot       = pathname?.startsWith('/dashboard/solicitacoes') ?? false
-  const isSolicEnviadas   = pathname === '/dashboard/solicitacoes/enviadas'
-  const isSolicRecebidas  = pathname === '/dashboard/solicitacoes/recebidas'
-  const isSolicCadastros  = pathname === '/dashboard/solicitacoes/cadastros'
+  const isSolicRoot = pathname?.startsWith('/dashboard/solicitacoes') ?? false
+  const isSolicEnviadas = pathname === '/dashboard/solicitacoes/enviadas'
+  const isSolicRecebidas = pathname === '/dashboard/solicitacoes/recebidas'
+  const isSolicCadastros = pathname === '/dashboard/solicitacoes/cadastros'
 
-  const isConfigRoot      = pathname?.startsWith('/dashboard/configuracoes') ?? false
-  const isConfigHome      = pathname === '/dashboard/configuracoes'
-  const isConfigUsuarios  = pathname?.startsWith('/dashboard/configuracoes/usuarios') ?? false
-  const isConfigPerms     = pathname?.startsWith('/dashboard/configuracoes/permissoes') ?? false
+  const isConfigRoot = pathname?.startsWith('/dashboard/configuracoes') ?? false
+  const isConfigHome = pathname === '/dashboard/configuracoes'
+  const isConfigUsuarios = pathname?.startsWith('/dashboard/configuracoes/usuarios') ?? false
+  const isConfigPerms = pathname?.startsWith('/dashboard/configuracoes/permissoes') ?? false
 
   const itemClass = (active?: boolean) =>
     [
       'group flex items-center gap-3 rounded-md text-sm font-medium transition-colors',
       collapsed ? 'justify-center w-12 h-12 p-0' : 'px-4 py-3',
       active ? 'bg-orange-500 text-white shadow-sm'
-             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
+        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
     ].join(' ')
 
   const hideText = useMemo(() => (collapsed ? 'hidden' : ''), [collapsed])
@@ -96,9 +96,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={[
                   'transition-colors rounded-md',
                   collapsed ? 'w-12 h-12 grid place-items-center'
-                            : 'w-full flex items-center gap-3 px-6 py-3 text-sm font-medium',
+                    : 'w-full flex items-center gap-3 px-6 py-3 text-sm font-medium',
                   isSolicRoot ? 'bg-orange-500 text-white shadow-sm'
-                              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
+                    : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
                 ].join(' ')}
                 title="Solicitações"
               >
@@ -114,15 +114,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* submenu */}
               {!collapsed && solicOpen && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link href="/dashboard/solicitacoes/enviadas"   className={itemClass(isSolicEnviadas)}  title="Solicitações Enviadas">
+                  <Link href="/dashboard/solicitacoes/enviadas" className={itemClass(isSolicEnviadas)} title="Solicitações Enviadas">
                     <Send size={16} />
                     <span>Solicitações Enviadas</span>
                   </Link>
-                  <Link href="/dashboard/solicitacoes/recebidas"  className={itemClass(isSolicRecebidas)} title="Solicitações Recebidas">
+                  <Link href="/dashboard/solicitacoes/recebidas" className={itemClass(isSolicRecebidas)} title="Solicitações Recebidas">
                     <Inbox size={16} />
                     <span>Solicitações Recebidas</span>
                   </Link>
-                  <Link href="/dashboard/solicitacoes/cadastros"  className={itemClass(isSolicCadastros)} title="Cadastros">
+                  <Link href="/dashboard/solicitacoes/cadastros" className={itemClass(isSolicCadastros)} title="Cadastros">
                     <FolderCog size={16} />
                     <span>Cadastros</span>
                   </Link>
@@ -137,9 +137,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={[
                   'transition-colors rounded-md',
                   collapsed ? 'w-12 h-12 grid place-items-center'
-                            : 'w-full flex items-center gap-3 px-6 py-3 text-sm font-medium',
+                    : 'w-full flex items-center gap-3 px-6 py-3 text-sm font-medium',
                   isConfigRoot ? 'bg-orange-500 text-white shadow-sm'
-                               : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
+                    : 'text-slate-200 hover:bg-orange-500/90 hover:text-white',
                 ].join(' ')}
                 title="Configurações"
               >
@@ -154,20 +154,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {!collapsed && configOpen && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link href="/dashboard/configuracoes"                className={itemClass(isConfigHome)}>
+                  <Link href="/dashboard/configuracoes" className={itemClass(isConfigHome)}>
                     <Settings size={16} />
                     <span>Painel</span>
                   </Link>
 
-                  <Link href="/dashboard/configuracoes/usuarios"       className={itemClass(isConfigUsuarios)}>
+                  <Link href="/dashboard/configuracoes/usuarios" className={itemClass(isConfigUsuarios)}>
                     <Users size={16} />
                     <span>Usuários</span>
                   </Link>
 
-                  <Link href="/dashboard/configuracoes/permissoes"     className={itemClass(isConfigPerms)}>
+                  <Link href="/dashboard/configuracoes/permissoes" className={itemClass(isConfigPerms)}>
                     <Shield size={16} />
                     <span>Permissões</span>
                   </Link>
+                  <Link
+                    href="/dashboard/configuracoes/centros-de-custo"
+                    className={itemClass(pathname?.startsWith('/dashboard/configuracoes/centros-de-custo'))}
+                  >
+                    <FolderCog size={16} />
+                    <span>Centros de Custo</span>
+                  </Link>
+
                 </div>
               )}
             </div>

@@ -1,3 +1,4 @@
+// src/app/dashboard/configuracoes/usuarios/page.tsx
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -9,8 +10,11 @@ type UserRow = {
   email: string
   login: string
   phone?: string | null
-  costCenter?: string | null
+  costCenterId?: string | null
+  costCenterName?: string | null
 }
+
+type CostCenter = { id: string; description: string }
 
 const LABEL =
   'block text-xs font-semibold text-black uppercase tracking-wide'
@@ -35,7 +39,7 @@ export default function Page() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [costCenter, setCostCenter] = useState('')
+  const [costCenterId, setCostCenterId] = useState('') // agora FK
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [firstAccess, setFirstAccess] = useState(false)
@@ -45,23 +49,30 @@ export default function Page() {
 
   // ------- listagem -------
   const [rows, setRows] = useState<UserRow[]>([])
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   async function load() {
     setLoading(true)
     try {
-      // AGORA LISTA DIRETO DO AUTH (endpoint novo que retorna ARRAY):
+      // usuários (Auth + Prisma) → já retorna array com costCenterName/costCenterId
       const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
       if (!r.ok) {
         const err: any = await r.json().catch(() => ({}))
         throw new Error(err?.error || `GET falhou: ${r.status}`)
       }
-      const list: UserRow[] = await r.json()     // <- array direto
+      const list: UserRow[] = await r.json()
       setRows(list)
+
+      // centros de custo (para preencher selects)
+      const cr = await fetch('/api/configuracoes/centros-de-custo', { cache: 'no-store' })
+      const cjson = await cr.json().catch(() => ({ rows: [] }))
+      setCostCenters((cjson.rows || []).map((c: any) => ({ id: c.id, description: c.description })))
     } catch (e) {
       console.error('load() error', e)
       setRows([])
+      setCostCenters([])
     } finally {
       setLoading(false)
     }
@@ -69,44 +80,42 @@ export default function Page() {
   useEffect(() => { load() }, [])
 
   async function onSubmit(e: React.FormEvent) {
-  e.preventDefault()
-  if (!fullName || !email || !login) {
-    alert('Preencha Nome, E-mail e Login.')
-    return
-  }
-  try {
-    setSubmitting(true)
-
-    // 👉 agora cria no AUTH + PRISMA
-    const r = await fetch('/api/configuracoes/usuarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        login: login.trim().toLowerCase(),
-        phone: phone.trim(),
-        costCenter: costCenter.trim(),
-        password: firstAccess ? '' : password, // quando firstAccess, senha vazia
-        firstAccess,                            // true = enviar convite
-      }),
-    })
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({} as any))
-      throw new Error(err?.error || `POST falhou: ${r.status}`)
+    e.preventDefault()
+    if (!fullName || !email || !login) {
+      alert('Preencha Nome, E-mail e Login.')
+      return
     }
-
-    setFullName(''); setEmail(''); setPhone(''); setCostCenter('')
-    setLogin(''); setPassword(''); setFirstAccess(false)
-    await load()
-    alert('Usuário criado com sucesso!')
-  } catch (e: any) {
-    console.error('onSubmit error', e)
-    alert(e?.message || 'Erro ao registrar usuário.')
-  } finally {
-    setSubmitting(false)
+    try {
+      setSubmitting(true)
+      // cria no AUTH + PRISMA (agora com costCenterId)
+      const r = await fetch('/api/configuracoes/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          login: login.trim().toLowerCase(),
+          phone: phone.trim(),
+          costCenterId: costCenterId || null,   // FK
+          password: firstAccess ? '' : password,
+          firstAccess,
+        }),
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({} as any))
+        throw new Error(err?.error || `POST falhou: ${r.status}`)
+      }
+      setFullName(''); setEmail(''); setPhone(''); setCostCenterId('')
+      setLogin(''); setPassword(''); setFirstAccess(false)
+      await load()
+      alert('Usuário criado com sucesso!')
+    } catch (e: any) {
+      console.error('onSubmit error', e)
+      alert(e?.message || 'Erro ao registrar usuário.')
+    } finally {
+      setSubmitting(false)
+    }
   }
-}
 
   // ------- edição -------
   const [editing, setEditing] = useState<UserRow | null>(null)
@@ -114,7 +123,7 @@ export default function Page() {
   const [editEmail, setEditEmail] = useState('')
   const [editLogin, setEditLogin] = useState('')
   const [editPhone, setEditPhone] = useState('')
-  const [editCost, setEditCost] = useState('')
+  const [editCostCenterId, setEditCostCenterId] = useState('')
   const [editPassword, setEditPassword] = useState('')
 
   function openEdit(u: UserRow) {
@@ -123,14 +132,13 @@ export default function Page() {
     setEditEmail(u.email)
     setEditLogin(u.login)
     setEditPhone(u.phone || '')
-    setEditCost(u.costCenter || '')
+    setEditCostCenterId(u.costCenterId || '')
     setEditPassword('')
   }
   function closeEdit() { setEditing(null) }
 
   async function submitEdit() {
     if (!editing) return
-    // mantém PATCH/DELETE (já existentes) no /api/configuracoes/usuarios/[id]
     const r = await fetch(`/api/configuracoes/usuarios/${editing.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -139,7 +147,7 @@ export default function Page() {
         email: editEmail,
         login: editLogin,
         phone: editPhone,
-        costCenter: editCost,
+        costCenterId: editCostCenterId || null,  // FK
         password: editPassword || undefined,
       }),
     })
@@ -154,6 +162,10 @@ export default function Page() {
 
   // ------- excluir -------
   async function handleDelete(u: UserRow) {
+    if (!u.id) {
+      alert('Este usuário não existe no banco (somente no Auth).')
+      return
+    }
     if (!confirm(`Excluir o usuário "${u.fullName}"?`)) return
     const r = await fetch(`/api/configuracoes/usuarios/${u.id}`, { method: 'DELETE' })
     if (!r.ok) {
@@ -207,7 +219,16 @@ export default function Page() {
             </div>
             <div>
               <label className={LABEL}>Centro de Custo</label>
-              <input className={INPUT} value={costCenter} onChange={(e)=>setCostCenter(e.target.value)} placeholder="Ex.: TI" />
+              <select
+                className={INPUT}
+                value={costCenterId}
+                onChange={(e)=>setCostCenterId(e.target.value)}
+              >
+                <option value="">Selecione...</option>
+                {costCenters.map(cc => (
+                  <option key={cc.id} value={cc.id}>{cc.description}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -286,29 +307,32 @@ export default function Page() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="text-left text-slate-500">
-                    <th className="py-2 w-[34%]">Nome</th>
-                    <th className="py-2 w-[18%]">Login</th>
-                    <th className="py-2 w-[36%]">E-mail</th>
+                    <th className="py-2 w-[28%]">Nome</th>
+                    <th className="py-2 w-[16%]">Login</th>
+                    <th className="py-2 w-[28%]">E-mail</th>
+                    <th className="py-2 w-[16%]">Centro de Custo</th>
                     <th className="py-2 w-[12%] whitespace-nowrap">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td className="py-6 text-slate-500" colSpan={4}>Carregando…</td></tr>
+                    <tr><td className="py-6 text-slate-500" colSpan={5}>Carregando…</td></tr>
                   ) : rows.length === 0 ? (
-                    <tr><td className="py-6 text-slate-500" colSpan={4}>Nenhum usuário cadastrado.</td></tr>
+                    <tr><td className="py-6 text-slate-500" colSpan={5}>Nenhum usuário cadastrado.</td></tr>
                   ) : (
                     rows.map((u) => (
                       <tr key={u.id || u.email} className="border-t">
                         <td className="py-2 pr-3">{u.fullName}</td>
                         <td className="py-2 pr-3">{u.login}</td>
                         <td className="py-2 pr-3 break-all">{u.email}</td>
+                        <td className="py-2 pr-3">{u.costCenterName || '—'}</td>
                         <td className="py-2">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEdit(u)}
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50"
                               title="Editar"
+                              disabled={!u.id} // se veio só do Auth e não existe no Prisma, não terá id
                             >
                               <Pencil size={16}/> Editar
                             </button>
@@ -316,7 +340,7 @@ export default function Page() {
                               onClick={() => handleDelete(u)}
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
                               title="Excluir"
-                              disabled={!u.id} // se veio só do Auth e não existe no Prisma, não tem id p/ excluir
+                              disabled={!u.id}
                             >
                               <Trash2 size={16}/> Excluir
                             </button>
@@ -364,7 +388,16 @@ export default function Page() {
               </div>
               <div>
                 <label className={LABEL}>Centro de Custo</label>
-                <input className={INPUT} value={editCost} onChange={(e)=>setEditCost(e.target.value)} />
+                <select
+                  className={INPUT}
+                  value={editCostCenterId}
+                  onChange={(e)=>setEditCostCenterId(e.target.value)}
+                >
+                  <option value="">Selecione...</option>
+                  {costCenters.map(cc => (
+                    <option key={cc.id} value={cc.id}>{cc.description}</option>
+                  ))}
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className={LABEL}>Nova Senha (opcional)</label>
