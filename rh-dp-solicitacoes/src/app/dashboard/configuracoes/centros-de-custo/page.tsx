@@ -26,7 +26,7 @@ export default function CostCentersPage() {
   const [area, setArea] = useState('')
   const [managementType, setManagementType] = useState('')
   const [groupName, setGroupName] = useState('')
-  const [status, setStatus] = useState<'ATIVADO' | 'INATIVO'>('ATIVADO')
+  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE')
   const [notes, setNotes] = useState('')
 
   // edição
@@ -37,32 +37,28 @@ export default function CostCentersPage() {
   async function load() {
     setLoading(true)
     try {
-      const skip = (page - 1) * pageSize
-      const r = await fetch(
-        `/api/cost-centers?q=${encodeURIComponent(q)}&take=${pageSize}&skip=${skip}`,
-        { cache: 'no-store' },
-      )
-      const d = await r.json()
-      setRows(
-        (d.rows || []).map((r: any) => ({
-          id: r.id,
-          description: r.description,
-          code: r.code,
-          externalCode: r.externalCode,
-          abbreviation: r.abbreviation,
-          area: r.area,
-          managementType: r.managementType,
-          groupName: r.groupName,
-          status: r.status,
-          notes: r.notes,
-          updatedAt: r.updatedAt,
-        })),
-      )
-      setTotal(d.total || 0)
+      const params = new URLSearchParams({
+        q: q,                     // << usar o estado 'q'
+        page: String(page),
+        pageSize: String(pageSize),
+      })
+
+      const r = await fetch(`/api/cost-centers?${params.toString()}`, { cache: 'no-store' })
+      if (!r.ok) throw new Error(`GET /api/cost-centers -> ${r.status}`)
+      const { items, total } = await r.json()
+
+      setRows(items)   // API devolve { items, total }
+      setTotal(total)
+    } catch (err) {
+      console.error(err)
+      setRows([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
   }
+
+
 
   useEffect(() => {
     load()
@@ -96,7 +92,7 @@ export default function CostCentersPage() {
     setArea('')
     setManagementType('')
     setGroupName('')
-    setStatus('ATIVADO')
+    setStatus('ACTIVE')
     setNotes('')
     setCreating(false)
     setPage(1)
@@ -349,8 +345,8 @@ export default function CostCentersPage() {
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
                 >
-                  <option value="ATIVADO">ATIVADO</option>
-                  <option value="INATIVO">INATIVO</option>
+                  <option value="ACTIVE">ATIVO</option>
+                  <option value="INACTIVE">INATIVO</option>
                 </select>
               </div>
               <div className="sm:col-span-2">

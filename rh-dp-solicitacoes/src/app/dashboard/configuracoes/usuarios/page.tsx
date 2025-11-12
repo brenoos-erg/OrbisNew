@@ -22,8 +22,7 @@ type CostCenter = {
   externalCode?: string | null
 }
 
-const LABEL =
-  'block text-xs font-semibold text-black uppercase tracking-wide'
+const LABEL = 'block text-xs font-semibold text-black uppercase tracking-wide'
 const INPUT =
   'mt-1 w-full rounded-md border border-blue-500/70 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150'
 
@@ -78,15 +77,12 @@ export default function Page() {
       const list: UserRow[] = await r.json()
       setRows(list)
 
-      // centros de custo (para selects)
-      const cr = await fetch('/api/cost-centers?take=200&skip=0', { cache: 'no-store' })
-      const cjson = await cr.json().catch(() => ({ rows: [] }))
-      setCostCenters((cjson.rows || []).map((c: any) => ({
-        id: c.id,
-        description: c.description,
-        code: c.code,
-        externalCode: c.externalCode,
-      })))
+      // centros de custo (para selects) — usa o endpoint correto do SELECT
+      const cr = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
+      const arr: { id: string; description: string; code?: string | null; externalCode?: string | null }[] =
+        await cr.json()
+      setCostCenters(arr)
     } catch (e) {
       console.error('load() error', e)
       setRows([])
@@ -95,7 +91,9 @@ export default function Page() {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -152,7 +150,9 @@ export default function Page() {
     setEditCostCenterId(u.costCenterId || '')
     setEditPassword('')
   }
-  function closeEdit() { setEditing(null) }
+  function closeEdit() {
+    setEditing(null)
+  }
 
   async function submitEdit() {
     if (!editing) return

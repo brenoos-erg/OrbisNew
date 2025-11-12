@@ -1,27 +1,37 @@
+// src/app/dashboard/layout.tsx
 import Link from 'next/link'
 import { ClipboardList, ChevronLeft, Send, Inbox, FolderCog, Settings, Users, Shield } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import UserMenu from '@/components/layout/userMenu'
+import type { ReactNode } from 'react'   // ✅ importe o tipo
 
-// Server Component
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+// ⚠️ NÃO coloque "use client" aqui: é Server Component
+export default async function DashboardLayout({ children }: { children: ReactNode }) { // ✅ use ReactNode
   const { appUser } = await getCurrentAppUser()
 
   let showSolic = false
   let showConfig = false
 
-  if (appUser?.costCenterId) {
-    // lê os módulos habilitados para o CC do usuário
-    const ccModules = await prisma.costCenterModule.findMany({
-      where: { costCenterId: appUser.costCenterId },
-      include: { module: { select: { key: true } } },
+  if (appUser?.id) {
+    // pega TODOS os CCs do usuário (N:N) + o costCenterId “principal”
+    const userLinks = await prisma.userCostCenter.findMany({   // ver item 2 abaixo
+      where: { userId: appUser.id },
+      select: { costCenterId: true },
     })
-    const enabled = new Set(ccModules.map((r) => r.module.key))
 
-    // só aparece se o CC tiver o módulo
-    showSolic = enabled.has('solicitacoes')
-    showConfig = enabled.has('configuracoes')
+    const ccIds = new Set<string>(userLinks.map(l => l.costCenterId))
+    if (appUser.costCenterId) ccIds.add(appUser.costCenterId)
+
+    if (ccIds.size > 0) {
+      const rows = await prisma.costCenterModule.findMany({
+        where: { costCenterId: { in: [...ccIds] } },
+        include: { module: { select: { key: true } } },
+      })
+      const enabled = new Set(rows.map(r => r.module.key))
+      showSolic = enabled.has('solicitacoes')
+      showConfig = enabled.has('configuracoes')
+    }
   }
 
   return (
@@ -58,10 +68,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 </div>
 
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link href="/dashboard/configuracoes"                      className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Settings size={16}/> <span>Painel</span></Link>
-                  <Link href="/dashboard/configuracoes/usuarios"              className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Users size={16}/>    <span>Usuários</span></Link>
-                  <Link href="/dashboard/configuracoes/permissoes"            className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Shield size={16}/>   <span>Permissões</span></Link>
-                  <Link href="/dashboard/configuracoes/centros-de-custo"      className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><FolderCog size={16}/> <span>Centros de Custo</span></Link>
+                  <Link href="/dashboard/configuracoes"                 className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Settings size={16}/> <span>Painel</span></Link>
+                  <Link href="/dashboard/configuracoes/usuarios"         className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Users size={16}/>    <span>Usuários</span></Link>
+                  <Link href="/dashboard/configuracoes/permissoes"       className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><Shield size={16}/>   <span>Permissões</span></Link>
+                  <Link href="/dashboard/configuracoes/centros-de-custo" className="group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3 text-slate-200 hover:bg-orange-500/90 hover:text-white"><FolderCog size={16}/> <span>Centros de Custo</span></Link>
                 </div>
               </div>
             )}

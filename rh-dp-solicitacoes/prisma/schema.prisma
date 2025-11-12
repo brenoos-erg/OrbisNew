@@ -122,7 +122,10 @@ model CostCenter {
   updatedAt      DateTime @updatedAt
   users          User[]
 
-  // 👇 lado inverso da relação N:N via tabela de junção
+  // 👇 Lado inverso da relação N:N via UserCostCenter
+  userLinks UserCostCenter[]
+
+  // (já tinha, se você criou) relação com módulos:
   modules CostCenterModule[]
 
   @@map("CostCenter")
@@ -202,14 +205,12 @@ model User {
   login    String? @unique(map: "user_login_key")
   phone    String?
 
+  // CC principal (seu campo atual, pode continuar existindo)
   costCenterId String?
   costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  positionId String?
-  position   Position? @relation(fields: [positionId], references: [id])
-
-  leaderId String?
-  leader   Leader? @relation(fields: [leaderId], references: [id])
+  // 👇 Lado inverso da relação N:N via UserCostCenter
+  costCenters UserCostCenter[]
 
   status    UserStatus @default(ATIVO)
   role      Role       @default(COLABORADOR)
@@ -223,6 +224,10 @@ model User {
   events                Event[]        @relation("EventActor")
 
   membersOfGroups GroupMember[]
+  position        Position?     @relation(fields: [positionId], references: [id])
+  positionId      String?
+  leader          Leader?       @relation(fields: [leaderId], references: [id])
+  leaderId        String?
 
   @@map("User")
 }
@@ -298,4 +303,17 @@ model CostCenterModule {
 
   @@unique([costCenterId, moduleId])
   @@map("CostCenterModule")
+}
+
+model UserCostCenter {
+  id           String   @id @default(uuid())
+  userId       String
+  costCenterId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
+
+  @@unique([userId, costCenterId])
+  @@map("UserCostCenter")
 }
