@@ -42,6 +42,21 @@ enum CCStatus {
   INACTIVE
 }
 
+/* ===== NOVOS ENUMS ===== */
+
+enum Action {
+  VIEW
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+}
+
+enum GroupRole {
+  MEMBER
+  MANAGER
+}
+
 /* =========================
    MODELOS DE SUPORTE
    ========================= */
@@ -91,7 +106,6 @@ model CostCenter {
   abbreviation   String?
   area           String?
   managementType String?
-  // was: group String?
   groupName      String?   @map("group_name")
   status         CCStatus  @default(ACTIVE)
   description    String
@@ -103,29 +117,23 @@ model CostCenter {
   @@map("CostCenter")
 }
 
-
-/// Cargo / Posição
 model Position {
   id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
   name        String   @unique
   description String?
-
-  users      User[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("Position")
 }
 
-/// Líder (pessoa física cadastrada como líder)
 model Leader {
   id        String  @id @default(dbgenerated("(gen_random_uuid())::text"))
   fullName  String
   email     String? @unique
   phone     String?
-
-  members   User[]  // Users que apontam para este líder
-
+  members   User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -143,7 +151,6 @@ model TipoSolicitacao {
   schemaJson   Json
   createdAt    DateTime @default(now())
   updatedAt    DateTime
-
   solicitacoes Solicitation[]
 }
 
@@ -180,15 +187,12 @@ model User {
   login         String?    @unique(map: "user_login_key")
   phone         String?
 
-  // Centro de custo (FK)
   costCenterId  String?
   costCenter    CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  // Posição / Cargo (FK)
   positionId    String?
   position      Position?   @relation(fields: [positionId], references: [id])
 
-  // Líder (FK para Leader)
   leaderId      String?
   leader        Leader?     @relation(fields: [leaderId], references: [id])
 
@@ -203,5 +207,62 @@ model User {
   comments              Comment[]      @relation("CommentAutor")
   events                Event[]        @relation("EventActor")
 
+  membersOfGroups       GroupMember[]
+
   @@map("User")
+}
+
+/* =========================
+   CONTROLE DE ACESSOS
+   ========================= */
+
+model Module {
+  id     String @id @default(uuid())
+  key    String @unique
+  name   String
+  grants AccessGroupGrant[]
+
+  @@map("Module")
+}
+
+model AccessGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members GroupMember[]
+  grants  AccessGroupGrant[]
+
+  @@map("AccessGroup")
+}
+
+model GroupMember {
+  id        String @id @default(uuid())
+  userId    String
+  groupId   String
+  role      GroupRole @default(MEMBER)
+  createdAt DateTime  @default(now())
+
+  user  User        @relation(fields: [userId], references: [id])
+  group AccessGroup @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+  @@map("GroupMember")
+}
+
+model AccessGroupGrant {
+  id        String   @id @default(uuid())
+  groupId   String
+  moduleId  String
+  actions   Action[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group  AccessGroup @relation(fields: [groupId], references: [id])
+  module Module      @relation(fields: [moduleId], references: [id])
+
+  @@unique([groupId, moduleId])
+  @@map("AccessGroupGrant")
 }
