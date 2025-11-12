@@ -8,6 +8,7 @@ export default function LoginPage() {
   const router = useRouter()
   const search = useSearchParams()
   const nextUrl = search.get('next') || '/dashboard'
+  const isInactive = search.get('inactive') === '1'
   const supabase = supabaseBrowser()
 
   const [loadingSession, setLoadingSession] = useState(true)
@@ -29,12 +30,13 @@ export default function LoginPage() {
       try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
       setLoadingSession(false)
     })()
-  }, []) // eslint-disable-line
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
 
+    // 1️⃣ Tenta autenticar com Supabase
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setLoading(false)
@@ -42,9 +44,30 @@ export default function LoginPage() {
       return
     }
 
-    // sincroniza sessão/usuário no backend
-    try { await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' }) } catch {}
+    // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
+    try {
+      await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
+    } catch {}
 
+    // 3️⃣ Verifica status no backend
+    try {
+      const res = await fetch('/api/session/me', { cache: 'no-store' })
+      if (res.ok) {
+        const me = await res.json()
+        if (me?.appUser?.status === 'INATIVO') {
+          await supabase.auth.signOut({ scope: 'global' })
+          setLoading(false)
+          alert('Seu usuário está INATIVO. Fale com o administrador.')
+          router.replace('/login?inactive=1')
+          router.refresh()
+          return
+        }
+      }
+    } catch {
+      // erro silencioso, mas não deixa travar
+    }
+
+    // 4️⃣ Se for primeiro acesso (mustChangePassword)
     const { data: { user } } = await supabase.auth.getUser()
     const must = (user?.user_metadata as any)?.mustChangePassword === true
 
@@ -56,8 +79,7 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  async function handleReset(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleResetClick() {
     setResetErr(null)
     setResetMsg(null)
     setSendingReset(true)
@@ -87,6 +109,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-xl rounded-3xl border-2 border-orange-300 bg-white p-10 shadow-[0_20px_60px_-20px_rgba(2,6,23,.25)]">
+
+        {/* Aviso de usuário INATIVO */}
+        {isInactive && (
+          <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            Sua conta está inativa. Solicite ativação ao administrador.
+          </div>
+        )}
+
         <div className="mb-8 flex flex-col items-center gap-2 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-orange-300 bg-orange-50">
             <LogIn className="h-6 w-6 text-orange-500" />
@@ -134,7 +164,7 @@ export default function LoginPage() {
               <div className="text-[13px] text-slate-700 mb-2">
                 Enviaremos um link para redefinir sua senha. Ao abrir o link, você será levado à página de definição de nova senha.
               </div>
-              <form onSubmit={handleReset} className="space-y-2">
+              <div className="space-y-2">
                 <input
                   type="email"
                   placeholder="seuemail@empresa.com"
@@ -146,7 +176,8 @@ export default function LoginPage() {
                 {resetMsg && <div className="text-[12px] text-green-700">{resetMsg}</div>}
                 <div className="flex gap-2">
                   <button
-                    onClick={handleReset}
+                    type="button"
+                    onClick={handleResetClick}
                     disabled={sendingReset}
                     className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-950 disabled:opacity-60"
                   >
@@ -160,7 +191,7 @@ export default function LoginPage() {
                     Cancelar
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           )}
 

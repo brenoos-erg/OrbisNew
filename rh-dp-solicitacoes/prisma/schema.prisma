@@ -214,7 +214,7 @@ model User {
 
   status    UserStatus @default(ATIVO)
   role      Role       @default(COLABORADOR)
-  authId    String?    @db.Uuid
+  authId    String?    @db.Uuid @unique   // <- agora é chave única para o upsert
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 

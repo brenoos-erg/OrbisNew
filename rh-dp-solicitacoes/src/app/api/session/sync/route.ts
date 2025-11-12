@@ -1,36 +1,30 @@
-// src/app/api/session/sync/route.ts
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { prisma } from '@/lib/prisma'
-import { generateLoginFromFullName } from '@/lib/login' // <-- helper já existe
-
-export const dynamic = 'force-dynamic'
 
 export async function POST() {
-  const cookieStore = await cookies()
-  const supabase = createRouteHandlerClient({ cookies: async () => cookieStore })
+  const cookieStore = cookies()
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-  const { data, error } = await supabase.auth.getUser()
-  const user = data?.user
-  if (error || !user) return NextResponse.json({ ok: false }, { status: 401 })
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return NextResponse.json({ ok: true })
 
-  const meta = user.user_metadata || {}
-  const fullName = (meta.fullName || meta.name || user.email) as string
+  const authId = session.user.id
+  const email  = session.user.email ?? ''
+  const name   = (session.user.user_metadata as any)?.name ?? ''
 
-  // tenta vir do metadata; se não houver, gera a partir do nome
-  let login: string | null | undefined = (meta.login as string | undefined)?.trim()
-  if (!login) {
-    // se quiser gerar automaticamente, use o helper que já existe
-    // (ele garante unicidade no banco)
-    login = await generateLoginFromFullName(fullName)  // helper: :contentReference[oaicite:1]{index=1}
-  }
-
-  await prisma.user.upsert({
-    where: { email: user.email! },
-    update: { fullName, authId: user.id, login },
-    create: { email: user.email!, fullName, authId: user.id, login },
+  const appUser = await prisma.user.upsert({
+    where: { authId },               // ⚠️ precisa ser @unique no schema
+    create: {
+      authId, email, fullName: name,
+      status: 'ATIVO',               // só na criação
+    },
+    update: {
+      email, fullName: name,         // ❌ NÃO ALTERE status aqui
+    },
+    select: { id: true, status: true },
   })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, appUser })
 }

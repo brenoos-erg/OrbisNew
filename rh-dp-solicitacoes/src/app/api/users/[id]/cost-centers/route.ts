@@ -1,53 +1,42 @@
-import { NextResponse } from 'next/server'
+// src/app/api/users/[id]/route.ts
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 
-// GET /api/users/:id/cost-centers
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const userId = params.id
-  try {
-    const rows = await prisma.userCostCenter.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        costCenter: { select: { id: true, description: true } },
-      },
-    })
-    return NextResponse.json(rows)
-  } catch (e) {
-    console.error('GET user cost-centers error', e)
-    return NextResponse.json({ error: 'Erro ao carregar vínculos.' }, { status: 500 })
-  }
-}
+type Status = 'ATIVO' | 'INATIVO'
 
-// POST /api/users/:id/cost-centers
-// body: { costCenterId: string }
-export async function POST(
+export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const userId = params.id
-  const { costCenterId } = await req.json().catch(() => ({}))
-  if (!costCenterId) {
-    return NextResponse.json({ error: 'costCenterId é obrigatório.' }, { status: 400 })
+  const body = await req.json()
+
+  // validação simples (use Zod se quiser)
+  const dataToUpdate: any = {}
+  if (typeof body.fullName === 'string') dataToUpdate.fullName = body.fullName
+  if (typeof body.login === 'string') dataToUpdate.login = body.login
+  if (typeof body.phone === 'string') dataToUpdate.phone = body.phone
+  if (body.status === 'ATIVO' || body.status === 'INATIVO') {
+    dataToUpdate.status = body.status as Status         // ⬅️ salvar status
   }
 
-  try {
-    // garanta que tenha um índice único em [userId, costCenterId] no Prisma:
-    // @@unique([userId, costCenterId])
-    const link = await prisma.userCostCenter.upsert({
-      where: { userId_costCenterId: { userId, costCenterId } },
-      create: { userId, costCenterId },
-      update: {},
-      include: {
-        costCenter: { select: { id: true, description: true } },
-      },
-    })
-    return NextResponse.json(link, { status: 201 })
-  } catch (e) {
-    console.error('POST user cost-centers error', e)
-    return NextResponse.json({ error: 'Falha ao criar vínculo.' }, { status: 500 })
+  // senha opcional (se existir no seu fluxo)
+  if (typeof body.password === 'string' && body.password.length > 0) {
+    // … sua lógica de troca de senha, se houver
   }
+
+  const updated = await prisma.user.update({
+    where: { id: params.id },
+    data: dataToUpdate,
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      login: true,
+      phone: true,
+      status: true,            // ⬅️ devolva status
+      costCenterId: true,
+    },
+  })
+
+  return NextResponse.json(updated)
 }
