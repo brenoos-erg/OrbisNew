@@ -7,9 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* =========================
-   ENUMS
-   ========================= */
+/**
+ * =========================
+ * ENUMS
+ * =========================
+ */
 
 enum Role {
   COLABORADOR
@@ -42,7 +44,9 @@ enum CCStatus {
   INACTIVE
 }
 
-/* ===== NOVOS ENUMS ===== */
+/**
+ * ===== NOVOS ENUMS =====
+ */
 
 enum Action {
   VIEW
@@ -57,62 +61,69 @@ enum GroupRole {
   MANAGER
 }
 
-/* =========================
-   MODELOS DE SUPORTE
-   ========================= */
+/**
+ * =========================
+ * MODELOS DE SUPORTE
+ * =========================
+ */
 
 model Attachment {
-  id             String       @id
+  id             String   @id
   solicitationId String
   filename       String
   url            String
   mimeType       String
   sizeBytes      Int
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
 }
 
 model Comment {
-  id             String       @id
+  id             String   @id
   solicitationId String
   autorId        String
   texto          String
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
-  autor          User         @relation("CommentAutor", fields: [autorId], references: [id])
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+  autor        User         @relation("CommentAutor", fields: [autorId], references: [id])
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
 }
 
 model Event {
-  id             String       @id
+  id             String   @id
   solicitationId String
   actorId        String
   tipo           String
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
-  actor          User         @relation("EventActor", fields: [actorId], references: [id])
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+  actor        User         @relation("EventActor", fields: [actorId], references: [id])
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
 }
 
-/* =========================
-   CATALOGOS / CADASTROS
-   ========================= */
+/**
+ * =========================
+ * CATALOGOS / CADASTROS
+ * =========================
+ */
 
 model CostCenter {
-  id             String    @id @default(uuid())
+  id             String   @id @default(uuid())
   code           String?
   externalCode   String?
   abbreviation   String?
   area           String?
   managementType String?
-  groupName      String?   @map("group_name")
-  status         CCStatus  @default(ACTIVE)
+  groupName      String?  @map("group_name")
+  status         CCStatus @default(ACTIVE)
   description    String
   observations   String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   users          User[]
+
+  // 👇 lado inverso da relação N:N via tabela de junção
+  modules CostCenterModule[]
 
   @@map("CostCenter")
 }
@@ -129,9 +140,9 @@ model Position {
 }
 
 model Leader {
-  id        String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
   fullName  String
-  email     String? @unique
+  email     String?  @unique
   phone     String?
   members   User[]
   createdAt DateTime @default(now())
@@ -140,16 +151,18 @@ model Leader {
   @@map("Leader")
 }
 
-/* =========================
-   NÚCLEO DE SOLICITAÇÕES
-   ========================= */
+/**
+ * =========================
+ * NÚCLEO DE SOLICITAÇÕES
+ * =========================
+ */
 
 model TipoSolicitacao {
-  id           String   @id
-  nome         String   @unique
+  id           String         @id
+  nome         String         @unique
   descricao    String?
   schemaJson   Json
-  createdAt    DateTime @default(now())
+  createdAt    DateTime       @default(now())
   updatedAt    DateTime
   solicitacoes Solicitation[]
 }
@@ -167,60 +180,67 @@ model Solicitation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  anexos        Attachment[]
-  comentarios   Comment[]
-  eventos       Event[]
+  anexos      Attachment[]
+  comentarios Comment[]
+  eventos     Event[]
 
-  autor         User            @relation("SolicitationAutor", fields: [autorId], references: [id])
-  responsavel   User?           @relation("SolicitationResponsavel", fields: [responsavelId], references: [id])
-  tipo          TipoSolicitacao @relation(fields: [tipoId], references: [id])
+  autor       User            @relation("SolicitationAutor", fields: [autorId], references: [id])
+  responsavel User?           @relation("SolicitationResponsavel", fields: [responsavelId], references: [id])
+  tipo        TipoSolicitacao @relation(fields: [tipoId], references: [id])
 }
 
-/* =========================
-   USUÁRIO
-   ========================= */
+/**
+ * =========================
+ * USUÁRIO
+ * =========================
+ */
 
 model User {
-  id            String     @id @default(dbgenerated("(gen_random_uuid())::text"))
-  email         String     @unique
-  fullName      String
-  login         String?    @unique(map: "user_login_key")
-  phone         String?
+  id       String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email    String  @unique
+  fullName String
+  login    String? @unique(map: "user_login_key")
+  phone    String?
 
-  costCenterId  String?
-  costCenter    CostCenter? @relation(fields: [costCenterId], references: [id])
+  costCenterId String?
+  costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  positionId    String?
-  position      Position?   @relation(fields: [positionId], references: [id])
+  positionId String?
+  position   Position? @relation(fields: [positionId], references: [id])
 
-  leaderId      String?
-  leader        Leader?     @relation(fields: [leaderId], references: [id])
+  leaderId String?
+  leader   Leader? @relation(fields: [leaderId], references: [id])
 
-  status        UserStatus  @default(ATIVO)
-  role          Role        @default(COLABORADOR)
-  authId        String?     @db.Uuid
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  status    UserStatus @default(ATIVO)
+  role      Role       @default(COLABORADOR)
+  authId    String?    @db.Uuid
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   solicitacoesCriadas   Solicitation[] @relation("SolicitationAutor")
   solicitacoesAssumidas Solicitation[] @relation("SolicitationResponsavel")
   comments              Comment[]      @relation("CommentAutor")
   events                Event[]        @relation("EventActor")
 
-  membersOfGroups       GroupMember[]
+  membersOfGroups GroupMember[]
 
   @@map("User")
 }
 
-/* =========================
-   CONTROLE DE ACESSOS
-   ========================= */
+/**
+ * =========================
+ * CONTROLE DE ACESSOS
+ * =========================
+ */
 
 model Module {
-  id     String @id @default(uuid())
-  key    String @unique
+  id     String             @id @default(uuid())
+  key    String             @unique
   name   String
   grants AccessGroupGrant[]
+
+  // 👇 lado inverso da relação N:N via tabela de junção
+  costCenters CostCenterModule[]
 
   @@map("Module")
 }
@@ -239,7 +259,7 @@ model AccessGroup {
 }
 
 model GroupMember {
-  id        String @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
   groupId   String
   role      GroupRole @default(MEMBER)
@@ -265,4 +285,17 @@ model AccessGroupGrant {
 
   @@unique([groupId, moduleId])
   @@map("AccessGroupGrant")
+}
+
+model CostCenterModule {
+  id           String   @id @default(uuid())
+  costCenterId String
+  moduleId     String
+  createdAt    DateTime @default(now())
+
+  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
+  module     Module     @relation(fields: [moduleId], references: [id])
+
+  @@unique([costCenterId, moduleId])
+  @@map("CostCenterModule")
 }
