@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Save, PlusCircle, Pencil, Trash2, X, Check } from 'lucide-react'
 
 type UserRow = {
@@ -68,7 +69,7 @@ export default function Page() {
   async function load() {
     setLoading(true)
     try {
-      // usuários (Auth + Prisma) – já retorna costCenterName/costCenterId
+      // usuários (Auth + Prisma)
       const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
       if (!r.ok) {
         const err: any = await r.json().catch(() => ({}))
@@ -77,7 +78,7 @@ export default function Page() {
       const list: UserRow[] = await r.json()
       setRows(list)
 
-      // centros de custo (para preencher selects) – agora com code/externalCode
+      // centros de custo (para selects)
       const cr = await fetch('/api/cost-centers?take=200&skip=0', { cache: 'no-store' })
       const cjson = await cr.json().catch(() => ({ rows: [] }))
       setCostCenters((cjson.rows || []).map((c: any) => ({
@@ -104,7 +105,6 @@ export default function Page() {
     }
     try {
       setSubmitting(true)
-      // cria no AUTH + PRISMA (agora com costCenterId)
       const r = await fetch('/api/configuracoes/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,7 +113,7 @@ export default function Page() {
           email: email.trim().toLowerCase(),
           login: login.trim().toLowerCase(),
           phone: phone.trim(),
-          costCenterId: costCenterId || null,   // FK
+          costCenterId: costCenterId || null,
           password: firstAccess ? '' : password,
           firstAccess,
         }),
@@ -164,7 +164,7 @@ export default function Page() {
         email: editEmail,
         login: editLogin,
         phone: editPhone,
-        costCenterId: editCostCenterId || null,  // FK
+        costCenterId: editCostCenterId || null,
         password: editPassword || undefined,
       }),
     })
@@ -339,7 +339,15 @@ export default function Page() {
                   ) : (
                     rows.map((u) => (
                       <tr key={u.id || u.email} className="border-t">
-                        <td className="py-2 pr-3">{u.fullName}</td>
+                        <td className="py-2 pr-3">
+                          {u.id ? (
+                            <Link href={`/dashboard/configuracoes/usuarios/${u.id}`} className="text-blue-700 hover:underline">
+                              {u.fullName}
+                            </Link>
+                          ) : (
+                            u.fullName
+                          )}
+                        </td>
                         <td className="py-2 pr-3">{u.login}</td>
                         <td className="py-2 pr-3 break-all">{u.email}</td>
                         <td className="py-2 pr-3">{u.costCenterName || '—'}</td>
@@ -349,7 +357,7 @@ export default function Page() {
                               onClick={() => openEdit(u)}
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50"
                               title="Editar"
-                              disabled={!u.id} // se veio só do Auth e não existe no Prisma, não terá id
+                              disabled={!u.id}
                             >
                               <Pencil size={16} /> Editar
                             </button>

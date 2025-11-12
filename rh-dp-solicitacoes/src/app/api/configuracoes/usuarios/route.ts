@@ -33,7 +33,7 @@ export async function GET() {
   return NextResponse.json(list)
 }
 
-// === POST: criar usuário ===
+// === POST: criar usuário (Prisma + Supabase Auth) ===
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const login = (body.login ?? '').trim().toLowerCase()
     const phone = (body.phone ?? '') || null
     const costCenterId = (body.costCenterId ?? '') || null
-    const password = (body.password ?? '').trim()
+    const rawPassword = (body.password ?? '').trim()
     const firstAccess = !!body.firstAccess
 
     if (!fullName || !email || !login) {
@@ -52,35 +52,48 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Cria no Prisma
+    // 1) Cria no Prisma (rollback se Auth falhar)
     const created = await prisma.user.create({
       data: { fullName, email, login, phone, costCenterId },
       select: { id: true, fullName: true, email: true, login: true },
     })
 
-    // Cria no Supabase Auth
+    // 2) Cria no Supabase Auth (Admin)
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
-    const authPassword = firstAccess ? undefined : password || undefined
+
+    // Senha efetiva: nunca undefined
+    // - Se for "primeiro acesso" e vier vazia → temporária `${login}@123`
+    // - Se vier preenchida → usa a informada
+    // - Fallback: UUID
+    const effectivePassword =
+      firstAccess && !rawPassword ? `${login}@123` : (rawPassword || crypto.randomUUID())
 
     const { data: authData, error } = await sb.auth.admin.createUser({
       email,
-      password: authPassword,
+      password: effectivePassword,
       email_confirm: true,
-      user_metadata: { fullName, login, phone, costCenterId },
+      user_metadata: {
+        fullName,
+        login,
+        phone,
+        costCenterId,
+        mustChangePassword: firstAccess, // flag lido no login/middleware
+      },
     })
 
     if (error) {
-      await prisma.user.delete({ where: { id: created.id } })
+      await prisma.user.delete({ where: { id: created.id } }) // rollback
       return NextResponse.json(
         { error: 'Falha ao criar no Auth: ' + error.message },
         { status: 500 }
       )
     }
 
-    if (authData.user) {
+    // 3) Vincula authId no Prisma
+    if (authData?.user?.id) {
       await prisma.user.update({
         where: { id: created.id },
         data: { authId: authData.user.id as any },
@@ -89,10 +102,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(created, { status: 201 })
   } catch (e: any) {
+    if ((e as any)?.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'E-mail ou login já cadastrado.' },
+        { status: 409 }
+      )
+    }
     console.error('POST /api/configuracoes/usuarios error', e)
     return NextResponse.json(
-      { error: e?.message || 'Erro ao criar usuário.' },
-      { status: 500 }
+        { error: e?.message || 'Erro ao criar usuário.' },
+        { status: 500 }
     )
   }
 }

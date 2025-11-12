@@ -12,6 +12,34 @@ function getSupabaseAdmin() {
   return createClient(url, key)
 }
 
+/** GET: retorna dados do usuário (para a página de perfil) */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const { id } = params
+    const u = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true, fullName: true, email: true, login: true, phone: true,
+        costCenterId: true,
+        costCenter: { select: { description: true } },
+      },
+    })
+    if (!u) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+
+    return NextResponse.json({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      login: u.login ?? '',
+      phone: u.phone ?? '',
+      costCenterId: u.costCenterId ?? null,
+      costCenterName: u.costCenter?.description ?? null,
+    })
+  } catch (e) {
+    return NextResponse.json({ error: 'Falha ao carregar usuário.' }, { status: 500 })
+  }
+}
+
 /** PATCH: atualiza no Prisma e reflete no Auth (se houver authId) */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -95,10 +123,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
-    // 2) exclui no Prisma primeiro (respeita FKs e garante consistência)
+    // 2) exclui no Prisma primeiro
     await prisma.user.delete({ where: { id } })
 
-    // 3) tenta excluir no Auth (não falha a resposta se der erro)
+    // 3) tenta excluir no Auth (não falha se der erro)
     if (existing.authId) {
       const admin = getSupabaseAdmin()
       await admin.auth.admin.deleteUser(existing.authId).catch((err) => {
