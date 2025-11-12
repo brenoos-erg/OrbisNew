@@ -146,25 +146,25 @@ export default function UserCostCenterPanel({ userId }: { userId: string }) {
             </tr>
           </thead>
           <tbody>
-            {links.map((l) => (
-              <tr key={l.id} className="border-t">
-                <td className="py-2 px-2">
-                  {l.costCenter?.description ||
-                    allCenters.find((c) => c.id === l.costCenterId)?.description ||
-                    '—'}
-                </td>
-                <td className="py-2 px-2">
-                  <button
-                    onClick={() => remove(l.id)}
-                    disabled={saving}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
-                  >
-                    <Trash2 size={16} /> Remover
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+  {links.map((l) => (
+    <tr key={l.id} className="border-t">
+      <td className="py-2 px-2">
+        {l.costCenter?.description ||
+          allCenters.find((c) => c.id === l.costCenterId)?.description ||
+          '—'}
+      </td>
+      <td className="py-2 px-2">
+        <button
+          onClick={() => remove(l.id)}   // ← aqui fica o “remove(l.id)”
+          disabled={saving}
+          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
+        >
+          Remover
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
         </table>
       )}
     </div>
