@@ -12,6 +12,7 @@ export async function POST() {
     data: { session },
   } = await supabase.auth.getSession()
 
+  // Se não tiver sessão, não faz nada
   if (!session?.user) {
     return NextResponse.json({ ok: true })
   }
@@ -21,17 +22,19 @@ export async function POST() {
   const name = (session.user.user_metadata as any)?.name ?? ''
 
   const appUser = await prisma.user.upsert({
-    where: { authId }, // precisa ser @unique no schema
+    where: { authId }, // authId precisa ser @unique no schema
     create: {
       authId,
       email,
-      fullName: name || email, // usa name se tiver, senão o email como quebra-galho
+      fullName: name || email, // usa name se tiver, senão o email como fallback
       status: 'ATIVO',
     },
     update: {
-      // ⚠️ importante: NÃO mexer em fullName aqui para não apagar o nome cadastrado no painel
+      // ⚠️ IMPORTANTE:
+      // não mexer em fullName aqui para não apagar o nome cadastrado no painel
       email,
-      // se você quiser, pode só atualizar o nome quando vier preenchido:
+      // Se algum dia QUISER atualizar o nome só quando vier preenchido,
+      // pode usar algo assim:
       // ...(name ? { fullName: name } : {}),
     },
     select: { id: true, status: true },

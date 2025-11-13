@@ -60,15 +60,26 @@ export async function PATCH(req: NextRequest) {
     }
 
     // 2) Atualiza por ID (campo unique de verdade)
-    const updated = await prisma.user.update({
-      where: { id: dbUser.id }, // <- AQUI está a correção principal
-      data: {
-        ...(typeof fullName === 'string'   ? { fullName }   : {}),
-        ...(typeof phone === 'string'      ? { phone }      : {}),
-        ...(typeof costCenter === 'string' ? { costCenter } : {}),
-      },
-      select: { id: true, fullName: true, email: true, login: true, phone: true, costCenter: true, role: true },
-    })
+   const updated = await prisma.user.update({
+  where: { id: dbUser.id },
+  data: {
+    ...(typeof fullName   === 'string' ? { fullName }   : {}),
+    ...(typeof phone      === 'string' ? { phone }      : {}),
+    ...(typeof costCenter === 'string' ? { costCenter } : {}),
+    ...(typeof avatarUrl  === 'string' ? { avatarUrl }  : {}), // 👈 AQUI
+  },
+  select: {
+    id: true,
+    fullName: true,
+    email: true,
+    login: true,
+    phone: true,
+    costCenter: true,
+    role: true,
+    // opcional: se quiser já devolver a foto no /api/me:
+    // avatarUrl: true,
+  },
+})
 
     // 3) Atualiza metadata do Supabase
     const metaPatch: Record<string, any> = {}

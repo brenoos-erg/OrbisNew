@@ -1,13 +1,12 @@
+// src/components/layout/userMenu.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabaseBrowser } from '@/lib/supabase/client'   // <- use o client do projeto
+import { supabaseBrowser } from '@/lib/supabase/client'
 import { ChevronDown, LogOut, Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/components/theme/ThemeProvider'
 
 type Props = { collapsed?: boolean }
-
-const supabase = supabaseBrowser()
 
 function initialsFrom(name: string) {
   const parts = name.trim().split(/\s+/)
@@ -24,6 +23,7 @@ export default function UserMenu({ collapsed }: Props) {
   const [email, setEmail] = useState('')
 
   const { theme, toggleTheme } = useTheme()
+  const supabase = supabaseBrowser()
 
   useEffect(() => {
     let mounted = true
@@ -31,61 +31,85 @@ export default function UserMenu({ collapsed }: Props) {
     async function load() {
       setLoading(true)
 
-      // 1) Pega sessão do Supabase
-      const { data } = await supabase.auth.getUser()
-      const user = data.user
-      if (!mounted || !user) { setLoading(false); return }
+      // 1) Usuário autenticado no Supabase
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      // 2) Tenta o perfil oficial do Prisma
+      if (!mounted || !user) {
+        setFullName('')
+        setLogin('')
+        setEmail('')
+        setLoading(false)
+        return
+      }
+
+      // 2) Tenta pegar o “espelho” oficial no Prisma via /api/session/me
+      let prismaUser: any = null
       try {
-        const r = await fetch('/api/me', { cache: 'no-store' })
+        const r = await fetch('/api/session/me', { cache: 'no-store' })
         if (r.ok) {
-          const me = await r.json()
-          if (mounted && me) {
-            const name =
-              (me.fullName?.toString()?.trim()) ||
-              (user.user_metadata?.fullName?.toString()?.trim()) ||
-              (user.user_metadata?.name?.toString()?.trim()) ||
-              (user.email || 'Usuário')
-
-            setFullName(name)
-            setLogin((me.login || user.user_metadata?.login || user.email?.split('@')[0] || '').toString())
-            setEmail((me.email || user.email || '').toString())
-            setLoading(false)
-            return
-          }
+          const payload = await r.json()
+          prismaUser = payload?.appUser ?? null
         }
-      } catch { /* falhou? vai pro fallback */ }
+      } catch {
+        // se der erro, só usa o fallback do Supabase
+      }
 
-      // 3) Fallback: metadata da sessão
-      const meta = user.user_metadata || {}
+      const meta = (user.user_metadata || {}) as Record<string, any>
+
       const name =
+        prismaUser?.fullName?.toString()?.trim() ||
         meta.fullName?.toString()?.trim() ||
         meta.name?.toString()?.trim() ||
         user.email?.toString()?.trim() ||
         'Usuário'
 
+      const loginValue =
+        prismaUser?.login?.toString()?.trim() ||
+        meta.login?.toString()?.trim() ||
+        user.email?.split('@')[0] ||
+        ''
+
+      const emailValue =
+        prismaUser?.email?.toString()?.trim() || user.email?.toString()?.trim() || ''
+
+      if (!mounted) return
+
       setFullName(name)
-      setLogin(meta.login?.toString()?.trim() || user.email?.split('@')[0] || '')
-      setEmail(user.email || '')
+      setLogin(loginValue)
+      setEmail(emailValue)
       setLoading(false)
     }
 
     load()
-    const { data: sub } = supabase.auth.onAuthStateChange(() => { load() })
-    return () => { mounted = false; sub?.subscription?.unsubscribe() }
+
+    // Recarrega se a sessão mudar
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      load()
+    })
+
+    return () => {
+      mounted = false
+      sub?.subscription?.unsubscribe()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSignOut() {
-    try { await supabase.auth.signOut({ scope: 'global' }) } catch { }
-    try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch { }
+    try {
+      await supabase.auth.signOut({ scope: 'global' })
+    } catch {}
+    try {
+      await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' })
+    } catch {}
     window.location.href = '/login'
   }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         className="w-full rounded-xl bg-white/5 hover:bg-white/10 text-left flex items-center gap-3 px-3 py-2 transition"
       >
         <div className="h-9 w-9 rounded-lg bg-white/15 grid place-items-center text-xs font-bold text-white">
@@ -94,12 +118,17 @@ export default function UserMenu({ collapsed }: Props) {
 
         {!collapsed && (
           <div className="min-w-0">
-            <div className="truncate text-sm text-white">{loading ? 'Carregando…' : fullName || 'Usuário'}</div>
+            <div className="truncate text-sm text-white">
+              {loading ? 'Carregando…' : fullName || 'Usuário'}
+            </div>
             <div className="truncate text-[11px] text-slate-400">{login || email}</div>
           </div>
         )}
 
-        <ChevronDown className={['ml-auto text-slate-300', open ? 'rotate-180' : ''].join(' ')} size={16} />
+        <ChevronDown
+          className={['ml-auto text-slate-300', open ? 'rotate-180' : ''].join(' ')}
+          size={16}
+        />
       </button>
 
       {open && (
@@ -111,24 +140,13 @@ export default function UserMenu({ collapsed }: Props) {
           ].join(' ')}
         >
           <div className="px-3 py-2">
-            <div className="text-sm font-medium truncate">
-              {fullName || 'Usuário'}
-            </div>
-            <div className="text-[11px] text-slate-400 truncate">
-              {email || login}
-            </div>
+            <div className="text-sm font-medium truncate">{fullName || 'Usuário'}</div>
+            <div className="text-[11px] text-slate-400 truncate">{email || login}</div>
           </div>
 
           <div className="my-2 h-px bg-white/10" />
 
-          {/* Botão de tema */}
-          <button
-            onClick={toggleTheme}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-          </button>
+        
 
           <div className="my-2 h-px bg-white/10" />
 
@@ -147,7 +165,6 @@ export default function UserMenu({ collapsed }: Props) {
           </button>
         </div>
       )}
-
     </div>
   )
 }

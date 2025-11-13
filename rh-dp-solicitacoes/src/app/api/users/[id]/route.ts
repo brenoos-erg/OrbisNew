@@ -31,11 +31,11 @@ export async function GET(
         login: true,
         phone: true,
         status: true,
+        avatarUrl: true,
+
         costCenters: {
           include: {
-            costCenter: {
-              select: { id: true, description: true },
-            },
+            costCenter: true, // 👈 AGORA O TYPE É COMPLETO
           },
         },
       },
@@ -56,10 +56,13 @@ export async function GET(
       login: user.login,
       phone: user.phone,
       status: user.status, // 'ATIVO' | 'INATIVO'
-      costCenters: user.costCenters.map((link) => ({
-        id: link.costCenter.id,
-        description: link.costCenter.description,
-      })),
+      avatarUrl: user.avatarUrl ?? null, // 👈 devolve a foto
+      costCenters: user.costCenters.map(
+  (link: { costCenter: { id: string; description: string } }) => ({
+    id: link.costCenter.id,
+    description: link.costCenter.description,
+  }),
+),
     })
   } catch (err) {
     console.error('GET /api/users/[id] error', err)

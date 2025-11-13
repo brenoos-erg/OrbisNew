@@ -4,6 +4,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Save, PlusCircle, Pencil, Trash2, X, Check } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Eye } from 'lucide-react'
 
 type UserRow = {
   id: string
@@ -22,8 +24,9 @@ type CostCenter = {
   externalCode?: string | null
 }
 
+// labels mais escuros para melhor leitura no fundo claro
 const LABEL =
-  'block text-xs font-semibold uppercase tracking-wide text-slate-300'
+  'block text-xs font-semibold uppercase tracking-wide text-slate-700'
 
 const INPUT =
   'mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-[15px] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300 transition-colors'
@@ -57,7 +60,7 @@ export default function Page() {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [firstAccess, setFirstAccess] = useState(false)
-
+  const router = useRouter()
   const autoLogin = useMemo(() => toLoginFromName(fullName), [fullName])
   useEffect(() => setLogin(autoLogin), [autoLogin])
 
@@ -66,7 +69,22 @@ export default function Page() {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // 👇 novo estado
+  const [search, setSearch] = useState('')
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return rows
 
+    return rows.filter((u) => {
+      const costCenter = (u.costCenterName || '').toLowerCase()
+      return (
+        u.fullName.toLowerCase().includes(term) ||
+        u.login.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term) ||
+        costCenter.includes(term)
+      )
+    })
+  }, [rows, search])
   async function load() {
     setLoading(true)
     try {
@@ -79,11 +97,15 @@ export default function Page() {
       const list: UserRow[] = await r.json()
       setRows(list)
 
-      // centros de custo (para selects) — usa o endpoint correto do SELECT
+      // centros de custo (para selects)
       const cr = await fetch('/api/cost-centers/select', { cache: 'no-store' })
       if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
-      const arr: { id: string; description: string; code?: string | null; externalCode?: string | null }[] =
-        await cr.json()
+      const arr: {
+        id: string
+        description: string
+        code?: string | null
+        externalCode?: string | null
+      }[] = await cr.json()
       setCostCenters(arr)
     } catch (e) {
       console.error('load() error', e)
@@ -203,10 +225,20 @@ export default function Page() {
   return (
     <div className="max-w-7xl mx-auto w-full">
       <div className="text-sm text-slate-400 mb-6">Sistema de Solicitações</div>
-      <h1 className="text-2xl font-semibold text-slate-100 mb-1">Configurações</h1>
-      <p className="text-sm text-slate-400 mb-6">Cadastro e manutenção de usuários.</p>
 
-      <form onSubmit={onSubmit} autoComplete="off" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Título bem escuro */}
+      <h1 className="text-2xl font-semibold text-slate-900 mb-1">
+        Configurações
+      </h1>
+      <p className="text-sm text-slate-500 mb-6">
+        Cadastro e manutenção de usuários.
+      </p>
+
+      <form
+        onSubmit={onSubmit}
+        autoComplete="off"
+        className="grid grid-cols-1 lg:grid-cols-12 gap-6"
+      >
         {/* HONEYPOTS */}
         <input
           type="text"
@@ -226,7 +258,9 @@ export default function Page() {
         />
 
         {/* ESQUERDA */}
-        <div className="lg:col-span-5 space-y-5">
+<div className="lg:col-span-4">
+
+
           <div>
             <label className={LABEL}>Nome completo</label>
             <input
@@ -291,13 +325,14 @@ export default function Page() {
               placeholder="breno.sousa"
             />
             <p className="mt-1 text-[11px] text-slate-500">
-              Padrão: primeiro nome + último sobrenome (sem acento), ex.: <b>breno.sousa</b>.
+              Padrão: primeiro nome + último sobrenome (sem acento), ex.:{' '}
+              <b>breno.sousa</b>.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-300">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
                 Senha (opcional)
               </label>
               <input
@@ -329,13 +364,12 @@ export default function Page() {
                 onChange={(e) => setFirstAccess(e.target.checked)}
               />
               <label
-  htmlFor="firstAccess"
-  className="ml-2 text-sm"
-  style={{ color: 'var(--foreground)' }}
->
-  Usuário definirá a senha no primeiro acesso
-</label>
-
+                htmlFor="firstAccess"
+                className="ml-2 text-sm"
+                style={{ color: 'var(--foreground)' }}
+              >
+                Usuário definirá a senha no primeiro acesso
+              </label>
             </div>
           </div>
 
@@ -361,9 +395,23 @@ export default function Page() {
         </div>
 
         {/* DIREITA */}
-        <div className="lg:col-span-7">
+       <div className="lg:col-span-8">
+
+
           <div className="card p-4">
-            <div className="text-sm font-semibold text-slate-100 mb-3">Últimos usuários</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-slate-100">
+                Últimos usuários
+              </div>
+
+              <input
+                type="search"
+                className="ml-3 w-56 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                placeholder="Buscar por nome, login, e-mail..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
 
             <div className="max-h-[620px] overflow-auto overflow-x-auto">
               <table className="w-full text-sm">
@@ -383,45 +431,63 @@ export default function Page() {
                         Carregando…
                       </td>
                     </tr>
-                  ) : rows.length === 0 ? (
+                  ) : filteredRows.length === 0 ? (
                     <tr>
                       <td className="py-6 text-slate-500" colSpan={5}>
-                        Nenhum usuário cadastrado.
+                        Nenhum usuário encontrado.
                       </td>
                     </tr>
                   ) : (
-                    rows.map((u) => (
-                      <tr key={u.id || u.email} className="table-row hover:bg-white/5">
+                    filteredRows.map((u) => (
+                      <tr
+                        key={u.id || u.email}
+                        className="hover:bg-white/5 cursor-pointer"
+                        onClick={() => router.push(`/dashboard/configuracoes/usuarios/${u.id}`)}
+                      >
                         <td className="py-2 pr-3">
-                          {u.id ? (
-                            <Link
-                              href={`/dashboard/configuracoes/usuarios/${u.id}`}
-                              className="text-blue-400 hover:underline"
-                            >
-                              {u.fullName}
-                            </Link>
-                          ) : (
-                            u.fullName
-                          )}
+                          <td className="py-2 pr-3">{u.fullName}</td>
                         </td>
+
+
+
                         <td className="py-2 pr-3">{u.login}</td>
                         <td className="py-2 pr-3 break-all">{u.email}</td>
                         <td className="py-2 pr-3">{u.costCenterName || '—'}</td>
+
                         <td className="py-2">
                           <div className="flex items-center gap-2">
+
+                            {/* Visualizar */}
                             <button
-                              onClick={() => openEdit(u)}
+                              onClick={() => router.push(`/dashboard/configuracoes/usuarios/${u.id}`)}
                               className="btn-table"
-                              title="Editar"
                               disabled={!u.id}
+                            >
+                              <Eye size={14} /> Visualizar
+                            </button>
+
+                            {/* Editar */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openEdit(u)
+                              }}
+                              className="btn-table"
+                              disabled={!u.id}
+                              title="Editar"
                             >
                               <Pencil size={14} /> Editar
                             </button>
+
+                            {/* Excluir */}
                             <button
-                              onClick={() => handleDelete(u)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDelete(u)
+                              }}
                               className="btn-table btn-table-danger"
-                              title="Excluir"
                               disabled={!u.id}
+                              title="Excluir"
                             >
                               <Trash2 size={14} /> Excluir
                             </button>
@@ -434,8 +500,9 @@ export default function Page() {
               </table>
             </div>
 
-            <p className="mt-2 text-[11px] text-slate-400">
-              Dica: após criar, você pode usar esse usuário como solicitante nas telas.
+            <p className="mt-2 text-[11px] text-slate-500">
+              Dica: após criar, você pode usar esse usuário como solicitante nas
+              telas.
             </p>
           </div>
         </div>
@@ -447,7 +514,10 @@ export default function Page() {
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Editar usuário</h3>
-              <button onClick={closeEdit} className="rounded-md p-1 hover:bg-slate-100">
+              <button
+                onClick={closeEdit}
+                className="rounded-md p-1 hover:bg-slate-100"
+              >
                 <X size={18} />
               </button>
             </div>

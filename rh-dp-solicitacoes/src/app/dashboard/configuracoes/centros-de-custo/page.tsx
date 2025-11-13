@@ -151,7 +151,8 @@ export default function CostCentersPage() {
       <div className="text-sm text-slate-400 mb-6">Sistema de Solicitações</div>
 
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-semibold text-slate-100">
+        {/* AQUI: título mais escuro */}
+        <h1 className="text-2xl font-semibold text-slate-900">
           Centros de Custo
         </h1>
         <div className="flex items-center gap-2">

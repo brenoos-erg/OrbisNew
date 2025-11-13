@@ -153,11 +153,13 @@ body {
   background: rgba(148, 163, 184, 0.12);
 }
 
+/* Versão "perigo" – bem visível no fundo claro */
 .btn-table-danger {
   border-color: #dc2626;
-  color: #fecaca;
+  background: #fee2e2;   /* fundo rosado */
+  color: #b91c1c;        /* texto vermelho forte */
 }
 
 .btn-table-danger:hover {
-  background: rgba(248, 113, 113, 0.12);
+  background: #fecaca;   /* um pouco mais escuro no hover */
 }

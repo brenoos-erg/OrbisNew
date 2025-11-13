@@ -13,6 +13,7 @@ type UserData = {
   login: string | null
   phone: string | null
   status: UserStatus
+  avatarUrl?: string | null  // 👈 foto que vem da API
 }
 
 const LABEL = 'form-label'
@@ -57,7 +58,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
           setUser(null)
           return
         }
-        const data = await r.json()
+        const data = (await r.json()) as UserData
         setUser(data)
       } catch (err) {
         console.error('Erro ao carregar usuário', err)
@@ -86,7 +87,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
       alert('Alterações salvas.')
 
-      // opcional: atualiza estado local após salvar
+      // atualiza estado local após salvar
       setUser((prev) =>
         prev
           ? {
@@ -114,12 +115,22 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
       </h1>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Card à esquerda com avatar e status */}
-        <div className="col-span-12 lg:col-span-4">
+        {/* ESQUERDA: foto + dados + ATIVO/INATIVO */}
+        <div className="col-span-12 lg:col-span-5">
           <div className="card p-4 flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center text-sm font-semibold text-slate-700">
-                {user.email?.slice(0, 2).toUpperCase()}
+              <div className="h-24 w-24 rounded-full bg-slate-200 flex items-center justify-center text-base font-semibold text-slate-700">
+
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user.email?.slice(0, 2).toUpperCase()
+                )}
               </div>
               <div className="text-[var(--foreground)]">
                 <div className="font-semibold">{user.fullName}</div>
@@ -157,8 +168,8 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
           </div>
         </div>
 
-        {/* Formulário à direita */}
-        <div className="col-span-12 lg:col-span-8">
+        {/* DIREITA: dados do usuário + botão Salvar */}
+       <div className="col-span-12 lg:col-span-7">
           <div className="card p-4">
             <div className="grid grid-cols-1 gap-4">
               <div>
@@ -209,7 +220,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
             </div>
           </div>
 
-          {/* Painel de Centros de Custo do usuário */}
+          {/* CENTROS DE CUSTO (card embaixo) */}
           <div className="mt-6">
             <UserCostCenterPanel userId={user.id} />
           </div>

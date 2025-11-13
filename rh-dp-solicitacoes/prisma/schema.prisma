@@ -204,6 +204,7 @@ model User {
   fullName String
   login    String? @unique(map: "user_login_key")
   phone    String?
+  avatarUrl String?     
 
   // CC principal (seu campo atual, pode continuar existindo)
   costCenterId String?

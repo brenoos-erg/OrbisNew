@@ -1,42 +1,57 @@
-// src/app/api/users/[id]/route.ts
-import { prisma } from '@/lib/prisma'
+// src/app/api/users/[id]/cost-centers/route.ts
 import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
-type Status = 'ATIVO' | 'INATIVO'
+type Params = { params: { id: string; linkId?: string } }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const body = await req.json()
-
-  // validação simples (use Zod se quiser)
-  const dataToUpdate: any = {}
-  if (typeof body.fullName === 'string') dataToUpdate.fullName = body.fullName
-  if (typeof body.login === 'string') dataToUpdate.login = body.login
-  if (typeof body.phone === 'string') dataToUpdate.phone = body.phone
-  if (body.status === 'ATIVO' || body.status === 'INATIVO') {
-    dataToUpdate.status = body.status as Status         // ⬅️ salvar status
-  }
-
-  // senha opcional (se existir no seu fluxo)
-  if (typeof body.password === 'string' && body.password.length > 0) {
-    // … sua lógica de troca de senha, se houver
-  }
-
-  const updated = await prisma.user.update({
-    where: { id: params.id },
-    data: dataToUpdate,
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      login: true,
-      phone: true,
-      status: true,            // ⬅️ devolva status
-      costCenterId: true,
-    },
+// Lista vínculos do usuário
+export async function GET(_req: Request, { params }: Params) {
+  const links = await prisma.userCostCenter.findMany({
+    where: { userId: params.id },
+    include: { costCenter: { select: { id: true, description: true } } },
   })
 
-  return NextResponse.json(updated)
+  return NextResponse.json(links)
+}
+
+// Cria vínculo
+export async function POST(req: Request, { params }: Params) {
+  try {
+    const { id } = params
+    const { costCenterId } = await req.json()
+
+    const link = await prisma.userCostCenter.create({
+      data: {
+        userId: id,
+        costCenterId,
+      },
+      include: {
+        costCenter: { select: { id: true, description: true } },
+      },
+    })
+
+    return NextResponse.json(link, { status: 201 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json(
+      { error: 'Erro ao vincular centro de custo.' },
+      { status: 500 },
+    )
+  }
+}
+
+// Remove vínculo: DELETE /api/users/:id/cost-centers/:linkId
+export async function DELETE(_req: Request, { params }: { params: { id: string; linkId: string } }) {
+  try {
+    await prisma.userCostCenter.delete({
+      where: { id: params.linkId },
+    })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json(
+      { error: 'Erro ao remover vínculo.' },
+      { status: 500 },
+    )
+  }
 }
