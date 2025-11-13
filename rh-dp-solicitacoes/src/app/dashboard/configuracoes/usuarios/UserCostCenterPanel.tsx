@@ -7,6 +7,8 @@ import { Plus, Trash2 } from 'lucide-react'
 type CostCenter = {
   id: string
   description: string
+  code?: string | null
+  externalCode?: string | null
 }
 
 type UserCostCenterLink = {
@@ -17,6 +19,13 @@ type UserCostCenterLink = {
 }
 
 const SELECT = 'input flex-1'
+
+// mesmo padrão da tela de cadastro
+function ccLabel(cc: CostCenter) {
+  const num = cc.externalCode || cc.code || ''
+  return num ? `${num} - ${cc.description}` : cc.description
+}
+
 
 export default function UserCostCenterPanel({ userId }: { userId: string }) {
   const [allCenters, setAllCenters] = useState<CostCenter[]>([])
@@ -59,7 +68,10 @@ export default function UserCostCenterPanel({ userId }: { userId: string }) {
     }
     loadLinks()
   }, [userId])
-
+  function ccLabel(c: CostCenter) {
+    const num = c.code || c.externalCode || ''
+    return num ? `${num} - ${c.description}` : c.description
+  }
   // Adicionar vínculo
   async function add() {
     if (!selectedCenter) return alert('Selecione um centro de custo.')
@@ -120,9 +132,10 @@ export default function UserCostCenterPanel({ userId }: { userId: string }) {
           <option value="">Selecione centro de custo...</option>
           {allCenters.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.description}
+              {ccLabel(c)}
             </option>
           ))}
+
         </select>
 
         <button
@@ -155,10 +168,12 @@ export default function UserCostCenterPanel({ userId }: { userId: string }) {
             {links.map((l) => (
               <tr key={l.id} className="table-row">
                 <td className="py-2 px-2">
-                  {l.costCenter?.description ||
-                    allCenters.find((c) => c.id === l.costCenterId)
-                      ?.description ||
-                    '—'}
+                  {l.costCenter
+                    ? ccLabel(l.costCenter)
+                    : ccLabel(
+                      allCenters.find((c) => c.id === l.costCenterId) ??
+                      ({ description: '—' } as CostCenter),
+                    )}
                 </td>
                 <td className="py-2 px-2">
                   <button

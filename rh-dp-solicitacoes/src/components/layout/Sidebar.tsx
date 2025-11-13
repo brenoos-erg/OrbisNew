@@ -70,120 +70,120 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
         {/* MENU */}
         <nav className="px-3 space-y-2 mt-2">
           {showSolic && (
-  <div>
-    {/* Cabeçalho do grupo Solicitacoes */}
-    <button
-      type="button"
-      onClick={() => setOpenSolic((v) => !v)}
-      className={`${baseSection} ${inSolic ? activeSection : inactiveSection}`}
-    >
-      <ClipboardList className="h-5 w-5 shrink-0" />
-      {!collapsed && <span>Solicitações</span>}
-    </button>
+            <div>
+              {/* Cabeçalho do grupo Solicitacoes */}
+              <button
+                type="button"
+                onClick={() => setOpenSolic((v) => !v)}
+                className={`${baseSection} ${inSolic ? activeSection : inactiveSection}`}
+              >
+                <ClipboardList className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>Solicitações</span>}
+              </button>
 
-    {/* Submenu – só aparece se não estiver colapsado e se estiver "openSolic" */}
-    {openSolic && !collapsed && (
-      <div className="mt-1 ml-9 flex flex-col gap-1">
-        <Link
-          href="/dashboard/solicitacoes/enviadas"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+              {/* Submenu – só aparece se não estiver colapsado e se estiver "openSolic" */}
+              {openSolic && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/solicitacoes/enviadas"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname === '/dashboard/solicitacoes/enviadas'
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <Send size={16} /> <span>Solicitações Enviadas</span>
-        </Link>
+                  >
+                    <Send size={16} /> <span>Solicitações Enviadas</span>
+                  </Link>
 
-        <Link
-          href="/dashboard/solicitacoes/recebidas"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                  <Link
+                    href="/dashboard/solicitacoes/recebidas"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname === '/dashboard/solicitacoes/recebidas'
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <Inbox size={16} /> <span>Solicitações Recebidas</span>
-        </Link>
+                  >
+                    <Inbox size={16} /> <span>Solicitações Recebidas</span>
+                  </Link>
 
-        <Link
-          href="/dashboard/solicitacoes/cadastros"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                  <Link
+                    href="/dashboard/solicitacoes/cadastros"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname.startsWith('/dashboard/solicitacoes/cadastros')
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <FolderCog size={16} /> <span>Cadastros</span>
-        </Link>
-      </div>
-    )}
-  </div>
-)}
+                  >
+                    <FolderCog size={16} /> <span>Cadastros</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
 
           {showConfig && (
-  <div>
-    {/* Cabeçalho do grupo Configurações */}
-    <button
-      type="button"
-      onClick={() => setOpenConfig((v) => !v)}
-      className={`${baseSection} ${inConfig ? activeSection : inactiveSection}`}
-    >
-      <Settings className="h-5 w-5 shrink-0" />
-      {!collapsed && <span>Configurações</span>}
-    </button>
+            <div>
+              {/* Cabeçalho do grupo Configurações */}
+              <button
+                type="button"
+                onClick={() => setOpenConfig((v) => !v)}
+                className={`${baseSection} ${inConfig ? activeSection : inactiveSection}`}
+              >
+                <Settings className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>Configurações</span>}
+              </button>
 
-    {/* Submenu */}
-    {openConfig && !collapsed && (
-      <div className="mt-1 ml-9 flex flex-col gap-1">
-        <Link
-          href="/dashboard/configuracoes"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+              {/* Submenu */}
+              {openConfig && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/configuracoes"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname === '/dashboard/configuracoes'
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <Settings size={16} /> <span>Painel</span>
-        </Link>
+                  >
+                    <Settings size={16} /> <span>Painel</span>
+                  </Link>
 
-        <Link
-          href="/dashboard/configuracoes/usuarios"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                  <Link
+                    href="/dashboard/configuracoes/usuarios"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname.startsWith('/dashboard/configuracoes/usuarios')
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <Users size={16} /> <span>Usuários</span>
-        </Link>
+                  >
+                    <Users size={16} /> <span>Usuários</span>
+                  </Link>
 
-        <Link
-          href="/dashboard/configuracoes/permissoes"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                  <Link
+                    href="/dashboard/configuracoes/permissoes"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname.startsWith('/dashboard/configuracoes/permissoes')
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <Shield size={16} /> <span>Permissões</span>
-        </Link>
+                  >
+                    <Shield size={16} /> <span>Permissões</span>
+                  </Link>
 
-        <Link
-          href="/dashboard/configuracoes/centros-de-custo"
-          className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                  <Link
+                    href="/dashboard/configuracoes/centros-de-custo"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
             ${pathname.startsWith('/dashboard/configuracoes/centros-de-custo')
-              ? 'bg-orange-500/90 text-white'
-              : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+                        ? 'bg-orange-500/90 text-white'
+                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
           `}
-        >
-          <FolderCog size={16} /> <span>Centros de Custo</span>
-        </Link>
-      </div>
-    )}
-  </div>
-)}
+                  >
+                    <FolderCog size={16} /> <span>Centros de Custo</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
 
         </nav>
       </div>
