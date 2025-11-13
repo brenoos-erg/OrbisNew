@@ -127,7 +127,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <label className="form-label mb-1">Email</label>
             <input
               type="email"
               required
@@ -140,7 +140,7 @@ export default function LoginPage() {
 
           <div>
             <div className="flex items-center justify-between">
-              <label className="mb-1 block text-sm font-medium text-slate-700">Senha</label>
+              <label className="form-label mb-1">Senha</label>
               <button
                 type="button"
                 onClick={() => { setShowReset((v) => !v); setResetEmail(email); setResetMsg(null); setResetErr(null) }}

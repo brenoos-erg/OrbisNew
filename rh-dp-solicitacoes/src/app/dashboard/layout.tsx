@@ -35,9 +35,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex">
+    <div className="dashboard-shell min-h-screen flex">
       <Sidebar showSolic={showSolic} showConfig={showConfig} userMenu={<UserMenu collapsed={false} />} />
-      <main className="flex-1 bg-white ml-16 md:ml-72 transition-all">
+      <main className="flex-1 ml-72">
         <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
           Sistema de Solicitações
         </div>

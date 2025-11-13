@@ -1,10 +1,41 @@
 @import "tailwindcss";
 
+/* ========================
+   VARIÁVEIS DE TEMA
+   ======================== */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  --card: #ffffff;
+  --card-soft: #f8fafc;
+  --card-border: #e2e8f0;
+  --border-subtle: #e2e8f0;
 }
 
+/* Dark mode (quando html[data-theme='dark']) */
+:root {
+  /* cores fixas para modo claro */
+  --background: #f8fafc;    /* parecido com bg-slate-50 */
+  --foreground: #020617;    /* parecido com text-slate-950 */
+}
+
+
+/* fallback se a pessoa tiver prefers-color-scheme=dark e nenhum tema salvo */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --background: #020617;
+    --foreground: #e5e7eb;
+
+    --card: #020617;
+    --card-soft: #020617;
+    --card-border: rgba(148, 163, 184, 0.6);
+    --border-subtle: rgba(148, 163, 184, 0.5);
+  }
+}
+
+/* integração com o Tailwind @theme */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,15 +43,121 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+
+/* ========================
+   BASE
+   ======================== */
+/* ❌ NÃO tem mais @media (prefers-color-scheme: dark) */
+/* Sempre modo claro, independente do tema do sistema */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ========================
+   HELPERS DE LAYOUT
+   ======================== */
+
+/* Card padrão (painéis, box de formulário, etc.) */
+.card {
+  background: var(--card);
+  border-radius: 0.75rem;
+  border: 1px solid var(--card-border);
+}
+
+/* Label de formulário */
+.form-label {
+  font-size: 0.75rem;          /* text-xs */
+  font-weight: 600;            /* font-semibold */
+  text-transform: uppercase;
+  letter-spacing: 0.08em;      /* tracking-wide */
+  color: var(--foreground);
+  opacity: 0.9;
+}
+
+:root[data-theme='dark'] .form-label {
+  opacity: 0.85;
+}
+
+/* Input / select / textarea padrão */
+.input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border-subtle);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.input::placeholder {
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.input:focus {
+  border-color: #f97316; /* laranja */
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
+}
+
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ========================
+   TABELAS
+   ======================== */
+
+.table-header {
+  background: var(--card-soft);
+}
+
+.table-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.table-footer {
+  border-top: 1px solid var(--border-subtle);
+  background: var(--card-soft);
+}
+
+/* Botões de ação em tabela ("Editar", "Excluir") */
+.btn-table {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-subtle);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.btn-table:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.btn-table-danger {
+  border-color: #dc2626;
+  color: #fecaca;
+}
+
+.btn-table-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
 }

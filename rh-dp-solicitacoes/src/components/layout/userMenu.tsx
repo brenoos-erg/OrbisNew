@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/client'   // <- use o client do projeto
-import { ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronDown, LogOut, Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
+import { useTheme } from '@/components/theme/ThemeProvider'
 
 type Props = { collapsed?: boolean }
 
@@ -21,6 +22,8 @@ export default function UserMenu({ collapsed }: Props) {
   const [fullName, setFullName] = useState('')
   const [login, setLogin] = useState('')
   const [email, setEmail] = useState('')
+
+  const { theme, toggleTheme } = useTheme()
 
   useEffect(() => {
     let mounted = true
@@ -74,8 +77,8 @@ export default function UserMenu({ collapsed }: Props) {
   }, [])
 
   async function handleSignOut() {
-    try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
-    try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
+    try { await supabase.auth.signOut({ scope: 'global' }) } catch { }
+    try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch { }
     window.location.href = '/login'
   }
 
@@ -100,21 +103,42 @@ export default function UserMenu({ collapsed }: Props) {
       </button>
 
       {open && (
-        <div className={[
-          'absolute z-50 w-56 rounded-xl border border-white/10 bg-[#0f172a] text-slate-100 shadow-xl',
-          'bottom-full mb-2 left-0', collapsed ? 'translate-x-[8px]' : '',
-        ].join(' ')}>
+        <div
+          className={[
+            'absolute z-50 w-56 rounded-xl border border-white/10 bg-[#0f172a] text-slate-100 shadow-xl',
+            'bottom-full mb-2 left-0',
+            collapsed ? 'translate-x-[8px]' : '',
+          ].join(' ')}
+        >
           <div className="px-3 py-2">
-            <div className="text-sm font-medium truncate">{fullName || 'Usuário'}</div>
-            <div className="text-[11px] text-slate-400 truncate">{email || login}</div>
+            <div className="text-sm font-medium truncate">
+              {fullName || 'Usuário'}
+            </div>
+            <div className="text-[11px] text-slate-400 truncate">
+              {email || login}
+            </div>
           </div>
+
           <div className="my-2 h-px bg-white/10" />
+
+          {/* Botão de tema */}
+          <button
+            onClick={toggleTheme}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+          </button>
+
+          <div className="my-2 h-px bg-white/10" />
+
           <button
             onClick={() => (window.location.href = '/dashboard/configuracoes/perfil')}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
           >
             <SettingsIcon size={16} /> Gerenciar perfil
           </button>
+
           <button
             onClick={handleSignOut}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
@@ -123,6 +147,7 @@ export default function UserMenu({ collapsed }: Props) {
           </button>
         </div>
       )}
+
     </div>
   )
 }

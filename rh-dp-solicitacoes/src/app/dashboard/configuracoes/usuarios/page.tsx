@@ -22,9 +22,11 @@ type CostCenter = {
   externalCode?: string | null
 }
 
-const LABEL = 'block text-xs font-semibold text-black uppercase tracking-wide'
+const LABEL =
+  'block text-xs font-semibold uppercase tracking-wide text-slate-300'
+
 const INPUT =
-  'mt-1 w-full rounded-md border border-blue-500/70 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150'
+  'mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-[15px] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300 transition-colors'
 
 // Rótulo “número - nome”
 function ccLabel(cc: CostCenter) {
@@ -120,8 +122,13 @@ export default function Page() {
         const err = await r.json().catch(() => ({} as any))
         throw new Error(err?.error || `POST falhou: ${r.status}`)
       }
-      setFullName(''); setEmail(''); setPhone(''); setCostCenterId('')
-      setLogin(''); setPassword(''); setFirstAccess(false)
+      setFullName('')
+      setEmail('')
+      setPhone('')
+      setCostCenterId('')
+      setLogin('')
+      setPassword('')
+      setFirstAccess(false)
       await load()
       alert('Usuário criado com sucesso!')
     } catch (e: any) {
@@ -195,20 +202,39 @@ export default function Page() {
 
   return (
     <div className="max-w-7xl mx-auto w-full">
-      <div className="text-sm text-slate-500 mb-6">Sistema de Solicitações</div>
-      <h1 className="text-2xl font-semibold text-slate-900 mb-1">Configurações</h1>
-      <p className="text-sm text-slate-500 mb-6">Cadastro e manutenção de usuários.</p>
+      <div className="text-sm text-slate-400 mb-6">Sistema de Solicitações</div>
+      <h1 className="text-2xl font-semibold text-slate-100 mb-1">Configurações</h1>
+      <p className="text-sm text-slate-400 mb-6">Cadastro e manutenção de usuários.</p>
 
       <form onSubmit={onSubmit} autoComplete="off" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* HONEYPOTS */}
-        <input type="text" name="email" autoComplete="email" tabIndex={-1} aria-hidden="true" className="hidden" />
-        <input type="password" name="password" autoComplete="new-password" tabIndex={-1} aria-hidden="true" className="hidden" />
+        <input
+          type="text"
+          name="email"
+          autoComplete="email"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="hidden"
+        />
+        <input
+          type="password"
+          name="password"
+          autoComplete="new-password"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="hidden"
+        />
 
         {/* ESQUERDA */}
         <div className="lg:col-span-5 space-y-5">
           <div>
             <label className={LABEL}>Nome completo</label>
-            <input className={INPUT} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="" />
+            <input
+              className={INPUT}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder=""
+            />
           </div>
 
           <div>
@@ -232,7 +258,12 @@ export default function Page() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LABEL}>Telefone</label>
-              <input className={INPUT} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(31) 99999-0000" />
+              <input
+                className={INPUT}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(31) 99999-0000"
+              />
             </div>
             <div>
               <label className={LABEL}>Centro de Custo</label>
@@ -242,8 +273,10 @@ export default function Page() {
                 onChange={(e) => setCostCenterId(e.target.value)}
               >
                 <option value="">Selecione...</option>
-                {costCenters.map(cc => (
-                  <option key={cc.id} value={cc.id}>{ccLabel(cc)}</option>
+                {costCenters.map((cc) => (
+                  <option key={cc.id} value={cc.id}>
+                    {ccLabel(cc)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -251,7 +284,12 @@ export default function Page() {
 
           <div>
             <label className={LABEL}>Login (gerado automaticamente)</label>
-            <input className={INPUT} value={login} onChange={(e) => setLogin(e.target.value)} placeholder="breno.sousa" />
+            <input
+              className={INPUT}
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              placeholder="breno.sousa"
+            />
             <p className="mt-1 text-[11px] text-slate-500">
               Padrão: primeiro nome + último sobrenome (sem acento), ex.: <b>breno.sousa</b>.
             </p>
@@ -259,7 +297,9 @@ export default function Page() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Senha (opcional)</label>
+              <label className="mb-1 block text-sm font-medium text-slate-300">
+                Senha (opcional)
+              </label>
               <input
                 type="password"
                 id="userPassword"
@@ -269,10 +309,10 @@ export default function Page() {
                 autoCapitalize="none"
                 spellCheck={false}
                 className={
-                  'w-full rounded-lg border bg-white px-4 py-3 text-sm outline-none ' +
+                  'w-full rounded-lg border px-4 py-3 text-sm outline-none bg-[var(--card)] text-[var(--foreground)] ' +
                   (firstAccess
-                    ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'border-slate-300 focus:border-orange-400 focus:ring-2 focus:ring-orange-300')
+                    ? 'border-slate-500/50 text-slate-500 cursor-not-allowed'
+                    : 'border-[var(--border-subtle)] focus:border-orange-400 focus:ring-2 focus:ring-orange-300')
                 }
                 placeholder="••••••••"
                 value={password}
@@ -288,9 +328,14 @@ export default function Page() {
                 checked={firstAccess}
                 onChange={(e) => setFirstAccess(e.target.checked)}
               />
-              <label htmlFor="firstAccess" className="ml-2 text-sm text-slate-700">
-                Usuário definirá a senha no primeiro acesso
-              </label>
+              <label
+  htmlFor="firstAccess"
+  className="ml-2 text-sm"
+  style={{ color: 'var(--foreground)' }}
+>
+  Usuário definirá a senha no primeiro acesso
+</label>
+
             </div>
           </div>
 
@@ -317,13 +362,13 @@ export default function Page() {
 
         {/* DIREITA */}
         <div className="lg:col-span-7">
-          <div className="rounded-lg border border-slate-200 bg-white/60 p-4">
-            <div className="text-sm font-semibold text-slate-700 mb-3">Últimos usuários</div>
+          <div className="card p-4">
+            <div className="text-sm font-semibold text-slate-100 mb-3">Últimos usuários</div>
 
             <div className="max-h-[620px] overflow-auto overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="text-left text-slate-500">
+                <thead className="sticky top-0 table-header">
+                  <tr className="text-left text-slate-400">
                     <th className="py-2 w-[28%]">Nome</th>
                     <th className="py-2 w-[16%]">Login</th>
                     <th className="py-2 w-[28%]">E-mail</th>
@@ -333,15 +378,26 @@ export default function Page() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td className="py-6 text-slate-500" colSpan={5}>Carregando…</td></tr>
+                    <tr>
+                      <td className="py-6 text-slate-500" colSpan={5}>
+                        Carregando…
+                      </td>
+                    </tr>
                   ) : rows.length === 0 ? (
-                    <tr><td className="py-6 text-slate-500" colSpan={5}>Nenhum usuário cadastrado.</td></tr>
+                    <tr>
+                      <td className="py-6 text-slate-500" colSpan={5}>
+                        Nenhum usuário cadastrado.
+                      </td>
+                    </tr>
                   ) : (
                     rows.map((u) => (
-                      <tr key={u.id || u.email} className="border-t">
+                      <tr key={u.id || u.email} className="table-row hover:bg-white/5">
                         <td className="py-2 pr-3">
                           {u.id ? (
-                            <Link href={`/dashboard/configuracoes/usuarios/${u.id}`} className="text-blue-700 hover:underline">
+                            <Link
+                              href={`/dashboard/configuracoes/usuarios/${u.id}`}
+                              className="text-blue-400 hover:underline"
+                            >
                               {u.fullName}
                             </Link>
                           ) : (
@@ -355,19 +411,19 @@ export default function Page() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openEdit(u)}
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50"
+                              className="btn-table"
                               title="Editar"
                               disabled={!u.id}
                             >
-                              <Pencil size={16} /> Editar
+                              <Pencil size={14} /> Editar
                             </button>
                             <button
                               onClick={() => handleDelete(u)}
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-slate-50 text-red-600"
+                              className="btn-table btn-table-danger"
                               title="Excluir"
                               disabled={!u.id}
                             >
-                              <Trash2 size={16} /> Excluir
+                              <Trash2 size={14} /> Excluir
                             </button>
                           </div>
                         </td>
@@ -378,7 +434,7 @@ export default function Page() {
               </table>
             </div>
 
-            <p className="mt-2 text-[11px] text-slate-500">
+            <p className="mt-2 text-[11px] text-slate-400">
               Dica: após criar, você pode usar esse usuário como solicitante nas telas.
             </p>
           </div>
@@ -391,25 +447,43 @@ export default function Page() {
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Editar usuário</h3>
-              <button onClick={closeEdit} className="rounded-md p-1 hover:bg-slate-100"><X size={18} /></button>
+              <button onClick={closeEdit} className="rounded-md p-1 hover:bg-slate-100">
+                <X size={18} />
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className={LABEL}>Nome completo</label>
-                <input className={INPUT} value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+                <input
+                  className={INPUT}
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                />
               </div>
               <div>
                 <label className={LABEL}>E-mail</label>
-                <input className={INPUT} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+                <input
+                  className={INPUT}
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
               </div>
               <div>
                 <label className={LABEL}>Login</label>
-                <input className={INPUT} value={editLogin} onChange={(e) => setEditLogin(e.target.value)} />
+                <input
+                  className={INPUT}
+                  value={editLogin}
+                  onChange={(e) => setEditLogin(e.target.value)}
+                />
               </div>
               <div>
                 <label className={LABEL}>Telefone</label>
-                <input className={INPUT} value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+                <input
+                  className={INPUT}
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                />
               </div>
               <div>
                 <label className={LABEL}>Centro de Custo</label>
@@ -419,8 +493,10 @@ export default function Page() {
                   onChange={(e) => setEditCostCenterId(e.target.value)}
                 >
                   <option value="">Selecione...</option>
-                  {costCenters.map(cc => (
-                    <option key={cc.id} value={cc.id}>{ccLabel(cc)}</option>
+                  {costCenters.map((cc) => (
+                    <option key={cc.id} value={cc.id}>
+                      {ccLabel(cc)}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -437,7 +513,10 @@ export default function Page() {
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-              <button onClick={closeEdit} className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm">
+              <button
+                onClick={closeEdit}
+                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm"
+              >
                 <X size={16} /> Cancelar
               </button>
               <button

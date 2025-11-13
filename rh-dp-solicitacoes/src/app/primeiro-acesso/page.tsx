@@ -90,7 +90,7 @@ export default function PrimeiroAcessoPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Nova senha</label>
+            <label className="form-label mb-1">Nova senha</label>
             <input
               type="password"
               value={pwd1}
@@ -101,7 +101,7 @@ export default function PrimeiroAcessoPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Confirmar nova senha</label>
+            <label className="form-label mb-1">Confirmar nova senha</label>
             <input
               type="password"
               value={pwd2}

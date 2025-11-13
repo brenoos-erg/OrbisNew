@@ -1,3 +1,4 @@
+// src/app/dashboard/configuracoes/usuarios/[id]/UserProfilePageClient.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -14,8 +15,8 @@ type UserData = {
   status: UserStatus
 }
 
-const INPUT =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
+const LABEL = 'form-label'
+const INPUT = 'input'
 
 type Props = {
   userId: string
@@ -107,32 +108,36 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="text-sm text-slate-500">Sistema de Solicitações</div>
-      <h1 className="text-xl font-semibold my-4">Perfil do Usuário</h1>
+      <div className="text-sm text-slate-400 mb-2">Sistema de Solicitações</div>
+      <h1 className="text-xl font-semibold mb-6 text-[var(--foreground)]">
+        Perfil do Usuário
+      </h1>
 
       <div className="grid grid-cols-12 gap-6">
         {/* Card à esquerda com avatar e status */}
         <div className="col-span-12 lg:col-span-4">
-          <div className="border rounded-xl p-4 bg-white">
+          <div className="card p-4 flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center text-sm font-semibold text-slate-600">
+              <div className="h-20 w-20 rounded-full bg-slate-200 flex items-center justify-center text-sm font-semibold text-slate-700">
                 {user.email?.slice(0, 2).toUpperCase()}
               </div>
-              <div>
+              <div className="text-[var(--foreground)]">
                 <div className="font-semibold">{user.fullName}</div>
-                <div className="text-xs text-slate-500">Login: {user.login || '—'}</div>
-                <div className="text-xs text-slate-500">E-mail: {user.email}</div>
+                <div className="text-xs opacity-80">
+                  Login: {user.login || '—'}
+                </div>
+                <div className="text-xs opacity-80">E-mail: {user.email}</div>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setStatus('ATIVO')}
-                className={`px-3 py-2 rounded text-sm border ${
+                className={`px-3 py-2 rounded text-sm border transition-colors ${
                   status === 'ATIVO'
                     ? 'bg-green-600 text-white border-green-700'
-                    : 'hover:bg-slate-50'
+                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-white/5'
                 }`}
               >
                 Ativo
@@ -140,10 +145,10 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
               <button
                 type="button"
                 onClick={() => setStatus('INATIVO')}
-                className={`px-3 py-2 rounded text-sm border ${
+                className={`px-3 py-2 rounded text-sm border transition-colors ${
                   status === 'INATIVO'
                     ? 'bg-red-600 text-white border-red-700'
-                    : 'hover:bg-slate-50'
+                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-white/5'
                 }`}
               >
                 Inativo
@@ -154,32 +159,37 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
         {/* Formulário à direita */}
         <div className="col-span-12 lg:col-span-8">
-          <div className="border rounded-xl p-4 bg-white">
+          <div className="card p-4">
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-xs font-semibold uppercase">
-                  Nome completo
-                </label>
+                <label className={LABEL}>Nome completo</label>
                 <input
                   className={INPUT}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold uppercase">E-mail</label>
-                <input className={INPUT} value={email} disabled />
+                <label className={LABEL}>E-mail</label>
+                <input
+                  className={`${INPUT} opacity-60 cursor-not-allowed`}
+                  value={email}
+                  disabled
+                />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold uppercase">Login</label>
+                <label className={LABEL}>Login</label>
                 <input
                   className={INPUT}
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold uppercase">Telefone</label>
+                <label className={LABEL}>Telefone</label>
                 <input
                   className={INPUT}
                   value={phone}

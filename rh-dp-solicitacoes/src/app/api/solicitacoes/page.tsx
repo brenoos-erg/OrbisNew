@@ -85,7 +85,8 @@ export default function SolicitacoesPage() {
 
   return (
     <div className="max-w-[1200px] mx-auto">
-      <div className="bg-white border rounded-xl shadow-sm">
+      <div className="card p-3">
+
         <div className="p-4 border-b">
           <div className="text-lg font-semibold">Solicitações Realizadas</div>
         </div>

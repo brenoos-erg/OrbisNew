@@ -1,3 +1,5 @@
+const LABEL = 'form-label'
+
 export default function ConfiguracoesPage() {
   return (
     <div className="max-w-5xl">
