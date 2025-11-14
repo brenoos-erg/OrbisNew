@@ -7,46 +7,39 @@ import { prisma } from '@/lib/prisma'
 // ----------------------------------------------------
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: { userId: string } },
 ) {
-  const { id } = params
+  const { userId } = params
 
-  try {
-    const links = await prisma.userCostCenter.findMany({
-      where: { userId: id },
-      include: {
-        costCenter: {
-          select: {
-            id: true,
-            description: true,
-            code: true,
-            externalCode: true,
-          },
-        },
+  const links = await prisma.userCostCenter.findMany({
+    where: { userId },
+    include: {
+      costCenter: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const items = links.map((l) => {
+    const cc = l.costCenter
+    const labelCode = cc.externalCode || cc.code || ''
+
+    return {
+      id: l.id,                 // 👈 AGORA É O ID DO VÍNCULO
+      userId: l.userId,
+      costCenterId: l.costCenterId,
+      costCenter: {
+        id: cc.id,
+        description: cc.description,
+        code: cc.code,
+        externalCode: cc.externalCode,
       },
-      orderBy: { createdAt: 'asc' },
-    })
+      label: labelCode
+        ? `${labelCode} - ${cc.description}`
+        : cc.description,
+    }
+  })
 
-    const items = links
-      .map((l) => {
-        const cc = l.costCenter
-        if (!cc) return null
-        const code = cc.externalCode || cc.code || ''
-        return {
-          id: cc.id,
-          label: code ? `${code} - ${cc.description}` : cc.description,
-        }
-      })
-      .filter(Boolean)
-
-    return NextResponse.json(items)
-  } catch (err) {
-    console.error('GET /api/users/[id]/cost-centers error', err)
-    return NextResponse.json(
-      { error: 'Erro ao buscar centros de custo do usuário.' },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json(items)
 }
 
 // Helper pra pegar costCenterId do body OU da query string
