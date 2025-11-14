@@ -12,7 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect('/login?inactive=1')
   }
 
-  // ... seu cálculo de showSolic/showConfig por cost centers ...
+  // cálculo de módulos liberados
   let showSolic = false
   let showConfig = false
   if (appUser?.id) {
@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       where: { userId: appUser.id },
       select: { costCenterId: true },
     })
-    const ccIds = new Set<string>(links.map(l => l.costCenterId))
+    const ccIds = new Set<string>(links.map((l) => l.costCenterId))
     if (appUser.costCenterId) ccIds.add(appUser.costCenterId)
 
     if (ccIds.size > 0) {
@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         where: { costCenterId: { in: [...ccIds] } },
         include: { module: { select: { key: true } } },
       })
-      const enabled = new Set(rows.map(r => r.module.key))
+      const enabled = new Set(rows.map((r) => r.module.key))
       showSolic = enabled.has('solicitacoes')
       showConfig = enabled.has('configuracoes')
     }
@@ -36,12 +36,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="dashboard-shell min-h-screen flex">
-      <Sidebar showSolic={showSolic} showConfig={showConfig} userMenu={<UserMenu collapsed={false} />} />
-      <main className="flex-1 ml-72">
+      <Sidebar
+        showSolic={showSolic}
+        showConfig={showConfig}
+        userMenu={<UserMenu collapsed={false} />}
+      />
+
+      {/* 🔴 AQUI: sem ml-72, o conteúdo ocupa todo o espaço restante */}
+      <main className="flex-1 flex flex-col">
         <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
           Sistema de Solicitações
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 flex-1 overflow-auto">{children}</div>
       </main>
     </div>
   )

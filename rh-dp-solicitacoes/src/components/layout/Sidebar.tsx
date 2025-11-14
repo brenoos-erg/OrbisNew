@@ -1,11 +1,10 @@
 // src/components/layout/Sidebar.tsx
-// src/components/layout/Sidebar.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ClipboardList, ChevronLeft, Send, Inbox, FolderCog, Settings, Users, Shield } from 'lucide-react'
-import { usePathname } from 'next/navigation'   // 👈 ADD
+import { usePathname } from 'next/navigation'
 
 type Props = {
   showSolic: boolean
@@ -34,7 +33,7 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
     }
   }, [inSolic, inConfig])
 
-  // Lembra estado entre reloads (já existia)
+  // Lembra estado entre reloads
   useEffect(() => {
     const v = localStorage.getItem('sidebar_collapsed')
     if (v === '1') setCollapsed(true)
@@ -48,10 +47,10 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
 
-
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen bg-[#0f172a] text-slate-200 shadow-xl flex flex-col justify-between transition-all duration-200
+      // 🔴 AQUI: tiramos fixed/left/top, usamos apenas min-h-screen e largura variável
+      className={`min-h-screen bg-[#0f172a] text-slate-200 shadow-xl flex flex-col justify-between transition-all duration-200
         ${collapsed ? 'w-16' : 'w-72'}`}
     >
       <div>
@@ -59,7 +58,7 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
         <div className="h-16 flex items-center px-3 border-b border-white/10">
           {!collapsed && <div className="font-semibold mr-2">Sistema de Solicitações</div>}
           <button
-            onClick={() => setCollapsed(v => !v)}
+            onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
             className="ml-auto rounded-md p-2 hover:bg-white/10"
           >
@@ -71,7 +70,7 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
         <nav className="px-3 space-y-2 mt-2">
           {showSolic && (
             <div>
-              {/* Cabeçalho do grupo Solicitacoes */}
+              {/* Cabeçalho do grupo Solicitações */}
               <button
                 type="button"
                 onClick={() => setOpenSolic((v) => !v)}
@@ -87,9 +86,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/solicitacoes/enviadas"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname === '/dashboard/solicitacoes/enviadas'
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname === '/dashboard/solicitacoes/enviadas'
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <Send size={16} /> <span>Solicitações Enviadas</span>
@@ -98,9 +99,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/solicitacoes/recebidas"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname === '/dashboard/solicitacoes/recebidas'
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname === '/dashboard/solicitacoes/recebidas'
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <Inbox size={16} /> <span>Solicitações Recebidas</span>
@@ -109,9 +112,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/solicitacoes/cadastros"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname.startsWith('/dashboard/solicitacoes/cadastros')
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname.startsWith('/dashboard/solicitacoes/cadastros')
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <FolderCog size={16} /> <span>Cadastros</span>
@@ -120,7 +125,6 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
               )}
             </div>
           )}
-
 
           {showConfig && (
             <div>
@@ -140,9 +144,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname === '/dashboard/configuracoes'
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname === '/dashboard/configuracoes'
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <Settings size={16} /> <span>Painel</span>
@@ -151,9 +157,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/usuarios"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname.startsWith('/dashboard/configuracoes/usuarios')
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname.startsWith('/dashboard/configuracoes/usuarios')
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <Users size={16} /> <span>Usuários</span>
@@ -162,9 +170,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/permissoes"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname.startsWith('/dashboard/configuracoes/permissoes')
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname.startsWith('/dashboard/configuracoes/permissoes')
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <Shield size={16} /> <span>Permissões</span>
@@ -173,9 +183,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/centros-de-custo"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${pathname.startsWith('/dashboard/configuracoes/centros-de-custo')
-                        ? 'bg-orange-500/90 text-white'
-                        : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'}
+            ${
+              pathname.startsWith('/dashboard/configuracoes/centros-de-custo')
+                ? 'bg-orange-500/90 text-white'
+                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+            }
           `}
                   >
                     <FolderCog size={16} /> <span>Centros de Custo</span>
@@ -184,7 +196,6 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
               )}
             </div>
           )}
-
         </nav>
       </div>
 
