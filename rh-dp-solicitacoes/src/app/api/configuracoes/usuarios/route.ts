@@ -1,3 +1,4 @@
+// src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
@@ -16,19 +17,33 @@ export async function GET() {
       login: true,
       phone: true,
       costCenterId: true,
-      costCenter: { select: { description: true } },
+      costCenter: {
+        select: {
+          description: true,
+          code: true,
+          externalCode: true,
+        },
+      },
     },
   })
 
-  const list = rows.map(r => ({
-    id: r.id,
-    fullName: r.fullName,
-    email: r.email,
-    login: r.login ?? '',
-    phone: r.phone ?? '',
-    costCenterId: r.costCenterId ?? null,
-    costCenterName: r.costCenter?.description ?? null,
-  }))
+  const list = rows.map((r) => {
+    const cc = r.costCenter
+    const ccCode = cc?.externalCode || cc?.code || ''
+    const costCenterName = cc
+      ? (ccCode ? `${ccCode} - ${cc.description}` : cc.description)
+      : null
+
+    return {
+      id: r.id,
+      fullName: r.fullName,
+      email: r.email,
+      login: r.login ?? '',
+      phone: r.phone ?? '',
+      costCenterId: r.costCenterId ?? null,
+      costCenterName,
+    }
+  })
 
   return NextResponse.json(list)
 }
@@ -44,32 +59,42 @@ export async function POST(req: NextRequest) {
     const costCenterId = (body.costCenterId ?? '') || null
     const rawPassword = (body.password ?? '').trim()
     const firstAccess = !!body.firstAccess
+    const department = (body.department ?? '').trim() || null
 
     if (!fullName || !email || !login) {
       return NextResponse.json(
         { error: 'Nome, e-mail e login são obrigatórios.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
-    // 1) Cria no Prisma (rollback se Auth falhar)
+    // 1) Cria no Prisma
     const created = await prisma.user.create({
-      data: { fullName, email, login, phone, costCenterId },
+      data: { fullName, email, login, phone, costCenterId, department },
       select: { id: true, fullName: true, email: true, login: true },
     })
+
+    // 1.1) Se tiver centro de custo, cria também o vínculo em UserCostCenter
+    if (costCenterId) {
+      await prisma.userCostCenter.create({
+        data: {
+          userId: created.id,
+          costCenterId,
+        },
+      })
+    }
 
     // 2) Cria no Supabase Auth (Admin)
     const sb = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
     )
 
     // Senha efetiva: nunca undefined
-    // - Se for "primeiro acesso" e vier vazia → temporária `${login}@123`
-    // - Se vier preenchida → usa a informada
-    // - Fallback: UUID
     const effectivePassword =
-      firstAccess && !rawPassword ? `${login}@123` : (rawPassword || crypto.randomUUID())
+      firstAccess && !rawPassword
+        ? `${login}@123`
+        : rawPassword || crypto.randomUUID()
 
     const { data: authData, error } = await sb.auth.admin.createUser({
       email,
@@ -80,15 +105,17 @@ export async function POST(req: NextRequest) {
         login,
         phone,
         costCenterId,
-        mustChangePassword: firstAccess, // flag lido no login/middleware
+        department,
+        mustChangePassword: firstAccess,
       },
     })
 
     if (error) {
-      await prisma.user.delete({ where: { id: created.id } }) // rollback
+      // rollback no Prisma se der erro no Auth
+      await prisma.user.delete({ where: { id: created.id } })
       return NextResponse.json(
         { error: 'Falha ao criar no Auth: ' + error.message },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
@@ -102,16 +129,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(created, { status: 201 })
   } catch (e: any) {
-    if ((e as any)?.code === 'P2002') {
+    if (e?.code === 'P2002') {
       return NextResponse.json(
         { error: 'E-mail ou login já cadastrado.' },
-        { status: 409 }
+        { status: 409 },
       )
     }
     console.error('POST /api/configuracoes/usuarios error', e)
     return NextResponse.json(
-        { error: e?.message || 'Erro ao criar usuário.' },
-        { status: 500 }
+      { error: e?.message || 'Erro ao criar usuário.' },
+      { status: 500 },
     )
   }
 }

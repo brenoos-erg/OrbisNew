@@ -213,6 +213,10 @@ model User {
   // 👇 Lado inverso da relação N:N via UserCostCenter
   costCenters UserCostCenter[]
 
+ // NOVO: departamento (muitos usuários pra 1 departamento)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  
   status    UserStatus @default(ATIVO)
   role      Role       @default(COLABORADOR)
   authId    String?    @db.Uuid @unique   // <- agora é chave única para o upsert
@@ -249,6 +253,15 @@ model Module {
   costCenters CostCenterModule[]
 
   @@map("Module")
+}
+model Department {
+  id        String   @id @default(uuid())
+  code      String   @unique     // 👈 PRECISA ser único
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
 }
 
 model AccessGroup {

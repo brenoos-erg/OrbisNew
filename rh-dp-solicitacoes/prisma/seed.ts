@@ -57,6 +57,54 @@ async function main() {
   console.log('✅ Tipos de solicitação criados.')
 
   /* =========================
+     DEPARTAMENTOS
+     ========================= */
+
+  const departamentos = [
+    { code: '01', name: 'ADMINISTRATIVO' },
+    { code: '02', name: 'APOIO/COPA' },
+    { code: '03', name: 'COMERCIAL' },
+    { code: '04', name: 'COMPRAS' },
+    { code: '05', name: 'COMUNICAÇÃO' },
+    { code: '06', name: 'CONTÁBIL/FISCAL' },
+    { code: '07', name: 'CUSTOS E CONTRATOS' },
+    { code: '08', name: 'DEPARTAMENTO PESSOAL' },
+    { code: '09', name: 'ENGENHARIA' },
+    { code: '10', name: 'FINANCEIRO' },
+    { code: '11', name: 'LOGÍSTICA' },
+    { code: '12', name: 'MEDIÇÃO' },
+    { code: '13', name: 'MEIO AMBIENTE' },
+    { code: '14', name: 'PRAD' },
+    { code: '15', name: 'PROJETOS' },
+    { code: '16', name: 'QUALIDADE' },
+    { code: '17', name: 'RECURSOS HUMANOS' },
+    { code: '18', name: 'SIG' },
+    { code: '19', name: 'SEGURANÇA DO TRABALHO' },
+    { code: '20', name: 'TECNOLOGIA DA INFORMAÇÃO' },
+    { code: '21', name: 'TOPOGRAFIA' },
+    { code: '22', name: 'GEOTECNOLOGIAS' },
+    { code: '23', name: 'LASER SCANNER' },
+    { code: '24', name: 'GEOTECNIA' },
+    { code: '25', name: 'CONTROLE TECNOLÓGICO' },
+    { code: '26', name: 'GESTÃO DE FAUNA' },
+    { code: '27', name: 'GEOREFERENCIAMENTO' },
+    { code: '28', name: 'FERROVIA' },
+    { code: '29', name: 'GEOLOGIA' },
+  ]
+
+ for (const d of departamentos) {
+  await prisma.department.upsert({
+    where: { code: d.code },      // code é unique no model
+    update: { name: d.name },
+    create: {
+      code: d.code,
+      name: d.name,
+    },
+  })
+}
+  console.log('✅ Departamentos cadastrados.')
+
+  /* =========================
      CONTROLE DE ACESSO
      ========================= */
 
