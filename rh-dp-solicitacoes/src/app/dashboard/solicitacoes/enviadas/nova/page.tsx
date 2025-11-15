@@ -2,16 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Combobox } from '@headlessui/react'
+
+/** ------------------ Tipos auxiliares ------------------ */
 
 type CentroCusto = { id: string; nome: string }
 type Departamento = { id: string; nome: string }
 
-type TipoCampo =
-  | 'text'
-  | 'textarea'
-  | 'select'
-  | 'number'
-  | 'date'
+type TipoCampo = 'text' | 'textarea' | 'select' | 'number' | 'date'
 
 type CampoEspecifico = {
   name: string
@@ -28,6 +26,29 @@ type TipoSolicitacao = {
   camposEspecificos: CampoEspecifico[]
 }
 
+type MeMini = {
+  id?: string
+  fullName?: string
+  email?: string
+  login?: string
+  phone?: string | null
+  costCenter?: {
+    id: string
+    code: string | null
+    description: string
+  } | null
+}
+
+type SolicitanteForm = {
+  fullName: string
+  email: string
+  login: string
+  phone: string
+  costCenterText: string
+}
+
+/** ------------------ estilos reutilizáveis ------------------ */
+
 const LABEL =
   'block text-xs font-semibold text-black uppercase tracking-wide'
 const INPUT =
@@ -36,10 +57,12 @@ const INPUT =
 const cx = (...c: (string | false | undefined)[]) =>
   c.filter(Boolean).join(' ')
 
+/** ------------------ Componente principal ------------------ */
+
 export default function NovaSolicitacaoPage() {
   const router = useRouter()
 
-  // ------------------ estados principais (esquerda) ------------------ //
+  // ESQUERDA – combos principais
   const [centros, setCentros] = useState<CentroCusto[]>([])
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([])
@@ -48,28 +71,73 @@ export default function NovaSolicitacaoPage() {
   const [departamentoId, setDepartamentoId] = useState('')
   const [tipoId, setTipoId] = useState('')
 
-  // campos específicos do tipo
+  // Busca digitada no combobox de centro de custo
+  const [queryCC, setQueryCC] = useState('')
+
+  // campos específicos
   const [extras, setExtras] = useState<Record<string, any>>({})
+
+  // DIREITA – dados do solicitante
+  const [me, setMe] = useState<MeMini | null>(null)
+  const [loadingMe, setLoadingMe] = useState(true)
+  const [solicitante, setSolicitante] = useState<SolicitanteForm>({
+    fullName: '',
+    email: '',
+    login: '',
+    phone: '',
+    costCenterText: '',
+  })
 
   const tipoSelecionado = useMemo(
     () => tipos.find((t) => t.id === tipoId),
     [tipos, tipoId],
   )
 
-  // ------------------ carregar combos básicos ------------------ //
+  const centrosFiltrados = useMemo(
+    () =>
+      queryCC === ''
+        ? centros
+        : centros.filter((c) =>
+            c.nome.toLowerCase().includes(queryCC.toLowerCase()),
+          ),
+    [queryCC, centros],
+  )
+
+  /** ------------------ carregar centros + departamentos ------------------ */
+
   useEffect(() => {
     async function loadBase() {
       try {
         const [cRes, dRes] = await Promise.all([
-          fetch('/api/centros-custo'),
-          fetch('/api/departamentos'),
+          fetch('/api/cost-centers/select', { cache: 'no-store' }),
+          fetch('/api/departments/select', { cache: 'no-store' }),
         ])
 
-        const centrosJson: CentroCusto[] = await cRes.json()
-        const depsJson: Departamento[] = await dRes.json()
+        const centrosRaw: {
+          id: string
+          description: string
+          code: string | null
+          externalCode: string | null
+        }[] = await cRes.json()
 
-        setCentros(centrosJson)
-        setDepartamentos(depsJson)
+        const depsRaw: {
+          id: string
+          label: string
+          description: string | null
+        }[] = await dRes.json()
+
+        const centrosMap: CentroCusto[] = centrosRaw.map((c) => ({
+          id: c.id,
+          nome: c.code ? `${c.code} - ${c.description}` : c.description,
+        }))
+
+        const depsMap: Departamento[] = depsRaw.map((d) => ({
+          id: d.id,
+          nome: d.label,
+        }))
+
+        setCentros(centrosMap)
+        setDepartamentos(depsMap)
       } catch (e) {
         console.error('Erro ao carregar centros / departamentos', e)
       }
@@ -78,9 +146,9 @@ export default function NovaSolicitacaoPage() {
     loadBase()
   }, [])
 
-  // ------------------ carregar tipos conforme centro + depto ------------------ //
+  /** ------------------ carregar tipos conforme centro + depto ------------------ */
+
   useEffect(() => {
-    // sempre que mudar centro ou departamento:
     setTipoId('')
     setExtras({})
 
@@ -105,7 +173,44 @@ export default function NovaSolicitacaoPage() {
     loadTipos()
   }, [centroCustoId, departamentoId])
 
-  // ------------------ submissão ------------------ //
+  /** ------------------ carregar dados do solicitante (card da direita) ------------------ */
+
+  useEffect(() => {
+    async function loadMe() {
+      try {
+        setLoadingMe(true)
+        const r = await fetch('/api/me', { cache: 'no-store' })
+
+        if (r.ok) {
+          const data: MeMini = await r.json()
+          setMe(data)
+
+          setSolicitante({
+            fullName: data.fullName || '',
+            email: data.email || '',
+            login: data.login || '',
+            phone: data.phone || '',
+            costCenterText: data.costCenter
+              ? data.costCenter.code
+                ? `${data.costCenter.code} - ${data.costCenter.description}`
+                : data.costCenter.description
+              : '',
+          })
+        } else {
+          setMe(null)
+        }
+      } catch (e) {
+        console.error('Erro ao carregar /api/me', e)
+        setMe(null)
+      } finally {
+        setLoadingMe(false)
+      }
+    }
+
+    loadMe()
+  }, [])
+
+  /** ------------------ submissão ------------------ */
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -115,8 +220,6 @@ export default function NovaSolicitacaoPage() {
       return
     }
 
-    // aqui você junta com os dados do solicitante (da direita)
-    // e envia para sua API de criação de solicitação
     try {
       const res = await fetch('/api/solicitacoes', {
         method: 'POST',
@@ -125,8 +228,8 @@ export default function NovaSolicitacaoPage() {
           centroCustoId,
           departamentoId,
           tipoSolicitacaoId: tipoId,
-          campos: extras, // campos específicos preenchidos
-          // TODO: adicionar dadosDoSolicitante aqui
+          campos: extras,
+          solicitante,
         }),
       })
 
@@ -141,17 +244,18 @@ export default function NovaSolicitacaoPage() {
     }
   }
 
-  // alteração de um campo específico
   function handleExtraChange(name: string, value: any) {
     setExtras((prev) => ({ ...prev, [name]: value }))
   }
 
-  // ------------------ UI ------------------ //
+  /** ------------------ UI ------------------ */
 
   return (
     <div className="max-w-6xl mx-auto">
       {/* título e breadcrumb simples */}
-      <div className="text-sm text-slate-500 mb-1">Sistema de Solicitações</div>
+      <div className="text-sm text-slate-500 mb-1">
+        Sistema de Solicitações
+      </div>
       <h1 className="text-2xl font-semibold text-slate-900 mb-4">
         Nova Solicitação
       </h1>
@@ -160,24 +264,55 @@ export default function NovaSolicitacaoPage() {
         onSubmit={handleSubmit}
         className="grid grid-cols-1 lg:grid-cols-12 gap-6"
       >
-        {/* ESQUERDA – só os 3 campos + específicos do tipo */}
+        {/* ESQUERDA – 3 campos principais */}
         <div className="lg:col-span-7 space-y-5">
-          {/* Centro de custo */}
+          {/* Centro de Custo (Combobox) */}
           <div>
             <label className={LABEL}>Centro de Custo</label>
-            <select
-              className={INPUT}
+
+            <Combobox
               value={centroCustoId}
-              onChange={(e) => setCentroCustoId(e.target.value)}
-              required
+              onChange={(value: any) => setCentroCustoId(value as string)}
             >
-              <option value="">Selecione o centro de custo</option>
-              {centros.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
+              <div className="relative mt-1">
+                <Combobox.Input
+                  className={INPUT}
+                  placeholder="Digite ou selecione o centro de custo"
+                  displayValue={(id: any) => {
+                    const item = centros.find((c) => c.id === id)
+                    return item ? item.nome : ''
+                  }}
+                  onChange={(e) => setQueryCC(e.target.value)}
+                />
+
+                <Combobox.Options
+                  className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md
+                             bg-white shadow-lg border border-slate-200"
+                >
+                  {centrosFiltrados.length === 0 ? (
+                    <div className="cursor-default select-none px-4 py-2 text-slate-500">
+                      Nenhum centro de custo encontrado.
+                    </div>
+                  ) : (
+                    centrosFiltrados.map((c) => (
+                      <Combobox.Option
+                        key={c.id}
+                        value={c.id}
+                        className={({ active }: { active: boolean }) =>
+                          `cursor-pointer select-none px-4 py-2 ${
+                            active
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-900'
+                          }`
+                        }
+                      >
+                        {c.nome}
+                      </Combobox.Option>
+                    ))
+                  )}
+                </Combobox.Options>
+              </div>
+            </Combobox>
           </div>
 
           {/* Departamento */}
@@ -235,14 +370,152 @@ export default function NovaSolicitacaoPage() {
               </p>
             )}
           </div>
+        </div>
 
-          {/* Campos específicos do tipo escolhido */}
-          {tipoSelecionado && tipoSelecionado.camposEspecificos.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                Dados específicos para este tipo de solicitação
+        {/* DIREITA – card de Dados do Solicitante + botões */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
+            <div className="mb-3">
+  <div className="text-sm font-semibold">
+    Dados do Solicitante
+  </div>
+  <p className="text-[11px] text-slate-500">
+    Essas informações serão usadas para contato sobre a solicitação.
+    Você pode ajustá-las se o chamado for para outra pessoa.
+  </p>
+</div>
+
+
+            {loadingMe && (
+              <p className="text-xs text-slate-500">Carregando dados...</p>
+            )}
+
+            {!loadingMe && !me && (
+              <p className="text-xs text-red-600">
+                Não foi possível carregar seus dados. Verifique se está logado.
               </p>
+            )}
 
+            {!loadingMe && (
+              <div className="space-y-3 text-sm">
+                {/* Nome (linha inteira) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Nome completo
+                  </label>
+                  <input
+                    className={INPUT}
+                    value={solicitante.fullName}
+                    onChange={(e) =>
+                      setSolicitante((prev) => ({
+                        ...prev,
+                        fullName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* Email & Login (lado a lado) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      E-mail
+                    </label>
+                    <input
+                      className={INPUT}
+                      type="email"
+                      value={solicitante.email}
+                      onChange={(e) =>
+                        setSolicitante((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Login
+                    </label>
+                    <input
+                      className={INPUT}
+                      value={solicitante.login}
+                      onChange={(e) =>
+                        setSolicitante((prev) => ({
+                          ...prev,
+                          login: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Telefone & Centro de Custo (lado a lado) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Telefone
+                    </label>
+                    <input
+                      className={INPUT}
+                      value={solicitante.phone}
+                      onChange={(e) =>
+                        setSolicitante((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Centro de Custo
+                    </label>
+                    <input
+                      className={INPUT}
+                      value={solicitante.costCenterText}
+                      onChange={(e) =>
+                        setSolicitante((prev) => ({
+                          ...prev,
+                          costCenterText: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Texto apenas informativo. O vínculo real é o centro de
+                      custo selecionado à esquerda.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/solicitacoes/enviadas')}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500"
+            >
+              Enviar Solicitação
+            </button>
+          </div>
+        </div>
+
+        {/* LINHA DE BAIXO – formulário do tipo de solicitação, largura total */}
+        {tipoSelecionado && tipoSelecionado.camposEspecificos.length > 0 && (
+          <div className="lg:col-span-12 col-span-1 rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+              Formulário do tipo de solicitação
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {tipoSelecionado.camposEspecificos.map((campo) => (
                 <div key={campo.name} className="space-y-1">
                   <label
@@ -282,9 +555,11 @@ export default function NovaSolicitacaoPage() {
                     <input
                       id={campo.name}
                       type={
-                        campo.type === 'number' ? 'number' :
-                        campo.type === 'date'   ? 'date'   :
-                        'text'
+                        campo.type === 'number'
+                          ? 'number'
+                          : campo.type === 'date'
+                          ? 'date'
+                          : 'text'
                       }
                       className={INPUT}
                       onChange={(e) =>
@@ -295,40 +570,8 @@ export default function NovaSolicitacaoPage() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* DIREITA – MANTÉM SEU CARD DE DADOS DO SOLICITANTE */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Aqui você coloca exatamente o mesmo componente/card que já usa hoje */}
-          {/* Exemplo genérico: */}
-          <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
-            <div className="text-sm font-semibold mb-2">
-              Dados do Solicitante
-            </div>
-            {/* TODO: substituir por seus inputs / dados já existentes */}
-            <p className="text-xs text-slate-500">
-              (Use aqui o mesmo card de &quot;Dados do Solicitante&quot; que
-              você já tem.)
-            </p>
           </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/solicitacoes/enviadas')}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500"
-            >
-              Enviar Solicitação
-            </button>
-          </div>
-        </div>
+        )}
       </form>
     </div>
   )

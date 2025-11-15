@@ -148,10 +148,10 @@ model CostCenter {
   updatedAt      DateTime @updatedAt
   users          User[]
 
-  // Lado inverso da relação N:N via UserCostCenter
+  // N:N via UserCostCenter
   userLinks UserCostCenter[]
 
-  // relação com módulos:
+  // relação com módulos
   modules       CostCenterModule[]
   solicitations Solicitation[]
 
@@ -195,6 +195,17 @@ model TipoSolicitacao {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime
   solicitacoes Solicitation[]
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  solicitations Solicitation[]
 }
 
 model Solicitation {
@@ -260,10 +271,10 @@ model User {
   costCenterId String?
   costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  // Lado inverso da relação N:N via UserCostCenter
+  // N:N via UserCostCenter
   costCenters UserCostCenter[]
 
-  // departamento (muitos usuários pra 1 departamento)
+  // departamento
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
@@ -299,21 +310,9 @@ model Module {
   name   String
   grants AccessGroupGrant[]
 
-  // lado inverso da relação N:N via tabela de junção
   costCenters CostCenterModule[]
 
   @@map("Module")
-}
-
-model Department {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users         User[]
-  solicitations Solicitation[]
 }
 
 model AccessGroup {

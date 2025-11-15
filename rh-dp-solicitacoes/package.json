@@ -12,6 +12,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "@prisma/client": "^6.19.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-helpers-shared": "^0.7.0",

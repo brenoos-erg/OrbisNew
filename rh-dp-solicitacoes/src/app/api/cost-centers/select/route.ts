@@ -1,33 +1,23 @@
-import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import type { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
-export async function GET(req: Request) {
-  const url = new URL(req.url)
-  const q = (url.searchParams.get('q') || '').trim()
 
-  let where: Prisma.CostCenterWhereInput | undefined = undefined
+export async function GET() {
+  try {
+    const data = await prisma.costCenter.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        code: true,
+        description: true,
+        externalCode: true,
+      },
+      orderBy: { description: 'asc' },
+    })
 
-  if (q) {
-    where = {
-      OR: [
-        { description: { contains: q, mode: 'insensitive' } },
-        { code: { contains: q, mode: 'insensitive' } },
-        { abbreviation: { contains: q, mode: 'insensitive' } },
-      ]
-    }
+    return NextResponse.json(data)
+  } catch (e) {
+    console.error('Erro ao listar cost centers:', e)
+    return NextResponse.json({ error: 'Erro ao buscar centros de custo' }, { status: 500 })
   }
-
-  const rows = await prisma.costCenter.findMany({
-    where,
-    orderBy: { description: 'asc' },
-    select: {
-      id: true,
-      description: true,
-      code: true,
-      externalCode: true,
-    },
-  })
-
-  return NextResponse.json(rows)
 }
