@@ -25,38 +25,6 @@ async function main() {
   console.log('✅ Usuário admin criado:', adminUser.email)
 
   /* =========================
-     TIPOS DE SOLICITAÇÃO
-     ========================= */
-  await prisma.tipoSolicitacao.upsert({
-    where: { nome: 'Atualização cadastral' },
-    update: {},
-    create: {
-      id: randomUUID(),
-      nome: 'Atualização cadastral',
-      descricao: 'Alteração de dados pessoais/funcionais',
-      schemaJson: {
-        campos: [{ name: 'novoEndereco', type: 'text', label: 'Novo endereço' }],
-      },
-      updatedAt: new Date(),
-    },
-  })
-
-  await prisma.tipoSolicitacao.upsert({
-    where: { nome: 'Vale-transporte' },
-    update: {},
-    create: {
-      id: randomUUID(),
-      nome: 'Vale-transporte',
-      descricao: 'Inclusão/alteração de rotas',
-      schemaJson: {
-        campos: [{ name: 'linha', type: 'text', label: 'Linha de ônibus' }],
-      },
-      updatedAt: new Date(),
-    },
-  })
-  console.log('✅ Tipos de solicitação criados.')
-
-  /* =========================
      DEPARTAMENTOS
      ========================= */
 
@@ -92,17 +60,290 @@ async function main() {
     { code: '29', name: 'GEOLOGIA' },
   ]
 
- for (const d of departamentos) {
-  await prisma.department.upsert({
-    where: { code: d.code },      // code é unique no model
-    update: { name: d.name },
+  for (const d of departamentos) {
+    await prisma.department.upsert({
+      where: { code: d.code }, // code é unique no model
+      update: { name: d.name },
+      create: {
+        code: d.code,
+        name: d.name,
+      },
+    })
+  }
+  console.log('✅ Departamentos cadastrados.')
+
+  /* =========================
+     TIPOS DE SOLICITAÇÃO BÁSICOS
+     (ex: Vale-transporte)
+     ========================= */
+
+  await prisma.tipoSolicitacao.upsert({
+    where: { nome: 'Vale-transporte' },
+    update: {},
     create: {
-      code: d.code,
-      name: d.name,
+      id: randomUUID(),
+      nome: 'Vale-transporte',
+      descricao: 'Inclusão/alteração de rotas de vale-transporte',
+      schemaJson: {
+        meta: {
+          centros: [],
+          departamentos: [],
+        },
+        camposEspecificos: [
+          {
+            name: 'linha',
+            label: 'Linha de ônibus',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'empresa',
+            label: 'Empresa de transporte',
+            type: 'text',
+          },
+          {
+            name: 'valor',
+            label: 'Valor mensal estimado',
+            type: 'number',
+          },
+        ],
+      },
+      updatedAt: new Date(),
     },
   })
-}
-  console.log('✅ Departamentos cadastrados.')
+
+  console.log('✅ Tipo de solicitação "Vale-transporte" criado/atualizado.')
+
+  /* =========================
+     TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (DP)
+     ========================= */
+
+  const dpDepartment = await prisma.department.findUnique({
+    where: { code: '08' }, // DEPARTAMENTO PESSOAL
+  })
+
+  if (!dpDepartment) {
+    console.warn(
+      '⚠️ Departamento Pessoal (code=08) não encontrado. Tipo RQ_063 não foi criado.'
+    )
+  } else {
+    const schemaRQ063 = {
+      meta: {
+        // esse tipo só aparece quando o departamento selecionado
+        // na tela for "DEPARTAMENTO PESSOAL"
+        departamentos: [dpDepartment.id],
+        // se depois quiser filtrar por CC específicos, coloca aqui:
+        // centros: ['id-cc-1', 'id-cc-2']
+      },
+      camposEspecificos: [
+        // 🧩 BLOCO 1 – Informações básicas
+        {
+          name: 'cargo',
+          label: 'Cargo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'setorOuProjeto',
+          label: 'Setor e/ou Projeto',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'vagaPrevistaContrato',
+          label: 'Vaga prevista em contrato?',
+          type: 'select',
+          options: ['Sim', 'Não'],
+          required: true,
+        },
+        {
+          name: 'localTrabalho',
+          label: 'Local de Trabalho',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'horarioTrabalho',
+          label: 'Horário de Trabalho',
+          type: 'text',
+        },
+        {
+          name: 'coordenadorContrato',
+          label: 'Coordenador do Contrato',
+          type: 'text',
+        },
+
+        // 🧩 BLOCO 2 – Motivo / Contratação / Descrição
+        {
+          name: 'motivoVaga',
+          label: 'Motivo da vaga',
+          type: 'select',
+          options: ['Substituição', 'Aumento de quadro'],
+          required: true,
+        },
+        {
+          name: 'tipoContratacao',
+          label: 'Contratação',
+          type: 'select',
+          options: ['Temporária', 'Permanente'],
+          required: true,
+        },
+        {
+          name: 'justificativaVaga',
+          label: 'Justificativa da vaga',
+          type: 'textarea',
+          required: true,
+        },
+        {
+          name: 'principaisAtividades',
+          label: 'Principais atividades',
+          type: 'textarea',
+        },
+        {
+          name: 'atividadesComplementares',
+          label: 'Atividades complementares',
+          type: 'textarea',
+        },
+
+        // 🧩 BLOCO 3 – Requisitos Acadêmicos
+        {
+          name: 'escolaridade',
+          label: 'Escolaridade',
+          type: 'text',
+        },
+        {
+          name: 'curso',
+          label: 'Curso',
+          type: 'text',
+        },
+        {
+          name: 'escolaridadeCompleta',
+          label: 'Escolaridade completa?',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'cursoEmAndamento',
+          label: 'Curso em andamento?',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'periodoModulo',
+          label: 'Período / Módulo - mínimo ou máximo',
+          type: 'text',
+        },
+        {
+          name: 'requisitosConhecimentos',
+          label: 'Requisitos e conhecimentos necessários',
+          type: 'textarea',
+        },
+        {
+          name: 'competenciasComportamentais',
+          label: 'Competências comportamentais exigidas',
+          type: 'textarea',
+        },
+
+        // 🧩 BLOCO 4 – Solicitações para o novo funcionário
+        {
+          name: 'solicitacaoCracha',
+          label: 'Crachá',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'solicitacaoRepublica',
+          label: 'República',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'solicitacaoUniforme',
+          label: 'Uniforme',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'solicitacaoOutros',
+          label: 'Outros (descrever)',
+          type: 'text',
+        },
+        {
+          name: 'solicitacaoTesteDirecao',
+          label: 'Teste de direção',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'solicitacaoEPIs',
+          label: 'EPIs',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+        {
+          name: 'solicitacaoPostoTrabalho',
+          label: 'Posto de trabalho',
+          type: 'select',
+          options: ['Sim', 'Não'],
+        },
+
+        // 🧩 BLOCO 5 – Escritório de Projetos
+        {
+          name: 'projetosLocal',
+          label: 'Local (Matriz ou Filial)',
+          type: 'select',
+          options: ['Matriz', 'Filial'],
+        },
+        {
+          name: 'projetosPrevistoContrato',
+          label:
+            'Previsto em contrato (Salários, Benefícios, Carga horária e Outros)',
+          type: 'textarea',
+        },
+
+        // 🧩 BLOCO 6 – Recursos Humanos
+        {
+          name: 'rhNomeProfissional',
+          label: 'Nome do profissional',
+          type: 'text',
+        },
+        {
+          name: 'rhDataAdmissao',
+          label: 'Data de admissão',
+          type: 'date',
+        },
+        {
+          name: 'rhObservacoes',
+          label: 'Observações',
+          type: 'textarea',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ_063 - Solicitação de Pessoal' },
+
+      // atualiza se já existir
+      update: {
+        descricao: 'Requisição de pessoal (Departamento Pessoal)',
+        schemaJson: schemaRQ063,
+        updatedAt: new Date(),
+      },
+
+      // cria se não existir
+      create: {
+        id: randomUUID(),
+        nome: 'RQ_063 - Solicitação de Pessoal',
+        descricao: 'Requisição de pessoal (Departamento Pessoal)',
+        schemaJson: schemaRQ063,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      '✅ Tipo de solicitação "RQ_063 - Solicitação de Pessoal" criado/atualizado.'
+    )
+  }
 
   /* =========================
      CONTROLE DE ACESSO

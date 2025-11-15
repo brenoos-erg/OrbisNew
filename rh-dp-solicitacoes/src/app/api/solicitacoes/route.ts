@@ -3,15 +3,19 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ApprovalStatus, SolicitationStatus } from '@prisma/client'
 
-type Meta = {
-  requiresApproval?: boolean
+// Só pra ter um protocolo amigável. Pode trocar depois.
+function gerarProtocolo() {
+  const agora = new Date()
+  const ano = agora.getFullYear().toString().slice(-2)
+  const mes = String(agora.getMonth() + 1).padStart(2, '0')
+  const dia = String(agora.getDate()).padStart(2, '0')
+  const hora = String(agora.getHours()).padStart(2, '0')
+  const min = String(agora.getMinutes()).padStart(2, '0')
+  const seg = String(agora.getSeconds()).padStart(2, '0')
+
+  return `RQ${ano}${mes}${dia}-${hora}${min}${seg}`
 }
 
-type TipoSchemaJson = {
-  meta?: Meta
-}
-
-// POST /api/solicitacoes  -> cria uma nova solicitação
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -21,11 +25,10 @@ export async function POST(request: Request) {
       costCenterId,
       departmentId,
       solicitanteId,
-      titulo,
-      descricao,
       payload,
-    } = body ?? {}
+    } = body
 
+    // validação básica
     if (!tipoId || !costCenterId || !departmentId || !solicitanteId) {
       return NextResponse.json(
         {
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // pega o tipo pra ver meta.requiresApproval (se você usar)
+    // busca o tipo pra usar nome/descrição como título
     const tipo = await prisma.tipoSolicitacao.findUnique({
       where: { id: tipoId },
     })
@@ -44,43 +47,34 @@ export async function POST(request: Request) {
     if (!tipo) {
       return NextResponse.json(
         { error: 'Tipo de solicitação não encontrado.' },
-        { status: 404 },
+        { status: 400 },
       )
     }
 
-    const schema = tipo.schemaJson as TipoSchemaJson | null
-    const requiresApproval = schema?.meta?.requiresApproval ?? false
+    const protocolo = gerarProtocolo()
 
-    // gera protocolo simples
-    const count = await prisma.solicitation.count()
-    const protocolo = `RQ-${String(count + 1).padStart(6, '0')}`
+    const solicitacao = await prisma.solicitation.create({
+      data: {
+        protocolo,
+        tipoId,
+        costCenterId,
+        departmentId,
+        solicitanteId,
 
-    const status: SolicitationStatus = requiresApproval
-      ? SolicitationStatus.AGUARDANDO_APROVACAO
-      : SolicitationStatus.ABERTA
+        // por enquanto tudo sem aprovação
+        requiresApproval: false,
+        approverId: null,
+        approvalStatus: ApprovalStatus.NAO_PRECISA,
+        status: SolicitationStatus.ABERTA,
 
-    const approvalStatus: ApprovalStatus = requiresApproval
-      ? ApprovalStatus.PENDENTE
-      : ApprovalStatus.NAO_PRECISA
+        // título/descrição padrão
+        titulo: tipo.nome,
+        descricao: tipo.descricao ?? null,
 
-    const approverId: string | null = null // depois você pode colocar regra aqui
-
-const solicitacao = await prisma.solicitation.create({
-  data: {
-    protocolo,
-    tipoId,
-    costCenterId,
-    departmentId,
-    solicitanteId,
-    requiresApproval,
-    approverId,
-    approvalStatus,
-    status,
-    titulo,
-    descricao,
-    payload: payload ?? {},
-  },
-})
+        // joga tudo do formulário dinâmico + card da direita aqui
+        payload: payload ?? {},
+      },
+    })
 
     return NextResponse.json(solicitacao, { status: 201 })
   } catch (error) {

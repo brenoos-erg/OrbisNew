@@ -98,8 +98,8 @@ export default function NovaSolicitacaoPage() {
       queryCC === ''
         ? centros
         : centros.filter((c) =>
-            c.nome.toLowerCase().includes(queryCC.toLowerCase()),
-          ),
+          c.nome.toLowerCase().includes(queryCC.toLowerCase()),
+        ),
     [queryCC, centros],
   )
 
@@ -220,29 +220,38 @@ export default function NovaSolicitacaoPage() {
       return
     }
 
+    if (!me?.id) {
+      alert('Não foi possível identificar o solicitante. Faça login novamente.')
+      return
+    }
+
     try {
       const res = await fetch('/api/solicitacoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          centroCustoId,
-          departamentoId,
-          tipoSolicitacaoId: tipoId,
-          campos: extras,
-          solicitante,
+          tipoId: tipoId,
+          costCenterId: centroCustoId,
+          departmentId: departamentoId,
+          solicitanteId: me.id,
+          payload: {
+            campos: extras,
+            solicitante,
+          },
         }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => null)
-        throw new Error(err?.error || 'Erro ao criar solicitação')
+        throw new Error(err?.error || 'Erro ao registrar a solicitação.')
       }
 
       router.push('/dashboard/solicitacoes/enviadas')
     } catch (e: any) {
-      alert(e.message || 'Falha ao salvar solicitação')
+      alert(e.message || 'Erro ao registrar a solicitação.')
     }
   }
+
 
   function handleExtraChange(name: string, value: any) {
     setExtras((prev) => ({ ...prev, [name]: value }))
@@ -299,10 +308,9 @@ export default function NovaSolicitacaoPage() {
                         key={c.id}
                         value={c.id}
                         className={({ active }: { active: boolean }) =>
-                          `cursor-pointer select-none px-4 py-2 ${
-                            active
-                              ? 'bg-blue-600 text-white'
-                              : 'text-slate-900'
+                          `cursor-pointer select-none px-4 py-2 ${active
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-900'
                           }`
                         }
                       >
@@ -355,8 +363,8 @@ export default function NovaSolicitacaoPage() {
                 {!centroCustoId || !departamentoId
                   ? 'Informe centro de custo e departamento primeiro'
                   : tipos.length === 0
-                  ? 'Nenhum tipo disponível para essa combinação'
-                  : 'Selecione o tipo de solicitação'}
+                    ? 'Nenhum tipo disponível para essa combinação'
+                    : 'Selecione o tipo de solicitação'}
               </option>
               {tipos.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -376,14 +384,14 @@ export default function NovaSolicitacaoPage() {
         <div className="lg:col-span-5 space-y-4">
           <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
             <div className="mb-3">
-  <div className="text-sm font-semibold">
-    Dados do Solicitante
-  </div>
-  <p className="text-[11px] text-slate-500">
-    Essas informações serão usadas para contato sobre a solicitação.
-    Você pode ajustá-las se o chamado for para outra pessoa.
-  </p>
-</div>
+              <div className="text-sm font-semibold">
+                Dados do Solicitante
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Essas informações serão usadas para contato sobre a solicitação.
+                Você pode ajustá-las se o chamado for para outra pessoa.
+              </p>
+            </div>
 
 
             {loadingMe && (
@@ -558,8 +566,8 @@ export default function NovaSolicitacaoPage() {
                         campo.type === 'number'
                           ? 'number'
                           : campo.type === 'date'
-                          ? 'date'
-                          : 'text'
+                            ? 'date'
+                            : 'text'
                       }
                       className={INPUT}
                       onChange={(e) =>
