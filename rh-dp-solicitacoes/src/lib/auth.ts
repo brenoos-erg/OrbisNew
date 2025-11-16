@@ -6,9 +6,11 @@ import { prisma } from '@/lib/prisma'
 export async function getCurrentAppUser() {
   // ❌ NÃO usar: const cookieStore = cookies()
   // ✅ Passa a função `cookies` direto para o helper
+  
   const supabase = createServerComponentClient({
     cookies, // nada de cookies()
   })
+  
 
   const {
     data: { session },
@@ -35,4 +37,13 @@ export async function getCurrentAppUser() {
   })
 
   return { appUser, session }
+}
+export async function requireActiveUser() {
+  const { appUser } = await getCurrentAppUser()
+
+  if (!appUser) {
+    throw new Error('Usuário não autenticado')
+  }
+
+  return appUser
 }

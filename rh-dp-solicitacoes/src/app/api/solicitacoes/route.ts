@@ -2,77 +2,135 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ApprovalStatus, SolicitationStatus } from '@prisma/client'
+import { requireActiveUser } from '@/lib/auth'
 
-// Só pra ter um protocolo amigável. Pode trocar depois.
-function gerarProtocolo() {
-  const agora = new Date()
-  const ano = agora.getFullYear().toString().slice(-2)
-  const mes = String(agora.getMonth() + 1).padStart(2, '0')
-  const dia = String(agora.getDate()).padStart(2, '0')
-  const hora = String(agora.getHours()).padStart(2, '0')
-  const min = String(agora.getMinutes()).padStart(2, '0')
-  const seg = String(agora.getSeconds()).padStart(2, '0')
-
-  return `RQ${ano}${mes}${dia}-${hora}${min}${seg}`
+type Meta = {
+  requiresApproval?: boolean
 }
 
+type TipoSchemaJson = {
+  meta?: Meta
+}
+
+/** Utilitário simples pra gerar protocolo */
+function gerarProtocolo() {
+  // Exemplo: RQ-2025-00000123
+  const agora = new Date()
+  const ano = agora.getFullYear()
+  const rand = Math.floor(Math.random() * 1_000_000)
+    .toString()
+    .padStart(6, '0')
+
+  return `RQ-${ano}-${rand}`
+}
+
+/**
+ * GET /api/solicitacoes
+ * Lista solicitações ENVIADAS pelo usuário logado
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+
+    const user = await requireActiveUser()
+
+    const page = Number(searchParams.get('page') ?? '1')
+    const perPage = Number(searchParams.get('perPage') ?? '10')
+
+    const where = {
+      solicitanteId: user.id,
+    }
+
+    const [total, itens] = await Promise.all([
+      prisma.solicitation.count({ where }),
+      prisma.solicitation.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * perPage,
+        take: perPage,
+        include: {
+          tipoSolicitacao: true, // 👈 ajuste pro nome da relação no seu schema
+          costCenter: true,
+          department: true,
+        },
+      }),
+    ])
+
+    return NextResponse.json({
+      page,
+      perPage,
+      total,
+      itens,
+    })
+  } catch (error) {
+    console.error('Erro em GET /api/solicitacoes:', error)
+    return NextResponse.json(
+      { error: 'Erro ao listar solicitações.' },
+      { status: 500 },
+    )
+  }
+}
+
+/**
+ * POST /api/solicitacoes  -> cria uma nova solicitação
+ */
 export async function POST(request: Request) {
   try {
+    const user = await requireActiveUser()
     const body = await request.json()
 
     const {
-      tipoId,
-      costCenterId,
-      departmentId,
-      solicitanteId,
-      payload,
+      centroCustoId,
+      departamentoId,
+      tipoSolicitacaoId,
+      campos,
+      solicitante,
     } = body
 
-    // validação básica
-    if (!tipoId || !costCenterId || !departmentId || !solicitanteId) {
+    if (!centroCustoId || !departamentoId || !tipoSolicitacaoId) {
       return NextResponse.json(
         {
           error:
-            'tipoId, costCenterId, departmentId e solicitanteId são obrigatórios.',
+            'tipoSolicitacaoId, centroCustoId e departamentoId são obrigatórios.',
         },
         { status: 400 },
       )
     }
 
-    // busca o tipo pra usar nome/descrição como título
+    // 🔎 Busca o tipo pra ver meta.requiresApproval (se você estiver usando)
     const tipo = await prisma.tipoSolicitacao.findUnique({
-      where: { id: tipoId },
+      where: { id: tipoSolicitacaoId },
     })
 
-    if (!tipo) {
-      return NextResponse.json(
-        { error: 'Tipo de solicitação não encontrado.' },
-        { status: 400 },
-      )
-    }
+    const schema = tipo?.schemaJson as TipoSchemaJson | null
+    const requiresApproval = schema?.meta?.requiresApproval ?? false
+
+    const status = requiresApproval
+      ? SolicitationStatus.AGUARDANDO_APROVACAO
+      : SolicitationStatus.ABERTA
+
+    const approvalStatus = requiresApproval
+      ? ApprovalStatus.PENDENTE
+      : ApprovalStatus.NAO_PRECISA
 
     const protocolo = gerarProtocolo()
 
     const solicitacao = await prisma.solicitation.create({
       data: {
         protocolo,
-        tipoId,
-        costCenterId,
-        departmentId,
-        solicitanteId,
+        costCenterId: centroCustoId,
+        departmentId: departamentoId,
 
-        // por enquanto tudo sem aprovação
-        requiresApproval: false,
-        approverId: null,
-        approvalStatus: ApprovalStatus.NAO_PRECISA,
-        status: SolicitationStatus.ABERTA,
+        // 👇 AQUI É O NOME IMPORTANTE!
+        // use *exatamente* o que está no seu schema, provavelmente:
+        tipoSolicitacaoId, // ✅ se no Prisma é tipoSolicitacaoId
+        // tipoId: tipoSolicitacaoId, // ❌ isso dá erro se no Prisma não existe "tipoId"
 
-        // título/descrição padrão
-        titulo: tipo.nome,
-        descricao: tipo.descricao ?? null,
-
-        // joga tudo do formulário dinâmico + card da direita aqui
-        payload: payload ?? {},
+        solicitanteId: user.id,
+        requiresApproval,
+        approvalStatus,
+        status,
+        payload: campos,
       },
     })
 
