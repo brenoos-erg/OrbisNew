@@ -2,46 +2,39 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ApprovalStatus, SolicitationStatus } from '@prisma/client'
-import { requireActiveUser } from '@/lib/auth'
+import { requireActiveUser } from '@/lib/guards'
 
-type Meta = {
-  requiresApproval?: boolean
-}
-
-type TipoSchemaJson = {
-  meta?: Meta
-}
-
-/** Utilitário simples pra gerar protocolo */
+/* ------------------------------------------
+   GERADOR DE PROTOCOLO
+------------------------------------------- */
 function gerarProtocolo() {
-  // Exemplo: RQ-2025-00000123
-  const agora = new Date()
-  const ano = agora.getFullYear()
-  const rand = Math.floor(Math.random() * 1_000_000)
-    .toString()
-    .padStart(6, '0')
-
-  return `RQ-${ano}-${rand}`
+  const d = new Date()
+  const ano = d.getFullYear().toString().slice(-2)
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `RQ${ano}${mes}${dia}-${h}${m}${s}`
 }
 
-/**
- * GET /api/solicitacoes
- * Lista solicitações ENVIADAS pelo usuário logado
- */
+/* ------------------------------------------
+   GET → Lista solicitações enviadas pelo usuário
+------------------------------------------- */
 export async function GET(request: Request) {
   try {
+    const g = await requireActiveUser()
+    if (!g.ok) return g.response
+    const user = g.user
+
     const { searchParams } = new URL(request.url)
-
-    const user = await requireActiveUser()
-
     const page = Number(searchParams.get('page') ?? '1')
-    const perPage = Number(searchParams.get('perPage') ?? '10')
+    const perPage =
+      Number(searchParams.get('pageSize') ?? searchParams.get('perPage') ?? '10')
 
-    const where = {
-      solicitanteId: user.id,
-    }
+    const where = { solicitanteId: user.id }
 
-    const [total, itens] = await Promise.all([
+    const [total, registros] = await Promise.all([
       prisma.solicitation.count({ where }),
       prisma.solicitation.findMany({
         where,
@@ -49,19 +42,28 @@ export async function GET(request: Request) {
         skip: (page - 1) * perPage,
         take: perPage,
         include: {
-          tipoSolicitacao: true, // 👈 ajuste pro nome da relação no seu schema
+          tipo: true,
           costCenter: true,
-          department: true,
         },
       }),
     ])
 
-    return NextResponse.json({
-      page,
-      perPage,
-      total,
-      itens,
-    })
+    // Formato que a sua tabela do frontend espera:
+    const rows = registros.map((s) => ({
+      id: s.id,
+      titulo: s.tipo?.nome ?? '',
+      status: s.status,
+      protocolo: s.protocolo ?? undefined,
+      createdAt: s.createdAt.toISOString(),
+      tipo: s.tipo ? { nome: s.tipo.nome } : null,
+      responsavel: null,
+      responsavelId: null,
+      autor: null,
+      sla: null,
+      setorDestino: s.costCenter?.description ?? null,
+    }))
+
+    return NextResponse.json({ rows, total })
   } catch (error) {
     console.error('Erro em GET /api/solicitacoes:', error)
     return NextResponse.json(
@@ -71,66 +73,61 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- * POST /api/solicitacoes  -> cria uma nova solicitação
- */
+/* ------------------------------------------
+   POST → Cria nova solicitação
+------------------------------------------- */
 export async function POST(request: Request) {
   try {
-    const user = await requireActiveUser()
+    const g = await requireActiveUser()
+    if (!g.ok) return g.response
+    const user = g.user
+
     const body = await request.json()
 
     const {
-      centroCustoId,
-      departamentoId,
-      tipoSolicitacaoId,
-      campos,
-      solicitante,
+      tipoId,
+      costCenterId,
+      departmentId,
+      payload,
     } = body
 
-    if (!centroCustoId || !departamentoId || !tipoSolicitacaoId) {
+    if (!tipoId || !costCenterId || !departmentId) {
       return NextResponse.json(
-        {
-          error:
-            'tipoSolicitacaoId, centroCustoId e departamentoId são obrigatórios.',
-        },
+        { error: 'tipoId, costCenterId e departmentId são obrigatórios.' },
         { status: 400 },
       )
     }
 
-    // 🔎 Busca o tipo pra ver meta.requiresApproval (se você estiver usando)
     const tipo = await prisma.tipoSolicitacao.findUnique({
-      where: { id: tipoSolicitacaoId },
+      where: { id: tipoId },
     })
 
-    const schema = tipo?.schemaJson as TipoSchemaJson | null
-    const requiresApproval = schema?.meta?.requiresApproval ?? false
-
-    const status = requiresApproval
-      ? SolicitationStatus.AGUARDANDO_APROVACAO
-      : SolicitationStatus.ABERTA
-
-    const approvalStatus = requiresApproval
-      ? ApprovalStatus.PENDENTE
-      : ApprovalStatus.NAO_PRECISA
+    if (!tipo) {
+      return NextResponse.json(
+        { error: 'Tipo de solicitação não encontrado.' },
+        { status: 400 },
+      )
+    }
 
     const protocolo = gerarProtocolo()
 
     const solicitacao = await prisma.solicitation.create({
       data: {
         protocolo,
-        costCenterId: centroCustoId,
-        departmentId: departamentoId,
-
-        // 👇 AQUI É O NOME IMPORTANTE!
-        // use *exatamente* o que está no seu schema, provavelmente:
-        tipoSolicitacaoId, // ✅ se no Prisma é tipoSolicitacaoId
-        // tipoId: tipoSolicitacaoId, // ❌ isso dá erro se no Prisma não existe "tipoId"
-
+        tipoId,
+        costCenterId,
+        departmentId,
         solicitanteId: user.id,
-        requiresApproval,
-        approvalStatus,
-        status,
-        payload: campos,
+
+        requiresApproval: false,
+        approverId: null,
+        approvalStatus: ApprovalStatus.NAO_PRECISA,
+        status: SolicitationStatus.ABERTA,
+
+        titulo: tipo.nome,
+        descricao: tipo.descricao ?? null,
+
+        payload: payload ?? {},
       },
     })
 
