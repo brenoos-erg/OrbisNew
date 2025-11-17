@@ -1,9 +1,18 @@
 // src/components/layout/Sidebar.tsx
 'use client'
-
+import { CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ClipboardList, ChevronLeft, Send, Inbox, FolderCog, Settings, Users, Shield } from 'lucide-react'
+import {
+  ClipboardList,
+  ChevronLeft,
+  Send,
+  Inbox,
+  FolderCog,
+  Settings,
+  Users,
+  Shield,
+} from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 type Props = {
@@ -49,20 +58,24 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
 
   return (
     <aside
-      // 🔴 AQUI: tiramos fixed/left/top, usamos apenas min-h-screen e largura variável
       className={`min-h-screen bg-[#0f172a] text-slate-200 shadow-xl flex flex-col justify-between transition-all duration-200
         ${collapsed ? 'w-16' : 'w-72'}`}
     >
       <div>
         {/* Cabeçalho com botão recolher/expandir */}
         <div className="h-16 flex items-center px-3 border-b border-white/10">
-          {!collapsed && <div className="font-semibold mr-2">Sistema de Solicitações</div>}
+          {!collapsed && (
+            <div className="font-semibold mr-2">Sistema de Solicitações</div>
+          )}
           <button
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
             className="ml-auto rounded-md p-2 hover:bg-white/10"
           >
-            <ChevronLeft size={18} className={`transition-transform ${collapsed ? '' : 'rotate-180'}`} />
+            <ChevronLeft
+              size={18}
+              className={`transition-transform ${collapsed ? '' : 'rotate-180'}`}
+            />
           </button>
         </div>
 
@@ -74,7 +87,9 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
               <button
                 type="button"
                 onClick={() => setOpenSolic((v) => !v)}
-                className={`${baseSection} ${inSolic ? activeSection : inactiveSection}`}
+                className={`${baseSection} ${
+                  inSolic ? activeSection : inactiveSection
+                }`}
               >
                 <ClipboardList className="h-5 w-5 shrink-0" />
                 {!collapsed && <span>Solicitações</span>}
@@ -86,12 +101,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/solicitacoes/enviadas"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname === '/dashboard/solicitacoes/enviadas'
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname === '/dashboard/solicitacoes/enviadas'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <Send size={16} /> <span>Solicitações Enviadas</span>
                   </Link>
@@ -99,25 +113,38 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/solicitacoes/recebidas"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname === '/dashboard/solicitacoes/recebidas'
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname === '/dashboard/solicitacoes/recebidas'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <Inbox size={16} /> <span>Solicitações Recebidas</span>
+                  </Link>
+
+                  {/* 👉 NOVO ITEM: Painel de Aprovações */}
+                  <Link
+                    href="/dashboard/solicitacoes/aprovacao"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname === '/dashboard/solicitacoes/aprovacao'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <CheckCircle2 size={16} /> <span>Aprovações</span>
                   </Link>
 
                   <Link
                     href="/dashboard/solicitacoes/cadastros"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname.startsWith('/dashboard/solicitacoes/cadastros')
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname.startsWith(
+                          '/dashboard/solicitacoes/cadastros',
+                        )
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <FolderCog size={16} /> <span>Cadastros</span>
                   </Link>
@@ -132,7 +159,9 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
               <button
                 type="button"
                 onClick={() => setOpenConfig((v) => !v)}
-                className={`${baseSection} ${inConfig ? activeSection : inactiveSection}`}
+                className={`${baseSection} ${
+                  inConfig ? activeSection : inactiveSection
+                }`}
               >
                 <Settings className="h-5 w-5 shrink-0" />
                 {!collapsed && <span>Configurações</span>}
@@ -144,12 +173,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname === '/dashboard/configuracoes'
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname === '/dashboard/configuracoes'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <Settings size={16} /> <span>Painel</span>
                   </Link>
@@ -157,12 +185,11 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/usuarios"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname.startsWith('/dashboard/configuracoes/usuarios')
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname.startsWith('/dashboard/configuracoes/usuarios')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <Users size={16} /> <span>Usuários</span>
                   </Link>
@@ -170,12 +197,13 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/permissoes"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname.startsWith('/dashboard/configuracoes/permissoes')
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname.startsWith(
+                          '/dashboard/configuracoes/permissoes',
+                        )
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <Shield size={16} /> <span>Permissões</span>
                   </Link>
@@ -183,12 +211,13 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                   <Link
                     href="/dashboard/configuracoes/centros-de-custo"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-            ${
-              pathname.startsWith('/dashboard/configuracoes/centros-de-custo')
-                ? 'bg-orange-500/90 text-white'
-                : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-            }
-          `}
+                      ${
+                        pathname.startsWith(
+                          '/dashboard/configuracoes/centros-de-custo',
+                        )
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
                   >
                     <FolderCog size={16} /> <span>Centros de Custo</span>
                   </Link>
@@ -199,9 +228,7 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
         </nav>
       </div>
 
-      <div className="px-3 py-3 border-t border-white/10">
-        {userMenu}
-      </div>
+      <div className="px-3 py-3 border-t border-white/10">{userMenu}</div>
     </aside>
   )
 }

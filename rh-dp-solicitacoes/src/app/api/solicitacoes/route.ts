@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { requireActiveUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +119,9 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
  */
 export async function GET(req: NextRequest) {
   try {
+    // ✔️ Usuário logado (via Supabase / auth)
+    const me = await requireActiveUser()
+
     const { searchParams } = new URL(req.url)
 
     const page = Math.max(
@@ -131,32 +135,50 @@ export async function GET(req: NextRequest) {
 
     const where = buildWhereFromSearchParams(searchParams)
 
-    const scope = searchParams.get('scope') // sent, to-approve, etc.
+    const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve, etc.
 
-    // 👉 Aqui vamos tratar o painel de aprovação
-    if (scope === 'to-approve') {
-      // TODO: PEGAR usuário logado de verdade (Supabase / Auth do seu projeto)
-      // Exemplo: const userId = getCurrentUserIdFromRequest(req)
-      const userId = searchParams.get('userId') // provisório para teste
+    /**
+     * ESCOPOS
+     * --------------------------------
+     * sent      -> solicitações que EU abri
+     * received  -> solicitações para os MEUS centros de custo
+     * to-approve-> solicitações pendentes de aprovação por MIM
+     */
 
-      if (!userId) {
-        return NextResponse.json(
-          { error: 'Usuário não identificado para painel de aprovação.' },
-          { status: 401 },
-        )
+    if (scope === 'sent') {
+      // ✅ Só o que o usuário atual abriu
+      where.solicitanteId = me.id
+    } else if (scope === 'received') {
+      // ✅ Solicitações destinadas aos centros de custo do usuário
+      const ccIds = new Set<string>()
+
+      if (me.costCenterId) {
+        ccIds.add(me.costCenterId)
       }
 
-      // Só solicitações que precisam de aprovação e estão pendentes
+      const links = await prisma.userCostCenter.findMany({
+        where: { userId: me.id },
+        select: { costCenterId: true },
+      })
+
+      for (const l of links) {
+        ccIds.add(l.costCenterId)
+      }
+
+      if (ccIds.size === 0) {
+        // se não tiver nenhum CC vinculado, não retorna nada
+        where.id = '__never__' as any
+      } else {
+        where.costCenterId = { in: [...ccIds] }
+        // Se você NÃO quiser ver as que ele mesmo abriu aqui:
+        // where.solicitanteId = { not: me.id }
+      }
+    } else if (scope === 'to-approve') {
+      // ✅ Painel de aprovação: só o que está pendente para o usuário atual
       where.requiresApproval = true
       where.approvalStatus = 'PENDENTE'
-
-      // Regra: aprovador é o usuário atual
-      where.approverId = userId
+      where.approverId = me.id
     }
-
-
-    // FUTURO: se quiser filtrar por "scope=sent" (somente as enviadas pelo usuário logado),
-    // você pode ler o usuário logado aqui e aplicar where.solicitanteId = user.id
 
     const [solicitations, total] = await Promise.all([
       prisma.solicitation.findMany({
@@ -183,9 +205,7 @@ export async function GET(req: NextRequest) {
       tipo: s.tipo ? { nome: s.tipo.nome } : null,
       responsavelId: s.approver?.id ?? null,
       responsavel: s.approver ? { fullName: s.approver.fullName } : null,
-      autor: s.solicitante
-        ? { fullName: s.solicitante.fullName }
-        : null,
+      autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
       sla: null, // se quiser, depois adiciona um campo SLA na tabela
       setorDestino: s.department?.name ?? null,
     }))
@@ -227,7 +247,10 @@ export async function POST(req: NextRequest) {
 
     if (!tipoId || !costCenterId || !departmentId || !solicitanteId) {
       return NextResponse.json(
-        { error: 'Tipo, centro de custo, departamento e solicitante são obrigatórios.' },
+        {
+          error:
+            'Tipo, centro de custo, departamento e solicitante são obrigatórios.',
+        },
         { status: 400 },
       )
     }
