@@ -124,7 +124,7 @@ async function main() {
 
   if (!rhDepartment) {
     console.warn(
-      '⚠️ Departamento de Recursos Humanos (code=17) não encontrado. Tipo RQ_063 não foi criado.'
+      '⚠️ Departamento de Recursos Humanos (code=17) não encontrado. Tipo RQ_063 não foi criado.',
     )
   } else {
     const schemaRQ063 = {
@@ -341,7 +341,7 @@ async function main() {
     })
 
     console.log(
-      '✅ Tipo de solicitação "RQ_063 - Solicitação de Pessoal" criado/atualizado.'
+      '✅ Tipo de solicitação "RQ_063 - Solicitação de Pessoal" criado/atualizado.',
     )
   }
 

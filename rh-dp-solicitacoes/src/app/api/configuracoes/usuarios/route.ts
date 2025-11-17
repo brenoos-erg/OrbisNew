@@ -31,7 +31,9 @@ export async function GET() {
     const cc = r.costCenter
     const ccCode = cc?.externalCode || cc?.code || ''
     const costCenterName = cc
-      ? (ccCode ? `${ccCode} - ${cc.description}` : cc.description)
+      ? ccCode
+        ? `${ccCode} - ${cc.description}`
+        : cc.description
       : null
 
     return {
@@ -59,7 +61,6 @@ export async function POST(req: NextRequest) {
     const costCenterId = (body.costCenterId ?? '') || null
     const rawPassword = (body.password ?? '').trim()
     const firstAccess = !!body.firstAccess
-    const department = (body.department ?? '').trim() || null
 
     if (!fullName || !email || !login) {
       return NextResponse.json(
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     // 1) Cria no Prisma
     const created = await prisma.user.create({
-      data: { fullName, email, login, phone, costCenterId, department },
+      data: { fullName, email, login, phone, costCenterId },
       select: { id: true, fullName: true, email: true, login: true },
     })
 
@@ -105,7 +106,6 @@ export async function POST(req: NextRequest) {
         login,
         phone,
         costCenterId,
-        department,
         mustChangePassword: firstAccess,
       },
     })

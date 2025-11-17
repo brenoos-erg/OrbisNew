@@ -9,7 +9,7 @@ import { Combobox } from '@headlessui/react'
 type CentroCusto = { id: string; nome: string }
 type Departamento = { id: string; nome: string }
 
-type TipoCampo = 'text' | 'textarea' | 'select' | 'number' | 'date'
+type TipoCampo = 'text' | 'textarea' | 'select' | 'number' | 'date' | 'file'
 
 type CampoEspecifico = {
   name: string
@@ -74,8 +74,9 @@ export default function NovaSolicitacaoPage() {
   // Busca digitada no combobox de centro de custo
   const [queryCC, setQueryCC] = useState('')
 
-  // campos específicos
+  // campos específicos (valores) + arquivos
   const [extras, setExtras] = useState<Record<string, any>>({})
+  const [filesByField, setFilesByField] = useState<Record<string, FileList | null>>({})
 
   // DIREITA – dados do solicitante
   const [me, setMe] = useState<MeMini | null>(null)
@@ -98,8 +99,8 @@ export default function NovaSolicitacaoPage() {
       queryCC === ''
         ? centros
         : centros.filter((c) =>
-          c.nome.toLowerCase().includes(queryCC.toLowerCase()),
-        ),
+            c.nome.toLowerCase().includes(queryCC.toLowerCase()),
+          ),
     [queryCC, centros],
   )
 
@@ -151,6 +152,7 @@ export default function NovaSolicitacaoPage() {
   useEffect(() => {
     setTipoId('')
     setExtras({})
+    setFilesByField({})
 
     if (!centroCustoId || !departamentoId) {
       setTipos([])
@@ -210,61 +212,109 @@ export default function NovaSolicitacaoPage() {
     loadMe()
   }, [])
 
-  /** ------------------ submissão ------------------ */
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (!centroCustoId || !departamentoId || !tipoId) {
-      alert('Preencha centro de custo, departamento e tipo de solicitação.')
-      return
-    }
-
-    if (!me?.id) {
-      alert('Não foi possível identificar o solicitante. Faça login novamente.')
-      return
-    }
-
-    try {
-      const res = await fetch('/api/solicitacoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipoId: tipoId,
-          costCenterId: centroCustoId,
-          departmentId: departamentoId,
-          solicitanteId: me.id,
-          payload: {
-            campos: extras,
-            solicitante,
-          },
-        }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null)
-        throw new Error(err?.error || 'Erro ao registrar a solicitação.')
-      }
-
-      router.push('/dashboard/solicitacoes/enviadas')
-    } catch (e: any) {
-      alert(e.message || 'Erro ao registrar a solicitação.')
-    }
-  }
-
+  /** ------------------ helpers de campos específicos ------------------ */
 
   function handleExtraChange(name: string, value: any) {
     setExtras((prev) => ({ ...prev, [name]: value }))
   }
+
+  function handleFileChange(name: string, files: FileList | null) {
+    setFilesByField((prev) => ({ ...prev, [name]: files }))
+
+    // opcional: salva só os nomes dos arquivos no payload.campos
+    if (files && files.length > 0) {
+      const nomes = Array.from(files)
+        .map((f) => f.name)
+        .join(', ')
+      setExtras((prev) => ({ ...prev, [name]: nomes }))
+    } else {
+      setExtras((prev) => {
+        const clone = { ...prev }
+        delete clone[name]
+        return clone
+      })
+    }
+  }
+
+  /** ------------------ submissão ------------------ */
+
+  async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault()
+
+  if (!centroCustoId || !departamentoId || !tipoId) {
+    alert('Preencha centro de custo, departamento e tipo de solicitação.')
+    return
+  }
+
+  if (!me?.id) {
+    alert('Não foi possível identificar o solicitante. Faça login novamente.')
+    return
+  }
+
+  try {
+    // 1) Cria a solicitação (como já fazia antes)
+    const res = await fetch('/api/solicitacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tipoId: tipoId,
+        costCenterId: centroCustoId,
+        departmentId: departamentoId,
+        solicitanteId: me.id,
+        payload: {
+          campos: extras,
+          solicitante,
+        },
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      throw new Error(err?.error || 'Erro ao registrar a solicitação.')
+    }
+
+    const created = (await res.json()) as { id: string }
+
+    // 2) Se tiver arquivos em algum campo, envia para /[id]/anexos
+    const formData = new FormData()
+    Object.entries(filesByField).forEach(([fieldName, fileList]) => {
+      if (!fileList) return
+      Array.from(fileList).forEach((file) => {
+        // você pode incluir o nome do campo, se quiser
+        formData.append('files', file)
+      })
+    })
+
+    if ([...formData.keys()].length > 0) {
+      const uploadRes = await fetch(
+        `/api/solicitacoes/${created.id}/anexos`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+      )
+
+      if (!uploadRes.ok) {
+        console.error('Falha ao enviar anexos')
+        // Se quiser, você pode avisar o usuário, mas não bloquear o chamado:
+        // alert('Solicitação criada, mas houve erro ao enviar os anexos.')
+      }
+    }
+
+    // 3) Redireciona para a lista
+    router.push('/dashboard/solicitacoes/enviadas')
+  } catch (e: any) {
+    alert(e.message || 'Erro ao registrar a solicitação.')
+  }
+}
+
 
   /** ------------------ UI ------------------ */
 
   return (
     <div className="max-w-6xl mx-auto">
       {/* título e breadcrumb simples */}
-      <div className="text-sm text-slate-500 mb-1">
-        Sistema de Solicitações
-      </div>
+      <div className="text-sm text-slate-500 mb-1">Sistema de Solicitações</div>
       <h1 className="text-2xl font-semibold text-slate-900 mb-4">
         Nova Solicitação
       </h1>
@@ -308,9 +358,8 @@ export default function NovaSolicitacaoPage() {
                         key={c.id}
                         value={c.id}
                         className={({ active }: { active: boolean }) =>
-                          `cursor-pointer select-none px-4 py-2 ${active
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-900'
+                          `cursor-pointer select-none px-4 py-2 ${
+                            active ? 'bg-blue-600 text-white' : 'text-slate-900'
                           }`
                         }
                       >
@@ -355,6 +404,7 @@ export default function NovaSolicitacaoPage() {
               onChange={(e) => {
                 setTipoId(e.target.value)
                 setExtras({})
+                setFilesByField({})
               }}
               required
               disabled={!centroCustoId || !departamentoId}
@@ -363,8 +413,8 @@ export default function NovaSolicitacaoPage() {
                 {!centroCustoId || !departamentoId
                   ? 'Informe centro de custo e departamento primeiro'
                   : tipos.length === 0
-                    ? 'Nenhum tipo disponível para essa combinação'
-                    : 'Selecione o tipo de solicitação'}
+                  ? 'Nenhum tipo disponível para essa combinação'
+                  : 'Selecione o tipo de solicitação'}
               </option>
               {tipos.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -384,15 +434,12 @@ export default function NovaSolicitacaoPage() {
         <div className="lg:col-span-5 space-y-4">
           <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
             <div className="mb-3">
-              <div className="text-sm font-semibold">
-                Dados do Solicitante
-              </div>
+              <div className="text-sm font-semibold">Dados do Solicitante</div>
               <p className="text-[11px] text-slate-500">
                 Essas informações serão usadas para contato sobre a solicitação.
                 Você pode ajustá-las se o chamado for para outra pessoa.
               </p>
             </div>
-
 
             {loadingMe && (
               <p className="text-xs text-slate-500">Carregando dados...</p>
@@ -559,6 +606,16 @@ export default function NovaSolicitacaoPage() {
                         </option>
                       ))}
                     </select>
+                  ) : campo.type === 'file' ? (
+                    <input
+                      id={campo.name}
+                      type="file"
+                      className={INPUT}
+                      multiple
+                      onChange={(e) =>
+                        handleFileChange(campo.name, e.target.files)
+                      }
+                    />
                   ) : (
                     <input
                       id={campo.name}
@@ -566,8 +623,8 @@ export default function NovaSolicitacaoPage() {
                         campo.type === 'number'
                           ? 'number'
                           : campo.type === 'date'
-                            ? 'date'
-                            : 'text'
+                          ? 'date'
+                          : 'text'
                       }
                       className={INPUT}
                       onChange={(e) =>
