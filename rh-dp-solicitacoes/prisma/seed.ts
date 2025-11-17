@@ -25,6 +25,42 @@ async function main() {
   console.log('✅ Usuário admin criado:', adminUser.email)
 
   /* =========================
+     USUÁRIOS APROVADORES (VIDAL / LORENA)
+     ========================= */
+
+  const vidalUser = await prisma.user.upsert({
+    where: { email: 'eduardo.vidal@ergengenharia.com.br' }, // ajuste se o e-mail for outro
+    update: {},
+    create: {
+      login: 'vidal',
+      fullName: 'Eduardo Vidal',
+      email: 'eduardo.vidal@ergengenharia.com.br',
+      phone: '',
+      status: UserStatus.ATIVO,
+      role: 'RH', // enum Role
+    },
+  })
+
+  const lorenaUser = await prisma.user.upsert({
+    where: { email: 'lorena.oliveira@ergengenharia.com.br' }, // ajuste se o e-mail for outro
+    update: {},
+    create: {
+      login: 'lorena',
+      fullName: 'Lorena Oliveira',
+      email: 'lorena.oliveira@ergengenharia.com.br',
+      phone: '',
+      status: UserStatus.ATIVO,
+      role: 'RH',
+    },
+  })
+
+  console.log(
+    '✅ Usuários aprovadores criados:',
+    vidalUser.email,
+    lorenaUser.email,
+  )
+
+  /* =========================
      DEPARTAMENTOS
      ========================= */
 
@@ -115,7 +151,7 @@ async function main() {
   console.log('✅ Tipo de solicitação "Vale-transporte" criado/atualizado.')
 
   /* =========================
-     TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (DP)
+     TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (RH)
      ========================= */
 
   const rhDepartment = await prisma.department.findUnique({
@@ -132,8 +168,6 @@ async function main() {
         // esse tipo só aparece quando o departamento selecionado
         // na tela for "RECURSOS HUMANOS"
         departamentos: [rhDepartment.id],
-        // se depois quiser filtrar por CC específicos, coloca aqui:
-        // centros: ['id-cc-1', 'id-cc-2']
       },
       camposEspecificos: [
         // 🧩 BLOCO 1 – Informações básicas
@@ -334,7 +368,7 @@ async function main() {
       create: {
         id: randomUUID(),
         nome: 'RQ_063 - Solicitação de Pessoal',
-        descricao: 'Requisição de pessoal (Departamento Pessoal)',
+        descricao: 'Requisição de pessoal (Recursos Humanos)',
         schemaJson: schemaRQ063,
         updatedAt: new Date(),
       },
@@ -435,6 +469,70 @@ async function main() {
     },
   })
   console.log('✅ Permissões de TI aplicadas ao módulo Configurações')
+
+  // 8️⃣ Criar grupo Aprovadores RQ_063
+  const rq063ApproversGroup = await prisma.accessGroup.upsert({
+    where: { name: 'Aprovadores RQ_063' },
+    update: {},
+    create: {
+      name: 'Aprovadores RQ_063',
+      notes: 'Gestores que podem aprovar a RQ_063 - Solicitação de Pessoal',
+    },
+  })
+  console.log('✅ Grupo criado:', rq063ApproversGroup.name)
+
+  // 9️⃣ Permissões dos Aprovadores RQ_063 no módulo Solicitações (VIEW + APPROVE)
+  await prisma.accessGroupGrant.upsert({
+    where: {
+      groupId_moduleId: {
+        groupId: rq063ApproversGroup.id,
+        moduleId: solicitacoesModule.id,
+      },
+    },
+    update: {
+      actions: ['VIEW', 'APPROVE'],
+    },
+    create: {
+      groupId: rq063ApproversGroup.id,
+      moduleId: solicitacoesModule.id,
+      actions: ['VIEW', 'APPROVE'],
+    },
+  })
+  console.log(
+    '✅ Permissões de Aprovadores RQ_063 aplicadas ao módulo Solicitações',
+  )
+
+  // 🔟 Adicionar Vidal e Lorena ao grupo Aprovadores RQ_063
+  await prisma.groupMember.upsert({
+    where: {
+      userId_groupId: {
+        userId: vidalUser.id,
+        groupId: rq063ApproversGroup.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: vidalUser.id,
+      groupId: rq063ApproversGroup.id,
+      role: 'MANAGER',
+    },
+  })
+
+  await prisma.groupMember.upsert({
+    where: {
+      userId_groupId: {
+        userId: lorenaUser.id,
+        groupId: rq063ApproversGroup.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: lorenaUser.id,
+      groupId: rq063ApproversGroup.id,
+      role: 'MANAGER',
+    },
+  })
+  console.log('✅ Vidal e Lorena adicionados ao grupo Aprovadores RQ_063')
 
   console.log('🎉 Seed concluído com sucesso!')
 }
