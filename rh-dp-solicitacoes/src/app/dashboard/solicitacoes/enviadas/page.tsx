@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Download, Filter, RefreshCcw, Search, Plus, Info, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 
+/** ===== TIPOS DA LISTA (tabela) ===== */
+
 type Row = {
   id: string
   titulo: string
@@ -23,7 +25,86 @@ type ApiResponse = {
   total: number
 }
 
+/** ===== TIPOS DO DETALHE ===== */
+
+type CampoEspecifico = {
+  name: string
+  label: string
+  type: string
+  required?: boolean
+  options?: string[]
+}
+
+type SchemaJson = {
+  camposEspecificos?: CampoEspecifico[]
+}
+
+type PayloadSolicitante = {
+  fullName?: string
+  email?: string
+  login?: string
+  phone?: string
+  costCenterText?: string
+}
+
+type Payload = {
+  campos?: Record<string, any>
+  solicitante?: PayloadSolicitante
+  [key: string]: any
+}
+
+type Attachment = {
+  id: string
+  filename: string
+  url: string
+  mimeType: string
+  sizeBytes: number
+  createdAt: string
+}
+
+type Comment = {
+  id: string
+  texto: string
+  createdAt: string
+  autor?: {
+    id: string
+    fullName: string
+    email: string
+  } | null
+}
+
+type SolicitationDetail = {
+  id: string
+  protocolo: string
+  titulo: string
+  descricao: string | null
+  status: string
+  dataAbertura: string
+  dataPrevista?: string | null
+  dataFechamento?: string | null
+  dataCancelamento?: string | null
+  tipo?: {
+    id: string
+    nome: string
+    descricao?: string | null
+    schemaJson?: SchemaJson
+  } | null
+  costCenter?: {
+    description: string
+  } | null
+  payload?: Payload
+  anexos?: Attachment[]
+  comentarios?: Comment[]
+}
+
+/** ===== CONSTANTES ===== */
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
+
+const LABEL_RO = 'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
+const INPUT_RO =
+  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700' +
+  ' focus:outline-none cursor-default'
 
 export default function SentRequestsPage() {
   const [loading, setLoading] = useState(false)
@@ -45,6 +126,12 @@ export default function SentRequestsPage() {
   const [status, setStatus] = useState<string>('')
   const [text, setText] = useState<string>('') // texto no formulário
 
+  // ===== ESTADO DO DETALHE =====
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null)
+  const [detail, setDetail] = useState<SolicitationDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+
   // combos mockados (troque por fetchs reais depois)
   const centros = useMemo(
     () => [
@@ -52,21 +139,21 @@ export default function SentRequestsPage() {
       { id: 'ti', nome: 'Tecnologia da Informação' },
       { id: 'rh', nome: 'Recursos Humanos' },
     ],
-    []
+    [],
   )
   const tipos = useMemo(
     () => [
       { id: '', nome: 'Selecione uma opção' },
       { id: 'tipo-docs-1', nome: 'Abertura de Chamado' },
     ],
-    []
+    [],
   )
   const categorias = useMemo(
     () => [
       { id: '', nome: 'Selecione uma opção' },
       { id: 'padrao', nome: 'Padrão' },
     ],
-    []
+    [],
   )
   const statuses = useMemo(
     () => [
@@ -78,14 +165,15 @@ export default function SentRequestsPage() {
       { id: 'REJEITADA', nome: 'REJEITADA' },
       { id: 'CONCLUIDA', nome: 'CONCLUIDA' },
     ],
-    []
+    [],
   )
 
   function buildQuery() {
     const qs = new URLSearchParams()
     qs.set('page', String(page))
     qs.set('pageSize', String(pageSize))
-    qs.set('scope', 'sent') // IMPORTANTe: pedimos só as ENVIADAS
+    // neste módulo usamos sempre as ENVIADAS pelo usuário logado
+    qs.set('scope', 'sent')
     if (dateStart) qs.set('dateStart', dateStart)
     if (dateEnd) qs.set('dateEnd', dateEnd)
     if (centerId) qs.set('centerId', centerId)
@@ -160,6 +248,52 @@ export default function SentRequestsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
+  /** ===== DETALHE ===== */
+
+  async function openDetail(row: Row) {
+    setSelectedRow(row)
+    setDetail(null)
+    setDetailError(null)
+    setDetailLoading(true)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${row.id}`, { cache: 'no-store' })
+      if (!res.ok) {
+        throw new Error('Erro ao carregar detalhes da solicitação.')
+      }
+      const json = (await res.json()) as SolicitationDetail
+      setDetail(json)
+    } catch (e: any) {
+      console.error('Erro ao buscar detalhe da solicitação', e)
+      setDetailError(e?.message ?? 'Erro ao carregar detalhes.')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  function closeDetail() {
+    setSelectedRow(null)
+    setDetail(null)
+    setDetailError(null)
+  }
+
+  // helpers de formatação
+  function formatDate(dateStr?: string | null) {
+    if (!dateStr) return '-'
+    try {
+      return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
+    } catch {
+      return '-'
+    }
+  }
+
+  const payload = (detail?.payload ?? {}) as Payload
+  const payloadSolic = payload.solicitante ?? {}
+  const payloadCampos = payload.campos ?? {}
+
+  const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
+  const camposSchema = schema.camposEspecificos ?? []
+
   return (
     <div className="space-y-4">
       {/* Título + Ações */}
@@ -190,8 +324,15 @@ export default function SentRequestsPage() {
             Nova Solicitação
           </button>
 
+          {/* Botões Detalhes / Cancelar podem ser ligados depois a uma seleção de linha */}
           <button
-            onClick={() => alert('Abra o detalhe da linha selecionada')}
+            onClick={() => {
+              if (!selectedRow) {
+                alert('Clique em uma solicitação na tabela para ver os detalhes.')
+              } else {
+                openDetail(selectedRow)
+              }
+            }}
             className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
             title="Detalhes da Solicitação"
           >
@@ -232,35 +373,35 @@ export default function SentRequestsPage() {
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-12 gap-3">
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Data Inicial</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Data Inicial
+            </label>
             <input
               type="date"
               value={dateStart}
               onChange={(e) => setDateStart(e.target.value)}
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-
-
             />
           </div>
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Data Fim</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Data Fim
+            </label>
             <input
               type="date"
               value={dateEnd}
               onChange={(e) => setDateEnd(e.target.value)}
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-
-
             />
           </div>
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Centro Responsável</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Centro Responsável
+            </label>
             <select
               value={centerId}
               onChange={(e) => setCenterId(e.target.value)}
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-
-
             >
               {centros.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -270,7 +411,9 @@ export default function SentRequestsPage() {
             </select>
           </div>
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Categoria</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Categoria
+            </label>
             <select
               value={categoriaId}
               onChange={(e) => setCategoriaId(e.target.value)}
@@ -285,7 +428,9 @@ export default function SentRequestsPage() {
           </div>
 
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Solicitação</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Solicitação
+            </label>
             <select
               value={tipoId}
               onChange={(e) => setTipoId(e.target.value)}
@@ -300,7 +445,9 @@ export default function SentRequestsPage() {
           </div>
 
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Protocolo</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Protocolo
+            </label>
             <input
               value={protocolo}
               onChange={(e) => setProtocolo(e.target.value)}
@@ -310,12 +457,13 @@ export default function SentRequestsPage() {
           </div>
 
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Solicitante</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Solicitante
+            </label>
             <input
               value={solicitante}
               onChange={(e) => setSolicitante(e.target.value)}
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-
               placeholder="nome ou e-mail"
             />
           </div>
@@ -326,7 +474,6 @@ export default function SentRequestsPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-
             >
               {statuses.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -337,7 +484,9 @@ export default function SentRequestsPage() {
           </div>
 
           <div className="col-span-12">
-            <label className="block text-xs font-semibold text-black tracking-wide">Texto no Formulário</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Texto no Formulário
+            </label>
             <div className="relative mt-1">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
@@ -383,7 +532,11 @@ export default function SentRequestsPage() {
               )}
               {!loading &&
                 data.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
+                  <tr
+                    key={r.id}
+                    className="hover:bg-slate-50 cursor-pointer"
+                    onClick={() => openDetail(r)}
+                  >
                     <td className="px-3 py-2">{r.status}</td>
                     <td className="px-3 py-2">{r.protocolo ?? '-'}</td>
                     <td className="px-3 py-2">
@@ -441,6 +594,265 @@ export default function SentRequestsPage() {
           </div>
         </div>
       </div>
+
+      {/* ===== MODAL DE DETALHES ===== */}
+      {selectedRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
+            {/* Cabeçalho do modal */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Detalhes da Solicitação
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Protocolo {detail?.protocolo ?? selectedRow.protocolo ?? '-'}
+                </p>
+              </div>
+              <button
+                onClick={closeDetail}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-5 px-5 py-4 text-sm">
+              {detailLoading && (
+                <p className="text-xs text-slate-500">Carregando detalhes...</p>
+              )}
+
+              {detailError && (
+                <p className="text-xs text-red-600">{detailError}</p>
+              )}
+
+              {/* Só mostra os campos se já carregou algo */}
+              {detail && (
+                <>
+                  {/* Bloco principal (igual ao topo do seu print) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={LABEL_RO}>Status</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={detail.status ?? selectedRow.status}
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Protocolo</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={detail.protocolo ?? selectedRow.protocolo ?? ''}
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Solicitação</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={
+                          detail.titulo ??
+                          detail.tipo?.nome ??
+                          selectedRow.titulo ??
+                          ''
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Centro Responsável</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={
+                          selectedRow.setorDestino ??
+                          detail.costCenter?.description ??
+                          ''
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Data Abertura</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={
+                          formatDate(detail.dataAbertura) ||
+                          (selectedRow.createdAt
+                            ? formatDate(selectedRow.createdAt)
+                            : '-')
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Prazo Solução</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={formatDate(detail.dataPrevista)}
+                      />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Data Fechamento</label>
+                      <input
+                        className={INPUT_RO}
+                        readOnly
+                        value={formatDate(detail.dataFechamento)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Descrição */}
+                  {detail.descricao && (
+                    <div>
+                      <label className={LABEL_RO}>Descrição da Solicitação</label>
+                      <textarea
+                        className={`${INPUT_RO} min-h-[80px]`}
+                        readOnly
+                        value={detail.descricao}
+                      />
+                    </div>
+                  )}
+
+                  {/* Anexos da Solicitação */}
+                  {detail.anexos && detail.anexos.length > 0 && (
+                    <div>
+                      <label className={LABEL_RO}>Anexo(s) da Solicitação</label>
+                      <div className="mt-2 space-y-1 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                        {detail.anexos.map((a) => (
+                          <div
+                            key={a.id}
+                            className="flex items-center justify-between"
+                          >
+                            <span>{a.filename}</span>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] font-medium text-blue-600 hover:underline"
+                            >
+                              Download
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dados do Solicitante (payload.solicitante) */}
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">
+                      Dados do Solicitante
+                    </p>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className={LABEL_RO}>Nome completo</label>
+                        <input
+                          className={INPUT_RO}
+                          readOnly
+                          value={payloadSolic.fullName ?? ''}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={LABEL_RO}>E-mail</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={payloadSolic.email ?? ''}
+                          />
+                        </div>
+                        <div>
+                          <label className={LABEL_RO}>Login</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={payloadSolic.login ?? ''}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={LABEL_RO}>Telefone</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={payloadSolic.phone ?? ''}
+                          />
+                        </div>
+                        <div>
+                          <label className={LABEL_RO}>Centro de Custo</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={payloadSolic.costCenterText ?? ''}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Formulário do tipo de solicitação (campos específicos) */}
+                  {camposSchema.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">
+                        Formulário do tipo de solicitação
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        {camposSchema.map((campo) => (
+                          <div key={campo.name}>
+                            <label className={LABEL_RO}>{campo.label}</label>
+                            <input
+                              className={INPUT_RO}
+                              readOnly
+                              value={
+                                payloadCampos[campo.name] !== undefined
+                                  ? String(payloadCampos[campo.name])
+                                  : ''
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comentários / Histórico simples */}
+                  {detail.comentarios && detail.comentarios.length > 0 && (
+                    <div>
+                      <label className={LABEL_RO}>Histórico de Atendimento</label>
+                      <div className="mt-2 space-y-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                        {detail.comentarios.map((c) => (
+                          <div key={c.id}>
+                            <div className="text-[10px] text-slate-500">
+                              {formatDate(c.createdAt)} - {c.autor?.fullName ?? '—'}
+                            </div>
+                            <div>{c.texto}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 px-5 py-3">
+              <button
+                onClick={closeDetail}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

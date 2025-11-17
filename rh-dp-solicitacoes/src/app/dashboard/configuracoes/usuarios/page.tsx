@@ -63,9 +63,8 @@ function CostCenterCombo({
   const options = useMemo(
     () =>
       centers.filter((cc) => {
-        const text = `${cc.externalCode ?? ''} ${cc.code ?? ''} ${
-          cc.description ?? ''
-        }`.toLowerCase()
+        const text = `${cc.externalCode ?? ''} ${cc.code ?? ''} ${cc.description ?? ''
+          }`.toLowerCase()
         return text.includes(query.toLowerCase())
       }),
     [centers, query],
@@ -487,7 +486,7 @@ export default function Page() {
         </div>
 
         {/* DIREITA */}
-                {/* DIREITA */}
+        {/* DIREITA */}
         <div className="lg:col-span-8">
           <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] shadow-sm p-4">
             {/* Cabeçalho da lista */}

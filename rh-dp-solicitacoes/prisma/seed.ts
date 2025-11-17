@@ -118,20 +118,20 @@ async function main() {
      TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (DP)
      ========================= */
 
-  const dpDepartment = await prisma.department.findUnique({
-    where: { code: '08' }, // DEPARTAMENTO PESSOAL
+  const rhDepartment = await prisma.department.findUnique({
+    where: { code: '17' }, // RECURSOS HUMANOS
   })
 
-  if (!dpDepartment) {
+  if (!rhDepartment) {
     console.warn(
-      '⚠️ Departamento Pessoal (code=08) não encontrado. Tipo RQ_063 não foi criado.'
+      '⚠️ Departamento de Recursos Humanos (code=17) não encontrado. Tipo RQ_063 não foi criado.'
     )
   } else {
     const schemaRQ063 = {
       meta: {
         // esse tipo só aparece quando o departamento selecionado
-        // na tela for "DEPARTAMENTO PESSOAL"
-        departamentos: [dpDepartment.id],
+        // na tela for "RECURSOS HUMANOS"
+        departamentos: [rhDepartment.id],
         // se depois quiser filtrar por CC específicos, coloca aqui:
         // centros: ['id-cc-1', 'id-cc-2']
       },
@@ -325,7 +325,7 @@ async function main() {
 
       // atualiza se já existir
       update: {
-        descricao: 'Requisição de pessoal (Departamento Pessoal)',
+        descricao: 'Requisição de pessoal (Recursos Humanos)',
         schemaJson: schemaRQ063,
         updatedAt: new Date(),
       },

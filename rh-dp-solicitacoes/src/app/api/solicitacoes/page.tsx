@@ -36,6 +36,7 @@ export default function SolicitacoesPage() {
   // dados
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<ApiResult>({ rows: [], total: 0 })
+  const [selectedRow, setSelectedRow] = useState<Row | null>(null)
 
   const qs = useMemo(() => {
     const p = new URLSearchParams()
