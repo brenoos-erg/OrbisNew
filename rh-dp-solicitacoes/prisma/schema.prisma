@@ -235,6 +235,9 @@ model Solicitation {
   status     SolicitationStatus    @default(ABERTA)
   prioridade SolicitationPriority?
 
+  /// 👇 Campo para controlar se a vaga já está prevista no orçamento
+  vagaPrevista Boolean @default(false)
+
   titulo    String
   descricao String?
 
@@ -252,6 +255,11 @@ model Solicitation {
   anexos      Attachment[]
   comentarios Comment[]
   eventos     Event[]
+
+  /// 🔗 VÍNCULO ENTRE CHAMADOS
+  parentId   String?
+  parent     Solicitation?   @relation("SolicitationParent", fields: [parentId], references: [id])
+  children   Solicitation[]  @relation("SolicitationParent")
 }
 
 /**
@@ -383,6 +391,7 @@ model UserCostCenter {
   @@unique([userId, costCenterId])
   @@map("UserCostCenter")
 }
+
 model SolicitationTimeline {
   id             String   @id @default(uuid())
   solicitationId String
@@ -392,4 +401,3 @@ model SolicitationTimeline {
 
   solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
 }
-
