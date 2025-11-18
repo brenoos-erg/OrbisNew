@@ -1,53 +1,58 @@
 // src/app/api/solicitacoes/[id]/aprovar/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
+import { requireActiveUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-type RouteParams = {
-  params: { id: string }
-}
-
-export async function POST(req: NextRequest, { params }: RouteParams) {
+/**
+ * POST /api/solicitacoes/[id]/aprovar
+ * Aprova uma solicitação pendente (Vidal/Lorena) e a coloca como
+ * "Aguardando atendimento" para o setor responsável.
+ *
+ * body opcional: { comment?: string }
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
-    const me = await requireActiveUser() // 👈 pega o usuário logado
-    const { id: solicitationId } = params
+    const me = await requireActiveUser()
+    const solicitationId = params.id
 
-    // corpo opcional, só pra receber comentário se você quiser
     const body = await req.json().catch(() => ({}))
     const comment: string | undefined = body.comment
 
-    // 1) Busca a solicitação
-    const solicit = await prisma.solicitation.findUnique({
+    const solicitation = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
     })
 
-    if (!solicit) {
+    if (!solicitation) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
       )
     }
 
-    // 2) Valida estado de aprovação
-    if (!solicit.requiresApproval || solicit.approvalStatus !== 'PENDENTE') {
+    if (
+      !solicitation.requiresApproval ||
+      solicitation.approvalStatus !== 'PENDENTE'
+    ) {
       return NextResponse.json(
         { error: 'Solicitação não está pendente de aprovação.' },
         { status: 400 },
       )
     }
 
-    // Se tiver um aprovador definido, só ele pode aprovar
-    if (solicit.approverId && solicit.approverId !== me.id) {
+    // Se tiver aprovador definido, só ele pode aprovar
+    if (solicitation.approverId && solicitation.approverId !== me.id) {
       return NextResponse.json(
         { error: 'Você não é o aprovador desta solicitação.' },
         { status: 403 },
       )
     }
 
-    // 3) Atualiza como APROVADO
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
@@ -55,11 +60,27 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         approvalAt: new Date(),
         approvalComment: comment ?? null,
         requiresApproval: false,
-        status: 'EM_ATENDIMENTO', // RH já pode seguir
+
+        // 🔹 Depois de aprovada fica "aguardando atendimento"
+        // (na prática: ABERTA para o setor responsável tratar)
+        status: 'ABERTA',
+
+        // 🔹 Não fica mais atrelada ao Vidal/Lorena como atendente
+        approverId: null,
       },
     })
 
-    // 4) Registra evento
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId,
+        status: 'APROVADO',
+        message:
+          comment && comment.trim().length > 0
+            ? `Aprovado por ${me.fullName ?? me.id}: ${comment}`
+            : `Aprovado por ${me.fullName ?? me.id}`,
+      },
+    })
+
     await prisma.event.create({
       data: {
         id: crypto.randomUUID(),
@@ -71,7 +92,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(updated)
   } catch (e) {
-    console.error('POST /api/solicitacoes/[id]/aprovar error', e)
+    console.error('❌ POST /api/solicitacoes/[id]/aprovar error:', e)
     return NextResponse.json(
       { error: 'Erro ao aprovar a solicitação.' },
       { status: 500 },

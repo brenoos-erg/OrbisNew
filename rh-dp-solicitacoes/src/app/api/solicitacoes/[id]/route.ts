@@ -19,6 +19,7 @@ export async function GET(
       where: { id: params.id },
       include: {
         tipo: true,
+        costCenter: true,
         comentarios: {
           include: {
             autor: {
@@ -34,6 +35,14 @@ export async function GET(
         timelines: {
           orderBy: { createdAt: 'asc' },
         },
+        // 👇 filhos vinculados
+        children: {
+          include: {
+            tipo: { select: { nome: true } },
+            department: { select: { name: true } },
+          },
+          orderBy: { dataAbertura: 'asc' },
+        },
       },
     })
 
@@ -44,7 +53,76 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(item)
+    // Mapeia para o formato que o front espera
+    const result = {
+      id: item.id,
+      protocolo: item.protocolo,
+      titulo: item.titulo,
+      descricao: item.descricao,
+      status: item.status,
+      dataAbertura: item.dataAbertura?.toISOString(),
+      dataPrevista: item.dataPrevista?.toISOString() ?? null,
+      dataFechamento: item.dataFechamento?.toISOString() ?? null,
+      dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
+      tipo: item.tipo
+        ? {
+            id: item.tipo.id,
+            nome: item.tipo.nome,
+            descricao: item.tipo.descricao,
+            schemaJson: item.tipo.schemaJson as any,
+          }
+        : null,
+      costCenter: item.costCenter
+        ? {
+            description: item.costCenter.description,
+          }
+        : null,
+      payload: item.payload as any,
+      anexos: item.anexos.map((a) => ({
+        id: a.id,
+        filename: a.filename,
+        url: a.url,
+        mimeType: a.mimeType,
+        sizeBytes: a.sizeBytes,
+        createdAt: a.createdAt.toISOString(),
+      })),
+      comentarios: item.comentarios.map((c) => ({
+        id: c.id,
+        texto: c.texto,
+        createdAt: c.createdAt.toISOString(),
+        autor: c.autor
+          ? {
+              id: c.autor.id,
+              fullName: c.autor.fullName,
+              email: c.autor.email,
+            }
+          : null,
+      })),
+      eventos: item.eventos.map((e) => ({
+        id: e.id,
+        tipo: e.tipo,
+        createdAt: e.createdAt.toISOString(),
+        actorId: e.actorId,
+      })),
+      timelines: item.timelines.map((t) => ({
+        id: t.id,
+        status: t.status,
+        message: t.message,
+        createdAt: t.createdAt.toISOString(),
+      })),
+      // 👇 filhos simplificados para o modal
+      children: item.children.map((child) => ({
+        id: child.id,
+        protocolo: child.protocolo,
+        titulo: child.titulo,
+        status: child.status,
+        dataAbertura: child.dataAbertura.toISOString(),
+        tipo: child.tipo ? { nome: child.tipo.nome } : null,
+        setorDestino: (child as any).department?.name ?? null,
+      })),
+    }
+
+    return NextResponse.json(result)
   } catch (e) {
     console.error('❌ GET /api/solicitacoes/[id] error:', e)
     return NextResponse.json(
@@ -62,7 +140,10 @@ export async function GET(
  *
  * body: { comment: string }
  */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
     const me = await requireActiveUser() // usuário logado
     const solicitationId = params.id
@@ -90,7 +171,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     // Só aprova/reprova se estiver pendente de aprovação
-    if (!solicitation.requiresApproval || solicitation.approvalStatus !== 'PENDENTE') {
+    if (
+      !solicitation.requiresApproval ||
+      solicitation.approvalStatus !== 'PENDENTE'
+    ) {
       return NextResponse.json(
         { error: 'Solicitação não está pendente de aprovação.' },
         { status: 400 },
