@@ -1,17 +1,15 @@
 // src/app/api/solicitacoes/[id]/aprovar/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/solicitacoes/[id]/aprovar
- * Aprova uma solicitação pendente (Vidal/Lorena) e a coloca como
- * "Aguardando atendimento" para o setor responsável.
- *
- * body opcional: { comment?: string }
+ * Aprova uma solicitação pendente (ex.: Vidal/Lorena) e
+ * deixa o chamado em "aguardando atendimento" SEM atendente.
  */
 export async function POST(
   req: NextRequest,
@@ -35,6 +33,7 @@ export async function POST(
       )
     }
 
+    // Tem que estar pendente de aprovação
     if (
       !solicitation.requiresApproval ||
       solicitation.approvalStatus !== 'PENDENTE'
@@ -53,6 +52,11 @@ export async function POST(
       )
     }
 
+    // ✅ Aqui é o ponto importante:
+    //    - approvalStatus vira APROVADO
+    //    - requiresApproval = false
+    //    - approverId = null  (tira o Vidal/Lorena do campo)
+    //    - status = ABERTA   (aguardando atendimento pelo RH)
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
@@ -61,12 +65,8 @@ export async function POST(
         approvalComment: comment ?? null,
         requiresApproval: false,
 
-        // 🔹 Depois de aprovada fica "aguardando atendimento"
-        // (na prática: ABERTA para o setor responsável tratar)
-        status: 'ABERTA',
-
-        // 🔹 Não fica mais atrelada ao Vidal/Lorena como atendente
-        approverId: null,
+        approverId: null, // 🔴 AQUI: zera o atendente
+        status: 'ABERTA', // 🔴 AQUI: volta para fila "aguardando atendimento"
       },
     })
 

@@ -6,11 +6,6 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * POST /api/solicitacoes/[id]/assumir
- * Marca o chamado como "assumido" pelo usuário logado
- * e muda o status para EM_ATENDIMENTO.
- */
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } },
@@ -30,7 +25,6 @@ export async function POST(
       )
     }
 
-    // Se já está concluída/cancelada, não deixa assumir
     if (solic.status === 'CONCLUIDA' || solic.status === 'CANCELADA') {
       return NextResponse.json(
         { error: 'Solicitação já foi finalizada.' },
@@ -41,8 +35,8 @@ export async function POST(
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
-        approverId: me.id,          // atendente
-        status: 'EM_ATENDIMENTO',   // entra na barra verde "EM ATENDIMENTO"
+        approverId: me.id,          // 🔹 aqui vira o ATENDENTE
+        status: 'EM_ATENDIMENTO',   // 🔹 aí sim entra em atendimento
       },
     })
 
@@ -63,7 +57,7 @@ export async function POST(
       },
     })
 
-    return NextResponse.json(updated, { status: 200 })
+    return NextResponse.json(updated)
   } catch (e) {
     console.error('❌ POST /api/solicitacoes/[id]/assumir error:', e)
     return NextResponse.json(

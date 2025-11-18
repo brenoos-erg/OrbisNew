@@ -70,6 +70,16 @@ type Comment = {
   } | null
 }
 
+type ChildSolicitation = {
+  id: string
+  protocolo: string
+  titulo: string
+  status: string
+  dataAbertura: string
+  tipo?: { nome: string } | null
+  setorDestino?: string | null
+}
+
 export type SolicitationDetail = {
   id: string
   protocolo: string
@@ -92,6 +102,7 @@ export type SolicitationDetail = {
   payload?: Payload
   anexos?: Attachment[]
   comentarios?: Comment[]
+  children?: ChildSolicitation[]
 }
 
 // ===== Timeline =====
@@ -199,30 +210,30 @@ export function SolicitationDetailModal({
   // ===== AÇÕES =====
 
   async function handleAssumirChamado() {
-  setAssumindo(true)
-  setAssumirError(null)
+    setAssumindo(true)
+    setAssumirError(null)
 
-  try {
-    const id = detail?.id ?? row?.id
-    if (!id) return
+    try {
+      const id = detail?.id ?? row?.id
+      if (!id) return
 
-    const res = await fetch(`/api/solicitacoes/${id}/assumir`, {
-      method: 'POST',
-    })
+      const res = await fetch(`/api/solicitacoes/${id}/assumir`, {
+        method: 'POST',
+      })
 
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}))
-      throw new Error(json?.error ?? 'Erro ao assumir chamado.')
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao assumir chamado.')
+      }
+
+      setCloseSuccess('Chamado assumido por você.')
+    } catch (err: any) {
+      console.error('Erro ao assumir chamado', err)
+      setAssumirError(err?.message ?? 'Erro ao assumir chamado.')
+    } finally {
+      setAssumindo(false)
     }
-
-    setCloseSuccess('Chamado assumido por você.')
-  } catch (err: any) {
-    console.error('Erro ao assumir chamado', err)
-    setAssumirError(err?.message ?? 'Erro ao assumir chamado.')
-  } finally {
-    setAssumindo(false)
   }
-}
 
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
@@ -594,7 +605,7 @@ export function SolicitationDetailModal({
                     Dados do contratado
                   </p>
 
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 text-xs">
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                     <div>
                       <label className={LABEL_RO}>Nome completo</label>
                       <input
@@ -650,6 +661,52 @@ export function SolicitationDetailModal({
                         placeholder="Ex: 3500,00"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chamados vinculados (filhos) */}
+              {detail.children && detail.children.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    Chamados vinculados
+                  </p>
+
+                  <div className="space-y-2 text-[12px]">
+                    {detail.children.map((child) => (
+                      <div
+                        key={child.id}
+                        className="flex flex-col rounded border border-slate-200 bg-white px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-800">
+                            {child.protocolo} — {child.titulo}
+                          </span>
+                          <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                            {child.tipo?.nome ?? '—'}
+                          </span>
+                        </div>
+
+                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                          <span>
+                            <span className="font-semibold">Status:</span>{' '}
+                            {child.status}
+                          </span>
+                          <span>
+                            <span className="font-semibold">Abertura:</span>{' '}
+                            {formatDate(child.dataAbertura)}
+                          </span>
+                          {child.setorDestino && (
+                            <span>
+                              <span className="font-semibold">
+                                Setor destino:
+                              </span>{' '}
+                              {child.setorDestino}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

@@ -1,38 +1,22 @@
 // src/app/api/solicitacoes/[id]/finalizar-rh/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * Ajuste esses valores conforme o seu cadastro:
- *
- * - NOME_TIPO_ADMISSAO: nome do TipoSolicitacao que representa "Admissão"
- * - DEPARTAMENTO_DP_CODE: código do Department que representa o DP
- */
-const NOME_TIPO_ADMISSAO = 'RQ_064 - Admissão de Pessoal' // <- ajuste aqui
-const DEPARTAMENTO_DP_CODE = 'DP' // <- ajuste aqui (Department.code)
+function generateProtocolo() {
+  const now = new Date()
+  const yy = now.getFullYear().toString().slice(-2)
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const rand = Math.floor(Math.random() * 9999)
+    .toString()
+    .padStart(4, '0')
+  return `RQ${yy}${mm}${dd}-${rand}`
+}
 
-/**
- * POST /api/solicitacoes/[id]/finalizar-rh
- *
- * Finaliza uma solicitação de pessoal (RQ_063) no RH
- * e cria automaticamente uma solicitação filha para o DP (admissão),
- * vinculada via parentId.
- *
- * Espera corpo:
- * {
- *   candidatoNome: string
- *   candidatoDocumento?: string
- *   dataAdmissaoPrevista?: string (ISO)
- *   salario?: string | number
- *   cargo?: string
- *   outrasInfos?: any
- * }
- */
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -41,22 +25,22 @@ export async function POST(
     const me = await requireActiveUser()
     const solicitationId = params.id
 
-    const body = await req.json()
+    const body = await req.json().catch(() => ({} as any))
     const {
       candidatoNome,
       candidatoDocumento,
       dataAdmissaoPrevista,
       salario,
       cargo,
-      outrasInfos,
     } = body
 
-    // 1) Busca a solicitação original
+    // 1) Solicitação original (RH)
     const original = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
       include: {
         tipo: true,
-        solicitante: true,
+        costCenter: true,
+        department: true,
       },
     })
 
@@ -67,158 +51,172 @@ export async function POST(
       )
     }
 
-    // (Opcional) Garante que só RQ_063 passe por esse fluxo
-    // Se quiser ser rígido, descomente:
-    //
-    // if (original.tipo.nome !== 'RQ_063 - Solicitação de Pessoal') {
-    //   return NextResponse.json(
-    //     { error: 'Esta rota é exclusiva para RQ_063 - Solicitação de Pessoal.' },
-    //     { status: 400 },
-    //   )
-    // }
-
-    // 2) Atualiza solicitação original como concluída pelo RH
-    const updatedOriginal = await prisma.solicitation.update({
-      where: { id: solicitationId },
-      data: {
-        status: 'CONCLUIDA',
-        dataFechamento: new Date(),
-        payload: {
-          ...(original.payload as any),
-          candidato: {
-            nome: candidatoNome,
-            documento: candidatoDocumento,
-            dataAdmissaoPrevista,
-            salario,
-            cargo,
-            outrasInfos,
-          },
-          finalizadaPor: {
-            id: me.id,
-            nome: me.fullName,
-            data: new Date().toISOString(),
-          },
-        },
-      },
-    })
-
-    // Evento de conclusão no RH
-    await prisma.event.create({
-      data: {
-        id: crypto.randomUUID(),
-        solicitationId: updatedOriginal.id,
-        actorId: me.id,
-        tipo: 'CONCLUIDA_RH',
-      },
-    })
-
-    // 3) Descobre o tipo "Admissão" (TipoSolicitacao) pelo nome
-    const tipoAdmissao = await prisma.tipoSolicitacao.findUnique({
-      where: { nome: NOME_TIPO_ADMISSAO },
-    })
-
-    if (!tipoAdmissao) {
-      // Se não existir, não quebra o fluxo de finalização, só avisa
+    // garantia: só RQ_063 entra aqui
+    if (original.tipo?.nome !== 'RQ_063 - Solicitação de Pessoal') {
       return NextResponse.json(
-        {
-          original: updatedOriginal,
-          warning:
-            'Tipo de solicitação de Admissão não encontrado. Ajuste NOME_TIPO_ADMISSAO no backend.',
-        },
-        { status: 200 },
+        { error: 'Esta rota é apenas para RQ_063 - Solicitação de Pessoal.' },
+        { status: 400 },
       )
     }
 
-    // 4) Descobre o Department do DP pelo code
-    const dpDepartment = await prisma.department.findFirst({
-      where: { code: DEPARTAMENTO_DP_CODE },
+    // 2) Tipo de solicitação para o DP (ajuste o nome se for outro)
+    const tipoAdmissao = await prisma.tipoSolicitacao.findFirst({
+      where: { nome: 'Admissão - DP' }, // <-- se o seu nome for outro, troque aqui
     })
 
-    const departmentIdForDp = dpDepartment?.id ?? original.departmentId
+    if (!tipoAdmissao) {
+      return NextResponse.json(
+        { error: 'Tipo de solicitação de Admissão (DP) não configurado.' },
+        { status: 400 },
+      )
+    }
 
-    // 5) Cria a solicitação filha para o DP (admissão)
+    // 3) Departamento DP
+    const departmentDp = await prisma.department.findFirst({
+      where: {
+        // ajuste se na sua base o code/name forem diferentes
+        OR: [{ code: 'DP' }, { name: 'DEPARTAMENTO PESSOAL' }],
+      },
+    })
+
+    if (!departmentDp) {
+      return NextResponse.json(
+        { error: 'Departamento Pessoal não encontrado (Department).' },
+        { status: 400 },
+      )
+    }
+
+    // 4) Centro de custo do DP
+    const costCenterDp = await prisma.costCenter.findFirst({
+      where: {
+        // ajuste aqui também conforme sua base:
+        OR: [
+          { code: 'DP' },
+          { description: 'DEPARTAMENTO PESSOAL' },
+          { abbreviation: 'DP' },
+        ],
+      },
+    })
+
+    if (!costCenterDp) {
+      return NextResponse.json(
+        { error: 'Centro de custo do Departamento Pessoal não encontrado.' },
+        { status: 400 },
+      )
+    }
+
+    // 5) Concluir a solicitação original (RH)
+    await prisma.solicitation.update({
+      where: { id: original.id },
+      data: {
+        status: 'CONCLUIDA',
+        dataFechamento: new Date(),
+      },
+    })
+
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId: original.id,
+        status: 'CONCLUIDA',
+        message: `Finalizada pelo RH por ${me.fullName ?? me.id}. Encaminhada para o DP.`,
+      },
+    })
+
+    await prisma.event.create({
+      data: {
+        id: crypto.randomUUID(),
+        solicitationId: original.id,
+        actorId: me.id,
+        tipo: 'FINALIZACAO_RH',
+      },
+    })
+
+    // 6) Criar o chamado FILHO para o DP
     const protocoloFilho = generateProtocolo()
+
+    const nomeCandidatoFinal =
+      candidatoNome ||
+      (original.payload as any)?.campos?.nomeColaborador ||
+      (original.payload as any)?.campos?.nomeCandidato ||
+      'Novo colaborador'
+
+    const documentoFinal =
+      candidatoDocumento ||
+      (original.payload as any)?.campos?.cpf ||
+      (original.payload as any)?.campos?.documento ||
+      undefined
 
     const dpSolicitation = await prisma.solicitation.create({
       data: {
         protocolo: protocoloFilho,
         tipoId: tipoAdmissao.id,
-        costCenterId: original.costCenterId,
-        departmentId: departmentIdForDp,
 
-        // pode ser o mesmo solicitante ou o usuário do RH que está finalizando
+        // 🔴 AQUI ESTÁ O PULO DO GATO:
+        //    Em vez de usar original.costCenterId, usamos o CC do DP
+        costCenterId: costCenterDp.id,
+        departmentId: departmentDp.id,
+
+        // pode ser o mesmo solicitante da original
         solicitanteId: original.solicitanteId,
 
-        // Admissão não precisa de aprovação (já veio aprovada do fluxo de pessoal)
+        parentId: original.id,
+
         requiresApproval: false,
         approvalStatus: 'NAO_PRECISA',
 
-        status: 'ABERTA',
+        status: 'ABERTA', // entra como "aguardando atendimento" do DP
         prioridade: original.prioridade,
 
-        // Aqui já é algo equivalente a "vaga prevista / aprovada"
-        vagaPrevista: true,
-
-        titulo: `Admissão - ${candidatoNome ?? 'Novo colaborador'}`,
-        descricao: `Solicitação gerada automaticamente a partir da solicitação de pessoal ${original.protocolo}.`,
+        titulo: `Admissão - ${nomeCandidatoFinal}`,
+        descricao: `Solicitação de admissão gerada automaticamente a partir da solicitação de pessoal ${original.protocolo}.`,
 
         payload: {
           origem: {
             solicitationId: original.id,
             protocolo: original.protocolo,
-            tipo: original.tipo.nome,
+            tipo: original.tipo?.nome,
           },
           candidato: {
-            nome: candidatoNome,
-            documento: candidatoDocumento,
+            nome: nomeCandidatoFinal,
+            documento: documentoFinal,
             dataAdmissaoPrevista,
             salario,
             cargo,
-            outrasInfos,
           },
         },
-
-        parentId: original.id,
       },
     })
 
-    // Evento na filha (DP)
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId: dpSolicitation.id,
+        status: 'ABERTA',
+        message: `Chamado de admissão criado automaticamente a partir da solicitação de pessoal ${original.protocolo}.`,
+      },
+    })
+
     await prisma.event.create({
       data: {
         id: crypto.randomUUID(),
         solicitationId: dpSolicitation.id,
         actorId: me.id,
-        tipo: 'CRIADA_AUTOMATICAMENTE_DP',
+        tipo: 'CRIACAO_ADMISSAO_DP',
       },
     })
 
     return NextResponse.json(
       {
-        original: updatedOriginal,
-        dpSolicitation,
+        message:
+          'Solicitação finalizada no RH e chamada de admissão criada no DP.',
+        dpSolicitationId: dpSolicitation.id,
       },
-      { status: 200 },
+      { status: 201 },
     )
   } catch (e) {
-    console.error('POST /api/solicitacoes/[id]/finalizar-rh error', e)
+    console.error('❌ POST /api/solicitacoes/[id]/finalizar-rh error:', e)
     return NextResponse.json(
-      { error: 'Erro ao finalizar a solicitação pelo RH.' },
+      { error: 'Erro ao finalizar solicitação no RH e criar chamado no DP.' },
       { status: 500 },
     )
   }
-}
-
-/**
- * Mesmo gerador de protocolo usado no /api/solicitacoes
- * (pode extrair para um util se quiser reutilizar).
- */
-function generateProtocolo() {
-  const now = new Date()
-  const yy = now.getFullYear().toString().slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const rand = Math.floor(Math.random() * 9999)
-    .toString()
-    .padStart(4, '0')
-  return `RQ${yy}${mm}${dd}-${rand}`
 }
