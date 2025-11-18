@@ -1,27 +1,31 @@
-import { NextResponse } from 'next/server'
+// src/app/api/solicitacoes/[id]/reprovar/route.ts
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireActiveUser } from '@/lib/auth'
+import crypto from 'crypto'
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export const dynamic = 'force-dynamic'
+
+type RouteParams = {
+  params: { id: string }
+}
+
+export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
-    const solicitationId = params.id
+    const me = await requireActiveUser()
+    const { id: solicitationId } = params
+
     const body = await req.json().catch(() => ({}))
+    const comment: string | undefined = body.comment
 
-    const userId = body.userId as string | undefined
-    const comment =
-      (body.comment as string | undefined) ??
-      (body.comentario as string | undefined) ??
-      null
-
-    if (!userId) {
+    if (!comment || comment.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Usuário não informado.' },
+        { error: 'Comentário é obrigatório para reprovar.' },
         { status: 400 },
       )
     }
 
+    // 1) Busca a solicitação
     const solicit = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
     })
@@ -33,38 +37,47 @@ export async function PATCH(
       )
     }
 
-    if (solicit.approvalStatus !== 'PENDENTE') {
+    if (!solicit.requiresApproval || solicit.approvalStatus !== 'PENDENTE') {
       return NextResponse.json(
         { error: 'Solicitação não está pendente de aprovação.' },
         { status: 400 },
       )
     }
 
+    if (solicit.approverId && solicit.approverId !== me.id) {
+      return NextResponse.json(
+        { error: 'Você não é o aprovador desta solicitação.' },
+        { status: 403 },
+      )
+    }
+
+    // 2) Atualiza como REPROVADO
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
         approvalStatus: 'REPROVADO',
         approvalAt: new Date(),
         approvalComment: comment,
-        status: 'CANCELADA',
+        requiresApproval: false,
+        status: 'CANCELADA', // ou outro status que você preferir
       },
     })
 
-    // Evento na "linha do tempo"
+    // 3) Registra evento
     await prisma.event.create({
       data: {
         id: crypto.randomUUID(),
         solicitationId,
-        actorId: userId,
+        actorId: me.id,
         tipo: 'REPROVACAO',
       },
     })
 
     return NextResponse.json(updated)
-  } catch (err) {
-    console.error('PATCH /api/solicitacoes/[id]/reprovar error', err)
+  } catch (e) {
+    console.error('POST /api/solicitacoes/[id]/reprovar error', e)
     return NextResponse.json(
-      { error: 'Erro interno ao reprovar solicitação.' },
+      { error: 'Erro ao reprovar a solicitação.' },
       { status: 500 },
     )
   }

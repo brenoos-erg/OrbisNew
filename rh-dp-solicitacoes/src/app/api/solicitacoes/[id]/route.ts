@@ -1,96 +1,147 @@
+// src/app/api/solicitacoes/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Status, Prisma } from '@prisma/client'
+import crypto from 'crypto'
+import { requireActiveUser } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/solicitacoes/[id]
  * Retorna os detalhes completos de uma solicitação específica.
  */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+) {
   try {
     const item = await prisma.solicitation.findUnique({
       where: { id: params.id },
       include: {
         tipo: true,
-        comentarios: { include: { autor: { select: { id: true, fullName: true, email: true } } } },
+        comentarios: {
+          include: {
+            autor: {
+              select: { id: true, fullName: true, email: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         anexos: true,
-        eventos: true,
+        eventos: {
+          orderBy: { createdAt: 'asc' },
+        },
+        timelines: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     })
 
     if (!item) {
-      return NextResponse.json({ error: 'Solicitação não encontrada' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Solicitação não encontrada.' },
+        { status: 404 },
+      )
     }
 
     return NextResponse.json(item)
   } catch (e) {
     console.error('❌ GET /api/solicitacoes/[id] error:', e)
-    return NextResponse.json({ error: 'Erro interno ao buscar solicitação' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Erro interno ao buscar solicitação.' },
+      { status: 500 },
+    )
   }
 }
 
 /**
  * PATCH /api/solicitacoes/[id]
- * Atualiza status, responsável ou payload da solicitação.
- * body: { status?: Status, responsavelId?: string | null, payload?: any, actorId?: string }
+ *
+ * Neste momento vamos usar o PATCH especificamente para
+ * **REPROVAR** a solicitação a partir do painel de aprovação.
+ *
+ * body: { comment: string }
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const me = await requireActiveUser() // usuário logado
+    const solicitationId = params.id
+
     const body = await req.json().catch(() => ({}))
-    const { status, responsavelId, payload, actorId } = body as {
-      status?: Status | string
-      responsavelId?: string | null
-      payload?: unknown
-      actorId?: string
+    const comment: string | undefined = body.comment
+
+    if (!comment || !comment.trim()) {
+      return NextResponse.json(
+        { error: 'Motivo é obrigatório.' },
+        { status: 400 },
+      )
     }
 
-    const data: Prisma.SolicitationUpdateInput = {}
+    // 1) Buscar solicitação
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id: solicitationId },
+    })
 
-    // valida e aplica status
-    if (typeof status === 'string') {
-      if (!Object.values(Status).includes(status as Status)) {
-        return NextResponse.json({ error: 'Status inválido' }, { status: 400 })
-      }
-      data.status = status as Status
+    if (!solicitation) {
+      return NextResponse.json(
+        { error: 'Solicitação não encontrada.' },
+        { status: 404 },
+      )
     }
 
-// aplica responsável
-if (typeof responsavelId === 'string' || responsavelId === null) {
-  (data as any).responsavelId = responsavelId
-}
-
-    // aplica payload (JSON)
-    if (payload !== undefined) {
-      data.payload = payload as Prisma.InputJsonValue
+    // Só aprova/reprova se estiver pendente de aprovação
+    if (!solicitation.requiresApproval || solicitation.approvalStatus !== 'PENDENTE') {
+      return NextResponse.json(
+        { error: 'Solicitação não está pendente de aprovação.' },
+        { status: 400 },
+      )
     }
 
-    if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 })
+    // Se tiver aprovador definido, só ele pode reprovar
+    if (solicitation.approverId && solicitation.approverId !== me.id) {
+      return NextResponse.json(
+        { error: 'Você não é o aprovador desta solicitação.' },
+        { status: 403 },
+      )
     }
 
-    // atualiza solicitação
+    // 2) Atualizar como REPROVADO / CANCELADA
     const updated = await prisma.solicitation.update({
-      where: { id: params.id },
-      data,
-      include: {
-        tipo: true,
-        autor: { select: { id: true, fullName: true, email: true } },
-        responsavel: { select: { id: true, fullName: true, email: true } },
+      where: { id: solicitationId },
+      data: {
+        approvalStatus: 'REPROVADO',
+        approvalAt: new Date(),
+        approvalComment: comment,
+        requiresApproval: false,
+        status: 'CANCELADA',
       },
     })
 
-    // cria evento de auditoria
+    // 3) Timeline
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId,
+        status: 'REPROVADO',
+        message: `Reprovado por ${me.fullName ?? me.id}: ${comment}`,
+      },
+    })
+
+    // 4) Evento
     await prisma.event.create({
       data: {
-        solicitationId: params.id,
-        actorId: actorId ?? updated.responsavelId ?? updated.autorId,
-        tipo: 'update',
+        id: crypto.randomUUID(),
+        solicitationId,
+        actorId: me.id,
+        tipo: 'REPROVACAO',
       },
     })
 
     return NextResponse.json(updated)
   } catch (e) {
-    console.error('❌ PATCH /api/solicitacoes/[id] error:', e)
-    return NextResponse.json({ error: 'Erro interno ao atualizar solicitação' }, { status: 500 })
+    console.error('❌ PATCH /api/solicitacoes/[id] (reprovar) error:', e)
+    return NextResponse.json(
+      { error: 'Erro ao reprovar a solicitação.' },
+      { status: 500 },
+    )
   }
 }

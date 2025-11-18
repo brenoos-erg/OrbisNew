@@ -1,3 +1,4 @@
+// src/app/dashboard/solicitacoes/enviadas/page.tsx
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -73,6 +74,13 @@ type Comment = {
   } | null
 }
 
+type TimelineItem = {
+  id: string
+  status: string
+  message: string | null
+  createdAt: string
+}
+
 type SolicitationDetail = {
   id: string
   protocolo: string
@@ -95,16 +103,43 @@ type SolicitationDetail = {
   payload?: Payload
   anexos?: Attachment[]
   comentarios?: Comment[]
+  timelines?: TimelineItem[]
 }
 
 /** ===== CONSTANTES ===== */
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
-const LABEL_RO = 'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
+const LABEL_RO =
+  'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
 const INPUT_RO =
-  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700' +
-  ' focus:outline-none cursor-default'
+  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 focus:outline-none cursor-default'
+
+const STATUS_STEPS = [
+  { id: 'ABERTA', label: 'ABERTA' },
+  { id: 'AGUARDANDO_APROVACAO', label: 'AGUARD. APROVAÇÃO' },
+  { id: 'EM_ATENDIMENTO', label: 'EM ATENDIMENTO' },
+  { id: 'CONCLUIDA', label: 'CONCLUÍDA' },
+]
+
+function escapeCsv(v: string) {
+  if (v == null) return ''
+  if (/[;"\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+  return v
+}
+
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return '-'
+  try {
+    return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
+  } catch {
+    return '-'
+  }
+}
+
+/** =========================================
+ *  PÁGINA
+ * ======================================= */
 
 export default function SentRequestsPage() {
   const [loading, setLoading] = useState(false)
@@ -126,13 +161,13 @@ export default function SentRequestsPage() {
   const [status, setStatus] = useState<string>('')
   const [text, setText] = useState<string>('') // texto no formulário
 
-  // ===== ESTADO DO DETALHE =====
+  // ===== DETALHE =====
   const [selectedRow, setSelectedRow] = useState<Row | null>(null)
   const [detail, setDetail] = useState<SolicitationDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  // combos mockados (troque por fetchs reais depois)
+  // combos mockados (trocar depois)
   const centros = useMemo(
     () => [
       { id: '', nome: 'Selecione uma opção' },
@@ -159,11 +194,10 @@ export default function SentRequestsPage() {
     () => [
       { id: '', nome: 'Todos' },
       { id: 'ABERTA', nome: 'ABERTA' },
-      { id: 'EM_ANALISE', nome: 'EM_ANALISE' },
-      { id: 'AGUARDANDO_INFO', nome: 'AGUARDANDO_INFO' },
-      { id: 'APROVADA', nome: 'APROVADA' },
-      { id: 'REJEITADA', nome: 'REJEITADA' },
+      { id: 'AGUARDANDO_APROVACAO', nome: 'AGUARDANDO_APROVACAO' },
+      { id: 'EM_ATENDIMENTO', nome: 'EM_ATENDIMENTO' },
       { id: 'CONCLUIDA', nome: 'CONCLUIDA' },
+      { id: 'CANCELADA', nome: 'CANCELADA' },
     ],
     [],
   )
@@ -240,12 +274,6 @@ export default function SentRequestsPage() {
     URL.revokeObjectURL(url)
   }
 
-  function escapeCsv(v: string) {
-    if (v == null) return ''
-    if (/[;"\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`
-    return v
-  }
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   /** ===== DETALHE ===== */
@@ -277,22 +305,20 @@ export default function SentRequestsPage() {
     setDetailError(null)
   }
 
-  // helpers de formatação
-  function formatDate(dateStr?: string | null) {
-    if (!dateStr) return '-'
-    try {
-      return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
-    } catch {
-      return '-'
-    }
-  }
-
   const payload = (detail?.payload ?? {}) as Payload
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
-
   const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
   const camposSchema = schema.camposEspecificos ?? []
+
+  // status atual para timeline
+  const currentStatus = detail?.status ?? selectedRow?.status ?? 'ABERTA'
+  const isCancelled = currentStatus === 'CANCELADA'
+
+  let activeIndex = 0
+  if (currentStatus === 'AGUARDANDO_APROVACAO') activeIndex = 1
+  else if (currentStatus === 'EM_ATENDIMENTO') activeIndex = 2
+  else if (currentStatus === 'CONCLUIDA') activeIndex = 3
 
   return (
     <div className="space-y-4">
@@ -324,7 +350,6 @@ export default function SentRequestsPage() {
             Nova Solicitação
           </button>
 
-          {/* Botões Detalhes / Cancelar podem ser ligados depois a uma seleção de linha */}
           <button
             onClick={() => {
               if (!selectedRow) {
@@ -469,7 +494,9 @@ export default function SentRequestsPage() {
           </div>
 
           <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Status</label>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Status
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -500,7 +527,7 @@ export default function SentRequestsPage() {
         </div>
       </div>
 
-      {/* Tabela */}
+      {/* Tabela (sem timeline em cima!) */}
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="max-h-[60vh] overflow-auto">
           <table className="min-w-full text-sm">
@@ -534,8 +561,10 @@ export default function SentRequestsPage() {
                 data.map((r) => (
                   <tr
                     key={r.id}
-                    className="hover:bg-slate-50 cursor-pointer"
-                    onClick={() => openDetail(r)}
+                    className={`hover:bg-slate-50 cursor-pointer ${
+                      selectedRow?.id === r.id ? 'bg-slate-50' : ''
+                    }`}
+                    onClick={() => openDetail(r)} // 👉 abre o modal com os dados
                   >
                     <td className="px-3 py-2">{r.status}</td>
                     <td className="px-3 py-2">{r.protocolo ?? '-'}</td>
@@ -617,6 +646,48 @@ export default function SentRequestsPage() {
               </button>
             </div>
 
+            {/* TIMELINE DENTRO DO MODAL */}
+            <div className="px-5 pt-4">
+              <div className="flex items-center gap-4 px-2">
+                {STATUS_STEPS.map((step, index) => {
+                  const isActive = !isCancelled && index <= activeIndex
+                  return (
+                    <div
+                      key={step.id}
+                      className="flex-1 flex flex-col items-center text-[11px]"
+                    >
+                      <div
+                        className={`h-1 w-full rounded-full ${
+                          isCancelled
+                            ? 'bg-slate-300'
+                            : isActive
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-300'
+                        }`}
+                      />
+                      <span
+                        className={`mt-1 ${
+                          isCancelled
+                            ? 'text-slate-500'
+                            : isActive
+                            ? 'text-emerald-600 font-semibold'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {isCancelled && (
+                <p className="mt-2 text-center text-[11px] font-semibold text-red-600 uppercase">
+                  SOLICITAÇÃO CANCELADA
+                </p>
+              )}
+            </div>
+
             <div className="space-y-5 px-5 py-4 text-sm">
               {detailLoading && (
                 <p className="text-xs text-slate-500">Carregando detalhes...</p>
@@ -629,7 +700,7 @@ export default function SentRequestsPage() {
               {/* Só mostra os campos se já carregou algo */}
               {detail && (
                 <>
-                  {/* Bloco principal (igual ao topo do seu print) */}
+                  {/* Bloco principal */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className={LABEL_RO}>Status</label>
@@ -740,7 +811,7 @@ export default function SentRequestsPage() {
                     </div>
                   )}
 
-                  {/* Dados do Solicitante (payload.solicitante) */}
+                  {/* Dados do Solicitante */}
                   <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">
                       Dados do Solicitante
@@ -796,7 +867,7 @@ export default function SentRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Formulário do tipo de solicitação (campos específicos) */}
+                  {/* Formulário do tipo de solicitação */}
                   {camposSchema.length > 0 && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">

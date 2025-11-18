@@ -247,6 +247,7 @@ model Solicitation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  timelines   SolicitationTimeline[]
 
   anexos      Attachment[]
   comentarios Comment[]
@@ -382,3 +383,13 @@ model UserCostCenter {
   @@unique([userId, costCenterId])
   @@map("UserCostCenter")
 }
+model SolicitationTimeline {
+  id             String   @id @default(uuid())
+  solicitationId String
+  status         String
+  message        String?
+  createdAt      DateTime @default(now())
+
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
