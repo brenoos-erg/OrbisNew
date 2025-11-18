@@ -146,14 +146,21 @@ model CostCenter {
   observations   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  users          User[]
+
+  users User[]
 
   // N:N via UserCostCenter
   userLinks UserCostCenter[]
 
-  // relação com módulos
-  modules       CostCenterModule[]
+  // relação com módulos (modelo antigo)
+  modules CostCenterModule[]
+
+  // relação com solicitações
   solicitations Solicitation[]
+
+  // relação com departamento
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
 
   @@map("CostCenter")
 }
@@ -206,6 +213,12 @@ model Department {
 
   users         User[]
   solicitations Solicitation[]
+
+  // relação com centros de custo
+  costCenters CostCenter[]
+
+  // módulos habilitados para esse departamento
+  modules DepartmentModule[]
 }
 
 model Solicitation {
@@ -235,7 +248,7 @@ model Solicitation {
   status     SolicitationStatus    @default(ABERTA)
   prioridade SolicitationPriority?
 
-  /// 👇 Campo para controlar se a vaga já está prevista no orçamento
+  /// Campo para controlar se a vaga já está prevista no orçamento
   vagaPrevista Boolean @default(false)
 
   titulo    String
@@ -248,18 +261,18 @@ model Solicitation {
   dataFechamento   DateTime?
   dataCancelamento DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  timelines   SolicitationTimeline[]
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  timelines SolicitationTimeline[]
 
   anexos      Attachment[]
   comentarios Comment[]
   eventos     Event[]
 
-  /// 🔗 VÍNCULO ENTRE CHAMADOS
-  parentId   String?
-  parent     Solicitation?   @relation("SolicitationParent", fields: [parentId], references: [id])
-  children   Solicitation[]  @relation("SolicitationParent")
+  /// VÍNCULO ENTRE CHAMADOS (pai/filhos)
+  parentId String?
+  parent   Solicitation?  @relation("SolicitationParent", fields: [parentId], references: [id])
+  children Solicitation[] @relation("SolicitationParent")
 }
 
 /**
@@ -304,6 +317,9 @@ model User {
   leader          Leader?       @relation(fields: [leaderId], references: [id])
   leaderId        String?
 
+  // relação com níveis de módulo
+  moduleAccesses UserModuleAccess[]
+
   @@map("User")
 }
 
@@ -314,12 +330,19 @@ model User {
  */
 
 model Module {
-  id     String             @id @default(uuid())
-  key    String             @unique
-  name   String
-  grants AccessGroupGrant[]
+  id        String   @id @default(uuid())
+  key       String   @unique // 'SOLICITACOES' | 'CONFIGURACOES'
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  // Relações existentes
+  grants      AccessGroupGrant[]
   costCenters CostCenterModule[]
+
+  // Novas relações de controle de nível
+  userAccess UserModuleAccess[]
+  deptAccess DepartmentModule[]
 
   @@map("Module")
 }
@@ -399,5 +422,42 @@ model SolicitationTimeline {
   message        String?
   createdAt      DateTime @default(now())
 
-  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+/**
+ * =========================
+ * CONTROLE DE NÍVEL POR MÓDULO
+ * =========================
+ */
+
+enum ModuleLevel {
+  NIVEL_1
+  NIVEL_2
+  NIVEL_3
+}
+
+model UserModuleAccess {
+  id       String      @id @default(uuid())
+  userId   String
+  moduleId String
+  level    ModuleLevel
+
+  user   User   @relation(fields: [userId], references: [id])
+  module Module @relation(fields: [moduleId], references: [id])
+
+  @@unique([userId, moduleId])
+  @@map("UserModuleAccess")
+}
+
+model DepartmentModule {
+  id           String @id @default(uuid())
+  departmentId String
+  moduleId     String
+
+  department Department @relation(fields: [departmentId], references: [id])
+  module     Module     @relation(fields: [moduleId], references: [id])
+
+  @@unique([departmentId, moduleId])
+  @@map("DepartmentModule")
 }
