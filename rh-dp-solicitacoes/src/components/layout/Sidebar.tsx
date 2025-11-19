@@ -18,10 +18,11 @@ import { usePathname } from 'next/navigation'
 type Props = {
   showSolic: boolean
   showConfig: boolean
+  canApprove: boolean
   userMenu: React.ReactNode
 }
 
-export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
+export default function Sidebar({ showSolic, showConfig, canApprove, userMenu }: Props) {
   const [collapsed, setCollapsed] = useState(false)
 
   const pathname = usePathname()
@@ -122,18 +123,20 @@ export default function Sidebar({ showSolic, showConfig, userMenu }: Props) {
                     <Inbox size={16} /> <span>Solicitações Recebidas</span>
                   </Link>
 
-                  {/* 👉 NOVO ITEM: Painel de Aprovações */}
-                  <Link
-                    href="/dashboard/solicitacoes/aprovacao"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname === '/dashboard/solicitacoes/aprovacao'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <CheckCircle2 size={16} /> <span>Aprovações</span>
-                  </Link>
+                  {/* 👉 Painel de Aprovações – só aparece para quem pode aprovar */}
+                  {canApprove && (
+                    <Link
+                      href="/dashboard/solicitacoes/aprovacao"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/solicitacoes/aprovacao'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <CheckCircle2 size={16} /> <span>Aprovações</span>
+                    </Link>
+                  )}
 
                   <Link
                     href="/dashboard/solicitacoes/cadastros"

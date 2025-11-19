@@ -5,33 +5,56 @@ import { getCurrentAppUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
+import { ModuleLevel } from '@prisma/client'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+type AccessMap = Record<string, ModuleLevel>
+
+async function loadUserModuleAccess(userId: string): Promise<AccessMap> {
+  const rows = await prisma.userModuleAccess.findMany({
+    where: { userId },
+    include: {
+      module: { select: { key: true } },
+    },
+  })
+
+  const map: AccessMap = {}
+  for (const r of rows) {
+    map[r.module.key] = r.level
+  }
+  return map
+}
+
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const { appUser } = await getCurrentAppUser()
-  if (appUser && appUser.status === 'INATIVO') {
+
+  // se não tiver usuário logado, manda pro login
+  if (!appUser) {
+    redirect('/login')
+  }
+
+  // se estiver inativo, mesma regra que já existia
+  if (appUser.status === 'INATIVO') {
     redirect('/login?inactive=1')
   }
 
-  // cálculo de módulos liberados
+  // cálculo de módulos liberados com base em UserModuleAccess
   let showSolic = false
   let showConfig = false
-  if (appUser?.id) {
-    const links = await prisma.userCostCenter.findMany({
-      where: { userId: appUser.id },
-      select: { costCenterId: true },
-    })
-    const ccIds = new Set<string>(links.map((l) => l.costCenterId))
-    if (appUser.costCenterId) ccIds.add(appUser.costCenterId)
+  let canApprove = false
 
-    if (ccIds.size > 0) {
-      const rows = await prisma.costCenterModule.findMany({
-        where: { costCenterId: { in: [...ccIds] } },
-        include: { module: { select: { key: true } } },
-      })
-      const enabled = new Set(rows.map((r) => r.module.key))
-      showSolic = enabled.has('solicitacoes')
-      showConfig = enabled.has('configuracoes')
-    }
+  if (appUser.id) {
+    const access = await loadUserModuleAccess(appUser.id)
+
+    // se tiver qualquer nível no módulo, ele aparece no menu
+    showSolic = !!access['solicitacoes']
+    showConfig = !!access['configuracoes']
+
+    // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
+    canApprove = access['solicitacoes'] === 'NIVEL_3'
   }
 
   return (
@@ -39,10 +62,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar
         showSolic={showSolic}
         showConfig={showConfig}
+        canApprove={canApprove}
         userMenu={<UserMenu collapsed={false} />}
       />
 
-      {/* 🔴 AQUI: sem ml-72, o conteúdo ocupa todo o espaço restante */}
+      {/* conteúdo */}
       <main className="flex-1 flex flex-col">
         <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
           Sistema de Solicitações

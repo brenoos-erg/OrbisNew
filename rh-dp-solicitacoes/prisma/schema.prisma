@@ -438,10 +438,10 @@ enum ModuleLevel {
 }
 
 model UserModuleAccess {
-  id       String      @id @default(uuid())
-  userId   String
-  moduleId String
-  level    ModuleLevel
+  id        String      @id @default(uuid())
+  userId    String
+  moduleId  String
+  level     ModuleLevel
 
   user   User   @relation(fields: [userId], references: [id])
   module Module @relation(fields: [moduleId], references: [id])
