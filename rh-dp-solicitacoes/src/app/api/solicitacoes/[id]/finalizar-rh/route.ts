@@ -1,4 +1,3 @@
-// src/app/api/solicitacoes/[id]/finalizar-rh/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
@@ -6,6 +5,7 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
+// Reaproveita o mesmo formato de protocolo da rota principal
 function generateProtocolo() {
   const now = new Date()
   const yy = now.getFullYear().toString().slice(-2)
@@ -23,20 +23,29 @@ export async function POST(
 ) {
   try {
     const me = await requireActiveUser()
-    const solicitationId = params.id
+    const { id } = params
 
     const body = await req.json().catch(() => ({} as any))
+
     const {
       candidatoNome,
       candidatoDocumento,
       dataAdmissaoPrevista,
       salario,
       cargo,
-    } = body
+      outrasInfos,
+    } = body as {
+      candidatoNome?: string
+      candidatoDocumento?: string
+      dataAdmissaoPrevista?: string
+      salario?: string
+      cargo?: string
+      outrasInfos?: Record<string, any>
+    }
 
-    // 1) Solicitação original (RH)
-    const original = await prisma.solicitation.findUnique({
-      where: { id: solicitationId },
+    // 1) Busca a solicitação original (RH)
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id },
       include: {
         tipo: true,
         costCenter: true,
@@ -44,178 +53,183 @@ export async function POST(
       },
     })
 
-    if (!original) {
+    if (!solicitation) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
       )
     }
 
-    // garantia: só RQ_063 entra aqui
-    if (original.tipo?.nome !== 'RQ_063 - Solicitação de Pessoal') {
+    if (solicitation.tipo?.nome !== 'RQ_063 - Solicitação de Pessoal') {
       return NextResponse.json(
-        { error: 'Esta rota é apenas para RQ_063 - Solicitação de Pessoal.' },
+        { error: 'Esta rota só pode ser usada para RQ_063 - Solicitação de Pessoal.' },
         { status: 400 },
       )
     }
 
-    // 2) Tipo de solicitação para o DP (ajuste o nome se for outro)
+    const payloadOrigem = (solicitation.payload ?? {}) as any
+    const camposOrigem = payloadOrigem.campos ?? {}
+    const solicitanteOrigem = payloadOrigem.solicitante ?? {}
+
+    // 2) Tipo de solicitação do DP
     const tipoAdmissao = await prisma.tipoSolicitacao.findFirst({
-      where: { nome: 'Admissão - DP' }, // <-- se o seu nome for outro, troque aqui
+      where: { nome: 'Solicitação de Admissão' },
     })
 
     if (!tipoAdmissao) {
       return NextResponse.json(
-        { error: 'Tipo de solicitação de Admissão (DP) não configurado.' },
+        { error: 'Tipo "Solicitação de Admissão" não cadastrado.' },
         { status: 400 },
       )
     }
 
-    // 3) Departamento DP
-    const departmentDp = await prisma.department.findFirst({
-      where: {
-        // ajuste se na sua base o code/name forem diferentes
-        OR: [{ code: 'DP' }, { name: 'DEPARTAMENTO PESSOAL' }],
-      },
+    // 3) Centro de custo do DP (externalCode = 590)
+    const ccDp = await prisma.costCenter.findFirst({
+      where: { externalCode: '590' },
     })
 
-    if (!departmentDp) {
+    if (!ccDp) {
       return NextResponse.json(
-        { error: 'Departamento Pessoal não encontrado (Department).' },
+        { error: 'Centro de custo do DP (externalCode = 590) não encontrado.' },
         { status: 400 },
       )
     }
 
-    // 4) Centro de custo do DP
-    const costCenterDp = await prisma.costCenter.findFirst({
+    // 4) Departamento do DP (ajuste o critério se for diferente)
+    const deptDp = await prisma.department.findFirst({
       where: {
-        // ajuste aqui também conforme sua base:
         OR: [
           { code: 'DP' },
-          { description: 'DEPARTAMENTO PESSOAL' },
-          { abbreviation: 'DP' },
+          { name: { contains: 'Pessoal', mode: 'insensitive' } },
         ],
       },
     })
 
-    if (!costCenterDp) {
-      return NextResponse.json(
-        { error: 'Centro de custo do Departamento Pessoal não encontrado.' },
-        { status: 400 },
-      )
-    }
+    const agora = new Date()
 
-    // 5) Concluir a solicitação original (RH)
-    await prisma.solicitation.update({
-      where: { id: original.id },
-      data: {
-        status: 'CONCLUIDA',
-        dataFechamento: new Date(),
-      },
-    })
-
-    await prisma.solicitationTimeline.create({
-      data: {
-        solicitationId: original.id,
-        status: 'CONCLUIDA',
-        message: `Finalizada pelo RH por ${me.fullName ?? me.id}. Encaminhada para o DP.`,
-      },
-    })
-
-    await prisma.event.create({
-      data: {
-        id: crypto.randomUUID(),
-        solicitationId: original.id,
-        actorId: me.id,
-        tipo: 'FINALIZACAO_RH',
-      },
-    })
-
-    // 6) Criar o chamado FILHO para o DP
-    const protocoloFilho = generateProtocolo()
-
-    const nomeCandidatoFinal =
-      candidatoNome ||
-      (original.payload as any)?.campos?.nomeColaborador ||
-      (original.payload as any)?.campos?.nomeCandidato ||
-      'Novo colaborador'
-
-    const documentoFinal =
-      candidatoDocumento ||
-      (original.payload as any)?.campos?.cpf ||
-      (original.payload as any)?.campos?.documento ||
-      undefined
-
-    const dpSolicitation = await prisma.solicitation.create({
-      data: {
-        protocolo: protocoloFilho,
-        tipoId: tipoAdmissao.id,
-
-        // 🔴 AQUI ESTÁ O PULO DO GATO:
-        //    Em vez de usar original.costCenterId, usamos o CC do DP
-        costCenterId: costCenterDp.id,
-        departmentId: departmentDp.id,
-
-        // pode ser o mesmo solicitante da original
-        solicitanteId: original.solicitanteId,
-
-        parentId: original.id,
-
-        requiresApproval: false,
-        approvalStatus: 'NAO_PRECISA',
-
-        status: 'ABERTA', // entra como "aguardando atendimento" do DP
-        prioridade: original.prioridade,
-
-        titulo: `Admissão - ${nomeCandidatoFinal}`,
-        descricao: `Solicitação de admissão gerada automaticamente a partir da solicitação de pessoal ${original.protocolo}.`,
-
-        payload: {
-          origem: {
-            solicitationId: original.id,
-            protocolo: original.protocolo,
-            tipo: original.tipo?.nome,
-          },
-          candidato: {
-            nome: nomeCandidatoFinal,
-            documento: documentoFinal,
-            dataAdmissaoPrevista,
-            salario,
-            cargo,
+    const result = await prisma.$transaction(async (tx) => {
+      // 4.1) Atualiza a solicitação do RH como CONCLUÍDA
+      const updatedRh = await tx.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+          payload: {
+            ...payloadOrigem,
+            campos: {
+              ...camposOrigem,
+              candidatoNome: candidatoNome ?? camposOrigem.candidatoNome,
+              candidatoDocumento:
+                candidatoDocumento ?? camposOrigem.candidatoDocumento,
+              dataAdmissaoPrevista:
+                dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
+              salario: salario ?? camposOrigem.salario,
+              cargoFinal: cargo ?? camposOrigem.cargoFinal,
+              ...(outrasInfos ?? {}),
+            },
           },
         },
-      },
+      })
+
+      await tx.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`,
+        },
+      })
+
+      await tx.event.create({
+        data: {
+          id: crypto.randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_RH',
+        },
+      })
+
+      // 4.2) Cria a nova solicitação para o DP – Solicitação de Admissão
+      const dpSolicitation = await tx.solicitation.create({
+        data: {
+          protocolo: generateProtocolo(),
+          tipoId: tipoAdmissao.id,
+          costCenterId: ccDp.id,
+          departmentId: deptDp?.id ?? solicitation.departmentId,
+          solicitanteId: solicitation.solicitanteId, // ou me.id, se preferir
+          parentId: solicitation.id, // vínculo pai/filho
+          titulo: 'Solicitação de Admissão',
+          descricao: `Solicitação de admissão gerada automaticamente a partir da ${solicitation.protocolo}.`,
+          requiresApproval: false,
+          approvalStatus: 'NAO_PRECISA',
+          status: 'ABERTA',
+          payload: {
+            origem: {
+              rhSolicitationId: solicitation.id,
+              rhProtocolo: solicitation.protocolo,
+            },
+            campos: {
+              // campos reaproveitados da RQ_063:
+              cargo: cargo ?? camposOrigem.cargo,
+              setorProjeto:
+                camposOrigem.setorProjeto ?? camposOrigem.setorOuProjeto,
+              localTrabalho: camposOrigem.localTrabalho,
+              horarioTrabalho: camposOrigem.horarioTrabalho,
+              centroCusto: camposOrigem.centroCusto,
+              chefiaImediata: camposOrigem.chefiaImediata,
+              motivoVaga: camposOrigem.motivoDaVaga,
+              tipoContratacao: camposOrigem.contratacao,
+              beneficios: camposOrigem.beneficios,
+              cbo: camposOrigem.cbo,
+              matriz: camposOrigem.matriz,
+              filial: camposOrigem.filial,
+              observacao:
+                outrasInfos?.observacao ?? camposOrigem.observacao,
+
+              // dados do contratado (vindos do formulário de finalização):
+              nomeProfissional:
+                candidatoNome ??
+                camposOrigem.nomeProfissional ??
+                camposOrigem.nomeCandidato,
+              documento:
+                candidatoDocumento ?? camposOrigem.cpf ?? camposOrigem.documento,
+              salario: salario ?? camposOrigem.salario,
+              dataAdmissao:
+                dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
+            },
+            // mantém os dados do solicitante original (quem pediu a vaga)
+            solicitante: solicitanteOrigem,
+          },
+        },
+      })
+
+      await tx.solicitationTimeline.create({
+        data: {
+          solicitationId: dpSolicitation.id,
+          status: 'ABERTA',
+          message: `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo}.`,
+        },
+      })
+
+      await tx.event.create({
+        data: {
+          id: crypto.randomUUID(),
+          solicitationId: dpSolicitation.id,
+          actorId: me.id,
+          tipo: 'CRIACAO_AUTOMATICA_ADMISSAO',
+        },
+      })
+
+      return {
+        rh: updatedRh,
+        dp: dpSolicitation,
+      }
     })
 
-    await prisma.solicitationTimeline.create({
-      data: {
-        solicitationId: dpSolicitation.id,
-        status: 'ABERTA',
-        message: `Chamado de admissão criado automaticamente a partir da solicitação de pessoal ${original.protocolo}.`,
-      },
-    })
-
-    await prisma.event.create({
-      data: {
-        id: crypto.randomUUID(),
-        solicitationId: dpSolicitation.id,
-        actorId: me.id,
-        tipo: 'CRIACAO_ADMISSAO_DP',
-      },
-    })
-
+    return NextResponse.json(result, { status: 200 })
+  } catch (err: any) {
+    console.error('POST /api/solicitacoes/[id]/finalizar-rh error', err)
     return NextResponse.json(
-      {
-        message:
-          'Solicitação finalizada no RH e chamada de admissão criada no DP.',
-        dpSolicitationId: dpSolicitation.id,
-      },
-      { status: 201 },
-    )
-  } catch (e) {
-    console.error('❌ POST /api/solicitacoes/[id]/finalizar-rh error:', e)
-    return NextResponse.json(
-      { error: 'Erro ao finalizar solicitação no RH e criar chamado no DP.' },
+      { error: 'Erro ao finalizar solicitação no RH / criar admissão.' },
       { status: 500 },
     )
   }
