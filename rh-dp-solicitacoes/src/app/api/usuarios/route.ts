@@ -1,63 +1,210 @@
+// src/app/api/permissoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireActiveUser } from '@/lib/auth'
+import { assertUserMinLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
-// GET: lista os últimos usuários
-export async function GET() {
+export const dynamic = 'force-dynamic'
+
+/**
+ * GET /api/permissoes/usuarios?email=...
+ *
+ * Resposta:
+ * {
+ *   user: { id, fullName, email, departmentId } | null,
+ *   modules: [{ id, key, name }],
+ *   access: [{ moduleId, level }],
+ *   departments: [{ id, code, name }]
+ * }
+ */
+export async function GET(req: NextRequest) {
   try {
-    const rows = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 20,
+    const me = await requireActiveUser()
+    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+
+    const { searchParams } = new URL(req.url)
+    const email = searchParams.get('email')?.trim().toLowerCase()
+
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Parâmetro "email" é obrigatório.' },
+        { status: 400 },
+      )
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
       select: {
-        id: true, fullName: true, email: true, login: true,
-        phone: true, costCenter: true, createdAt: true,
+        id: true,
+        fullName: true,
+        email: true,
+        departmentId: true,
       },
     })
-    return NextResponse.json({ rows })
-  } catch (e) {
-    console.error('GET /api/usuarios error', e)
-    return NextResponse.json({ rows: [] }, { status: 500 })
+
+    const [modules, departments, access] = await Promise.all([
+      prisma.module.findMany({
+        select: { id: true, key: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.department.findMany({
+        select: { id: true, code: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      user
+        ? prisma.userModuleAccess.findMany({
+            where: { userId: user.id },
+            select: { moduleId: true, level: true },
+          })
+        : Promise.resolve([]),
+    ])
+
+    return NextResponse.json({
+      user,
+      modules,
+      departments,
+      access,
+    })
+  } catch (e: any) {
+    console.error('GET /api/permissoes/usuarios error', e)
+
+    if (e instanceof Error && e.message.includes('permissão')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
+
+    return NextResponse.json(
+      { error: 'Erro ao carregar permissões do usuário.' },
+      { status: 500 },
+    )
   }
 }
 
-export async function POST(req: NextRequest) {
+/**
+ * PATCH /api/permissoes/usuarios
+ *
+ * body:
+ * - Para atualizar nível:
+ *   { email, moduleId, level: 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | null }
+ *
+ * - Para atualizar departamento:
+ *   { email, departmentId: string | null }
+ */
+export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
-    const { fullName, email, login, phone, costCenter } = body as {
-      fullName?: string; email?: string; login?: string;
-      phone?: string | null; costCenter?: string | null
+    const me = await requireActiveUser()
+    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+
+    const body = await req.json().catch(() => ({} as any))
+    const {
+      email,
+      moduleId,
+      level,
+      departmentId,
+    }: {
+      email?: string
+      moduleId?: string
+      level?: ModuleLevel | null
+      departmentId?: string | null
+    } = body
+
+    if (!email) {
+      return NextResponse.json(
+        { error: 'Campo "email" é obrigatório.' },
+        { status: 400 },
+      )
     }
 
-    if (!fullName || !email || !login) {
-      return NextResponse.json({ error: 'Nome, e-mail e login são obrigatórios.' }, { status: 400 })
+    const user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado.' },
+        { status: 404 },
+      )
     }
 
-    // Se seu modelo tiver 'status' sem default ou 'updatedAt' sem @updatedAt,
-    // estes campos abaixo evitam o erro 23502 (not-null). Se seu modelo NÃO
-    // tiver esses campos, pode remover sem problemas.
-    const created = await prisma.user.create({
-      data: {
-        fullName,
-        email,
-        login,
-        phone: phone || null,
-        costCenter: costCenter || null,
-        // Descomente se o seu modelo tiver esses campos como NOT NULL:
-        // status: 'ACTIVE' as any,
-        // createdAt: new Date(),
-        // updatedAt: new Date(),
+    // 1) Atualizar departamento do usuário
+    if (typeof departmentId !== 'undefined') {
+      const updated = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          departmentId: departmentId || null,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          departmentId: true,
+        },
+      })
+
+      return NextResponse.json(updated)
+    }
+
+    // 2) Atualizar nível de módulo
+    if (!moduleId) {
+      return NextResponse.json(
+        { error: 'moduleId é obrigatório quando level é informado.' },
+        { status: 400 },
+      )
+    }
+
+    const validLevels: ModuleLevel[] = [
+      ModuleLevel.NIVEL_1,
+      ModuleLevel.NIVEL_2,
+      ModuleLevel.NIVEL_3,
+    ]
+
+    const normalizedLevel =
+      level && (validLevels as string[]).includes(level)
+        ? (level as ModuleLevel)
+        : null
+
+    const existing = await prisma.userModuleAccess.findFirst({
+      where: {
+        userId: user.id,
+        moduleId,
       },
-      select: { id: true, fullName: true, email: true, login: true },
     })
 
-    return NextResponse.json(created, { status: 201 })
-  } catch (e: any) {
-    // Mostra códigos Prisma/PG para sabermos a causa
-    console.error('POST /api/usuarios error', e)
-    if (e?.code === 'P2002') {
-      return NextResponse.json({ error: 'Email ou login já cadastrado.' }, { status: 409 })
+    if (!normalizedLevel) {
+      // remover acesso
+      if (existing) {
+        await prisma.userModuleAccess.delete({
+          where: { id: existing.id },
+        })
+      }
+
+      return NextResponse.json({ ok: true })
     }
-    // Quando o erro vem do Postgres (ex.: NOT NULL ou enum), pegue o detalhe:
-    const message = e?.meta?.cause || e?.message || 'Erro ao criar usuário.'
-    return NextResponse.json({ error: message, code: e?.code }, { status: 500 })
+
+    // criar ou atualizar
+    if (existing) {
+      await prisma.userModuleAccess.update({
+        where: { id: existing.id },
+        data: { level: normalizedLevel },
+      })
+    } else {
+      await prisma.userModuleAccess.create({
+        data: {
+          userId: user.id,
+          moduleId,
+          level: normalizedLevel,
+        },
+      })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    console.error('PATCH /api/permissoes/usuarios error', e)
+
+    if (e instanceof Error && e.message.includes('permissão')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
+
+    return NextResponse.json(
+      { error: 'Erro ao atualizar permissões do usuário.' },
+      { status: 500 },
+    )
   }
 }

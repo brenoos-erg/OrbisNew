@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto' // <-- ADICIONAR
 
 export const dynamic = 'force-dynamic'
 
@@ -70,20 +71,41 @@ export async function POST(req: NextRequest) {
     }
 
     // 1) Cria no Prisma
-    const created = await prisma.user.create({
-      data: { fullName, email, login, phone, costCenterId },
-      select: { id: true, fullName: true, email: true, login: true },
-    })
+    // 1) Cria no Prisma
+// 1) Cria no Prisma
+const created = await prisma.user.create({
+  data: { fullName, email, login, phone, costCenterId },
+  select: { id: true, fullName: true, email: true, login: true },
+})
 
-    // 1.1) Se tiver centro de custo, cria também o vínculo em UserCostCenter
-    if (costCenterId) {
-      await prisma.userCostCenter.create({
-        data: {
-          userId: created.id,
-          costCenterId,
-        },
-      })
-    }
+// 1.1) Se tiver centro de custo, cria também o vínculo em UserCostCenter
+if (costCenterId) {
+  await prisma.userCostCenter.create({
+    data: {
+      userId: created.id,
+      costCenterId,
+    },
+  })
+}
+
+// 1.2) TODOS os usuários criados pela tela começam como NÍVEL 1 em TODOS os módulos
+const modules = await prisma.module.findMany({
+  where: { key: 'solicitacoes' },
+  select: { id: true },
+})
+
+if (modules.length > 0) {
+  await prisma.userModuleAccess.createMany({
+    data: modules.map((m) => ({
+      userId: created.id,
+      moduleId: m.id,
+      level: 'NIVEL_1', // enum ModuleLevel
+    })),
+    skipDuplicates: true, // segurança se futuramente for recriar ou rodar mais de uma vez
+  })
+}
+
+
 
     // 2) Cria no Supabase Auth (Admin)
     const sb = createClient(

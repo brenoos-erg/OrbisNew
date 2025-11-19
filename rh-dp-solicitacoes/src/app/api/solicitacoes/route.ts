@@ -304,16 +304,16 @@ export async function POST(req: NextRequest) {
         | undefined
 
       if (vagaPrevista === 'Sim') {
-  const updated = await prisma.solicitation.update({
-    where: { id: created.id },
-    data: {
-      requiresApproval: false,
-      approvalStatus: 'APROVADO',
-      approvalAt: new Date(),
-      approverId: null,         // 🔹 não deixa ninguém como atendente
-      status: 'ABERTA',         // 🔹 volta pra fila: aguardando atendimento
-    },
-  })
+        const updated = await prisma.solicitation.update({
+          where: { id: created.id },
+          data: {
+            requiresApproval: false,
+            approvalStatus: 'APROVADO',
+            approvalAt: new Date(),
+            approverId: null,         // 🔹 não deixa ninguém como atendente
+            status: 'ABERTA',         // 🔹 volta pra fila: aguardando atendimento
+          },
+        })
 
         await prisma.event.create({
           data: {

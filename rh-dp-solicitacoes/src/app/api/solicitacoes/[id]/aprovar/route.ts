@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,12 @@ export async function POST(
         approvalStatus: 'APROVADO',
         approvalAt: new Date(),
         approverId: me.id,
-        status: 'ABERTA', // volta pro fluxo normal (aguardando atendimento)
+        status: 'ABERTA',          // volta pro fluxo normal
+
+        // 👇 limpa o atendente depois de aprovar
+        // use os nomes exatos do seu schema.prisma
+        assumidaPorId: null,
+        assumidaEm: null,
       },
     })
 
