@@ -166,12 +166,34 @@ model CostCenter {
 }
 
 model Position {
-  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
-  name        String   @unique
+  id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name        String  @unique
   description String?
-  users       User[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  // Campos para auto-preenchimento da RQ_063
+  sectorProject           String? // Setor e/ou Projeto
+  workplace               String? // Local de Trabalho
+  workSchedule            String? // Horário de Trabalho
+  mainActivities          String? // Principais atividades
+  complementaryActivities String? // Atividades complementares
+  schooling               String? // Escolaridade
+  course                  String? // Curso
+  schoolingCompleted      String? // 'Sim' | 'Não' | outro texto
+  courseInProgress        String? // 'Sim' | 'Não' | outro texto
+  periodModule            String? // Período / Módulo
+  requiredKnowledge       String? // Requisitos e conhecimentos necessários
+  behavioralCompetencies  String? // Competências comportamentais exigidas
+  enxoval                 String? // info sobre enxoval
+  uniform                 String? // info sobre uniforme
+  others                  String? // Outros (descrever)
+  workPoint               String? // Ponto de trabalho
+  site                    String? // Local (Matriz, Filial, etc.)
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  department   Department? @relation(fields: [departmentId], references: [id])
+  departmentId String?
+  users        User[]
 
   @@map("Position")
 }
@@ -219,6 +241,8 @@ model Department {
 
   // módulos habilitados para esse departamento
   modules DepartmentModule[]
+
+  positions Position[] // <--- ADICIONE ESSA LINHA
 }
 
 model Solicitation {
@@ -275,10 +299,9 @@ model Solicitation {
   children Solicitation[] @relation("SolicitationParent")
 
   // em model Solicitation
-assumidaPorId String?
-assumidaEm    DateTime?
-assumidaPor   User? @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id])
-
+  assumidaPorId String?
+  assumidaEm    DateTime?
+  assumidaPor   User?     @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id])
 }
 
 /**
