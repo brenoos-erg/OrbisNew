@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
+import { assertUserMinLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +16,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const me = await requireActiveUser()
     const { id: solicitationId } = params
+
+    // 🔐 Só NIVEL_3 no módulo "solicitacoes" pode reprovar
+    await assertUserMinLevel(me.id, 'solicitacoes', ModuleLevel.NIVEL_3)
 
     const body = await req.json().catch(() => ({}))
     const comment: string | undefined = body.comment
@@ -44,6 +49,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       )
     }
 
+    // Opcional: se tiver um aprovador definido, só ele pode reprovar
     if (solicit.approverId && solicit.approverId !== me.id) {
       return NextResponse.json(
         { error: 'Você não é o aprovador desta solicitação.' },
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         approvalAt: new Date(),
         approvalComment: comment,
         requiresApproval: false,
-        status: 'CANCELADA', // ou outro status que você preferir
+        status: 'CANCELADA',
       },
     })
 
@@ -74,8 +80,17 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     })
 
     return NextResponse.json(updated)
-  } catch (e) {
+  } catch (e: any) {
     console.error('POST /api/solicitacoes/[id]/reprovar error', e)
+
+    // Tratamento bonitinho pra erro de permissão
+    if (e instanceof Error && e.message.includes('permissão')) {
+      return NextResponse.json(
+        { error: e.message },
+        { status: 403 },
+      )
+    }
+
     return NextResponse.json(
       { error: 'Erro ao reprovar a solicitação.' },
       { status: 500 },

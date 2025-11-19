@@ -2,25 +2,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import crypto from 'crypto'
+import { assertUserMinLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * POST /api/solicitacoes/[id]/aprovar
- * Aprova uma solicitação pendente (ex.: Vidal/Lorena) e
- * deixa o chamado em "aguardando atendimento" SEM atendente.
- */
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
     const me = await requireActiveUser()
-    const solicitationId = params.id
 
-    const body = await req.json().catch(() => ({}))
-    const comment: string | undefined = body.comment
+    // 🔐 só quem for NIVEL_3 no módulo "solicitacoes" pode aprovar
+    await assertUserMinLevel(me.id, 'solicitacoes', ModuleLevel.NIVEL_3)
+
+    const solicitationId = params.id
 
     const solicitation = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
@@ -33,7 +30,6 @@ export async function POST(
       )
     }
 
-    // Tem que estar pendente de aprovação
     if (
       !solicitation.requiresApproval ||
       solicitation.approvalStatus !== 'PENDENTE'
@@ -44,29 +40,13 @@ export async function POST(
       )
     }
 
-    // Se tiver aprovador definido, só ele pode aprovar
-    if (solicitation.approverId && solicitation.approverId !== me.id) {
-      return NextResponse.json(
-        { error: 'Você não é o aprovador desta solicitação.' },
-        { status: 403 },
-      )
-    }
-
-    // ✅ Aqui é o ponto importante:
-    //    - approvalStatus vira APROVADO
-    //    - requiresApproval = false
-    //    - approverId = null  (tira o Vidal/Lorena do campo)
-    //    - status = ABERTA   (aguardando atendimento pelo RH)
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
         approvalStatus: 'APROVADO',
         approvalAt: new Date(),
-        approvalComment: comment ?? null,
-        requiresApproval: false,
-
-        approverId: null, // 🔴 AQUI: zera o atendente
-        status: 'ABERTA', // 🔴 AQUI: volta para fila "aguardando atendimento"
+        approverId: me.id,
+        status: 'ABERTA', // volta pro fluxo normal (aguardando atendimento)
       },
     })
 
@@ -74,10 +54,7 @@ export async function POST(
       data: {
         solicitationId,
         status: 'APROVADO',
-        message:
-          comment && comment.trim().length > 0
-            ? `Aprovado por ${me.fullName ?? me.id}: ${comment}`
-            : `Aprovado por ${me.fullName ?? me.id}`,
+        message: `Aprovado por ${me.fullName ?? me.id}`,
       },
     })
 
@@ -91,10 +68,18 @@ export async function POST(
     })
 
     return NextResponse.json(updated)
-  } catch (e) {
-    console.error('❌ POST /api/solicitacoes/[id]/aprovar error:', e)
+  } catch (err: any) {
+    console.error('❌ erro ao aprovar solicitação', err)
+
+    if (err instanceof Error && err.message.includes('permissão')) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 403 },
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Erro ao aprovar a solicitação.' },
+      { error: 'Erro ao aprovar solicitação.' },
       { status: 500 },
     )
   }
