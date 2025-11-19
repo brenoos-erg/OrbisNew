@@ -80,12 +80,23 @@ type ChildSolicitation = {
   setorDestino?: string | null
 }
 
+// ===== Status / Aprovação =====
+
+type ApprovalStatus = 'NAO_PRECISA' | 'PENDENTE' | 'APROVADO' | 'REPROVADO'
+type SolicitationStatus =
+  | 'ABERTA'
+  | 'EM_ATENDIMENTO'
+  | 'AGUARDANDO_APROVACAO'
+  | 'CONCLUIDA'
+  | 'CANCELADA'
+
 export type SolicitationDetail = {
   id: string
   protocolo: string
   titulo: string
   descricao: string | null
-  status: string
+  status: SolicitationStatus | string
+  approvalStatus?: ApprovalStatus | null
   dataAbertura: string
   dataPrevista?: string | null
   dataFechamento?: string | null
@@ -110,30 +121,90 @@ export type SolicitationDetail = {
 type TimelineStepKey =
   | 'ABERTA'
   | 'AGUARDANDO_APROVACAO'
+  | 'APROVADO'
+  | 'REPROVADO'
+  | 'AGUARDANDO_ATENDIMENTO'
   | 'EM_ATENDIMENTO'
   | 'CONCLUIDA'
+  | 'CANCELADA'
 
-const TIMELINE_STEPS: { key: TimelineStepKey; label: string }[] = [
-  { key: 'ABERTA', label: 'ABERTA' },
-  { key: 'AGUARDANDO_APROVACAO', label: 'AGUARD. APROVAÇÃO' },
-  { key: 'EM_ATENDIMENTO', label: 'EM ATENDIMENTO' },
-  { key: 'CONCLUIDA', label: 'CONCLUÍDA' },
-]
+type TimelineStep = {
+  key: TimelineStepKey
+  label: string
+}
 
-function mapStatusToStep(status: string): TimelineStepKey {
-  switch (status) {
-    case 'ABERTA':
-      return 'ABERTA'
-    case 'AGUARDANDO_APROVACAO':
-      return 'AGUARDANDO_APROVACAO'
-    case 'EM_ATENDIMENTO':
-      return 'EM_ATENDIMENTO'
-    case 'CONCLUIDA':
-    case 'CANCELADA': // cancelada entra como última etapa da linha
-      return 'CONCLUIDA'
-    default:
-      return 'ABERTA'
+/**
+ * Monta os passos e descobre qual é o passo atual da linha do tempo
+ * baseado em status + approvalStatus.
+ */
+function buildTimeline(
+  status: SolicitationStatus,
+  approvalStatus: ApprovalStatus | undefined | null,
+): { steps: TimelineStep[]; currentIndex: number } {
+  const steps: TimelineStep[] = []
+
+  // sempre começa em ABERTA
+  steps.push({ key: 'ABERTA', label: 'Aberta' })
+
+  if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
+    // fluxo sem aprovação: Aberta → Em atendimento → Concluída/Cancelada
+    steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
+    steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
+  } else {
+    // fluxo com aprovação
+    steps.push({
+      key: 'AGUARDANDO_APROVACAO',
+      label: 'Aguard. aprovação',
+    })
+
+    if (approvalStatus === 'PENDENTE') {
+      // ainda parado em aguardando aprovação
+    } else if (approvalStatus === 'APROVADO') {
+      steps.push({ key: 'APROVADO', label: 'Aprovado' })
+      steps.push({
+        key: 'AGUARDANDO_ATENDIMENTO',
+        label: 'Aguardando atendimento',
+      })
+      steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
+      steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
+    } else if (approvalStatus === 'REPROVADO') {
+      steps.push({ key: 'REPROVADO', label: 'Reprovado' })
+      steps.push({
+        key: 'CANCELADA',
+        label: 'Solicitação cancelada',
+      })
+    }
   }
+
+  // ---- qual passo é o "atual"? ----
+  let currentKey: TimelineStepKey = 'ABERTA'
+
+  if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
+    // sem aprovação
+    if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
+    else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
+    else if (status === 'CANCELADA') currentKey = 'CANCELADA'
+    else currentKey = 'ABERTA'
+  } else if (approvalStatus === 'PENDENTE') {
+    currentKey = 'AGUARDANDO_APROVACAO'
+  } else if (approvalStatus === 'REPROVADO') {
+    currentKey = status === 'CANCELADA' ? 'CANCELADA' : 'REPROVADO'
+  } else if (approvalStatus === 'APROVADO') {
+    if (status === 'ABERTA') currentKey = 'AGUARDANDO_ATENDIMENTO'
+    else if (status === 'AGUARDANDO_APROVACAO')
+      currentKey = 'AGUARDANDO_APROVACAO'
+    else if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
+    else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
+    else if (status === 'CANCELADA') currentKey = 'CANCELADA'
+    else currentKey = 'APROVADO'
+  }
+
+  const currentIndex = Math.max(
+    0,
+    steps.findIndex((s) => s.key === currentKey),
+  )
+
+  return { steps, currentIndex }
 }
 
 function formatDate(dateStr?: string | null) {
@@ -181,10 +252,13 @@ export function SolicitationDetailModal({
   const [salario, setSalario] = useState('')
   const [cargo, setCargo] = useState('')
 
-  const effectiveStatus = detail?.status ?? row.status
-  const currentStepKey = mapStatusToStep(effectiveStatus)
-  const currentIndex = TIMELINE_STEPS.findIndex(
-    (s) => s.key === currentStepKey,
+  const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
+  const approvalStatus = (detail?.approvalStatus ??
+    null) as ApprovalStatus | null
+
+  const { steps: timelineSteps, currentIndex } = buildTimeline(
+    effectiveStatus,
+    approvalStatus,
   )
 
   const payload = (detail?.payload ?? {}) as Payload
@@ -194,7 +268,7 @@ export function SolicitationDetailModal({
   const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
   const camposSchema = schema.camposEspecificos ?? []
 
-  // Só RQ_063 segue esse fluxo
+  // Só RQ_063 segue esse fluxo especial de RH → DP
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
 
@@ -353,7 +427,7 @@ export function SolicitationDetailModal({
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
             <div className="flex gap-4">
-              {TIMELINE_STEPS.map((step, index) => {
+              {timelineSteps.map((step, index) => {
                 const isActive = index === currentIndex
                 const isDone = index < currentIndex
                 const barColor = isActive

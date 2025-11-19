@@ -3,7 +3,11 @@
 
 import React, { useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { Row, SolicitationDetail, SolicitationDetailModal } from '@/components/solicitacoes/SolicitationDetailModal'
+import {
+  Row,
+  SolicitationDetail,
+  SolicitationDetailModal,
+} from '@/components/solicitacoes/SolicitationDetailModal'
 
 type FilterState = {
   dateStart?: string
@@ -118,12 +122,12 @@ export default function ReceivedRequestsPage() {
           Solicitações Recebidas
         </h1>
         <p className="text-sm text-slate-500">
-          Visualize e trate as solicitações destinadas aos centros de custo em que você está vinculado.
+          Visualize e trate as solicitações destinadas aos centros de custo em
+          que você está vinculado.
         </p>
       </div>
 
-      {/* Aqui você pode reaproveitar os filtros da tela de Enviadas se quiser.
-          Vou deixar só os principais para o exemplo. */}
+      {/* Filtros principais */}
       <div className="grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-4">
         {/* Protocolo */}
         <div>
@@ -135,7 +139,11 @@ export default function ReceivedRequestsPage() {
             placeholder="Código do protocolo"
             value={filters.protocolo ?? ''}
             onChange={(e) =>
-              setFilters((prev) => ({ ...prev, protocolo: e.target.value, page: 1 }))
+              setFilters((prev) => ({
+                ...prev,
+                protocolo: e.target.value,
+                page: 1,
+              }))
             }
           />
         </div>
@@ -150,7 +158,11 @@ export default function ReceivedRequestsPage() {
             placeholder="nome ou e-mail"
             value={filters.solicitante ?? ''}
             onChange={(e) =>
-              setFilters((prev) => ({ ...prev, solicitante: e.target.value, page: 1 }))
+              setFilters((prev) => ({
+                ...prev,
+                solicitante: e.target.value,
+                page: 1,
+              }))
             }
           />
         </div>
@@ -165,7 +177,11 @@ export default function ReceivedRequestsPage() {
             placeholder="Buscar por texto..."
             value={filters.text ?? ''}
             onChange={(e) =>
-              setFilters((prev) => ({ ...prev, text: e.target.value, page: 1 }))
+              setFilters((prev) => ({
+                ...prev,
+                text: e.target.value,
+                page: 1,
+              }))
             }
           />
         </div>
@@ -175,13 +191,13 @@ export default function ReceivedRequestsPage() {
       <div className="flex-1 overflow-hidden rounded-md border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <span>Solicitações Recebidas</span>
-          {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
+          {loading && (
+            <span className="text-[11px] text-slate-400">Carregando...</span>
+          )}
         </div>
 
         {error && (
-          <div className="p-4 text-sm text-red-600">
-            {error}
-          </div>
+          <div className="p-4 text-sm text-red-600">{error}</div>
         )}
 
         <div className="max-h-[60vh] overflow-auto">
@@ -219,7 +235,9 @@ export default function ReceivedRequestsPage() {
                   </td>
                   <td className="px-4 py-2 text-xs">{row.protocolo}</td>
                   <td className="px-4 py-2 text-xs">
-                    {row.createdAt ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm') : '-'}
+                    {row.createdAt
+                      ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm')
+                      : '-'}
                   </td>
                   <td className="px-4 py-2 text-xs">
                     {row.tipo?.nome ?? row.titulo}
@@ -227,8 +245,14 @@ export default function ReceivedRequestsPage() {
                   <td className="px-4 py-2 text-xs">
                     {row.setorDestino ?? '-'}
                   </td>
+
+                  {/* 🔥 Regras do ATENDENTE:
+                      - Se status = ABERTA (AGUARDANDO ATENDIMENTO), nunca mostra atendente
+                      - Caso contrário, mostra somente o responsavel se existir */}
                   <td className="px-4 py-2 text-xs">
-                    {row.responsavel?.fullName ?? '-'}
+                    {row.status === 'ABERTA'
+                      ? '-'
+                      : row.responsavel?.fullName ?? '-'}
                   </td>
                 </tr>
               ))}
@@ -236,7 +260,7 @@ export default function ReceivedRequestsPage() {
           </table>
         </div>
 
-        {/* Rodapé da paginação bem simples */}
+        {/* Rodapé com total */}
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
           <span>
             Mostrando {rows.length} de {total} solicitações
@@ -244,7 +268,7 @@ export default function ReceivedRequestsPage() {
         </div>
       </div>
 
-      {/* Modal de detalhes (mesmo que você usa nas Enviadas) */}
+      {/* Modal de detalhes */}
       <SolicitationDetailModal
         isOpen={detailOpen}
         onClose={() => {

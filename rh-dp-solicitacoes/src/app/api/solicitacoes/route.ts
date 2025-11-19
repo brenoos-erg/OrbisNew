@@ -1,3 +1,4 @@
+// src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
@@ -115,7 +116,7 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 /**
  * GET /api/solicitacoes
  * Lista solicitações com filtros e paginação.
- * Responde no formato { rows, total } que a tela de "Solicitações Enviadas" espera.
+ * Responde no formato { rows, total } que as telas de "Solicitações Enviadas/Recebidas" esperam.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -189,7 +190,8 @@ export async function GET(req: NextRequest) {
         include: {
           tipo: { select: { nome: true } },
           department: { select: { name: true } },
-          approver: { select: { id: true, fullName: true } },
+          approver: { select: { id: true, fullName: true } }, // aprovador (só para info se precisar)
+          assumidaPor: { select: { id: true, fullName: true } }, // 👈 ATENDENTE DE FATO
           solicitante: { select: { id: true, fullName: true } },
         },
       }),
@@ -203,11 +205,20 @@ export async function GET(req: NextRequest) {
       protocolo: s.protocolo,
       createdAt: s.dataAbertura.toISOString(),
       tipo: s.tipo ? { nome: s.tipo.nome } : null,
-      responsavelId: s.approver?.id ?? null,
-      responsavel: s.approver ? { fullName: s.approver.fullName } : null,
+
+      // 🔹 ATENDENTE: sempre quem assumiu o chamado (assumidaPor)
+      responsavelId: s.assumidaPor?.id ?? null,
+      responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+
+      // quem abriu
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+
       sla: null, // se quiser, depois adiciona um campo SLA na tabela
       setorDestino: s.department?.name ?? null,
+
+      // info extra (se quiser usar depois em timeline da lista)
+      requiresApproval: s.requiresApproval,
+      approvalStatus: s.approvalStatus,
     }))
 
     return NextResponse.json({
@@ -310,8 +321,8 @@ export async function POST(req: NextRequest) {
             requiresApproval: false,
             approvalStatus: 'APROVADO',
             approvalAt: new Date(),
-            approverId: null,         // 🔹 não deixa ninguém como atendente
-            status: 'ABERTA',         // 🔹 volta pra fila: aguardando atendimento
+            approverId: null, // 🔹 ninguém fica como atendente
+            status: 'ABERTA', // 🔹 volta pra fila: aguardando atendimento
           },
         })
 
