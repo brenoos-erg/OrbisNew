@@ -273,6 +273,12 @@ model Solicitation {
   parentId String?
   parent   Solicitation?  @relation("SolicitationParent", fields: [parentId], references: [id])
   children Solicitation[] @relation("SolicitationParent")
+
+  // em model Solicitation
+assumidaPorId String?
+assumidaEm    DateTime?
+assumidaPor   User? @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id])
+
 }
 
 /**
@@ -306,10 +312,13 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  // relações com Solicitation
   solicitacoesCriadas   Solicitation[] @relation("SolicitationSolicitante")
-  solicitacoesAssumidas Solicitation[] @relation("SolicitationAprovador")
-  comments              Comment[]      @relation("CommentAutor")
-  events                Event[]        @relation("EventActor")
+  solicitacoesAprovador Solicitation[] @relation("SolicitationAprovador")
+  solicitacoesAssumidas Solicitation[] @relation("SolicitationAssumidaPor")
+
+  comments Comment[] @relation("CommentAutor")
+  events   Event[]   @relation("EventActor")
 
   membersOfGroups GroupMember[]
   position        Position?     @relation(fields: [positionId], references: [id])
@@ -438,10 +447,10 @@ enum ModuleLevel {
 }
 
 model UserModuleAccess {
-  id        String      @id @default(uuid())
-  userId    String
-  moduleId  String
-  level     ModuleLevel
+  id       String      @id @default(uuid())
+  userId   String
+  moduleId String
+  level    ModuleLevel
 
   user   User   @relation(fields: [userId], references: [id])
   module Module @relation(fields: [moduleId], references: [id])

@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import UserCostCenterPanel from '../UserCostCenterPanel'
+import {UserCostCenterPanel} from '../UserCostCenterPanel'
 
 type UserStatus = 'ATIVO' | 'INATIVO'
 
@@ -222,7 +222,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
           {/* CENTROS DE CUSTO (card embaixo) */}
           <div className="mt-6">
-            <UserCostCenterPanel userId={user.id} />
+            <UserCostCenterPanel key={user.id} userId={user.id} />
           </div>
         </div>
       </div>

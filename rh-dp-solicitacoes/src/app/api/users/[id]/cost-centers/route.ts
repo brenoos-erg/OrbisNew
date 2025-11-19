@@ -7,9 +7,9 @@ import { prisma } from '@/lib/prisma'
 // ----------------------------------------------------
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } },
+  { params }: { params: { id: string } },
 ) {
-  const { userId } = params
+  const { id: userId } = params
 
   const links = await prisma.userCostCenter.findMany({
     where: { userId },
@@ -24,7 +24,7 @@ export async function GET(
     const labelCode = cc.externalCode || cc.code || ''
 
     return {
-      id: l.id,                 // 👈 AGORA É O ID DO VÍNCULO
+      id: l.id,
       userId: l.userId,
       costCenterId: l.costCenterId,
       costCenter: {

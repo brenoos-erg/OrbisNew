@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Combobox } from '@headlessui/react'
+import { ChevronUpDownIcon } from '@heroicons/react/24/solid'
 
 /** ------------------ Tipos auxiliares ------------------ */
 
@@ -76,7 +77,9 @@ export default function NovaSolicitacaoPage() {
 
   // campos específicos (valores) + arquivos
   const [extras, setExtras] = useState<Record<string, any>>({})
-  const [filesByField, setFilesByField] = useState<Record<string, FileList | null>>({})
+  const [filesByField, setFilesByField] = useState<
+    Record<string, FileList | null>
+  >({})
 
   // DIREITA – dados do solicitante
   const [me, setMe] = useState<MeMini | null>(null)
@@ -96,7 +99,7 @@ export default function NovaSolicitacaoPage() {
 
   const centrosFiltrados = useMemo(
     () =>
-      queryCC === ''
+      queryCC.trim() === ''
         ? centros
         : centros.filter((c) =>
             c.nome.toLowerCase().includes(queryCC.toLowerCase()),
@@ -175,7 +178,7 @@ export default function NovaSolicitacaoPage() {
     loadTipos()
   }, [centroCustoId, departamentoId])
 
-  /** ------------------ carregar dados do solicitante (card da direita) ------------------ */
+  /** ------------------ carregar dados do solicitante ------------------ */
 
   useEffect(() => {
     async function loadMe() {
@@ -221,7 +224,6 @@ export default function NovaSolicitacaoPage() {
   function handleFileChange(name: string, files: FileList | null) {
     setFilesByField((prev) => ({ ...prev, [name]: files }))
 
-    // opcional: salva só os nomes dos arquivos no payload.campos
     if (files && files.length > 0) {
       const nomes = Array.from(files)
         .map((f) => f.name)
@@ -239,81 +241,76 @@ export default function NovaSolicitacaoPage() {
   /** ------------------ submissão ------------------ */
 
   async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault()
+    e.preventDefault()
 
-  if (!centroCustoId || !departamentoId || !tipoId) {
-    alert('Preencha centro de custo, departamento e tipo de solicitação.')
-    return
-  }
-
-  if (!me?.id) {
-    alert('Não foi possível identificar o solicitante. Faça login novamente.')
-    return
-  }
-
-  try {
-    // 1) Cria a solicitação (como já fazia antes)
-    const res = await fetch('/api/solicitacoes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tipoId: tipoId,
-        costCenterId: centroCustoId,
-        departmentId: departamentoId,
-        solicitanteId: me.id,
-        payload: {
-          campos: extras,
-          solicitante,
-        },
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null)
-      throw new Error(err?.error || 'Erro ao registrar a solicitação.')
+    if (!centroCustoId || !departamentoId || !tipoId) {
+      alert('Preencha centro de custo, departamento e tipo de solicitação.')
+      return
     }
 
-    const created = (await res.json()) as { id: string }
+    if (!me?.id) {
+      alert('Não foi possível identificar o solicitante. Faça login novamente.')
+      return
+    }
 
-    // 2) Se tiver arquivos em algum campo, envia para /[id]/anexos
-    const formData = new FormData()
-    Object.entries(filesByField).forEach(([fieldName, fileList]) => {
-      if (!fileList) return
-      Array.from(fileList).forEach((file) => {
-        // você pode incluir o nome do campo, se quiser
-        formData.append('files', file)
+    try {
+      // 1) Cria a solicitação
+      const res = await fetch('/api/solicitacoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipoId: tipoId,
+          costCenterId: centroCustoId,
+          departmentId: departamentoId,
+          solicitanteId: me.id,
+          payload: {
+            campos: extras,
+            solicitante,
+          },
+        }),
       })
-    })
 
-    if ([...formData.keys()].length > 0) {
-      const uploadRes = await fetch(
-        `/api/solicitacoes/${created.id}/anexos`,
-        {
-          method: 'POST',
-          body: formData,
-        },
-      )
-
-      if (!uploadRes.ok) {
-        console.error('Falha ao enviar anexos')
-        // Se quiser, você pode avisar o usuário, mas não bloquear o chamado:
-        // alert('Solicitação criada, mas houve erro ao enviar os anexos.')
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Erro ao registrar a solicitação.')
       }
+
+      const created = (await res.json()) as { id: string }
+
+      // 2) Envia anexos (se houver)
+      const formData = new FormData()
+      Object.entries(filesByField).forEach(([_, fileList]) => {
+        if (!fileList) return
+        Array.from(fileList).forEach((file) => {
+          formData.append('files', file)
+        })
+      })
+
+      if ([...formData.keys()].length > 0) {
+        const uploadRes = await fetch(
+          `/api/solicitacoes/${created.id}/anexos`,
+          {
+            method: 'POST',
+            body: formData,
+          },
+        )
+
+        if (!uploadRes.ok) {
+          console.error('Falha ao enviar anexos')
+        }
+      }
+
+      // 3) Redireciona para a lista
+      router.push('/dashboard/solicitacoes/enviadas')
+    } catch (e: any) {
+      alert(e.message || 'Erro ao registrar a solicitação.')
     }
-
-    // 3) Redireciona para a lista
-    router.push('/dashboard/solicitacoes/enviadas')
-  } catch (e: any) {
-    alert(e.message || 'Erro ao registrar a solicitação.')
   }
-}
-
 
   /** ------------------ UI ------------------ */
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* título e breadcrumb simples */}
       <div className="text-sm text-slate-500 mb-1">Sistema de Solicitações</div>
       <h1 className="text-2xl font-semibold text-slate-900 mb-4">
         Nova Solicitação
@@ -323,7 +320,7 @@ export default function NovaSolicitacaoPage() {
         onSubmit={handleSubmit}
         className="grid grid-cols-1 lg:grid-cols-12 gap-6"
       >
-        {/* ESQUERDA – 3 campos principais */}
+        {/* ESQUERDA – centro de custo, depto, tipo */}
         <div className="lg:col-span-7 space-y-5">
           {/* Centro de Custo (Combobox) */}
           <div>
@@ -335,7 +332,7 @@ export default function NovaSolicitacaoPage() {
             >
               <div className="relative mt-1">
                 <Combobox.Input
-                  className={INPUT}
+                  className={`${INPUT} pr-10`}
                   placeholder="Digite ou selecione o centro de custo"
                   displayValue={(id: any) => {
                     const item = centros.find((c) => c.id === id)
@@ -344,9 +341,16 @@ export default function NovaSolicitacaoPage() {
                   onChange={(e) => setQueryCC(e.target.value)}
                 />
 
+                {/* 🔽 setinha do dropdown */}
+                <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <ChevronUpDownIcon
+                    className="h-5 w-5 text-slate-400"
+                    aria-hidden="true"
+                  />
+                </Combobox.Button>
+
                 <Combobox.Options
-                  className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md
-                             bg-white shadow-lg border border-slate-200"
+                  className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white shadow-lg border border-slate-200"
                 >
                   {centrosFiltrados.length === 0 ? (
                     <div className="cursor-default select-none px-4 py-2 text-slate-500">
@@ -359,7 +363,9 @@ export default function NovaSolicitacaoPage() {
                         value={c.id}
                         className={({ active }: { active: boolean }) =>
                           `cursor-pointer select-none px-4 py-2 ${
-                            active ? 'bg-blue-600 text-white' : 'text-slate-900'
+                            active
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-900'
                           }`
                         }
                       >
@@ -430,7 +436,7 @@ export default function NovaSolicitacaoPage() {
           </div>
         </div>
 
-        {/* DIREITA – card de Dados do Solicitante + botões */}
+        {/* DIREITA – card do solicitante + botões */}
         <div className="lg:col-span-5 space-y-4">
           <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
             <div className="mb-3">
@@ -453,7 +459,7 @@ export default function NovaSolicitacaoPage() {
 
             {!loadingMe && (
               <div className="space-y-3 text-sm">
-                {/* Nome (linha inteira) */}
+                {/* Nome */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700">
                     Nome completo
@@ -470,7 +476,7 @@ export default function NovaSolicitacaoPage() {
                   />
                 </div>
 
-                {/* Email & Login (lado a lado) */}
+                {/* Email & Login */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700">
@@ -505,7 +511,7 @@ export default function NovaSolicitacaoPage() {
                   </div>
                 </div>
 
-                {/* Telefone & Centro de Custo (lado a lado) */}
+                {/* Telefone & Centro de Custo */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700">
@@ -563,7 +569,7 @@ export default function NovaSolicitacaoPage() {
           </div>
         </div>
 
-        {/* LINHA DE BAIXO – formulário do tipo de solicitação, largura total */}
+        {/* LINHA DE BAIXO – campos específicos */}
         {tipoSelecionado && tipoSelecionado.camposEspecificos.length > 0 && (
           <div className="lg:col-span-12 col-span-1 rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">

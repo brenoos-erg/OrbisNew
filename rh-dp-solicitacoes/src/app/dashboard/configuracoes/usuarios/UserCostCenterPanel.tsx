@@ -1,193 +1,240 @@
-// src/app/dashboard/configuracoes/usuarios/UserCostCenterPanel.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
 
-type CostCenter = {
+type CentroCusto = {
   id: string
-  description: string
-  code?: string | null
-  externalCode?: string | null
+  nome: string
 }
 
-type UserCostCenterLink = {
-  id: string
-  costCenterId: string
+type UserCostCenterPanelProps = {
   userId: string
-  costCenter?: CostCenter
 }
 
-const SELECT = 'input flex-1'
+export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
+  const [todosCC, setTodosCC] = useState<CentroCusto[]>([])
+  const [vinculados, setVinculados] = useState<CentroCusto[]>([])
+  const [selectedId, setSelectedId] = useState<string>('')
 
-// mesmo padrão da tela de cadastro
-function ccLabel(cc: CostCenter) {
-  const num = cc.externalCode || cc.code || ''
-  return num ? `${num} - ${cc.description}` : cc.description
-}
-
-
-export default function UserCostCenterPanel({ userId }: { userId: string }) {
-  const [allCenters, setAllCenters] = useState<CostCenter[]>([])
-  const [links, setLinks] = useState<UserCostCenterLink[]>([])
-  const [selectedCenter, setSelectedCenter] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loadingAll, setLoadingAll] = useState(false)
+  const [loadingUser, setLoadingUser] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Carrega todos os centros de custo (para o select)
+  /** ------------------ carregar TODOS os centros de custo ------------------ */
   useEffect(() => {
-    const loadCenters = async () => {
+    async function loadAll() {
       try {
-        const r = await fetch('/api/cost-centers/select', { cache: 'no-store' })
-        const arr = await r.json().catch(() => [])
-        setAllCenters(Array.isArray(arr) ? arr : [])
-      } catch (err) {
-        console.error('Erro ao carregar centros de custo:', err)
-        setAllCenters([])
-      }
-    }
-    loadCenters()
-  }, [])
+        setLoadingAll(true)
 
-  // Carrega vínculos do usuário
-  useEffect(() => {
-    const loadLinks = async () => {
-      setLoading(true)
-      try {
-        const r = await fetch(`/api/users/${userId}/cost-centers`, {
+        // mesma rota usada na tela "Nova Solicitação"
+        const res = await fetch('/api/cost-centers/select', {
           cache: 'no-store',
         })
-        const arr = await r.json().catch(() => [])
-        setLinks(Array.isArray(arr) ? arr : [])
+
+        if (!res.ok) {
+          console.error('Erro ao buscar centros de custo (all)')
+          setTodosCC([])
+          return
+        }
+
+        const json: {
+          id: string
+          code: string | null
+          description: string
+        }[] = await res.json()
+
+        const mapped: CentroCusto[] = json.map((c) => ({
+          id: c.id,
+          nome: c.code ? `${c.code} - ${c.description}` : c.description,
+        }))
+
+        setTodosCC(mapped)
       } catch (err) {
-        console.error('Erro ao carregar vínculos do usuário:', err)
-        setLinks([])
+        console.error('Erro ao carregar todos os centros de custo', err)
+        setTodosCC([])
       } finally {
-        setLoading(false)
+        setLoadingAll(false)
       }
     }
-    loadLinks()
-  }, [userId])
-  function ccLabel(c: CostCenter) {
-    const num = c.code || c.externalCode || ''
-    return num ? `${num} - ${c.description}` : c.description
-  }
-  // Adicionar vínculo
-  async function add() {
-    if (!selectedCenter) return alert('Selecione um centro de custo.')
-    setSaving(true)
+
+    loadAll()
+  }, []) // carrega só uma vez – independe do usuário
+
+  /** ------------------ carregar vínculos do USUÁRIO ------------------ */
+  useEffect(() => {
+    if (!userId) return
+
+    async function loadUserLinks() {
+      try {
+        setLoadingUser(true)
+        setSelectedId('') // limpa seleção quando troca de usuário
+
+        const res = await fetch(`/api/users/${userId}/cost-centers`, {
+          cache: 'no-store',
+        })
+
+        if (!res.ok) {
+          console.error('Erro ao buscar centros vinculados do usuário')
+          setVinculados([])
+          return
+        }
+
+        const json: {
+          costCenter: {
+            id: string
+            code: string | null
+            description: string
+          }
+        }[] = await res.json()
+
+        const mapped: CentroCusto[] = json.map((link) => ({
+          id: link.costCenter.id,
+          nome: link.costCenter.code
+            ? `${link.costCenter.code} - ${link.costCenter.description}`
+            : link.costCenter.description,
+        }))
+
+        setVinculados(mapped)
+      } catch (err) {
+        console.error('Erro ao carregar vínculos de centro de custo do usuário', err)
+        setVinculados([])
+      } finally {
+        setLoadingUser(false)
+      }
+    }
+
+    loadUserLinks()
+  }, [userId]) // ✅ recarrega sempre que muda o usuário
+
+  /** ------------------ adicionar vínculo ------------------ */
+  async function handleAdd() {
+    if (!selectedId || !userId) return
+
     try {
-      const r = await fetch(`/api/users/${userId}/cost-centers`, {
+      setSaving(true)
+
+      const res = await fetch(`/api/users/${userId}/cost-centers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ costCenterId: selectedCenter }),
+        body: JSON.stringify({ costCenterId: selectedId }),
       })
-      if (!r.ok) {
-        alert('Falha ao vincular centro de custo.')
-        return
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Erro ao salvar vínculo de centro de custo.')
       }
-      setSelectedCenter('')
-      const newLink = await r.json()
-      setLinks((prev) => [...prev, newLink])
-    } catch (err) {
-      console.error('Erro ao adicionar vínculo:', err)
+
+      // recarrega vínculos do usuário
+      const reload = await fetch(`/api/users/${userId}/cost-centers`, {
+        cache: 'no-store',
+      })
+      const json: {
+        costCenter: { id: string; code: string | null; description: string }
+      }[] = await reload.json()
+
+      const mapped: CentroCusto[] = json.map((link) => ({
+        id: link.costCenter.id,
+        nome: link.costCenter.code
+          ? `${link.costCenter.code} - ${link.costCenter.description}`
+          : link.costCenter.description,
+      }))
+
+      setVinculados(mapped)
+    } catch (err: any) {
+      alert(err.message ?? 'Erro ao vincular centro de custo.')
     } finally {
       setSaving(false)
     }
   }
 
-  // Remover vínculo
-  async function remove(linkId: string) {
-    if (!confirm('Deseja remover este vínculo?')) return
-    setSaving(true)
+  /** ------------------ remover vínculo ------------------ */
+  async function handleRemove(ccId: string) {
+    if (!userId) return
+
     try {
-      const r = await fetch(`/api/users/${userId}/cost-centers/${linkId}`, {
-        method: 'DELETE',
-      })
-      if (!r.ok) {
-        alert('Falha ao remover vínculo.')
-        return
+      setSaving(true)
+
+      const res = await fetch(
+        `/api/users/${userId}/cost-centers?costCenterId=${encodeURIComponent(
+          ccId,
+        )}`,
+        { method: 'DELETE' },
+      )
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || 'Erro ao remover vínculo.')
       }
-      setLinks((prev) => prev.filter((l) => l.id !== linkId))
-    } catch (err) {
-      console.error('Erro ao remover vínculo:', err)
+
+      setVinculados((prev) => prev.filter((c) => c.id !== ccId))
+    } catch (err: any) {
+      alert(err.message ?? 'Erro ao remover vínculo de centro de custo.')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="card p-4">
-      <h3 className="text-sm font-semibold mb-3 text-[var(--foreground)]">
+    <div className="mt-6 rounded-lg border border-slate-200 bg-white/80 p-4">
+      <h2 className="text-sm font-semibold text-slate-800 mb-2">
         Centros de Custo vinculados
-      </h3>
+      </h2>
 
-      {/* Seletor */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+      <div className="flex gap-2 items-center mb-3">
         <select
-          className={SELECT}
-          value={selectedCenter}
-          onChange={(e) => setSelectedCenter(e.target.value)}
+          className="flex-1 rounded-md border border-slate-300 text-sm px-3 py-2"
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          disabled={loadingAll || saving || todosCC.length === 0}
         >
-          <option value="">Selecione centro de custo...</option>
-          {allCenters.map((c) => (
-            <option key={c.id} value={c.id}>
-              {ccLabel(c)}
+          <option value="">
+            {loadingAll
+              ? 'Carregando centros de custo...'
+              : todosCC.length === 0
+              ? 'Nenhum centro de custo cadastrado.'
+              : 'Selecione centro de custo...'}
+          </option>
+          {todosCC.map((cc) => (
+            <option key={cc.id} value={cc.id}>
+              {cc.nome}
             </option>
           ))}
-
         </select>
 
         <button
-          onClick={add}
-          disabled={saving || !selectedCenter}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950 disabled:opacity-50"
+          type="button"
+          onClick={handleAdd}
+          disabled={!selectedId || saving}
+          className="rounded-md bg-slate-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
         >
-          <Plus size={16} /> Adicionar
+          {saving ? 'Salvando...' : '+ Adicionar'}
         </button>
       </div>
 
-      {/* Lista */}
-      {loading ? (
-        <div className="text-sm text-slate-400 py-4">
-          Carregando vínculos…
-        </div>
-      ) : links.length === 0 ? (
-        <div className="text-sm text-slate-400 py-4">
+      {loadingUser ? (
+        <p className="text-xs text-slate-500">Carregando vínculos...</p>
+      ) : vinculados.length === 0 ? (
+        <p className="text-xs text-slate-500">
           Nenhum centro de custo vinculado.
-        </div>
+        </p>
       ) : (
-        <table className="w-full text-sm">
-          <thead className="table-header">
-            <tr className="text-left text-slate-400">
-              <th className="py-2 px-2">Descrição</th>
-              <th className="py-2 px-2 w-[100px]">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {links.map((l) => (
-              <tr key={l.id} className="table-row">
-                <td className="py-2 px-2">
-                  {l.costCenter
-                    ? ccLabel(l.costCenter)
-                    : ccLabel(
-                      allCenters.find((c) => c.id === l.costCenterId) ??
-                      ({ description: '—' } as CostCenter),
-                    )}
-                </td>
-                <td className="py-2 px-2">
-                  <button
-                    onClick={() => remove(l.id)}
-                    disabled={saving}
-                    className="btn-table btn-table-danger inline-flex items-center gap-1"
-                  >
-                    <Trash2 size={14} /> Remover
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="space-y-1">
+          {vinculados.map((cc) => (
+            <li
+              key={cc.id}
+              className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-1.5 text-xs"
+            >
+              <span>{cc.nome}</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(cc.id)}
+                className="text-[11px] font-semibold text-red-600 hover:underline"
+              >
+                remover
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

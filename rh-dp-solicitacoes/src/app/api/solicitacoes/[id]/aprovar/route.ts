@@ -5,6 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import crypto from 'crypto'
+import { ApprovalStatus, SolicitationStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,19 +43,19 @@ export async function POST(
     }
 
     const updated = await prisma.solicitation.update({
-      where: { id: solicitationId },
-      data: {
-        approvalStatus: 'APROVADO',
-        approvalAt: new Date(),
-        approverId: me.id,
-        status: 'ABERTA',          // volta pro fluxo normal
+  where: { id: solicitationId },
+  data: {
+    approvalStatus: 'APROVADO',
+    approvalAt: new Date(),
+    approverId: me.id,
+    status: 'ABERTA',        // ou AGUARDANDO_ATENDIMENTO
+    assumidaPorId: null,
+    assumidaEm: null,
+  },
+})
 
-        // 👇 limpa o atendente depois de aprovar
-        // use os nomes exatos do seu schema.prisma
-        assumidaPorId: null,
-        assumidaEm: null,
-      },
-    })
+
+
 
     await prisma.solicitationTimeline.create({
       data: {
