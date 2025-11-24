@@ -24,7 +24,11 @@ type TipoSolicitacao = {
   id: string
   nome: string
   descricao?: string
-  camposEspecificos: CampoEspecifico[]
+  camposEspecificos?: CampoEspecifico[]
+  // fallback caso a API esteja mandando o schema bruto
+  schemaJson?: {
+    campos?: CampoEspecifico[]
+  } | null
 }
 
 type MeMini = {
@@ -46,6 +50,29 @@ type SolicitanteForm = {
   login: string
   phone: string
   costCenterText: string
+}
+
+// Cargos (Position) – para o campo "cargo" da RQ_063
+type Position = {
+  id: string
+  name: string
+  sectorProject?: string | null
+  workplace?: string | null
+  workSchedule?: string | null
+  mainActivities?: string | null
+  complementaryActivities?: string | null
+  schooling?: string | null
+  course?: string | null
+  schoolingCompleted?: string | null
+  courseInProgress?: string | null
+  periodModule?: string | null
+  requiredKnowledge?: string | null
+  behavioralCompetencies?: string | null
+  enxoval?: string | null
+  uniform?: string | null
+  others?: string | null
+  workPoint?: string | null
+  site?: string | null
 }
 
 /** ------------------ estilos reutilizáveis ------------------ */
@@ -81,6 +108,10 @@ export default function NovaSolicitacaoPage() {
     Record<string, FileList | null>
   >({})
 
+  // cargos (Position) – usados no campo "cargo"
+  const [positions, setPositions] = useState<Position[]>([])
+  const [cargoId, setCargoId] = useState('')
+
   // DIREITA – dados do solicitante
   const [me, setMe] = useState<MeMini | null>(null)
   const [loadingMe, setLoadingMe] = useState(true)
@@ -96,6 +127,18 @@ export default function NovaSolicitacaoPage() {
     () => tipos.find((t) => t.id === tipoId),
     [tipos, tipoId],
   )
+
+  // campos específicos vindos do tipo (suporta tanto camposEspecificos quanto schemaJson.campos)
+  const camposEspecificos: CampoEspecifico[] = useMemo(() => {
+    if (!tipoSelecionado) return []
+    if (tipoSelecionado.camposEspecificos?.length) {
+      return tipoSelecionado.camposEspecificos
+    }
+    if (tipoSelecionado.schemaJson?.campos?.length) {
+      return tipoSelecionado.schemaJson.campos
+    }
+    return []
+  }, [tipoSelecionado])
 
   const centrosFiltrados = useMemo(
     () =>
@@ -156,6 +199,7 @@ export default function NovaSolicitacaoPage() {
     setTipoId('')
     setExtras({})
     setFilesByField({})
+    setCargoId('')
 
     if (!centroCustoId || !departamentoId) {
       setTipos([])
@@ -215,6 +259,27 @@ export default function NovaSolicitacaoPage() {
     loadMe()
   }, [])
 
+  /** ------------------ carregar cargos (Position) ------------------ */
+
+  useEffect(() => {
+    async function loadPositions() {
+      try {
+        const res = await fetch('/api/positions', { cache: 'no-store' })
+        if (!res.ok) {
+          console.error('Erro ao carregar cargos')
+          return
+        }
+        const data: Position[] = await res.json()
+        setPositions(data)
+      } catch (err) {
+        console.error('Erro ao carregar cargos', err)
+      }
+    }
+
+    // Pode carregar sempre; se quiser otimizar, poderia só quando tipoSelecionado for RQ_063
+    loadPositions()
+  }, [])
+
   /** ------------------ helpers de campos específicos ------------------ */
 
   function handleExtraChange(name: string, value: any) {
@@ -236,6 +301,44 @@ export default function NovaSolicitacaoPage() {
         return clone
       })
     }
+  }
+
+  // Quando o campo "cargo" mudar (RQ_063)
+  function handleCargoChange(positionId: string) {
+    setCargoId(positionId)
+
+    const pos = positions.find((p) => p.id === positionId)
+
+    setExtras((prev) => ({
+      ...prev,
+      cargoId: positionId,
+      cargo: pos?.name ?? prev.cargo,
+
+      // esses nomes precisam bater com os names definidos no schemaJson
+      setorOuProjeto: pos?.sectorProject ?? prev.setorOuProjeto,
+      localTrabalho: pos?.workplace ?? prev.localTrabalho,
+      horarioTrabalho: pos?.workSchedule ?? prev.horarioTrabalho,
+      principaisAtividades:
+        pos?.mainActivities ?? prev.principaisAtividades,
+      atividadesComplementares:
+        pos?.complementaryActivities ?? prev.atividadesComplementares,
+      escolaridade: pos?.schooling ?? prev.escolaridade,
+      curso: pos?.course ?? prev.curso,
+      escolaridadeCompleta:
+        pos?.schoolingCompleted ?? prev.escolaridadeCompleta,
+      cursoEmAndamento:
+        pos?.courseInProgress ?? prev.cursoEmAndamento,
+      periodoModulo: pos?.periodModule ?? prev.periodoModulo,
+      requisitosConhecimentos:
+        pos?.requiredKnowledge ?? prev.requisitosConhecimentos,
+      competenciasComportamentais:
+        pos?.behavioralCompetencies ?? prev.competenciasComportamentais,
+      enxoval: pos?.enxoval ?? prev.enxoval,
+      uniforme: pos?.uniform ?? prev.uniforme,
+      outros: pos?.others ?? prev.outros,
+      pontoTrabalho: pos?.workPoint ?? prev.pontoTrabalho,
+      localMatrizFilial: pos?.site ?? prev.localMatrizFilial,
+    }))
   }
 
   /** ------------------ submissão ------------------ */
@@ -341,7 +444,6 @@ export default function NovaSolicitacaoPage() {
                   onChange={(e) => setQueryCC(e.target.value)}
                 />
 
-                {/* 🔽 setinha do dropdown */}
                 <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
                   <ChevronUpDownIcon
                     className="h-5 w-5 text-slate-400"
@@ -349,9 +451,7 @@ export default function NovaSolicitacaoPage() {
                   />
                 </Combobox.Button>
 
-                <Combobox.Options
-                  className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white shadow-lg border border-slate-200"
-                >
+                <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white shadow-lg border border-slate-200">
                   {centrosFiltrados.length === 0 ? (
                     <div className="cursor-default select-none px-4 py-2 text-slate-500">
                       Nenhum centro de custo encontrado.
@@ -363,9 +463,7 @@ export default function NovaSolicitacaoPage() {
                         value={c.id}
                         className={({ active }: { active: boolean }) =>
                           `cursor-pointer select-none px-4 py-2 ${
-                            active
-                              ? 'bg-blue-600 text-white'
-                              : 'text-slate-900'
+                            active ? 'bg-blue-600 text-white' : 'text-slate-900'
                           }`
                         }
                       >
@@ -411,6 +509,7 @@ export default function NovaSolicitacaoPage() {
                 setTipoId(e.target.value)
                 setExtras({})
                 setFilesByField({})
+                setCargoId('')
               }}
               required
               disabled={!centroCustoId || !departamentoId}
@@ -570,14 +669,14 @@ export default function NovaSolicitacaoPage() {
         </div>
 
         {/* LINHA DE BAIXO – campos específicos */}
-        {tipoSelecionado && tipoSelecionado.camposEspecificos.length > 0 && (
+        {tipoSelecionado && camposEspecificos.length > 0 && (
           <div className="lg:col-span-12 col-span-1 rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
               Formulário do tipo de solicitação
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tipoSelecionado.camposEspecificos.map((campo) => (
+              {camposEspecificos.map((campo) => (
                 <div key={campo.name} className="space-y-1">
                   <label
                     htmlFor={campo.name}
@@ -589,7 +688,22 @@ export default function NovaSolicitacaoPage() {
                     )}
                   </label>
 
-                  {campo.type === 'textarea' ? (
+                  {/* Campo de CARGO usa a tabela Position */}
+                  {campo.type === 'select' && campo.name === 'cargo' ? (
+                    <select
+                      id={campo.name}
+                      className={INPUT}
+                      value={cargoId}
+                      onChange={(e) => handleCargoChange(e.target.value)}
+                    >
+                      <option value="">Selecione o cargo...</option>
+                      {positions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : campo.type === 'textarea' ? (
                     <textarea
                       id={campo.name}
                       className={cx(INPUT, 'min-h-[90px] resize-y')}

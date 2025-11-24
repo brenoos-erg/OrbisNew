@@ -164,195 +164,198 @@ async function main() {
     )
   } else {
     const schemaRQ063 = {
-      meta: {
-        // esse tipo só aparece quando o departamento selecionado
-        // na tela for "RECURSOS HUMANOS"
-        departamentos: [rhDepartment.id],
-      },
-      camposEspecificos: [
-        // 🧩 BLOCO 1 – Informações básicas
-        {
-          name: 'cargo',
-          label: 'Cargo',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'setorOuProjeto',
-          label: 'Setor e/ou Projeto',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'vagaPrevistaContrato',
-          label: 'Vaga prevista em contrato?',
-          type: 'select',
-          options: ['Sim', 'Não'],
-          required: true,
-        },
-        {
-          name: 'localTrabalho',
-          label: 'Local de Trabalho',
-          type: 'text',
-          required: true,
-        },
-        {
-          name: 'horarioTrabalho',
-          label: 'Horário de Trabalho',
-          type: 'text',
-        },
-        {
-          name: 'coordenadorContrato',
-          label: 'Coordenador do Contrato',
-          type: 'text',
-        },
+  meta: {
+    // Esse tipo só aparece para RH
+    departamentos: [rhDepartment.id],
+  },
 
-        // 🧩 BLOCO 2 – Motivo / Contratação / Descrição
-        {
-          name: 'motivoVaga',
-          label: 'Motivo da vaga',
-          type: 'select',
-          options: ['Substituição', 'Aumento de quadro'],
-          required: true,
-        },
-        {
-          name: 'tipoContratacao',
-          label: 'Contratação',
-          type: 'select',
-          options: ['Temporária', 'Permanente'],
-          required: true,
-        },
-        {
-          name: 'justificativaVaga',
-          label: 'Justificativa da vaga',
-          type: 'textarea',
-          required: true,
-        },
-        {
-          name: 'principaisAtividades',
-          label: 'Principais atividades',
-          type: 'textarea',
-        },
-        {
-          name: 'atividadesComplementares',
-          label: 'Atividades complementares',
-          type: 'textarea',
-        },
+  camposEspecificos: [
+    // CARGO (select especial)
+    {
+      name: 'cargo',
+      label: 'Cargo',
+      type: 'select',
+      required: true,
+      // deixamos vazio porque o FRONT vai buscar em /api/positions
+      options: [],
+    },
 
-        // 🧩 BLOCO 3 – Requisitos Acadêmicos
-        {
-          name: 'escolaridade',
-          label: 'Escolaridade',
-          type: 'text',
-        },
-        {
-          name: 'curso',
-          label: 'Curso',
-          type: 'text',
-        },
-        {
-          name: 'escolaridadeCompleta',
-          label: 'Escolaridade completa?',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'cursoEmAndamento',
-          label: 'Curso em andamento?',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'periodoModulo',
-          label: 'Período / Módulo - mínimo ou máximo',
-          type: 'text',
-        },
-        {
-          name: 'requisitosConhecimentos',
-          label: 'Requisitos e conhecimentos necessários',
-          type: 'textarea',
-        },
-        {
-          name: 'competenciasComportamentais',
-          label: 'Competências comportamentais exigidas',
-          type: 'textarea',
-        },
+    {
+      name: 'setorOuProjeto',
+      label: 'Setor e/ou Projeto',
+      type: 'text',
+      required: true,
+    },
+    {
+      name: 'vagaPrevistaContrato',
+      label: 'Vaga prevista em contrato?',
+      type: 'select',
+      options: ['Sim', 'Não'],
+      required: true,
+    },
+    {
+      name: 'localTrabalho',
+      label: 'Local de Trabalho',
+      type: 'text',
+      required: true,
+    },
+    {
+      name: 'horarioTrabalho',
+      label: 'Horário de Trabalho',
+      type: 'text',
+    },
+    {
+      name: 'coordenadorContrato',
+      label: 'Coordenador do Contrato',
+      type: 'text',
+    },
 
-        // 🧩 BLOCO 4 – Solicitações para o novo funcionário
-        {
-          name: 'solicitacaoCracha',
-          label: 'Crachá',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'solicitacaoRepublica',
-          label: 'República',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'solicitacaoUniforme',
-          label: 'Uniforme',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'solicitacaoOutros',
-          label: 'Outros (descrever)',
-          type: 'text',
-        },
-        {
-          name: 'solicitacaoTesteDirecao',
-          label: 'Teste de direção',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'solicitacaoEPIs',
-          label: 'EPIs',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
-        {
-          name: 'solicitacaoPostoTrabalho',
-          label: 'Posto de trabalho',
-          type: 'select',
-          options: ['Sim', 'Não'],
-        },
+    // BLOCO 2
+    {
+      name: 'motivoVaga',
+      label: 'Motivo da vaga',
+      type: 'select',
+      options: ['Substituição', 'Aumento de quadro'],
+      required: true,
+    },
+    {
+      name: 'tipoContratacao',
+      label: 'Contratação',
+      type: 'select',
+      options: ['Temporária', 'Permanente'],
+      required: true,
+    },
+    {
+      name: 'justificativaVaga',
+      label: 'Justificativa da vaga',
+      type: 'textarea',
+      required: true,
+    },
+    {
+      name: 'principaisAtividades',
+      label: 'Principais atividades',
+      type: 'textarea',
+    },
+    {
+      name: 'atividadesComplementares',
+      label: 'Atividades complementares',
+      type: 'textarea',
+    },
 
-        // 🧩 BLOCO 5 – Escritório de Projetos
-        {
-          name: 'projetosLocal',
-          label: 'Local (Matriz ou Filial)',
-          type: 'select',
-          options: ['Matriz', 'Filial'],
-        },
-        {
-          name: 'projetosPrevistoContrato',
-          label:
-            'Previsto em contrato (Salários, Benefícios, Carga horária e Outros)',
-          type: 'textarea',
-        },
+    // BLOCO 3 – Requisitos
+    {
+      name: 'escolaridade',
+      label: 'Escolaridade',
+      type: 'text',
+    },
+    {
+      name: 'curso',
+      label: 'Curso',
+      type: 'text',
+    },
+    {
+      name: 'escolaridadeCompleta',
+      label: 'Escolaridade completa?',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'cursoEmAndamento',
+      label: 'Curso em andamento?',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'periodoModulo',
+      label: 'Período / Módulo - mínimo ou máximo',
+      type: 'text',
+    },
+    {
+      name: 'requisitosConhecimentos',
+      label: 'Requisitos e conhecimentos necessários',
+      type: 'textarea',
+    },
+    {
+      name: 'competenciasComportamentais',
+      label: 'Competências comportamentais exigidas',
+      type: 'textarea',
+    },
 
-        // 🧩 BLOCO 6 – Recursos Humanos
-        {
-          name: 'rhNomeProfissional',
-          label: 'Nome do profissional',
-          type: 'text',
-        },
-        {
-          name: 'rhDataAdmissao',
-          label: 'Data de admissão',
-          type: 'date',
-        },
-        {
-          name: 'rhObservacoes',
-          label: 'Observações',
-          type: 'textarea',
-        },
-      ],
-    }
+    // BLOCO 4 – Solicitações para o novo funcionário
+    {
+      name: 'solicitacaoCracha',
+      label: 'Crachá',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'solicitacaoRepublica',
+      label: 'República',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'solicitacaoUniforme',
+      label: 'Uniforme',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'solicitacaoOutros',
+      label: 'Outros (descrever)',
+      type: 'text',
+    },
+    {
+      name: 'solicitacaoTesteDirecao',
+      label: 'Teste de direção',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'solicitacaoEPIs',
+      label: 'EPIs',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+    {
+      name: 'solicitacaoPostoTrabalho',
+      label: 'Posto de trabalho',
+      type: 'select',
+      options: ['Sim', 'Não'],
+    },
+
+    // BLOCO 5 – Escritório de Projetos
+    {
+      name: 'projetosLocal',
+      label: 'Local (Matriz ou Filial)',
+      type: 'select',
+      options: ['Matriz', 'Filial'],
+    },
+    {
+      name: 'projetosPrevistoContrato',
+      label: 'Previsto em contrato (Salários, Benefícios, Carga horária e Outros)',
+      type: 'textarea',
+    },
+
+    // BLOCO 6 – RH
+    {
+      name: 'rhNomeProfissional',
+      label: 'Nome do profissional',
+      type: 'text',
+    },
+    {
+      name: 'rhDataAdmissao',
+      label: 'Data de admissão',
+      type: 'date',
+    },
+    {
+      name: 'rhObservacoes',
+      label: 'Observações',
+      type: 'textarea',
+    },
+  ],
+}
+
 
     await prisma.tipoSolicitacao.upsert({
       where: { nome: 'RQ_063 - Solicitação de Pessoal' },

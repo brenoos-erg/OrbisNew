@@ -10,13 +10,15 @@ type CampoEspecifico = {
 }
 
 type TipoMeta = {
-  centros?: string[]        // ids do centro de custo
-  departamentos?: string[]  // ids ou códigos do departamento
+  centros?: string[]        // ids do centro de custo permitidos
+  departamentos?: string[]  // ids de departamentos permitidos
 }
 
+// Aceita tanto "camposEspecificos" quanto "campos" no JSON do banco
 type SchemaJson = {
   meta?: TipoMeta
   camposEspecificos?: CampoEspecifico[]
+  campos?: CampoEspecifico[]
 }
 
 export async function GET(request: Request) {
@@ -37,12 +39,12 @@ export async function GET(request: Request) {
       const allowedCentros = meta?.centros
       const allowedDepartamentos = meta?.departamentos
 
-      // filtra por centro de custo
+      // Se há restrição de centro de custo e o atual não está na lista, descarta
       if (centroCustoId && allowedCentros && !allowedCentros.includes(centroCustoId)) {
         return false
       }
 
-      // filtra por departamento
+      // Se há restrição de departamento e o atual não está na lista, descarta
       if (departamentoId && allowedDepartamentos && !allowedDepartamentos.includes(departamentoId)) {
         return false
       }
@@ -53,21 +55,24 @@ export async function GET(request: Request) {
     // 3) Resposta limpa para o frontend
     const resposta = filtrados.map((tipo) => {
       const schema = tipo.schemaJson as SchemaJson | null
+
+      // pega camposEspecificos, ou (fallback) campos, ou array vazio
+      const campos = schema?.camposEspecificos ?? schema?.campos ?? []
+
       return {
         id: tipo.id,
         nome: tipo.nome,
-        descricao: tipo.descricao,
-        camposEspecificos: schema?.camposEspecificos ?? []
+        descricao: tipo.descricao ?? undefined,
+        camposEspecificos: campos,
       }
     })
 
     return NextResponse.json(resposta)
-
   } catch (error) {
     console.error('Erro em GET /api/tipos-solicitacao:', error)
     return NextResponse.json(
       { error: 'Erro ao buscar tipos de solicitação' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
