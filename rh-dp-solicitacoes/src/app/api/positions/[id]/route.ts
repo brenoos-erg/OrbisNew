@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     })
 
     return NextResponse.json(position)
-  } catch (e: any) {
+  } catch (e) {
     console.error('PATCH /api/positions/[id] error', e)
     return NextResponse.json(
       { error: 'Erro ao atualizar cargo.' },
@@ -46,13 +46,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-// DELETE /api/positions/:id  -> remover cargo
+// DELETE /api/positions/:id  -> excluir cargo
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const { id } = params
     await prisma.position.delete({ where: { id } })
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e) {
     console.error('DELETE /api/positions/[id] error', e)
     return NextResponse.json(
       { error: 'Erro ao excluir cargo.' },

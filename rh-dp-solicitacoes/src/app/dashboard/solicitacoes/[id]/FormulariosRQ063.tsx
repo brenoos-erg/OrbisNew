@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-// importe aqui o resto que você já usa (ex: useRouter, seus componentes, etc)
+// outros imports...
 
-// ⬇️ tipo que representa um cargo vindo da tabela Position
 type Position = {
   id: string
   name: string

@@ -165,38 +165,54 @@ model CostCenter {
   @@map("CostCenter")
 }
 
+/**
+ * =========================
+ * MODEL Position — CORRIGIDO
+ * =========================
+ */
+
 model Position {
   id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
   name        String  @unique
   description String?
 
-  // Campos para auto-preenchimento da RQ_063
-  sectorProject           String? // Setor e/ou Projeto
-  workplace               String? // Local de Trabalho
-  workSchedule            String? // Horário de Trabalho
-  mainActivities          String? // Principais atividades
-  complementaryActivities String? // Atividades complementares
-  schooling               String? // Escolaridade
-  course                  String? // Curso
-  schoolingCompleted      String? // 'Sim' | 'Não' | outro texto
-  courseInProgress        String? // 'Sim' | 'Não' | outro texto
-  periodModule            String? // Período / Módulo
-  requiredKnowledge       String? // Requisitos e conhecimentos necessários
-  behavioralCompetencies  String? // Competências comportamentais exigidas
-  enxoval                 String? // info sobre enxoval
-  uniform                 String? // info sobre uniforme
-  others                  String? // Outros (descrever)
-  workPoint               String? // Ponto de trabalho
-  site                    String? // Local (Matriz, Filial, etc.)
-
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  department   Department? @relation(fields: [departmentId], references: [id])
+  /// Relação MANY Positions → ONE Department
   departmentId String?
-  users        User[]
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  /// Relação ONE Position → MANY Users
+  users User[]
+
+  // Campos da RQ_063
+  sectorProject           String?
+  workplace               String?
+  workSchedule            String?
+  mainActivities          String?
+  complementaryActivities String?
+  schooling               String?
+  course                  String?
+  schoolingCompleted      String?
+  courseInProgress        String?
+  periodModule            String?
+  requiredKnowledge       String?
+  behavioralCompetencies  String?
+  enxoval                 String?
+  uniform                 String?
+  others                  String?
+  workPoint               String?
+  site                    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("Position")
 }
+
+/**
+ * =========================
+ * MODEL Leader
+ * =========================
+ */
 
 model Leader {
   id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
@@ -242,7 +258,8 @@ model Department {
   // módulos habilitados para esse departamento
   modules DepartmentModule[]
 
-  positions Position[] // <--- ADICIONE ESSA LINHA
+  // relação ONE Department → MANY Positions
+  positions Position[]
 }
 
 model Solicitation {
@@ -272,7 +289,6 @@ model Solicitation {
   status     SolicitationStatus    @default(ABERTA)
   prioridade SolicitationPriority?
 
-  /// Campo para controlar se a vaga já está prevista no orçamento
   vagaPrevista Boolean @default(false)
 
   titulo    String
@@ -293,12 +309,10 @@ model Solicitation {
   comentarios Comment[]
   eventos     Event[]
 
-  /// VÍNCULO ENTRE CHAMADOS (pai/filhos)
   parentId String?
   parent   Solicitation?  @relation("SolicitationParent", fields: [parentId], references: [id])
   children Solicitation[] @relation("SolicitationParent")
 
-  // em model Solicitation
   assumidaPorId String?
   assumidaEm    DateTime?
   assumidaPor   User?     @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id])
@@ -306,7 +320,7 @@ model Solicitation {
 
 /**
  * =========================
- * USUÁRIO
+ * USUÁRIO — CORRIGIDO
  * =========================
  */
 
@@ -318,14 +332,11 @@ model User {
   phone     String?
   avatarUrl String?
 
-  // CC principal
   costCenterId String?
   costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
 
-  // N:N via UserCostCenter
   costCenters UserCostCenter[]
 
-  // departamento
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
@@ -335,7 +346,6 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  // relações com Solicitation
   solicitacoesCriadas   Solicitation[] @relation("SolicitationSolicitante")
   solicitacoesAprovador Solicitation[] @relation("SolicitationAprovador")
   solicitacoesAssumidas Solicitation[] @relation("SolicitationAssumidaPor")
@@ -344,12 +354,14 @@ model User {
   events   Event[]   @relation("EventActor")
 
   membersOfGroups GroupMember[]
-  position        Position?     @relation(fields: [positionId], references: [id])
-  positionId      String?
-  leader          Leader?       @relation(fields: [leaderId], references: [id])
-  leaderId        String?
 
-  // relação com níveis de módulo
+  // relação MANY Users → ONE Position
+  positionId String?
+  position   Position? @relation(fields: [positionId], references: [id])
+
+  leaderId String?
+  leader   Leader? @relation(fields: [leaderId], references: [id])
+
   moduleAccesses UserModuleAccess[]
 
   @@map("User")
@@ -363,16 +375,14 @@ model User {
 
 model Module {
   id        String   @id @default(uuid())
-  key       String   @unique // 'SOLICITACOES' | 'CONFIGURACOES'
+  key       String   @unique
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relações existentes
   grants      AccessGroupGrant[]
   costCenters CostCenterModule[]
 
-  // Novas relações de controle de nível
   userAccess UserModuleAccess[]
   deptAccess DepartmentModule[]
 
@@ -456,12 +466,6 @@ model SolicitationTimeline {
 
   solicitation Solicitation @relation(fields: [solicitationId], references: [id])
 }
-
-/**
- * =========================
- * CONTROLE DE NÍVEL POR MÓDULO
- * =========================
- */
 
 enum ModuleLevel {
   NIVEL_1

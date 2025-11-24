@@ -8,17 +8,10 @@ export async function GET() {
   try {
     const positions = await prisma.position.findMany({
       orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        workplace: true,
-        workSchedule: true,
-      },
     })
 
     return NextResponse.json(positions)
-  } catch (e: any) {
+  } catch (e) {
     console.error('GET /api/positions error', e)
     return NextResponse.json(
       { error: 'Erro ao listar cargos.' },
@@ -27,7 +20,7 @@ export async function GET() {
   }
 }
 
-// POST /api/positions  -> cria cargo (usado pelo "Novo cargo")
+// POST /api/positions  -> criar cargo
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -57,7 +50,7 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json(position, { status: 201 })
-  } catch (e: any) {
+  } catch (e) {
     console.error('POST /api/positions error', e)
     return NextResponse.json(
       { error: 'Erro ao criar cargo.' },
