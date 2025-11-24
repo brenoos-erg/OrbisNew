@@ -1,21 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-export const dynamic = 'force-dynamic'
 
 type Params = { params: { id: string } }
 
-// PATCH /api/positions/:id  -> editar cargo
-export async function PATCH(req: NextRequest, { params }: Params) {
+// PATCH /api/positions/[id] -> editar cargo
+export async function PATCH(request: Request, { params }: Params) {
   try {
-    const body = await req.json()
-    const { id } = params
+    const body = await request.json()
 
-    const position = await prisma.position.update({
-      where: { id },
+    const updated = await prisma.position.update({
+      where: { id: params.id },
       data: {
         name: body.name,
         description: body.description ?? null,
+        departmentId: body.departmentId ?? null,
+
         sectorProject: body.sectorProject ?? null,
         workplace: body.workplace ?? null,
         workSchedule: body.workSchedule ?? null,
@@ -33,29 +32,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         others: body.others ?? null,
         workPoint: body.workPoint ?? null,
         site: body.site ?? null,
+        experience: body.experience ?? null,
       },
     })
 
-    return NextResponse.json(position)
+    return NextResponse.json(updated)
   } catch (e) {
     console.error('PATCH /api/positions/[id] error', e)
     return NextResponse.json(
-      { error: 'Erro ao atualizar cargo.' },
+      { error: 'Erro ao atualizar cargo' },
       { status: 500 },
     )
   }
 }
 
-// DELETE /api/positions/:id  -> excluir cargo
-export async function DELETE(_req: NextRequest, { params }: Params) {
+// DELETE /api/positions/[id]
+export async function DELETE(_request: Request, { params }: Params) {
   try {
-    const { id } = params
-    await prisma.position.delete({ where: { id } })
+    await prisma.position.delete({ where: { id: params.id } })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('DELETE /api/positions/[id] error', e)
     return NextResponse.json(
-      { error: 'Erro ao excluir cargo.' },
+      { error: 'Erro ao excluir cargo' },
       { status: 500 },
     )
   }

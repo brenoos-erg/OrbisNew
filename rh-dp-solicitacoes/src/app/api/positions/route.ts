@@ -1,60 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 
-export const dynamic = 'force-dynamic'
-
-// GET /api/positions  -> lista cargos
 export async function GET() {
   try {
-    const positions = await prisma.position.findMany({
+    const rows = await prisma.position.findMany({
       orderBy: { name: 'asc' },
     })
-
-    return NextResponse.json(positions)
+    return NextResponse.json(rows)
   } catch (e) {
-    console.error('GET /api/positions error', e)
-    return NextResponse.json(
-      { error: 'Erro ao listar cargos.' },
-      { status: 500 },
-    )
+    console.log(e)
+    return NextResponse.json({ error: 'Erro ao carregar cargos' }, { status: 500 })
   }
 }
 
-// POST /api/positions  -> criar cargo
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json()
-
-    const position = await prisma.position.create({
-      data: {
-        name: body.name,
-        description: body.description ?? null,
-        sectorProject: body.sectorProject ?? null,
-        workplace: body.workplace ?? null,
-        workSchedule: body.workSchedule ?? null,
-        mainActivities: body.mainActivities ?? null,
-        complementaryActivities: body.complementaryActivities ?? null,
-        schooling: body.schooling ?? null,
-        course: body.course ?? null,
-        schoolingCompleted: body.schoolingCompleted ?? null,
-        courseInProgress: body.courseInProgress ?? null,
-        periodModule: body.periodModule ?? null,
-        requiredKnowledge: body.requiredKnowledge ?? null,
-        behavioralCompetencies: body.behavioralCompetencies ?? null,
-        enxoval: body.enxoval ?? null,
-        uniform: body.uniform ?? null,
-        others: body.others ?? null,
-        workPoint: body.workPoint ?? null,
-        site: body.site ?? null,
-      },
-    })
-
-    return NextResponse.json(position, { status: 201 })
+    const data = await req.json()
+    const r = await prisma.position.create({ data })
+    return NextResponse.json(r)
   } catch (e) {
-    console.error('POST /api/positions error', e)
-    return NextResponse.json(
-      { error: 'Erro ao criar cargo.' },
-      { status: 500 },
-    )
+    console.log(e)
+    return NextResponse.json({ error: 'Erro ao criar cargo' }, { status: 500 })
   }
 }

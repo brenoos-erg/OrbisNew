@@ -167,7 +167,7 @@ model CostCenter {
 
 /**
  * =========================
- * MODEL Position — CORRIGIDO
+ * MODEL Position
  * =========================
  */
 
@@ -176,31 +176,34 @@ model Position {
   name        String  @unique
   description String?
 
-  /// Relação MANY Positions → ONE Department
+  // relação com Department (muitos cargos para 1 departamento)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  /// Relação ONE Position → MANY Users
+  // relação com User (1 cargo para vários usuários)
   users User[]
 
-  // Campos da RQ_063
-  sectorProject           String?
-  workplace               String?
-  workSchedule            String?
-  mainActivities          String?
-  complementaryActivities String?
-  schooling               String?
-  course                  String?
+  // Campos para auto-preenchimento da RQ_063
+  sectorProject           String? // Setor e/ou Projeto
+  workplace               String? // Local de Trabalho
+  workSchedule            String? // Horário de Trabalho
+  mainActivities          String? // Principais atividades
+  complementaryActivities String? // Atividades complementares
+  schooling               String? // Escolaridade
+  course                  String? // Curso
   schoolingCompleted      String?
   courseInProgress        String?
   periodModule            String?
-  requiredKnowledge       String?
-  behavioralCompetencies  String?
+  requiredKnowledge       String? // Requisitos e conhecimentos necessários
+  behavioralCompetencies  String? // Competências comportamentais exigidas
   enxoval                 String?
   uniform                 String?
   others                  String?
-  workPoint               String?
-  site                    String?
+  workPoint               String? // Ponto de trabalho
+  site                    String? // Local (Matriz, Filial, etc.)
+
+  /// experiência mínima
+  experience String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,8 +304,9 @@ model Solicitation {
   dataFechamento   DateTime?
   dataCancelamento DateTime?
 
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   timelines SolicitationTimeline[]
 
   anexos      Attachment[]
@@ -320,7 +324,7 @@ model Solicitation {
 
 /**
  * =========================
- * USUÁRIO — CORRIGIDO
+ * USUÁRIO
  * =========================
  */
 
@@ -332,11 +336,14 @@ model User {
   phone     String?
   avatarUrl String?
 
+  // CC principal
   costCenterId String?
   costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
 
+  // N:N via UserCostCenter
   costCenters UserCostCenter[]
 
+  // departamento
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
@@ -346,6 +353,7 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  // relações com Solicitation
   solicitacoesCriadas   Solicitation[] @relation("SolicitationSolicitante")
   solicitacoesAprovador Solicitation[] @relation("SolicitationAprovador")
   solicitacoesAssumidas Solicitation[] @relation("SolicitationAssumidaPor")
@@ -362,6 +370,7 @@ model User {
   leaderId String?
   leader   Leader? @relation(fields: [leaderId], references: [id])
 
+  // relação com níveis de módulo
   moduleAccesses UserModuleAccess[]
 
   @@map("User")
@@ -375,14 +384,16 @@ model User {
 
 model Module {
   id        String   @id @default(uuid())
-  key       String   @unique
+  key       String   @unique // 'SOLICITACOES' | 'CONFIGURACOES'
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relações existentes
   grants      AccessGroupGrant[]
   costCenters CostCenterModule[]
 
+  // Novas relações de controle de nível
   userAccess UserModuleAccess[]
   deptAccess DepartmentModule[]
 
@@ -466,6 +477,12 @@ model SolicitationTimeline {
 
   solicitation Solicitation @relation(fields: [solicitationId], references: [id])
 }
+
+/**
+ * =========================
+ * CONTROLE DE NÍVEL POR MÓDULO
+ * =========================
+ */
 
 enum ModuleLevel {
   NIVEL_1

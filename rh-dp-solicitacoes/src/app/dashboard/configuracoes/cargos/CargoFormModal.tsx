@@ -1,22 +1,40 @@
 'use client'
 
 import * as React from 'react'
+import type { PositionRow } from './page'
 
 const INPUT =
   'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
 
-export type PositionRow = {
+export type Position = {
   id?: string
   name: string
   description?: string | null
   departmentId?: string | null
-  baseSalary?: string | number | null
-  workLocation?: string | null
-  workHours?: string | null
-  requirements?: string | null
-  activities?: string | null
+
+  sectorProject?: string | null
+  workplace?: string | null
+  workSchedule?: string | null
+  mainActivities?: string | null
+  complementaryActivities?: string | null
+  schooling?: string | null
+  course?: string | null
+  schoolingCompleted?: string | null
+  courseInProgress?: string | null
+  periodModule?: string | null
+  requiredKnowledge?: string | null
+  behavioralCompetencies?: string | null
+  enxoval?: string | null
+  uniform?: string | null
+  others?: string | null
+  workPoint?: string | null
+  site?: string | null
+  experience?: string | null
 }
 
+/**
+ * Modal de criação/edição do cargo
+ */
 export function CargoFormModal({
   row,
   onClose,
@@ -27,17 +45,27 @@ export function CargoFormModal({
   onSaved: () => void
 }) {
   const isEdit = !!row?.id
-
   const [name, setName] = React.useState(row?.name ?? '')
   const [description, setDescription] = React.useState(row?.description ?? '')
-  const [workLocation, setWorkLocation] = React.useState(row?.workLocation ?? '')
-  const [workHours, setWorkHours] = React.useState(row?.workHours ?? '')
-  const [baseSalary, setBaseSalary] = React.useState(
-    row?.baseSalary ? String(row.baseSalary) : '',
-  )
-  const [requirements, setRequirements] = React.useState(row?.requirements ?? '')
-  const [activities, setActivities] = React.useState(row?.activities ?? '')
+  const [sectorProject, setSectorProject] = React.useState(row?.sectorProject ?? '',)
+  const [workplace, setWorkplace] = React.useState(row?.workplace ?? '')
+  const [workSchedule, setWorkSchedule] = React.useState(row?.workSchedule ?? '',)
+  const [experience, setExperience] = React.useState(row?.experience ?? '')
+  const [mainActivities, setMainActivities] = React.useState(row?.mainActivities ?? '',)
+  const [complementaryActivities, setComplementaryActivities] = React.useState(row?.complementaryActivities ?? '',)
+  const [schooling, setSchooling] = React.useState(row?.schooling ?? '')
+  const [course, setCourse] = React.useState(row?.course ?? '')
+  const [schoolingCompleted, setSchoolingCompleted] = React.useState(row?.schoolingCompleted ?? '',)
+  const [courseInProgress, setCourseInProgress] = React.useState(row?.courseInProgress ?? '',)
+  const [periodModule, setPeriodModule] = React.useState(row?.periodModule ?? '',)
+  const [requiredKnowledge, setRequiredKnowledge] = React.useState(row?.requiredKnowledge ?? '',)
+  const [behavioralCompetencies, setBehavioralCompetencies] = React.useState(row?.behavioralCompetencies ?? '',)
+  const [workPoint, setWorkPoint] = React.useState(row?.workPoint ?? '')
+  const [site, setSite] = React.useState(row?.site ?? '')
   const [saving, setSaving] = React.useState(false)
+  
+
+
 
   async function handleSave() {
     if (!name.trim()) {
@@ -46,14 +74,24 @@ export function CargoFormModal({
     }
     setSaving(true)
     try {
-      const payload = {
+      const payload: Position = {
         name,
         description,
-        workLocation,
-        workHours,
-        baseSalary: baseSalary ? Number(baseSalary) : null,
-        requirements,
-        activities,
+        sectorProject,
+        workplace,
+        workSchedule,
+        mainActivities,
+        complementaryActivities,
+        schooling,
+        course,
+        schoolingCompleted,
+        courseInProgress,
+        periodModule,
+        requiredKnowledge,
+        behavioralCompetencies,
+        experience,
+        workPoint,
+        site,
       }
 
       const url = row?.id ? `/api/positions/${row.id}` : '/api/positions'
@@ -79,7 +117,7 @@ export function CargoFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
             {isEdit ? 'Editar cargo' : 'Novo cargo'}
@@ -93,6 +131,7 @@ export function CargoFormModal({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Nome */}
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold uppercase">
               Nome do cargo *
@@ -104,6 +143,7 @@ export function CargoFormModal({
             />
           </div>
 
+          {/* Descrição */}
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold uppercase">
               Descrição / resumo
@@ -116,52 +156,53 @@ export function CargoFormModal({
             />
           </div>
 
+          {/* Linha 1 */}
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Setor / Projeto
+            </label>
+            <input
+              className={INPUT}
+              value={sectorProject || ''}
+              onChange={(e) => setSectorProject(e.target.value)}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase">
               Local de trabalho
             </label>
             <input
               className={INPUT}
-              value={workLocation || ''}
-              onChange={(e) => setWorkLocation(e.target.value)}
+              value={workplace || ''}
+              onChange={(e) => setWorkplace(e.target.value)}
             />
           </div>
 
+          {/* Linha 2 */}
           <div>
             <label className="block text-xs font-semibold uppercase">
               Horário de trabalho
             </label>
             <input
               className={INPUT}
-              value={workHours || ''}
-              onChange={(e) => setWorkHours(e.target.value)}
+              value={workSchedule || ''}
+              onChange={(e) => setWorkSchedule(e.target.value)}
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase">
-              Salário base (opcional)
+              Experiência mínima
             </label>
             <input
               className={INPUT}
-              value={baseSalary}
-              onChange={(e) => setBaseSalary(e.target.value)}
-              placeholder="Ex.: 3500.00"
+              value={experience || ''}
+              onChange={(e) => setExperience(e.target.value)}
             />
           </div>
 
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold uppercase">
-              Requisitos principais
-            </label>
-            <textarea
-              className={INPUT}
-              rows={3}
-              value={requirements || ''}
-              onChange={(e) => setRequirements(e.target.value)}
-            />
-          </div>
-
+          {/* Principais atividades */}
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold uppercase">
               Principais atividades
@@ -169,11 +210,129 @@ export function CargoFormModal({
             <textarea
               className={INPUT}
               rows={3}
-              value={activities || ''}
-              onChange={(e) => setActivities(e.target.value)}
+              value={mainActivities || ''}
+              onChange={(e) => setMainActivities(e.target.value)}
             />
           </div>
 
+          {/* Atividades complementares */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold uppercase">
+              Atividades complementares
+            </label>
+            <textarea
+              className={INPUT}
+              rows={3}
+              value={complementaryActivities || ''}
+              onChange={(e) => setComplementaryActivities(e.target.value)}
+            />
+          </div>
+
+          {/* Escolaridade / Curso */}
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Escolaridade
+            </label>
+            <input
+              className={INPUT}
+              value={schooling || ''}
+              onChange={(e) => setSchooling(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Curso
+            </label>
+            <input
+              className={INPUT}
+              value={course || ''}
+              onChange={(e) => setCourse(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Escolaridade completa?
+            </label>
+            <input
+              className={INPUT}
+              value={schoolingCompleted || ''}
+              onChange={(e) => setSchoolingCompleted(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Curso em andamento?
+            </label>
+            <input
+              className={INPUT}
+              value={courseInProgress || ''}
+              onChange={(e) => setCourseInProgress(e.target.value)}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold uppercase">
+              Período / Módulo - mínimo ou máximo
+            </label>
+            <input
+              className={INPUT}
+              value={periodModule || ''}
+              onChange={(e) => setPeriodModule(e.target.value)}
+            />
+          </div>
+
+          {/* Requisitos e competências */}
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold uppercase">
+              Requisitos e conhecimentos necessários
+            </label>
+            <textarea
+              className={INPUT}
+              rows={3}
+              value={requiredKnowledge || ''}
+              onChange={(e) => setRequiredKnowledge(e.target.value)}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold uppercase">
+              Competências comportamentais exigidas
+            </label>
+            <textarea
+              className={INPUT}
+              rows={3}
+              value={behavioralCompetencies || ''}
+              onChange={(e) => setBehavioralCompetencies(e.target.value)}
+            />
+          </div>
+
+          {/* Local / ponto de trabalho */}
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Ponto de trabalho
+            </label>
+            <input
+              className={INPUT}
+              value={workPoint || ''}
+              onChange={(e) => setWorkPoint(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase">
+              Local (Matriz / Filial / etc.)
+            </label>
+            <input
+              className={INPUT}
+              value={site || ''}
+              onChange={(e) => setSite(e.target.value)}
+            />
+          </div>
+
+          {/* Botões */}
           <div className="sm:col-span-2 mt-4 flex justify-end gap-2">
             <button
               onClick={onClose}
@@ -193,5 +352,54 @@ export function CargoFormModal({
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Botão + modal (usado na listagem)
+ */
+export function CargoFormTrigger({ row }: { row?: PositionRow }) {
+  const [open, setOpen] = React.useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className={
+          row
+            ? 'text-xs rounded-md border px-2 py-1 hover:bg-slate-50'
+            : 'rounded-md bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-950'
+        }
+      >
+        {row ? 'Editar' : 'Novo cargo'}
+      </button>
+      {open && (
+        <CargoFormModal
+          row={row ?? null}
+          onClose={() => setOpen(false)}
+          onSaved={() => window.location.reload()}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * Botão de excluir (client)
+ */
+export function CargoDeleteButton({ id }: { id: string }) {
+  async function handleDelete() {
+    if (!confirm('Tem certeza que deseja excluir este cargo?')) return
+    await fetch(`/api/positions/${id}`, { method: 'DELETE' })
+    window.location.reload()
+  }
+
+  return (
+    <button
+      onClick={handleDelete}
+      className="text-xs rounded-md border border-red-200 px-2 py-1 text-red-600 hover:bg-red-50"
+    >
+      Excluir
+    </button>
   )
 }

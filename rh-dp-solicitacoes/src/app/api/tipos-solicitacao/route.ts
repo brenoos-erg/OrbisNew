@@ -39,13 +39,21 @@ export async function GET(request: Request) {
       const allowedCentros = meta?.centros
       const allowedDepartamentos = meta?.departamentos
 
-      // Se há restrição de centro de custo e o atual não está na lista, descarta
-      if (centroCustoId && allowedCentros && !allowedCentros.includes(centroCustoId)) {
+      // filtra por centro de custo
+      if (
+        centroCustoId &&
+        allowedCentros &&
+        !allowedCentros.includes(centroCustoId)
+      ) {
         return false
       }
 
-      // Se há restrição de departamento e o atual não está na lista, descarta
-      if (departamentoId && allowedDepartamentos && !allowedDepartamentos.includes(departamentoId)) {
+      // filtra por departamento
+      if (
+        departamentoId &&
+        allowedDepartamentos &&
+        !allowedDepartamentos.includes(departamentoId)
+      ) {
         return false
       }
 
@@ -55,8 +63,6 @@ export async function GET(request: Request) {
     // 3) Resposta limpa para o frontend
     const resposta = filtrados.map((tipo) => {
       const schema = tipo.schemaJson as SchemaJson | null
-
-      // pega camposEspecificos, ou (fallback) campos, ou array vazio
       const campos = schema?.camposEspecificos ?? schema?.campos ?? []
 
       return {

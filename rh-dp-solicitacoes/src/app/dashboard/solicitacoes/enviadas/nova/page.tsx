@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Combobox } from '@headlessui/react'
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid'
 
-/** ------------------ Tipos auxiliares ------------------ */
+/* ------------------------------------------------------------
+   TIPOS
+------------------------------------------------------------ */
 
 type CentroCusto = { id: string; nome: string }
 type Departamento = { id: string; nome: string }
@@ -25,10 +27,27 @@ type TipoSolicitacao = {
   nome: string
   descricao?: string
   camposEspecificos?: CampoEspecifico[]
-  // fallback caso a API esteja mandando o schema bruto
-  schemaJson?: {
-    campos?: CampoEspecifico[]
-  } | null
+  schemaJson?: { campos?: CampoEspecifico[] } | null
+}
+
+type Position = {
+  id: string
+  name: string
+  sectorProject?: string | null
+  workplace?: string | null
+  workSchedule?: string | null
+  mainActivities?: string | null
+  complementaryActivities?: string | null
+  schooling?: string | null
+  course?: string | null
+  schoolingCompleted?: string | null
+  courseInProgress?: string | null
+  periodModule?: string | null
+  requiredKnowledge?: string | null
+  behavioralCompetencies?: string | null
+  experience?: string | null
+  workPoint?: string | null
+  site?: string | null
 }
 
 type MeMini = {
@@ -52,69 +71,43 @@ type SolicitanteForm = {
   costCenterText: string
 }
 
-// Cargos (Position) – para o campo "cargo" da RQ_063
-type Position = {
-  id: string
-  name: string
-  sectorProject?: string | null
-  workplace?: string | null
-  workSchedule?: string | null
-  mainActivities?: string | null
-  complementaryActivities?: string | null
-  schooling?: string | null
-  course?: string | null
-  schoolingCompleted?: string | null
-  courseInProgress?: string | null
-  periodModule?: string | null
-  requiredKnowledge?: string | null
-  behavioralCompetencies?: string | null
-  enxoval?: string | null
-  uniform?: string | null
-  others?: string | null
-  workPoint?: string | null
-  site?: string | null
-}
-
-/** ------------------ estilos reutilizáveis ------------------ */
+/* ------------------------------------------------------------
+   ESTILOS
+------------------------------------------------------------ */
 
 const LABEL =
   'block text-xs font-semibold text-black uppercase tracking-wide'
 const INPUT =
   'mt-1 w-full rounded-md border border-blue-500/70 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150'
 
-const cx = (...c: (string | false | undefined)[]) =>
-  c.filter(Boolean).join(' ')
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ')
 
-/** ------------------ Componente principal ------------------ */
+/* ------------------------------------------------------------
+   COMPONENTE PRINCIPAL
+------------------------------------------------------------ */
 
 export default function NovaSolicitacaoPage() {
   const router = useRouter()
 
-  // ESQUERDA – combos principais
+  /* ------------------ ESTADOS PRINCIPAIS ------------------ */
+
   const [centros, setCentros] = useState<CentroCusto[]>([])
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([])
+  const [positions, setPositions] = useState<Position[]>([])
 
+  const [cargoId, setCargoId] = useState('')
   const [centroCustoId, setCentroCustoId] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [tipoId, setTipoId] = useState('')
-
-  // Busca digitada no combobox de centro de custo
   const [queryCC, setQueryCC] = useState('')
 
-  // campos específicos (valores) + arquivos
   const [extras, setExtras] = useState<Record<string, any>>({})
-  const [filesByField, setFilesByField] = useState<
-    Record<string, FileList | null>
-  >({})
+  const [filesByField, setFilesByField] = useState<Record<string, FileList | null>>({})
 
-  // cargos (Position) – usados no campo "cargo"
-  const [positions, setPositions] = useState<Position[]>([])
-  const [cargoId, setCargoId] = useState('')
-
-  // DIREITA – dados do solicitante
   const [me, setMe] = useState<MeMini | null>(null)
   const [loadingMe, setLoadingMe] = useState(true)
+
   const [solicitante, setSolicitante] = useState<SolicitanteForm>({
     fullName: '',
     email: '',
@@ -123,20 +116,21 @@ export default function NovaSolicitacaoPage() {
     costCenterText: '',
   })
 
+  /* ------------------------------------------------------------
+     MEMO
+  ------------------------------------------------------------ */
+
   const tipoSelecionado = useMemo(
     () => tipos.find((t) => t.id === tipoId),
     [tipos, tipoId],
   )
 
-  // campos específicos vindos do tipo (suporta tanto camposEspecificos quanto schemaJson.campos)
   const camposEspecificos: CampoEspecifico[] = useMemo(() => {
     if (!tipoSelecionado) return []
-    if (tipoSelecionado.camposEspecificos?.length) {
+    if (tipoSelecionado.camposEspecificos?.length)
       return tipoSelecionado.camposEspecificos
-    }
-    if (tipoSelecionado.schemaJson?.campos?.length) {
+    if (tipoSelecionado.schemaJson?.campos?.length)
       return tipoSelecionado.schemaJson.campos
-    }
     return []
   }, [tipoSelecionado])
 
@@ -150,7 +144,9 @@ export default function NovaSolicitacaoPage() {
     [queryCC, centros],
   )
 
-  /** ------------------ carregar centros + departamentos ------------------ */
+  /* ------------------------------------------------------------
+     CARREGAR CENTROS + DEPTOS
+  ------------------------------------------------------------ */
 
   useEffect(() => {
     async function loadBase() {
@@ -160,40 +156,33 @@ export default function NovaSolicitacaoPage() {
           fetch('/api/departments/select', { cache: 'no-store' }),
         ])
 
-        const centrosRaw: {
-          id: string
-          description: string
-          code: string | null
-          externalCode: string | null
-        }[] = await cRes.json()
+        const centrosRaw = await cRes.json()
+        const depsRaw = await dRes.json()
 
-        const depsRaw: {
-          id: string
-          label: string
-          description: string | null
-        }[] = await dRes.json()
+        setCentros(
+          centrosRaw.map((c: any) => ({
+            id: c.id,
+            nome: c.code ? `${c.code} - ${c.description}` : c.description,
+          })),
+        )
 
-        const centrosMap: CentroCusto[] = centrosRaw.map((c) => ({
-          id: c.id,
-          nome: c.code ? `${c.code} - ${c.description}` : c.description,
-        }))
-
-        const depsMap: Departamento[] = depsRaw.map((d) => ({
-          id: d.id,
-          nome: d.label,
-        }))
-
-        setCentros(centrosMap)
-        setDepartamentos(depsMap)
+        setDepartamentos(
+          depsRaw.map((d: any) => ({
+            id: d.id,
+            nome: d.label,
+          })),
+        )
       } catch (e) {
-        console.error('Erro ao carregar centros / departamentos', e)
+        console.error('Erro ao carregar centros/departamentos', e)
       }
     }
 
     loadBase()
   }, [])
 
-  /** ------------------ carregar tipos conforme centro + depto ------------------ */
+  /* ------------------------------------------------------------
+     CARREGAR TIPOS
+  ------------------------------------------------------------ */
 
   useEffect(() => {
     setTipoId('')
@@ -208,21 +197,45 @@ export default function NovaSolicitacaoPage() {
 
     async function loadTipos() {
       try {
-        const url = `/api/tipos-solicitacao?centroCustoId=${encodeURIComponent(
-          centroCustoId,
-        )}&departamentoId=${encodeURIComponent(departamentoId)}`
+        const url = `/api/tipos-solicitacao?centroCustoId=${centroCustoId}&departamentoId=${departamentoId}`
         const res = await fetch(url)
-        const json: TipoSolicitacao[] = await res.json()
+        const json = await res.json()
         setTipos(json)
       } catch (e) {
-        console.error('Erro ao carregar tipos de solicitação', e)
+        console.error('Erro ao carregar tipos', e)
       }
     }
 
     loadTipos()
   }, [centroCustoId, departamentoId])
 
-  /** ------------------ carregar dados do solicitante ------------------ */
+  /* ------------------------------------------------------------
+     CARREGAR CARGOS
+  ------------------------------------------------------------ */
+
+  useEffect(() => {
+    async function loadPositions() {
+      try {
+        const res = await fetch('/api/positions')
+        if (!res.ok) return
+        const data = await res.json()
+        setPositions(data)
+      } catch (e) {
+        console.error('Erro ao carregar cargos', e)
+      }
+    }
+
+    if (tipoSelecionado?.nome === 'RQ_063 - Solicitação de Pessoal') {
+      loadPositions()
+    } else {
+      setPositions([])
+      setCargoId('')
+    }
+  }, [tipoSelecionado])
+
+  /* ------------------------------------------------------------
+     CARREGAR ME
+  ------------------------------------------------------------ */
 
   useEffect(() => {
     async function loadMe() {
@@ -231,7 +244,7 @@ export default function NovaSolicitacaoPage() {
         const r = await fetch('/api/me', { cache: 'no-store' })
 
         if (r.ok) {
-          const data: MeMini = await r.json()
+          const data = await r.json()
           setMe(data)
 
           setSolicitante({
@@ -245,12 +258,9 @@ export default function NovaSolicitacaoPage() {
                 : data.costCenter.description
               : '',
           })
-        } else {
-          setMe(null)
-        }
+        } else setMe(null)
       } catch (e) {
         console.error('Erro ao carregar /api/me', e)
-        setMe(null)
       } finally {
         setLoadingMe(false)
       }
@@ -259,238 +269,156 @@ export default function NovaSolicitacaoPage() {
     loadMe()
   }, [])
 
-  /** ------------------ carregar cargos (Position) ------------------ */
+  /* ------------------------------------------------------------
+     AUTOPREENCHER CAMPOS DO CARGO
+  ------------------------------------------------------------ */
 
-  useEffect(() => {
-    async function loadPositions() {
-      try {
-        const res = await fetch('/api/positions', { cache: 'no-store' })
-        if (!res.ok) {
-          console.error('Erro ao carregar cargos')
-          return
-        }
-        const data: Position[] = await res.json()
-        setPositions(data)
-      } catch (err) {
-        console.error('Erro ao carregar cargos', err)
-      }
-    }
+  function handleCargoChange(id: string) {
+    setCargoId(id)
+    const pos = positions.find(p => p.id === id)
+    if (!pos) return
 
-    // Pode carregar sempre; se quiser otimizar, poderia só quando tipoSelecionado for RQ_063
-    loadPositions()
-  }, [])
-
-  /** ------------------ helpers de campos específicos ------------------ */
-
-  function handleExtraChange(name: string, value: any) {
-    setExtras((prev) => ({ ...prev, [name]: value }))
-  }
-
-  function handleFileChange(name: string, files: FileList | null) {
-    setFilesByField((prev) => ({ ...prev, [name]: files }))
-
-    if (files && files.length > 0) {
-      const nomes = Array.from(files)
-        .map((f) => f.name)
-        .join(', ')
-      setExtras((prev) => ({ ...prev, [name]: nomes }))
-    } else {
-      setExtras((prev) => {
-        const clone = { ...prev }
-        delete clone[name]
-        return clone
-      })
-    }
-  }
-
-  // Quando o campo "cargo" mudar (RQ_063)
-  function handleCargoChange(positionId: string) {
-    setCargoId(positionId)
-
-    const pos = positions.find((p) => p.id === positionId)
-
-    setExtras((prev) => ({
+    setExtras(prev => ({
       ...prev,
-      cargoId: positionId,
-      cargo: pos?.name ?? prev.cargo,
+      cargo: pos.name,
 
-      // esses nomes precisam bater com os names definidos no schemaJson
-      setorOuProjeto: pos?.sectorProject ?? prev.setorOuProjeto,
-      localTrabalho: pos?.workplace ?? prev.localTrabalho,
-      horarioTrabalho: pos?.workSchedule ?? prev.horarioTrabalho,
-      principaisAtividades:
-        pos?.mainActivities ?? prev.principaisAtividades,
-      atividadesComplementares:
-        pos?.complementaryActivities ?? prev.atividadesComplementares,
-      escolaridade: pos?.schooling ?? prev.escolaridade,
-      curso: pos?.course ?? prev.curso,
-      escolaridadeCompleta:
-        pos?.schoolingCompleted ?? prev.escolaridadeCompleta,
-      cursoEmAndamento:
-        pos?.courseInProgress ?? prev.cursoEmAndamento,
-      periodoModulo: pos?.periodModule ?? prev.periodoModulo,
-      requisitosConhecimentos:
-        pos?.requiredKnowledge ?? prev.requisitosConhecimentos,
-      competenciasComportamentais:
-        pos?.behavioralCompetencies ?? prev.competenciasComportamentais,
-      enxoval: pos?.enxoval ?? prev.enxoval,
-      uniforme: pos?.uniform ?? prev.uniforme,
-      outros: pos?.others ?? prev.outros,
-      pontoTrabalho: pos?.workPoint ?? prev.pontoTrabalho,
-      localMatrizFilial: pos?.site ?? prev.localMatrizFilial,
+      setorOuProjeto: pos.sectorProject ?? prev.setorOuProjeto,
+      localTrabalho: pos.workplace ?? prev.localTrabalho,
+      horarioTrabalho: pos.workSchedule ?? prev.horarioTrabalho,
+
+      principaisAtividades: pos.mainActivities ?? prev.principaisAtividades,
+      atividadesComplementares: pos.complementaryActivities ?? prev.atividadesComplementares,
+
+      escolaridade: pos.schooling ?? prev.escolaridade,
+      curso: pos.course ?? prev.curso,
+      escolaridadeCompleta: pos.schoolingCompleted ?? prev.escolaridadeCompleta,
+      cursoEmAndamento: pos.courseInProgress ?? prev.cursoEmAndamento,
+
+      periodoModulo: pos.periodModule ?? prev.periodoModulo,
+      requisitosConhecimentos: pos.requiredKnowledge ?? prev.requisitosConhecimentos,
+      competenciasComportamentais: pos.behavioralCompetencies ?? prev.competenciasComportamentais,
+
+      experiencia: pos.experience ?? prev.experiencia,
+      pontoTrabalho: pos.workPoint ?? prev.pontoTrabalho,
+      projetosLocal: pos.site ?? prev.projetosLocal,
     }))
   }
 
-  /** ------------------ submissão ------------------ */
+  /* ------------------------------------------------------------
+     SUBMIT
+  ------------------------------------------------------------ */
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
     if (!centroCustoId || !departamentoId || !tipoId) {
-      alert('Preencha centro de custo, departamento e tipo de solicitação.')
+      alert('Preencha centro de custo, departamento e tipo.')
       return
     }
 
     if (!me?.id) {
-      alert('Não foi possível identificar o solicitante. Faça login novamente.')
+      alert('Falha ao identificar o solicitante.')
       return
     }
 
     try {
-      // 1) Cria a solicitação
       const res = await fetch('/api/solicitacoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipoId: tipoId,
+          tipoId,
           costCenterId: centroCustoId,
           departmentId: departamentoId,
           solicitanteId: me.id,
-          payload: {
-            campos: extras,
-            solicitante,
-          },
+          payload: { campos: extras, solicitante },
         }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => null)
-        throw new Error(err?.error || 'Erro ao registrar a solicitação.')
+        throw new Error(err?.error || 'Erro ao registrar solicitação.')
       }
 
-      const created = (await res.json()) as { id: string }
+      const created = await res.json()
 
-      // 2) Envia anexos (se houver)
+      // Upload de anexos
       const formData = new FormData()
-      Object.entries(filesByField).forEach(([_, fileList]) => {
-        if (!fileList) return
-        Array.from(fileList).forEach((file) => {
-          formData.append('files', file)
-        })
-      })
+      for (const [_, list] of Object.entries(filesByField)) {
+        if (!list) continue
+        for (const f of Array.from(list)) formData.append('files', f)
+      }
 
       if ([...formData.keys()].length > 0) {
-        const uploadRes = await fetch(
-          `/api/solicitacoes/${created.id}/anexos`,
-          {
-            method: 'POST',
-            body: formData,
-          },
-        )
-
-        if (!uploadRes.ok) {
-          console.error('Falha ao enviar anexos')
-        }
+        await fetch(`/api/solicitacoes/${created.id}/anexos`, {
+          method: 'POST',
+          body: formData,
+        })
       }
 
-      // 3) Redireciona para a lista
       router.push('/dashboard/solicitacoes/enviadas')
     } catch (e: any) {
-      alert(e.message || 'Erro ao registrar a solicitação.')
+      alert(e.message)
     }
   }
 
-  /** ------------------ UI ------------------ */
+  /* ------------------------------------------------------------
+     RENDER
+  ------------------------------------------------------------ */
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="text-sm text-slate-500 mb-1">Sistema de Solicitações</div>
       <h1 className="text-2xl font-semibold text-slate-900 mb-4">
         Nova Solicitação
       </h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="grid grid-cols-1 lg:grid-cols-12 gap-6"
-      >
-        {/* ESQUERDA – centro de custo, depto, tipo */}
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {/* LADO ESQUERDO */}
         <div className="lg:col-span-7 space-y-5">
-          {/* Centro de Custo (Combobox) */}
+
+          {/* CENTRO DE CUSTO */}
           <div>
             <label className={LABEL}>Centro de Custo</label>
 
             <Combobox
               value={centroCustoId}
-              onChange={(value: any) => setCentroCustoId(value as string)}
+              onChange={(value: any) => setCentroCustoId(value)}
             >
               <div className="relative mt-1">
                 <Combobox.Input
                   className={`${INPUT} pr-10`}
-                  placeholder="Digite ou selecione o centro de custo"
-                  displayValue={(id: any) => {
-                    const item = centros.find((c) => c.id === id)
-                    return item ? item.nome : ''
-                  }}
+                  displayValue={(id: string) => centros.find(c => c.id === id)?.nome || ''}
                   onChange={(e) => setQueryCC(e.target.value)}
                 />
-
                 <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <ChevronUpDownIcon
-                    className="h-5 w-5 text-slate-400"
-                    aria-hidden="true"
-                  />
+                  <ChevronUpDownIcon className="h-5 w-5 text-slate-400" />
                 </Combobox.Button>
 
-                <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white shadow-lg border border-slate-200">
-                  {centrosFiltrados.length === 0 ? (
-                    <div className="cursor-default select-none px-4 py-2 text-slate-500">
-                      Nenhum centro de custo encontrado.
-                    </div>
-                  ) : (
-                    centrosFiltrados.map((c) => (
-                      <Combobox.Option
-                        key={c.id}
-                        value={c.id}
-                        className={({ active }: { active: boolean }) =>
-                          `cursor-pointer select-none px-4 py-2 ${
-                            active ? 'bg-blue-600 text-white' : 'text-slate-900'
-                          }`
-                        }
-                      >
-                        {c.nome}
-                      </Combobox.Option>
-                    ))
-                  )}
+                <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full bg-white border shadow-lg">
+                  {centrosFiltrados.map((c) => (
+                    <Combobox.Option
+                      key={c.id}
+                      value={c.id}
+                      className="px-4 py-2 cursor-pointer hover:bg-blue-600 hover:text-white"
+                    >
+                      {c.nome}
+                    </Combobox.Option>
+                  ))}
                 </Combobox.Options>
               </div>
             </Combobox>
           </div>
 
-          {/* Departamento */}
+          {/* DEPARTAMENTO */}
           <div>
             <label className={LABEL}>Departamento</label>
             <select
               className={INPUT}
               value={departamentoId}
               onChange={(e) => setDepartamentoId(e.target.value)}
-              required
               disabled={!centroCustoId}
             >
-              <option value="">
-                {!centroCustoId
-                  ? 'Escolha antes o centro de custo'
-                  : 'Selecione o departamento'}
-              </option>
+              <option value="">Selecione...</option>
               {departamentos.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.nome}
@@ -499,199 +427,81 @@ export default function NovaSolicitacaoPage() {
             </select>
           </div>
 
-          {/* Tipo de solicitação */}
+          {/* TIPOS */}
           <div>
             <label className={LABEL}>Tipo de Solicitação</label>
+
             <select
               className={INPUT}
               value={tipoId}
               onChange={(e) => {
                 setTipoId(e.target.value)
                 setExtras({})
-                setFilesByField({})
                 setCargoId('')
               }}
-              required
-              disabled={!centroCustoId || !departamentoId}
+              disabled={!departamentoId}
             >
-              <option value="">
-                {!centroCustoId || !departamentoId
-                  ? 'Informe centro de custo e departamento primeiro'
-                  : tipos.length === 0
-                  ? 'Nenhum tipo disponível para essa combinação'
-                  : 'Selecione o tipo de solicitação'}
-              </option>
+              <option value="">Selecione...</option>
               {tipos.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.nome}
                 </option>
               ))}
             </select>
-            {tipoSelecionado?.descricao && (
-              <p className="mt-1 text-[11px] text-slate-500">
-                {tipoSelecionado.descricao}
-              </p>
-            )}
           </div>
         </div>
 
-        {/* DIREITA – card do solicitante + botões */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
-            <div className="mb-3">
-              <div className="text-sm font-semibold">Dados do Solicitante</div>
-              <p className="text-[11px] text-slate-500">
-                Essas informações serão usadas para contato sobre a solicitação.
-                Você pode ajustá-las se o chamado for para outra pessoa.
-              </p>
-            </div>
+        {/* LADO DIREITO */}
+        <div className="lg:col-span-5">
 
-            {loadingMe && (
-              <p className="text-xs text-slate-500">Carregando dados...</p>
-            )}
+          {/* CARD DO SOLICITANTE */}
+          <div className="border rounded-lg p-4 bg-white">
+            <h3 className="font-semibold mb-2">Dados do Solicitante</h3>
 
-            {!loadingMe && !me && (
-              <p className="text-xs text-red-600">
-                Não foi possível carregar seus dados. Verifique se está logado.
-              </p>
-            )}
-
-            {!loadingMe && (
-              <div className="space-y-3 text-sm">
-                {/* Nome */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Nome completo
-                  </label>
-                  <input
-                    className={INPUT}
-                    value={solicitante.fullName}
-                    onChange={(e) =>
-                      setSolicitante((prev) => ({
-                        ...prev,
-                        fullName: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                {/* Email & Login */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      E-mail
-                    </label>
-                    <input
-                      className={INPUT}
-                      type="email"
-                      value={solicitante.email}
-                      onChange={(e) =>
-                        setSolicitante((prev) => ({
-                          ...prev,
-                          email: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Login
-                    </label>
-                    <input
-                      className={INPUT}
-                      value={solicitante.login}
-                      onChange={(e) =>
-                        setSolicitante((prev) => ({
-                          ...prev,
-                          login: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* Telefone & Centro de Custo */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Telefone
-                    </label>
-                    <input
-                      className={INPUT}
-                      value={solicitante.phone}
-                      onChange={(e) =>
-                        setSolicitante((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Centro de Custo
-                    </label>
-                    <input
-                      className={INPUT}
-                      value={solicitante.costCenterText}
-                      onChange={(e) =>
-                        setSolicitante((prev) => ({
-                          ...prev,
-                          costCenterText: e.target.value,
-                        }))
-                      }
-                    />
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Texto apenas informativo. O vínculo real é o centro de
-                      custo selecionado à esquerda.
-                    </p>
-                  </div>
-                </div>
+            {loadingMe ? (
+              <p>Carregando...</p>
+            ) : (
+              <div className="space-y-3">
+                <input className={INPUT} value={solicitante.fullName} />
+                <input className={INPUT} value={solicitante.email} />
+                <input className={INPUT} value={solicitante.login} />
+                <input className={INPUT} value={solicitante.phone} />
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 mt-4">
             <button
               type="button"
               onClick={() => router.push('/dashboard/solicitacoes/enviadas')}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="px-4 py-2 border rounded"
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500"
-            >
+            <button className="px-4 py-2 bg-orange-600 text-white rounded">
               Enviar Solicitação
             </button>
           </div>
         </div>
 
-        {/* LINHA DE BAIXO – campos específicos */}
+        {/* CAMPOS ESPECÍFICOS */}
         {tipoSelecionado && camposEspecificos.length > 0 && (
-          <div className="lg:col-span-12 col-span-1 rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+          <div className="lg:col-span-12 border bg-slate-50 p-4 rounded">
+            <h4 className="text-xs uppercase font-semibold text-slate-500">
               Formulário do tipo de solicitação
-            </p>
+            </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
               {camposEspecificos.map((campo) => (
-                <div key={campo.name} className="space-y-1">
-                  <label
-                    htmlFor={campo.name}
-                    className="block text-xs font-semibold text-slate-700"
-                  >
+                <div key={campo.name}>
+                  <label className={LABEL}>
                     {campo.label}
-                    {campo.required && (
-                      <span className="text-red-500 ml-1">*</span>
-                    )}
+                    {campo.required && <span className="text-red-500">*</span>}
                   </label>
 
-                  {/* Campo de CARGO usa a tabela Position */}
-                  {campo.type === 'select' && campo.name === 'cargo' ? (
+                  {/* Campo de CARGO */}
+                  {campo.name === 'cargo' ? (
                     <select
-                      id={campo.name}
                       className={INPUT}
                       value={cargoId}
                       onChange={(e) => handleCargoChange(e.target.value)}
@@ -705,22 +515,20 @@ export default function NovaSolicitacaoPage() {
                     </select>
                   ) : campo.type === 'textarea' ? (
                     <textarea
-                      id={campo.name}
-                      className={cx(INPUT, 'min-h-[90px] resize-y')}
+                      className={cx(INPUT, 'min-h-[80px]')}
                       onChange={(e) =>
-                        handleExtraChange(campo.name, e.target.value)
+                        setExtras(prev => ({ ...prev, [campo.name]: e.target.value }))
                       }
                     />
                   ) : campo.type === 'select' && campo.options ? (
                     <select
-                      id={campo.name}
                       className={INPUT}
                       onChange={(e) =>
-                        handleExtraChange(campo.name, e.target.value)
+                        setExtras(prev => ({ ...prev, [campo.name]: e.target.value }))
                       }
                     >
                       <option value="">Selecione...</option>
-                      {campo.options.map((opt) => (
+                      {campo.options.map(opt => (
                         <option key={opt} value={opt}>
                           {opt}
                         </option>
@@ -728,27 +536,19 @@ export default function NovaSolicitacaoPage() {
                     </select>
                   ) : campo.type === 'file' ? (
                     <input
-                      id={campo.name}
                       type="file"
                       className={INPUT}
                       multiple
                       onChange={(e) =>
-                        handleFileChange(campo.name, e.target.files)
+                        setFilesByField(prev => ({ ...prev, [campo.name]: e.target.files }))
                       }
                     />
                   ) : (
                     <input
-                      id={campo.name}
-                      type={
-                        campo.type === 'number'
-                          ? 'number'
-                          : campo.type === 'date'
-                          ? 'date'
-                          : 'text'
-                      }
                       className={INPUT}
+                      type={campo.type === 'date' ? 'date' : 'text'}
                       onChange={(e) =>
-                        handleExtraChange(campo.name, e.target.value)
+                        setExtras(prev => ({ ...prev, [campo.name]: e.target.value }))
                       }
                     />
                   )}
@@ -757,6 +557,7 @@ export default function NovaSolicitacaoPage() {
             </div>
           </div>
         )}
+
       </form>
     </div>
   )
