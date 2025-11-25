@@ -176,34 +176,30 @@ model Position {
   name        String  @unique
   description String?
 
-  // relação com Department (muitos cargos para 1 departamento)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  // relação com User (1 cargo para vários usuários)
   users User[]
 
-  // Campos para auto-preenchimento da RQ_063
-  sectorProject           String? // Setor e/ou Projeto
-  workplace               String? // Local de Trabalho
-  workSchedule            String? // Horário de Trabalho
-  mainActivities          String? // Principais atividades
-  complementaryActivities String? // Atividades complementares
-  schooling               String? // Escolaridade
-  course                  String? // Curso
+  // AUTO-PREENCHIMENTO RQ_063
+  sectorProject           String?
+  workplace               String?
+  workSchedule            String?
+  mainActivities          String?
+  complementaryActivities String?
+  schooling               String?
+  course                  String?
   schoolingCompleted      String?
   courseInProgress        String?
   periodModule            String?
-  requiredKnowledge       String? // Requisitos e conhecimentos necessários
-  behavioralCompetencies  String? // Competências comportamentais exigidas
+  requiredKnowledge       String?
+  behavioralCompetencies  String?
   enxoval                 String?
   uniform                 String?
   others                  String?
-  workPoint               String? // Ponto de trabalho
-  site                    String? // Local (Matriz, Filial, etc.)
-
-  /// experiência mínima
-  experience String?
+  workPoint               String?
+  site                    String?
+  experience              String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

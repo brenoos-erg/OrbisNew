@@ -224,6 +224,21 @@ export default function Sidebar({ showSolic, showConfig, canApprove, userMenu }:
                   >
                     <FolderCog size={16} /> <span>Centros de Custo</span>
                   </Link>
+
+                  {/* 👉 NOVO SUBMENU: CARGOS */}
+                  <Link
+                    href="/dashboard/configuracoes/cargos"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith(
+                          '/dashboard/configuracoes/cargos',
+                        )
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <FolderCog size={16} /> <span>Cargos</span>
+                  </Link>
                 </div>
               )}
             </div>

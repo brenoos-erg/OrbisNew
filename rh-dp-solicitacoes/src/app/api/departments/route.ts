@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-
 export async function GET() {
   try {
     const data = await prisma.department.findMany({
@@ -13,6 +12,7 @@ export async function GET() {
       orderBy: { name: 'asc' },
     })
 
+    // O front espera { id, label, description }
     const formatted = data.map((d) => ({
       id: d.id,
       label: d.name,
@@ -22,6 +22,9 @@ export async function GET() {
     return NextResponse.json(formatted)
   } catch (e) {
     console.error('Erro ao listar departamentos:', e)
-    return NextResponse.json({ error: 'Erro ao buscar departamentos' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Erro ao buscar departamentos' },
+      { status: 500 }
+    )
   }
 }
