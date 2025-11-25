@@ -647,29 +647,33 @@ export function SolicitationDetailModal({
               </div>
 
               {/* Formulário do tipo de solicitação */}
-              {camposSchema.length > 0 && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                    Formulário do tipo de solicitação
-                  </p>
+              {isSolicitacaoPessoal ? (
+                <RQ063ResumoCampos payloadCampos={payloadCampos} />
+              ) : (
+                camposSchema.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                      Formulário do tipo de solicitação
+                    </p>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                    {camposSchema.map((campo) => (
-                      <div key={campo.name}>
-                        <label className={LABEL_RO}>{campo.label}</label>
-                        <input
-                          className={INPUT_RO}
-                          readOnly
-                          value={
-                            payloadCampos[campo.name] !== undefined
-                              ? String(payloadCampos[campo.name])
-                              : ''
-                          }
-                        />
-                      </div>
-                    ))}
+                    <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                      {camposSchema.map((campo) => (
+                        <div key={campo.name}>
+                          <label className={LABEL_RO}>{campo.label}</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={
+                              payloadCampos[campo.name] !== undefined
+                                ? String(payloadCampos[campo.name])
+                                : ''
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )
               )}
 
               {/* DADOS DO CONTRATADO (formulário extra) */}
@@ -826,6 +830,220 @@ export function SolicitationDetailModal({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Bloco específico para exibir os campos da RQ_063 - Solicitação de Pessoal
+ * usando os valores salvos em payload.campos.
+ *
+ * IMPORTANTE: ajuste as chaves (get('...')) para bater exatamente
+ * com o que você está salvando na criação da solicitação.
+ */
+function RQ063ResumoCampos({
+  payloadCampos,
+}: {
+  payloadCampos: Record<string, any>
+}) {
+  const get = (key: string) =>
+    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+        RQ_063 - Solicitação de Pessoal
+      </p>
+
+      {/* Informações básicas */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Informações básicas
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Cargo</label>
+            <input className={INPUT_RO} readOnly value={get('cargo')} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Setor / Projeto</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('setorProjeto')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Local de Trabalho</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('localTrabalho')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Horário de Trabalho</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('horarioTrabalho')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Motivo / contratação */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Motivo da vaga / Contratação
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Vaga prevista em contrato?</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('vagaPrevistaContrato')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Motivo da vaga</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('motivoVaga')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Tipo de contratação</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('tipoContratacao')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Atividades */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Atividades
+        </p>
+        <div className="space-y-3 text-xs">
+          <div>
+            <label className={LABEL_RO}>Principais atividades</label>
+            <textarea
+              className={`${INPUT_RO} min-h-[70px]`}
+              readOnly
+              value={get('principaisAtividades')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Atividades complementares</label>
+            <textarea
+              className={`${INPUT_RO} min-h-[70px]`}
+              readOnly
+              value={get('atividadesComplementares')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Requisitos acadêmicos */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Requisitos acadêmicos
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Escolaridade</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('escolaridade')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Curso</label>
+            <input className={INPUT_RO} readOnly value={get('curso')} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Período / Módulo</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('periodoModulo')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Requisitos e competências */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Requisitos e competências
+        </p>
+        <div className="space-y-3 text-xs">
+          <div>
+            <label className={LABEL_RO}>
+              Requisitos e conhecimentos necessários
+            </label>
+            <textarea
+              className={`${INPUT_RO} min-h-[70px]`}
+              readOnly
+              value={get('requisitosConhecimentos')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>
+              Competências comportamentais exigidas
+            </label>
+            <textarea
+              className={`${INPUT_RO} min-h-[70px]`}
+              readOnly
+              value={get('competenciasComportamentais')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Enxoval / uniforme / outros */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Solicitações para o novo funcionário
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Enxoval / EPIs / Uniforme</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('enxoval')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Outros</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('outros')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Observações finais */}
+      <div>
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Observações
+        </p>
+        <textarea
+          className={`${INPUT_RO} min-h-[70px]`}
+          readOnly
+          value={get('observacoes')}
+        />
       </div>
     </div>
   )
