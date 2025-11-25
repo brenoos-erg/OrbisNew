@@ -269,102 +269,126 @@ export default function NovaSolicitacaoPage() {
    6) SUBMIT
   ============================================================ */
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!me?.id) {
-      setSubmitError('Não foi possível identificar o solicitante (usuário logado).');
-      return;
-    }
+  if (!centroId || !departamentoId || !tipoId) {
+    setSubmitError(
+      'Preencha Centro de Custo, Departamento e Tipo de Solicitação.',
+    );
+    return;
+  }
 
-    // validação básica extra
-    if (!centroId || !departamentoId || !tipoId) {
-      setSubmitError(
-        'Preencha Centro de Custo, Departamento e Tipo de Solicitação.'
-      );
-      return;
-    }
+  if (isRQ063 && !cargoId) {
+    setSubmitError('Selecione o cargo para continuar.');
+    return;
+  }
 
-    if (isRQ063 && !cargoId) {
-      setSubmitError('Selecione o cargo para continuar.');
-      return;
-    }
+  setSubmitError(null);
+  setSubmitting(true);
 
-    setSubmitError(null);
-    setSubmitting(true);
+  try {
+    // nome do cargo selecionado
+    const cargoSelecionado = positions.find((p) => p.id === cargoId)?.name ?? '';
 
-    try {
-      // --------- MONTA payload.solicitante ---------
-      const payloadSolicitante = {
-        fullName: me.fullName,
-        email: me.email,
-        login: me.login,
-        phone: me.phone ?? '',
-        costCenterText: me.costCenterName ?? '',
-      };
+    // monta strings “bonitinhas” para os campos agregados
+    const motivoParts: string[] = [];
+    if (extras.motivoSubstituicao === 'true') motivoParts.push('Substituição');
+    if (extras.motivoAumentoQuadro === 'true') motivoParts.push('Aumento de quadro');
 
-      // --------- MONTA payload.campos (RQ_063) ---------
-      const payloadCampos: Record<string, any> = {
+    const tipoContrParts: string[] = [];
+    if (extras.contratacaoTemporaria === 'true') tipoContrParts.push('Temporária');
+    if (extras.contratacaoPermanente === 'true') tipoContrParts.push('Permanente');
+
+    const enxovalParts: string[] = [];
+    if (extras.solicitacaoCracha === 'true') enxovalParts.push('Crachá');
+    if (extras.solicitacaoRepublica === 'true') enxovalParts.push('República');
+    if (extras.solicitacaoUniforme === 'true') enxovalParts.push('Uniforme');
+    if (extras.solicitacaoTesteDirecao === 'true') enxovalParts.push('Teste direção');
+    if (extras.solicitacaoEpis === 'true') enxovalParts.push('EPIs');
+    if (extras.solicitacaoPostoTrabalho === 'true')
+      enxovalParts.push('Ponto / Posto de trabalho');
+
+    // === AQUI É O FORMATO QUE O MODAL ESPERA ===
+    const payload = {
+      solicitante: {
+        fullName: me?.fullName ?? '',
+        email: me?.email ?? '',
+        login: me?.login ?? '',
+        phone: me?.phone ?? '',
+        costCenterText: me?.costCenterName ?? '',
+      },
+      campos: {
+        // guarda tudo cru também, se quiser aproveitar em outras telas
         ...extras,
 
-        // garante campos que o backend usa pra aprovação
+        // CHAVES QUE O RQ063ResumoCampos USA:
+        cargo: cargoSelecionado,
+        setorProjeto: extras.setorProjeto ?? '',
+        localTrabalho: extras.localTrabalho ?? '',
+        horarioTrabalho: extras.horarioTrabalho ?? '',
+
         vagaPrevistaContrato: extras.vagaPrevista ?? '',
-        vagaPrevista: extras.vagaPrevista ?? '',
 
-        // infos auxiliares
-        cargo: extras.cargoNome ?? '',
-        centroCustoId: centroId,
-        departmentId: departamentoId,
-        positionId: cargoId || null,
-      };
+        motivoVaga: motivoParts.join(' / '),
+        tipoContratacao: tipoContrParts.join(' / '),
 
-      const body = {
-        // quem abriu
-        solicitanteId: me.id,
+        principaisAtividades: extras.principaisAtividades ?? '',
+        atividadesComplementares: extras.atividadesComplementares ?? '',
 
-        // destino
-        costCenterId: centroId,
-        departmentId: departamentoId,
+        escolaridade: extras.escolaridade ?? '',
+        curso: extras.curso ?? '',
+        periodoModulo: extras.periodoModulo ?? '',
 
-        // tipo
-        tipoId,
+        requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
+        competenciasComportamentais:
+          extras.competenciasComportamentais ?? '',
 
-        // tudo que é “conteúdo” da solicitação
-        payload: {
-          solicitante: payloadSolicitante,
-          campos: payloadCampos,
-        },
-      };
+        enxoval: enxovalParts.join(' / '),
+        outros: extras.solicitacaoOutros ?? '',
 
-      const res = await fetch('/api/solicitacoes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
+        observacoes: extras.observacoesRh ?? '',
+      },
+    };
 
-      if (!res.ok) {
-        let msg = 'Falha ao registrar a solicitação.';
-        try {
-          const json = await res.json();
-          if (json?.error) msg = json.error;
-        } catch {
-          // ignore parse error
-        }
-        throw new Error(msg);
+    const body = {
+      solicitanteId: me?.id ?? null,
+      costCenterId: centroId,
+      departmentId: departamentoId,
+      tipoId,
+      payload, // 👈 agora vai tudo dentro de payload
+    };
+
+    const res = await fetch('/api/solicitacoes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      let msg = 'Falha ao registrar a solicitação.';
+      try {
+        const json = await res.json();
+        if (json?.error) msg = json.error;
+      } catch {
+        // ignore
       }
-
-      const data = await res.json();
-      console.log('Solicitação criada:', data);
-
-      router.push('/dashboard/solicitacoes/enviadas');
-    } catch (err: any) {
-      console.error('Erro ao enviar solicitação', err);
-      setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
-    } finally {
-      setSubmitting(false);
+      throw new Error(msg);
     }
-  };
+
+    const data = await res.json();
+    console.log('Solicitação criada:', data);
+
+    router.push('/dashboard/solicitacoes/enviadas');
+  } catch (err: any) {
+    console.error('Erro ao enviar solicitação', err);
+    setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   /* ============================================================
    RENDER

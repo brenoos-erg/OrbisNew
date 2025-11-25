@@ -964,8 +964,49 @@ function RQ063ResumoCampos({
 }: {
   payloadCampos: Record<string, any>
 }) {
-  const get = (key: string) =>
-    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+  // helper para pegar a primeira chave que tiver valor
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = payloadCampos[k]
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        return String(v)
+      }
+    }
+    return ''
+  }
+
+  // helpers para campos booleanos salvos como 'true' / 'false'
+  const pickBoolLabel = (key: string) => {
+    const v = payloadCampos[key]
+    if (v === true || v === 'true') return 'Sim'
+    if (v === false || v === 'false') return 'Não'
+    return ''
+  }
+
+  // Motivo da vaga (checkboxes + texto)
+  const buildMotivoVaga = () => {
+    const motivos: string[] = []
+
+    if (payloadCampos.motivoSubstituicao === 'true')
+      motivos.push('Substituição')
+    if (payloadCampos.motivoAumentoQuadro === 'true')
+      motivos.push('Aumento de quadro')
+
+    const base = motivos.join(' / ')
+    const just = pick('justificativaVaga')
+
+    if (base && just) return `${base} - ${just}`
+    if (base) return base
+    return just
+  }
+
+  // Tipo de contratação (temporária / permanente)
+  const buildContratacao = () => {
+    const partes: string[] = []
+    if (payloadCampos.contratacaoTemporaria === 'true') partes.push('Temporária')
+    if (payloadCampos.contratacaoPermanente === 'true') partes.push('Permanente')
+    return partes.join(' / ')
+  }
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -978,66 +1019,95 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Informações básicas
         </p>
+
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Cargo</label>
-            <input className={INPUT_RO} readOnly value={get('cargo')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Setor / Projeto</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('setorProjeto')}
+              value={pick('cargo', 'cargoNome')}
             />
           </div>
-          <div>
-            <label className={LABEL_RO}>Local de Trabalho</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('localTrabalho')}
-            />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Horário de Trabalho</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('horarioTrabalho')}
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Motivo / contratação */}
-      <div className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Motivo da vaga / Contratação
-        </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Setor e/ou Projeto</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('setorProjeto')}
+            />
+          </div>
+
           <div>
             <label className={LABEL_RO}>Vaga prevista em contrato?</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('vagaPrevistaContrato')}
+              value={pick('vagaPrevistaContrato', 'vagaPrevista')}
             />
           </div>
+
+          <div>
+            <label className={LABEL_RO}>Local de Trabalho</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('localTrabalho')}
+            />
+          </div>
+
+          <div>
+            <label className={LABEL_RO}>Horário de Trabalho</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('horarioTrabalho')}
+            />
+          </div>
+
+          <div>
+            <label className={LABEL_RO}>Coordenador do Contrato</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('coordenadorContrato')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Motivo da vaga / Contratação */}
+      <div className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Motivo da vaga / Contratação
+        </p>
+
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Motivo da vaga</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('motivoVaga')}
+              value={buildMotivoVaga()}
             />
           </div>
+
           <div>
-            <label className={LABEL_RO}>Tipo de contratação</label>
+            <label className={LABEL_RO}>Contratação</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('tipoContratacao')}
+              value={buildContratacao()}
+            />
+          </div>
+
+          <div>
+            <label className={LABEL_RO}>Justificativa da vaga</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('justificativaVaga')}
             />
           </div>
         </div>
@@ -1054,7 +1124,7 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={get('principaisAtividades')}
+              value={pick('principaisAtividades')}
             />
           </div>
           <div>
@@ -1062,7 +1132,7 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={get('atividadesComplementares')}
+              value={pick('atividadesComplementares')}
             />
           </div>
         </div>
@@ -1073,27 +1143,52 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Requisitos acadêmicos
         </p>
+
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Escolaridade</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('escolaridade')}
+              value={pick('escolaridade')}
             />
           </div>
           <div>
             <label className={LABEL_RO}>Curso</label>
-            <input className={INPUT_RO} readOnly value={get('curso')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Período / Módulo</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('periodoModulo')}
+              value={pick('curso')}
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2 mt-3">
+          <div>
+            <label className={LABEL_RO}>Escolaridade completa?</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pickBoolLabel('escolaridadeCompleta')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Curso em andamento?</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pickBoolLabel('cursoEmAndamento')}
+            />
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <label className={LABEL_RO}>Período / Módulo - mínimo ou máximo</label>
+          <input
+            className={INPUT_RO}
+            readOnly
+            value={pick('periodoModulo')}
+          />
         </div>
       </div>
 
@@ -1110,7 +1205,7 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={get('requisitosConhecimentos')}
+              value={pick('requisitosConhecimentos')}
             />
           </div>
           <div>
@@ -1120,38 +1215,54 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={get('competenciasComportamentais')}
+              value={pick('competenciasComportamentais')}
             />
           </div>
         </div>
       </div>
 
-      {/* Enxoval / uniforme / outros */}
+      {/* Solicitações para o novo funcionário */}
       <div className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Solicitações para o novo funcionário
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
-            <label className={LABEL_RO}>Enxoval / EPIs / Uniforme</label>
+            <label className={LABEL_RO}>Crachá</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('enxoval')}
+              value={pickBoolLabel('solicitacaoCracha')}
             />
           </div>
           <div>
-            <label className={LABEL_RO}>Outros</label>
+            <label className={LABEL_RO}>República</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={get('outros')}
+              value={pickBoolLabel('solicitacaoRepublica')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Uniforme</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pickBoolLabel('solicitacaoUniforme')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Outros (descrever)</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={pick('solicitacaoOutros')}
             />
           </div>
         </div>
       </div>
 
-      {/* Observações finais */}
+      {/* Observações (RH etc.) */}
       <div>
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Observações
@@ -1159,7 +1270,7 @@ function RQ063ResumoCampos({
         <textarea
           className={`${INPUT_RO} min-h-[70px]`}
           readOnly
-          value={get('observacoes')}
+          value={pick('observacoesRh', 'observacoes')}
         />
       </div>
     </div>
