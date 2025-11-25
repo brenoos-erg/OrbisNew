@@ -216,6 +216,34 @@ function formatDate(dateStr?: string | null) {
   }
 }
 
+// ===== Helpers de Status =====
+
+function getStatusLabel(s: {
+  status: string
+  approvalStatus: ApprovalStatus | null
+  assumidaPorId?: string | null
+}) {
+  // Aguardando atendimento: já aprovado, mas ninguém assumiu ainda
+  if (
+    s.status === 'ABERTA' &&
+    s.approvalStatus === 'APROVADO' &&
+    !s.assumidaPorId
+  ) {
+    return 'Aguardando atendimento'
+  }
+
+  // Mapeia os demais status normalmente
+  const map: Record<string, string> = {
+    ABERTA: 'Aberta',
+    EM_ATENDIMENTO: 'Em atendimento',
+    AGUARDANDO_APROVACAO: 'Aguardando aprovação',
+    CONCLUIDA: 'Concluída',
+    CANCELADA: 'Cancelada',
+  }
+
+  return map[s.status] ?? s.status
+}
+
 // ===== PROPS DO MODAL =====
 
 type Props = {
@@ -225,6 +253,7 @@ type Props = {
   detail: SolicitationDetail | null
   loading: boolean
   error: string | null
+  mode?: 'default' | 'approval'
 }
 
 export function SolicitationDetailModal({
@@ -234,8 +263,11 @@ export function SolicitationDetailModal({
   detail,
   loading,
   error,
+  mode = 'default',
 }: Props) {
   if (!isOpen || !row) return null
+
+  const isApprovalMode = mode === 'approval'
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -260,6 +292,15 @@ export function SolicitationDetailModal({
     effectiveStatus,
     approvalStatus,
   )
+
+  const statusLabel = getStatusLabel({
+    status: effectiveStatus,
+    approvalStatus,
+    assumidaPorId:
+      (detail as any)?.assumidaPorId ??
+      row.responsavelId ??
+      null,
+  })
 
   const payload = (detail?.payload ?? {}) as Payload
   const payloadSolic = payload.solicitante ?? {}
@@ -364,6 +405,63 @@ export function SolicitationDetailModal({
     }
   }
 
+  // Aprovação pelo gestor (modo approval)
+  async function handleAprovarGestor() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(
+        `/api/solicitacoes/${solicitationId}/aprovar`,
+        { method: 'POST' },
+      )
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao aprovar a solicitação.')
+      }
+
+      setCloseSuccess('Solicitação aprovada com sucesso.')
+    } catch (err: any) {
+      console.error('Erro ao aprovar', err)
+      setCloseError(err?.message ?? 'Erro ao aprovar a solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  async function handleReprovarGestor() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(
+        `/api/solicitacoes/${solicitationId}/reprovar`,
+        { method: 'POST' },
+      )
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao reprovar a solicitação.')
+      }
+
+      setCloseSuccess('Solicitação reprovada.')
+    } catch (err: any) {
+      console.error('Erro ao reprovar', err)
+      setCloseError(err?.message ?? 'Erro ao reprovar a solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
@@ -382,35 +480,57 @@ export function SolicitationDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {canAssumir && (
-              <button
-                onClick={handleAssumirChamado}
-                disabled={assumindo}
-                className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
-              >
-                {assumindo ? 'Assumindo...' : 'Assumir chamado'}
-              </button>
-            )}
+            {isApprovalMode ? (
+              <>
+                <button
+                  onClick={handleAprovarGestor}
+                  disabled={closing}
+                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  Aprovar
+                </button>
 
-            {canEnviarDp && (
-              <button
-                onClick={() => setShowContratadoForm((v) => !v)}
-                className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                {showContratadoForm
-                  ? 'Ocultar dados do contratado'
-                  : 'Dados do contratado'}
-              </button>
-            )}
+                <button
+                  onClick={handleReprovarGestor}
+                  disabled={closing}
+                  className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+                >
+                  Reprovar
+                </button>
+              </>
+            ) : (
+              <>
+                {canAssumir && (
+                  <button
+                    onClick={handleAssumirChamado}
+                    disabled={assumindo}
+                    className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                  >
+                    {assumindo ? 'Assumindo...' : 'Assumir chamado'}
+                  </button>
+                )}
 
-            {canEnviarDp && (
-              <button
-                onClick={handleFinalizarRh}
-                disabled={closing}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-              >
-                {closing ? 'Enviando...' : 'Enviar para o DP'}
-              </button>
+                {canEnviarDp && (
+                  <button
+                    onClick={() => setShowContratadoForm((v) => !v)}
+                    className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    {showContratadoForm
+                      ? 'Ocultar dados do contratado'
+                      : 'Dados do contratado'}
+                  </button>
+                )}
+
+                {canEnviarDp && (
+                  <button
+                    onClick={handleFinalizarRh}
+                    disabled={closing}
+                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                  >
+                    {closing ? 'Enviando...' : 'Enviar para o DP'}
+                  </button>
+                )}
+              </>
             )}
 
             <button
@@ -482,7 +602,7 @@ export function SolicitationDetailModal({
                   <input
                     className={INPUT_RO}
                     readOnly
-                    value={effectiveStatus}
+                    value={statusLabel}
                   />
                 </div>
                 <div>
@@ -838,9 +958,6 @@ export function SolicitationDetailModal({
 /**
  * Bloco específico para exibir os campos da RQ_063 - Solicitação de Pessoal
  * usando os valores salvos em payload.campos.
- *
- * IMPORTANTE: ajuste as chaves (get('...')) para bater exatamente
- * com o que você está salvando na criação da solicitação.
  */
 function RQ063ResumoCampos({
   payloadCampos,

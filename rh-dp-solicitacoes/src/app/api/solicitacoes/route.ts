@@ -8,13 +8,12 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Gera um código de protocolo simples, ex: RQ2502-0001
- * Ajuste se quiser outro padrão.
  */
 function generateProtocolo() {
   const now = new Date()
   const yy = now.getFullYear().toString().slice(-2)
   const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
+  const dd = String(now.getDate()).toString().padStart(2, '0')
   const rand = Math.floor(Math.random() * 9999)
     .toString()
     .padStart(4, '0')
@@ -36,31 +35,20 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const status = searchParams.get('status')
   const text = searchParams.get('text')
 
-  // Período de abertura
   if (dateStart || dateEnd) {
     where.dataAbertura = {}
     if (dateStart) {
       where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
     }
     if (dateEnd) {
-      // adiciona 1 dia para incluir o dia final inteiro
       const end = new Date(dateEnd + 'T23:59:59')
       where.dataAbertura.lte = end
     }
   }
 
-  if (centerId) {
-    where.costCenterId = centerId
-  }
-
-  if (tipoId) {
-    where.tipoId = tipoId
-  }
-
-  if (status) {
-    // precisa bater com o enum SolicitationStatus
-    where.status = status
-  }
+  if (centerId) where.costCenterId = centerId
+  if (tipoId) where.tipoId = tipoId
+  if (status) where.status = status
 
   if (protocolo) {
     where.protocolo = {
@@ -73,16 +61,10 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     where.solicitante = {
       OR: [
         {
-          fullName: {
-            contains: solicitante,
-            mode: 'insensitive',
-          },
+          fullName: { contains: solicitante, mode: 'insensitive' },
         },
         {
-          email: {
-            contains: solicitante,
-            mode: 'insensitive',
-          },
+          email: { contains: solicitante, mode: 'insensitive' },
         },
       ],
     }
@@ -91,16 +73,10 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (text) {
     const or: any[] = [
       {
-        titulo: {
-          contains: text,
-          mode: 'insensitive',
-        },
+        titulo: { contains: text, mode: 'insensitive' },
       },
       {
-        descricao: {
-          contains: text,
-          mode: 'insensitive',
-        },
+        descricao: { contains: text, mode: 'insensitive' },
       },
     ]
     if (where.OR) {
@@ -119,7 +95,6 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-
     const { searchParams } = new URL(req.url)
 
     const page = Math.max(
@@ -130,17 +105,9 @@ export async function GET(req: NextRequest) {
       Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
 
     const skip = (page - 1) * pageSize
-
     const where = buildWhereFromSearchParams(searchParams)
 
-    const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve, etc.
-
-    /**
-     * ESCOPOS
-     * sent      -> solicitações que EU abri
-     * received  -> solicitações para os MEUS centros de custo
-     * to-approve-> solicitações pendentes de aprovação por MIM
-     */
+    const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
 
     if (scope === 'sent') {
       where.solicitanteId = me.id
@@ -168,7 +135,8 @@ export async function GET(req: NextRequest) {
     } else if (scope === 'to-approve') {
       where.requiresApproval = true
       where.approvalStatus = 'PENDENTE'
-      where.approverId = me.id
+      // se quiser filtrar por aprovador:
+      // where.approverId = me.id
     }
 
     const [solicitations, total] = await Promise.all([
@@ -197,7 +165,9 @@ export async function GET(req: NextRequest) {
       tipo: s.tipo ? { nome: s.tipo.nome } : null,
 
       responsavelId: s.assumidaPor?.id ?? null,
-      responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+      responsavel: s.assumidaPor
+        ? { fullName: s.assumidaPor.fullName }
+        : null,
 
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
@@ -208,10 +178,7 @@ export async function GET(req: NextRequest) {
       approvalStatus: s.approvalStatus,
     }))
 
-    return NextResponse.json({
-      rows,
-      total,
-    })
+    return NextResponse.json({ rows, total })
   } catch (e) {
     console.error('GET /api/solicitacoes error', e)
     return NextResponse.json(
@@ -222,32 +189,52 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Acha o aprovador: usuário nível 3 vinculado ao centro de custo.
- * Se não encontrar ninguém nesse centro, pega qualquer usuário nível 3.
- *
- * ⚠️ Ajuste o nome do campo de nível na tabela User se for diferente de "level".
+ * Acha um "aprovador nível 3" vinculado ao centro de custo,
+ * ou qualquer usuário como fallback.
  */
-async function findLevel3ApproverForCostCenter(costCenterId: string) {
-  // primeiro, usuários vinculados ao centro de custo
-  const links = await prisma.userCostCenter.findMany({
-    where: { costCenterId },
-    include: {
-      user: true,
-    },
-  })
+async function findLevel3ApproverForCostCenter(costCenterId?: string | null) {
+  if (costCenterId) {
+    const link = await prisma.userCostCenter.findFirst({
+      where: { costCenterId },
+      include: { user: true },
+    })
 
-  const level3FromCC = links
-    .map((l) => l.user)
-    .find((u: any) => u && u.level === 3) // <-- ajuste "level" se o campo tiver outro nome
+    if (link?.user) {
+      return link.user
+    }
+  }
 
-  if (level3FromCC) return level3FromCC
-
-  // fallback: qualquer usuário nível 3
-  const fallback = await prisma.user.findFirst({
-    where: { level: 3 }, // <-- ajuste "level" se precisar
-  })
-
+  // fallback: qualquer usuário
+  const fallback = await prisma.user.findFirst()
   return fallback
+}
+
+/**
+ * Monta o payload padrão com dados do solicitante + campos do formulário
+ */
+async function buildPayload(
+  solicitanteId: string,
+  campos: Record<string, any>,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: solicitanteId },
+    include: { costCenter: true },
+  })
+
+  return {
+    solicitante: {
+      fullName: user?.fullName ?? '',
+      email: user?.email ?? '',
+      login: user?.login ?? '',
+      phone: user?.phone ?? '',
+      costCenterText: user?.costCenter
+        ? `${user.costCenter.code ? user.costCenter.code + ' - ' : ''}${
+            user.costCenter.description
+          }`
+        : '',
+    },
+    campos,
+  }
 }
 
 /**
@@ -261,7 +248,7 @@ export async function POST(req: NextRequest) {
     const costCenterId = body.costCenterId as string | undefined
     const departmentId = body.departmentId as string | undefined
     const solicitanteId = body.solicitanteId as string | undefined
-    const payload = body.payload ?? {}
+    const campos = (body.campos ?? {}) as Record<string, any>
 
     if (!tipoId || !costCenterId || !departmentId || !solicitanteId) {
       return NextResponse.json(
@@ -285,11 +272,13 @@ export async function POST(req: NextRequest) {
     }
 
     const protocolo = generateProtocolo()
-
     const titulo = tipo.nome
     const descricao = null
 
-    // 1) cria a solicitação básica (status default = ABERTA)
+    // monta o payload com dados do solicitante + campos do formulário
+    const payload: any = await buildPayload(solicitanteId, campos)
+
+    // 1) cria a solicitação básica
     const created = await prisma.solicitation.create({
       data: {
         protocolo,
@@ -315,12 +304,24 @@ export async function POST(req: NextRequest) {
 
     // 3) Regras específicas para RQ_063 - Solicitação de Pessoal
     if (tipo.nome === 'RQ_063 - Solicitação de Pessoal') {
-      // front manda: campos.vagaPrevista = 'SIM' | 'NAO'
-      const raw = payload?.campos?.vagaPrevista as string | undefined
-      const vagaPrevista = raw?.toUpperCase()
+      const rawCampo =
+        (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
+        (payload?.campos?.vagaPrevista as string | undefined) ??
+        ''
 
-      if (vagaPrevista === 'SIM') {
-        // vaga já prevista em contrato -> não precisa aprovação
+      const normalized = rawCampo
+        ? rawCampo
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toUpperCase()
+        : ''
+
+      const isSim = normalized === 'SIM' || normalized === 'S'
+
+      if (isSim) {
+        // vaga já prevista em contrato -> aprovação automática
         const updated = await prisma.solicitation.update({
           where: { id: created.id },
           data: {
@@ -328,7 +329,7 @@ export async function POST(req: NextRequest) {
             approvalStatus: 'APROVADO',
             approvalAt: new Date(),
             approverId: null,
-            status: 'ABERTA', // já vai direto para atendimento
+            status: 'ABERTA',
           },
         })
 
@@ -344,35 +345,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(updated, { status: 201 })
       }
 
-      if (vagaPrevista === 'NAO') {
-        // NÃO prevista em contrato -> precisa passar para o usuário nível 3
-        const approver = await findLevel3ApproverForCostCenter(costCenterId)
-        const approverId = approver?.id ?? null
+      // qualquer coisa diferente de SIM exige aprovação
+      const approver = await findLevel3ApproverForCostCenter(costCenterId)
+      const approverId = approver?.id ?? null
 
-        const updated = await prisma.solicitation.update({
-          where: { id: created.id },
-          data: {
-            requiresApproval: true,
-            approvalStatus: 'PENDENTE',
-            approverId,
-            status: 'AGUARDANDO_APROVACAO',
-          },
-        })
+      const updated = await prisma.solicitation.update({
+        where: { id: created.id },
+        data: {
+          requiresApproval: true,
+          approvalStatus: 'PENDENTE',
+          approverId,
+          status: 'AGUARDANDO_APROVACAO',
+        },
+      })
 
-        await prisma.event.create({
-          data: {
-            id: crypto.randomUUID(),
-            solicitationId: created.id,
-            actorId: approverId ?? solicitanteId,
-            tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-          },
-        })
+      await prisma.event.create({
+        data: {
+          id: crypto.randomUUID(),
+          solicitationId: created.id,
+          actorId: approverId ?? solicitanteId,
+          tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+        },
+      })
 
-        return NextResponse.json(updated, { status: 201 })
-      }
+      return NextResponse.json(updated, { status: 201 })
     }
 
-    // Se não for RQ_063 (ou não tiver o campo vagaPrevista), devolve a criada normal
+    // 4) Se não for RQ_063, devolve a criada normal
     return NextResponse.json(created, { status: 201 })
   } catch (e) {
     console.error('POST /api/solicitacoes error', e)

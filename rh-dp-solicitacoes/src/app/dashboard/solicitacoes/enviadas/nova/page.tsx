@@ -269,115 +269,134 @@ export default function NovaSolicitacaoPage() {
    6) SUBMIT
   ============================================================ */
   const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  // validação básica extra (além do required do HTML)
-  if (!centroId || !departamentoId || !tipoId) {
-    setSubmitError(
-      'Preencha Centro de Custo, Departamento e Tipo de Solicitação.'
-    );
-    return;
-  }
-
-  if (isRQ063 && !cargoId) {
-    setSubmitError('Selecione o cargo para continuar.');
-    return;
-  }
-
-  setSubmitError(null);
-  setSubmitting(true);
-
-  try {
-    const body = {
-      // quem abriu
-      solicitanteId: me?.id ?? null,
-
-      // para qual centro de custo o chamado vai
-      costCenterId: centroId,
-      departmentId: departamentoId,
-
-      // tipo de solicitação
-      tipoId,
-
-      // cargo selecionado (RQ_063)
-      positionId: cargoId || null,
-
-      // campos específicos do formulário (RQ_063)
-      campos: extras,
-
-      // fluxo de aprovação
-      needsApproval: true,   // se sua API usar uma flag assim
-      approvalLevel: 3,      // nível de aprovação (Vidal = nível 3)
-    };
-
-    const res = await fetch('/api/solicitacoes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      let msg = 'Falha ao registrar a solicitação.';
-      try {
-        const json = await res.json();
-        if (json?.error) msg = json.error;
-      } catch {
-        // ignora erro de parse
-      }
-      throw new Error(msg);
+    if (!me?.id) {
+      setSubmitError('Não foi possível identificar o solicitante (usuário logado).');
+      return;
     }
 
-    // se quiser ver o retorno:
-    const data = await res.json();
-    console.log('Solicitação criada:', data);
+    // validação básica extra
+    if (!centroId || !departamentoId || !tipoId) {
+      setSubmitError(
+        'Preencha Centro de Custo, Departamento e Tipo de Solicitação.'
+      );
+      return;
+    }
 
-    // redireciona para a lista de enviadas
-    router.push('/dashboard/solicitacoes/enviadas');
-  } catch (err: any) {
-    console.error('Erro ao enviar solicitação', err);
-    setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
-  } finally {
-    setSubmitting(false);
-  }
-};
+    if (isRQ063 && !cargoId) {
+      setSubmitError('Selecione o cargo para continuar.');
+      return;
+    }
 
+    setSubmitError(null);
+    setSubmitting(true);
+
+    try {
+      // --------- MONTA payload.solicitante ---------
+      const payloadSolicitante = {
+        fullName: me.fullName,
+        email: me.email,
+        login: me.login,
+        phone: me.phone ?? '',
+        costCenterText: me.costCenterName ?? '',
+      };
+
+      // --------- MONTA payload.campos (RQ_063) ---------
+      const payloadCampos: Record<string, any> = {
+        ...extras,
+
+        // garante campos que o backend usa pra aprovação
+        vagaPrevistaContrato: extras.vagaPrevista ?? '',
+        vagaPrevista: extras.vagaPrevista ?? '',
+
+        // infos auxiliares
+        cargo: extras.cargoNome ?? '',
+        centroCustoId: centroId,
+        departmentId: departamentoId,
+        positionId: cargoId || null,
+      };
+
+      const body = {
+        // quem abriu
+        solicitanteId: me.id,
+
+        // destino
+        costCenterId: centroId,
+        departmentId: departamentoId,
+
+        // tipo
+        tipoId,
+
+        // tudo que é “conteúdo” da solicitação
+        payload: {
+          solicitante: payloadSolicitante,
+          campos: payloadCampos,
+        },
+      };
+
+      const res = await fetch('/api/solicitacoes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        let msg = 'Falha ao registrar a solicitação.';
+        try {
+          const json = await res.json();
+          if (json?.error) msg = json.error;
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      console.log('Solicitação criada:', data);
+
+      router.push('/dashboard/solicitacoes/enviadas');
+    } catch (err: any) {
+      console.error('Erro ao enviar solicitação', err);
+      setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   /* ============================================================
    RENDER
   ============================================================ */
   return (
     <main className="p-8">
-      {/* Agora o FORM envolve tudo, inclusive o cabeçalho com o botão */}
       <form
         id="form-solicitacao"
         onSubmit={handleSubmit}
         className="space-y-4"
       >
-        {/* HEADER COM BOTÃO NO TOPO DIREITA */}
+        {/* HEADER */}
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-semibold">Nova Solicitação</h1>
 
           <button
             type="submit"
             className="bg-orange-500 text-white rounded px-4 py-2 text-sm shadow-md disabled:opacity-60"
-            disabled={submitting || !tipoId} // desabilita enquanto envia ou sem tipo
+            disabled={submitting || !tipoId}
           >
             {submitting ? 'Enviando...' : 'Enviar Solicitação'}
           </button>
         </div>
 
-        {/* mensagem de erro de envio */}
         {submitError && (
           <p className="text-sm text-red-600 mb-2">{submitError}</p>
         )}
 
-        {/* TOPO: CABEÇALHO + CARD DADOS DO SOLICITANTE */}
+        {/* TOPO: CABEÇALHO + SOLICITANTE */}
         <div className="grid grid-cols-[2fr_minmax(320px,1fr)] gap-8 items-start mb-4">
           {/* ESQUERDA – Centro / Depto / Tipo */}
           <div className="space-y-4">
-            {/* Centro de Custo */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 CENTRO DE CUSTO <span className="text-red-500">*</span>
@@ -398,7 +417,6 @@ export default function NovaSolicitacaoPage() {
               </select>
             </div>
 
-            {/* Departamento */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 DEPARTAMENTO <span className="text-red-500">*</span>
@@ -418,7 +436,6 @@ export default function NovaSolicitacaoPage() {
               </select>
             </div>
 
-            {/* Tipo de Solicitação */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 TIPO DE SOLICITAÇÃO <span className="text-red-500">*</span>
@@ -440,7 +457,7 @@ export default function NovaSolicitacaoPage() {
             </div>
           </div>
 
-          {/* DIREITA – CARD DADOS DO SOLICITANTE */}
+          {/* DIREITA – Dados do Solicitante */}
           <aside className="border rounded-lg p-4 bg-white shadow-sm">
             <h2 className="text-sm font-semibold mb-3">
               Dados do Solicitante

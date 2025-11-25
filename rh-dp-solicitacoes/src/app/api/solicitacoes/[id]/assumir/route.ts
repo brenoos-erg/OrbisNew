@@ -35,8 +35,10 @@ export async function POST(
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
-        approverId: me.id,          // 🔹 aqui vira o ATENDENTE
-        status: 'EM_ATENDIMENTO',   // 🔹 aí sim entra em atendimento
+        // 👇 responsável pelo atendimento
+        assumidaPorId: me.id,
+        assumidaEm: new Date(),
+        status: 'EM_ATENDIMENTO',
       },
     })
 

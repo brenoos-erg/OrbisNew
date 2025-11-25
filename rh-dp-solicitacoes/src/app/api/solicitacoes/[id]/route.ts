@@ -55,15 +55,18 @@ export async function GET(
 
     // Mapeia para o formato que o front espera
     const result = {
-      id: item.id,
-      protocolo: item.protocolo,
-      titulo: item.titulo,
-      descricao: item.descricao,
-      status: item.status,
-      dataAbertura: item.dataAbertura?.toISOString(),
-      dataPrevista: item.dataPrevista?.toISOString() ?? null,
-      dataFechamento: item.dataFechamento?.toISOString() ?? null,
-      dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
+  id: item.id,
+  protocolo: item.protocolo,
+  titulo: item.titulo,
+  descricao: item.descricao,
+
+  status: item.status,
+  approvalStatus: item.approvalStatus,   // 👈 ADICIONAR ISSO
+
+  dataAbertura: item.dataAbertura?.toISOString(),
+  dataPrevista: item.dataPrevista?.toISOString() ?? null,
+  dataFechamento: item.dataFechamento?.toISOString() ?? null,
+  dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
       tipo: item.tipo
         ? {
             id: item.tipo.id,
