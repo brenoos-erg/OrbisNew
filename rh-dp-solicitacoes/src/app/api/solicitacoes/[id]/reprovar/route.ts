@@ -42,20 +42,6 @@ export const POST = withModuleLevel<RouteParams>(
         solicit.approvalStatus === 'PENDENTE' ||
         solicit.status === 'AGUARDANDO_APROVACAO'
 
-      if (!isPendingApproval) {
-        return NextResponse.json(
-          { error: 'Solicitação não está pendente de aprovação.' },
-          { status: 400 },
-        )
-      }
-
-      if (solicit.approverId && solicit.approverId !== me.id) {
-        return NextResponse.json(
-          { error: 'Você não é o aprovador desta solicitação.' },
-          { status: 403 },
-        )
-      }
-
       const updated = await prisma.solicitation.update({
         where: { id: solicitationId },
         data: {

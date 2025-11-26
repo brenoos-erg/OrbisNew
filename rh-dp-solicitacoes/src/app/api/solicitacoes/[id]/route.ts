@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
+import { getUserModuleLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -184,8 +186,15 @@ export async function PATCH(
       )
     }
 
-    // Se tiver aprovador definido, só ele pode reprovar
-    if (solicitation.approverId && solicitation.approverId !== me.id) {
+    // Se tiver aprovador definido, só ele pode reprovar — exceto nível 3
+    const moduleLevel = await getUserModuleLevel(me.id, 'solicitacoes')
+    const isNivel3 = moduleLevel === ModuleLevel.NIVEL_3
+
+    if (
+      solicitation.approverId &&
+      solicitation.approverId !== me.id &&
+      !isNivel3
+    ) {
       return NextResponse.json(
         { error: 'Você não é o aprovador desta solicitação.' },
         { status: 403 },

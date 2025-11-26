@@ -353,11 +353,13 @@ const camposSchema: CampoEspecifico[] =
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-    const comment = window.prompt(
+    
+    const comment = (window.prompt(
       'Informe o motivo da reprovação (obrigatório):',
-    )
+    ) ?? '')
+      .trim()
 
-    if (!comment || comment.trim().length === 0) {
+    if (comment.length === 0) {
       setCloseError('É necessário informar um comentário para reprovar.')
       return
     }
@@ -417,21 +419,7 @@ const camposSchema: CampoEspecifico[] =
   async function handleAprovarGestor() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-    const rawComment = window.prompt(
-      'Informe o motivo da reprovação (obrigatório):',
-    )
-
-    if (!rawComment) {
-      setCloseError('É necessário informar um comentário para reprovar.')
-      return
-    }
-
-    const comment = rawComment.trim()
-
-    if (comment.length === 0) {
-      setCloseError('É necessário informar um comentário para reprovar.')
-      return
-    }
+   
 
     setClosing(true)
     setCloseError(null)
@@ -445,7 +433,6 @@ const camposSchema: CampoEspecifico[] =
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ comment }),
         },
       )
 
@@ -466,6 +453,7 @@ const camposSchema: CampoEspecifico[] =
   async function handleReprovarGestor() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
+    
 
     setClosing(true)
     setCloseError(null)
@@ -479,7 +467,6 @@ const camposSchema: CampoEspecifico[] =
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ comment }),
         },
       )
 

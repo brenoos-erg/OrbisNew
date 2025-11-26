@@ -88,14 +88,7 @@ export default function ApprovalsPage() {
   // ===== AÇÕES DE APROVAR / REPROVAR (botões da lista) =====
   async function handleApprove(e: React.MouseEvent, row: Row) {
     e.stopPropagation() // não abrir o modal ao clicar no botão
-    const comment = window.prompt(
-      'Informe o motivo da reprovação (obrigatório):',
-    )
-
-    if (!comment || comment.trim().length === 0) {
-      alert('É necessário informar um comentário para reprovar.')
-      return
-    }
+    
 
 
     try {
@@ -104,7 +97,6 @@ export default function ApprovalsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ comment }),
 
       })
       if (!res.ok) {
@@ -114,7 +106,7 @@ export default function ApprovalsPage() {
       await loadApprovals()
     } catch (err: any) {
       console.error(err)
-      alert(err?.message ?? 'Erro ao reprovar a solicitação.')
+      alert(err?.message ?? 'Erro ao aprovar a solicitação.')
     }
   }
 
