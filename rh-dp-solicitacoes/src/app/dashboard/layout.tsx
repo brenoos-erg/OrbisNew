@@ -1,28 +1,13 @@
 // src/app/dashboard/layout.tsx
-import type { ReactNode } from 'react'
-import { prisma } from '@/lib/prisma'
+import type { ReactNode } from 'react' 
 import { getCurrentAppUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
-import { ModuleLevel } from '@prisma/client'
-
-type AccessMap = Record<string, ModuleLevel>
-
-async function loadUserModuleAccess(userId: string): Promise<AccessMap> {
-  const rows = await prisma.userModuleAccess.findMany({
-    where: { userId },
-    include: {
-      module: { select: { key: true } },
-    },
-  })
-
-  const map: AccessMap = {}
-  for (const r of rows) {
-    map[r.module.key] = r.level
-  }
-  return map
-}
+import {
+  loadUserModuleAccess,
+  userHasDepartmentOrCostCenter,
+} from '@/lib/moduleAccess'
 
 export default async function DashboardLayout({
   children,
@@ -46,15 +31,22 @@ export default async function DashboardLayout({
   let showConfig = false
   let canApprove = false
 
-  if (appUser.id) {
-    const access = await loadUserModuleAccess(appUser.id)
+ if (appUser.id) {
+    const [access, hasStructure] = await Promise.all([
+      loadUserModuleAccess(appUser.id),
+      userHasDepartmentOrCostCenter(
+        appUser.id,
+        appUser.costCenterId,
+        appUser.departmentId,
+      ),
+    ])
 
     // se tiver qualquer nível no módulo, ele aparece no menu
-    showSolic = !!access['solicitacoes']
+    showSolic = !!access['solicitacoes'] && hasStructure
     showConfig = !!access['configuracoes']
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
-    canApprove = access['solicitacoes'] === 'NIVEL_3'
+     canApprove = access['solicitacoes'] === 'NIVEL_3' && hasStructure
   }
 
   return (

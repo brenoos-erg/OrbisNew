@@ -32,6 +32,7 @@ export async function getCurrentAppUser() {
       status: true,
       role: true,
       costCenterId: true,
+      departmentId: true,
     },
   })
 
@@ -43,13 +44,14 @@ export async function getCurrentAppUser() {
         id: true,
         email: true,
         fullName: true,
-        login: true,
-        phone: true,
-        status: true,
-        role: true,
-        costCenterId: true,
-      },
-    })
+      login: true,
+      phone: true,
+      status: true,
+      role: true,
+      costCenterId: true,
+      departmentId: true,
+    },
+  })
 
     if (userByEmail) {
       await prisma.user.update({
