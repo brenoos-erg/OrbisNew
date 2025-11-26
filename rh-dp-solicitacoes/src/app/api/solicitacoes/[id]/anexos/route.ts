@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
+import { randomUUID } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { supabase } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 const ATTACHMENTS_BUCKET =
   process.env.SUPABASE_ATTACHMENTS_BUCKET || 'attachments'
+
+class HttpError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+type StorageApiError = {
+  message: string
+  statusCode?: number
+  error?: string
+}
 
 async function ensureAttachmentsBucket() {
   const { data: bucket, error } = await supabase.storage.getBucket(
@@ -17,7 +33,10 @@ async function ensureAttachmentsBucket() {
 
   if (bucket) return
 
-  if (error && error.statusCode !== 404) {
+  // 👉 FIX DO TYPE ERROR
+  const err = error as StorageApiError
+
+  if (err && err.statusCode !== 404) {
     throw error
   }
 
@@ -35,6 +54,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const uploadedPaths: string[] = []
+
   try {
     await requireActiveUser()
 
@@ -43,10 +64,7 @@ export async function POST(
     const files = form.getAll('files') as File[]
 
     if (!files || files.length === 0) {
-      return NextResponse.json(
-        { error: 'Envie ao menos um arquivo.' },
-        { status: 400 },
-      )
+      throw new HttpError(400, 'Envie ao menos um arquivo.')
     }
 
     await ensureAttachmentsBucket()
@@ -56,11 +74,10 @@ export async function POST(
     for (const file of files) {
       if (!(file instanceof File)) continue
 
-      const arrayBuffer = await file.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
+      const buffer = Buffer.from(await file.arrayBuffer())
 
       const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
-      const path = `solicitation-${solicitationId}/${crypto.randomUUID()}.${ext}`
+      const path = `solicitation-${solicitationId}/${randomUUID()}.${ext}`
 
       const upload = await supabase.storage
         .from(ATTACHMENTS_BUCKET)
@@ -72,11 +89,10 @@ export async function POST(
 
       if (upload.error) {
         console.error('Erro ao enviar arquivo para storage', upload.error)
-        return NextResponse.json(
-          { error: 'Não foi possível salvar o arquivo.' },
-          { status: 500 },
-        )
+        throw new HttpError(500, 'Não foi possível salvar o arquivo.')
       }
+
+      uploadedPaths.push(path)
 
       const { data } = supabase.storage
         .from(ATTACHMENTS_BUCKET)
@@ -84,14 +100,11 @@ export async function POST(
 
       const publicUrl = data?.publicUrl
       if (!publicUrl) {
-        return NextResponse.json(
-          { error: 'Não foi possível obter a URL do arquivo.' },
-          { status: 500 },
-        )
+        throw new HttpError(500, 'Não foi possível obter a URL do arquivo.')
       }
 
       const attachment: Prisma.AttachmentCreateManyInput = {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         solicitationId,
         filename: file.name,
         url: publicUrl,
@@ -104,20 +117,41 @@ export async function POST(
     }
 
     if (createdAttachments.length === 0) {
-      return NextResponse.json(
-        { error: 'Nenhum arquivo válido enviado.' },
-        { status: 400 },
-      )
+      throw new HttpError(400, 'Nenhum arquivo válido enviado.')
     }
 
     await prisma.attachment.createMany({ data: createdAttachments })
 
     return NextResponse.json({ anexos: createdAttachments })
   } catch (err) {
+    if (uploadedPaths.length > 0) {
+      const { error: cleanupError } = await supabase.storage
+        .from(ATTACHMENTS_BUCKET)
+        .remove(uploadedPaths)
+
+      if (cleanupError) {
+        console.error(
+          'Erro ao limpar uploads após falha na criação de anexos',
+          cleanupError,
+        )
+      }
+    }
+
+    if (err instanceof HttpError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
+
+    const message = err instanceof Error ? err.message : 'Erro ao enviar arquivo(s).'
+
+    if (message === 'Usuário não autenticado') {
+      return NextResponse.json({ error: message }, { status: 401 })
+    }
+
+    if (message === 'Usuário inativo') {
+      return NextResponse.json({ error: message }, { status: 403 })
+    }
+
     console.error('❌ POST /api/solicitacoes/[id]/anexos error', err)
-    return NextResponse.json(
-      { error: 'Erro ao enviar arquivo(s).' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Erro ao enviar arquivo(s).' }, { status: 500 })
   }
 }
