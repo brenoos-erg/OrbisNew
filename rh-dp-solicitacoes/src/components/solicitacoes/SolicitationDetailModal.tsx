@@ -2,7 +2,7 @@
 'use client'
 
 import { format } from 'date-fns'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 const LABEL_RO =
   'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
@@ -261,15 +261,23 @@ export function SolicitationDetailModal({
   isOpen,
   onClose,
   row,
-  detail,
+  detail: detailProp,
   loading,
   error,
   mode = 'default',
-  onActionCompleted,  
+  onActionCompleted,
 }: Props) {
   if (!isOpen || !row) return null
 
   const isApprovalMode = mode === 'approval'
+  const [detail, setDetail] = useState<SolicitationDetail | null>(
+    detailProp,
+  )
+
+  useEffect(() => {
+    setDetail(detailProp)
+  }, [detailProp])
+
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -288,6 +296,10 @@ export function SolicitationDetailModal({
   const [dataAdmissaoPrevista, setDataAdmissaoPrevista] = useState('')
   const [salario, setSalario] = useState('')
   const [cargo, setCargo] = useState('')
+  const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ??
@@ -311,9 +323,9 @@ export function SolicitationDetailModal({
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
 
-const camposSchema: CampoEspecifico[] =
+  const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
-    
+
   // Só RQ_063 segue esse fluxo especial de RH → DP
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
@@ -328,6 +340,60 @@ const camposSchema: CampoEspecifico[] =
   const canEnviarDp = isSolicitacaoPessoal && !isFinalizadaOuCancelada
 
   // ===== AÇÕES =====
+  async function refreshDetailFromServer() {
+    const id = detail?.id ?? row?.id
+    if (!id) return
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${id}`)
+      if (!res.ok) return
+
+      const json = (await res.json()) as SolicitationDetail
+      setDetail(json)
+    } catch (err) {
+      console.error('Erro ao atualizar detalhes após upload', err)
+    }
+  }
+
+  async function handleUploadAnexos() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    if (!filesToUpload || filesToUpload.length === 0) {
+      setUploadError('Selecione ao menos um arquivo para enviar.')
+      return
+    }
+
+    setUploadError(null)
+    setUploadSuccess(null)
+    setUploading(true)
+
+    try {
+      const formData = new FormData()
+      Array.from(filesToUpload).forEach((file) =>
+        formData.append('files', file),
+      )
+
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/anexos`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao enviar arquivo(s).')
+      }
+
+      setUploadSuccess('Arquivo(s) enviados com sucesso.')
+      setFilesToUpload(null)
+      await refreshDetailFromServer()
+    } catch (err: any) {
+      console.error('Erro ao enviar anexos', err)
+      setUploadError(err?.message ?? 'Erro ao enviar arquivo(s).')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function handleAssumirChamado() {
     setAssumindo(true)
@@ -358,7 +424,7 @@ const camposSchema: CampoEspecifico[] =
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-    
+
     const comment = (window.prompt(
       'Informe o motivo da reprovação (obrigatório):',
     ) ?? '')
@@ -424,21 +490,21 @@ const camposSchema: CampoEspecifico[] =
   async function handleAprovarGestor(comment?: string) {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-   
+
 
     setClosing(true)
     setCloseError(null)
     setCloseSuccess(null)
 
-   try {
+    try {
       const res = await fetch(
         `/api/solicitacoes/${solicitationId}/aprovar`,
         {
           method: 'POST',
           headers: comment
             ? {
-                'Content-Type': 'application/json',
-              }
+              'Content-Type': 'application/json',
+            }
             : undefined,
           body: comment ? JSON.stringify({ comment }) : undefined,
         },
@@ -496,7 +562,7 @@ const camposSchema: CampoEspecifico[] =
       setClosing(false)
     }
   }
-   function handleStartApproval(action: 'APROVAR' | 'REPROVAR') {
+  function handleStartApproval(action: 'APROVAR' | 'REPROVAR') {
     setCloseError(null)
     setCloseSuccess(null)
     setApprovalAction(action)
@@ -897,35 +963,35 @@ const camposSchema: CampoEspecifico[] =
               </div>
 
               {/* Formulário do tipo de solicitação */}
-              {/* Formulário do tipo de solicitação / RQ_063 */}
-{isSolicitacaoPessoal ? (
-  <RQ063ResumoCampos payloadCampos={payloadCampos} />
-) : (
-  camposSchema.length > 0 && (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-        Formulário do tipo de solicitação
-      </p>
+                {/* Formulário do tipo de solicitação / RQ_063 */}
+                {isSolicitacaoPessoal ? (
+                  <RQ063ResumoCampos payloadCampos={payloadCampos} />
+                ) : (
+                  camposSchema.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                        Formulário do tipo de solicitação
+                      </p>
 
-      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-        {camposSchema.map((campo) => (
-          <div key={campo.name}>
-            <label className={LABEL_RO}>{campo.label}</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={
-                payloadCampos[campo.name] !== undefined
-                  ? String(payloadCampos[campo.name])
-                  : ''
-              }
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-)}
+                      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                        {camposSchema.map((campo) => (
+                          <div key={campo.name}>
+                            <label className={LABEL_RO}>{campo.label}</label>
+                            <input
+                              className={INPUT_RO}
+                              readOnly
+                              value={
+                                payloadCampos[campo.name] !== undefined
+                                  ? String(payloadCampos[campo.name])
+                                  : ''
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
 
               {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && (
@@ -989,6 +1055,33 @@ const camposSchema: CampoEspecifico[] =
                         onChange={(e) => setSalario(e.target.value)}
                         placeholder="Ex: 3500,00"
                       />
+                    </div>
+                     <div className="space-y-1">
+                      <label className={LABEL_RO}>Anexar documento(s)</label>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => setFilesToUpload(e.target.files)}
+                        className="mt-1 block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                      />
+
+                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={handleUploadAnexos}
+                          disabled={uploading}
+                          className="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-60"
+                        >
+                          {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
+                        </button>
+
+                        {uploadSuccess && (
+                          <span className="text-emerald-600">{uploadSuccess}</span>
+                        )}
+                        {uploadError && (
+                          <span className="text-red-600">{uploadError}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -4,123 +4,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Download, Filter, RefreshCcw, Search, Plus, Info, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
-
-/** ===== TIPOS DA LISTA (tabela) ===== */
-
-type Row = {
-  id: string
-  titulo: string
-  status: string
-  protocolo?: string
-  createdAt: string
-  tipo?: { nome: string } | null
-  responsavel?: { fullName: string } | null
-  responsavelId?: string | null
-  autor?: { fullName: string } | null
-  sla?: string | null
-  setorDestino?: string | null
-}
+import {
+  Row,
+  SolicitationDetail,
+  SolicitationDetailModal,
+} from '@/components/solicitacoes/SolicitationDetailModal'
 
 type ApiResponse = {
   rows: Row[]
   total: number
 }
 
-/** ===== TIPOS DO DETALHE ===== */
-
-type CampoEspecifico = {
-  name: string
-  label: string
-  type: string
-  required?: boolean
-  options?: string[]
-}
-
-type SchemaJson = {
-  camposEspecificos?: CampoEspecifico[]
-}
-
-type PayloadSolicitante = {
-  fullName?: string
-  email?: string
-  login?: string
-  phone?: string
-  costCenterText?: string
-}
-
-type Payload = {
-  campos?: Record<string, any>
-  solicitante?: PayloadSolicitante
-  [key: string]: any
-}
-
-type Attachment = {
-  id: string
-  filename: string
-  url: string
-  mimeType: string
-  sizeBytes: number
-  createdAt: string
-}
-
-type Comment = {
-  id: string
-  texto: string
-  createdAt: string
-  autor?: {
-    id: string
-    fullName: string
-    email: string
-  } | null
-}
-
-type TimelineItem = {
-  id: string
-  status: string
-  message: string | null
-  createdAt: string
-}
-
-type SolicitationDetail = {
-  id: string
-  protocolo: string
-  titulo: string
-  descricao: string | null
-  status: string
-  dataAbertura: string
-  dataPrevista?: string | null
-  dataFechamento?: string | null
-  dataCancelamento?: string | null
-  tipo?: {
-    id: string
-    nome: string
-    descricao?: string | null
-    schemaJson?: SchemaJson
-  } | null
-  costCenter?: {
-    description: string
-  } | null
-  payload?: Payload
-  anexos?: Attachment[]
-  comentarios?: Comment[]
-  timelines?: TimelineItem[]
-}
-
 /** ===== CONSTANTES ===== */
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
-
-const LABEL_RO =
-  'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
-const INPUT_RO =
-  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 focus:outline-none cursor-default'
-
-const STATUS_STEPS = [
-  { id: 'ABERTA', label: 'ABERTA' },
-  { id: 'AGUARDANDO_APROVACAO', label: 'AGUARD. APROVAÇÃO' },
-  { id: 'EM_ATENDIMENTO', label: 'EM ATENDIMENTO' },
-  { id: 'CONCLUIDA', label: 'CONCLUÍDA' },
-]
 
 function escapeCsv(v: string) {
   if (v == null) return ''
@@ -128,14 +25,6 @@ function escapeCsv(v: string) {
   return v
 }
 
-function formatDate(dateStr?: string | null) {
-  if (!dateStr) return '-'
-  try {
-    return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
-  } catch {
-    return '-'
-  }
-}
 
 /** =========================================
  *  PÁGINA
@@ -166,6 +55,7 @@ export default function SentRequestsPage() {
   const [detail, setDetail] = useState<SolicitationDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // combos mockados (trocar depois)
   const centros = useMemo(
@@ -280,6 +170,7 @@ export default function SentRequestsPage() {
 
   async function openDetail(row: Row) {
     setSelectedRow(row)
+    setDetailOpen(true)
     setDetail(null)
     setDetailError(null)
     setDetailLoading(true)
@@ -300,32 +191,12 @@ export default function SentRequestsPage() {
   }
 
   function closeDetail() {
+    setDetailOpen(false)
     setSelectedRow(null)
     setDetail(null)
     setDetailError(null)
   }
 
-   const payload = (detail?.payload ?? {}) as Payload
-  const payloadSolic = payload.solicitante ?? {}
-  const payloadCampos = payload.campos ?? {}
-
-  const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
-  const camposSchema = schema.camposEspecificos ?? []
-  
-  
-
-  const tipoNome = detail?.tipo?.nome ?? selectedRow?.tipo?.nome ?? ''
-  const isSolicitacaoPessoal =
-    tipoNome.toUpperCase().includes('RQ_063') ||
-    tipoNome.toUpperCase().includes('SOLICITAÇÃO DE PESSOAL')
-  void isSolicitacaoPessoal
-  const currentStatus = detail?.status ?? selectedRow?.status ?? 'ABERTA'
-  const isCancelled = currentStatus === 'CANCELADA'
-
-  let activeIndex = 0
-  if (currentStatus === 'AGUARDANDO_APROVACAO') activeIndex = 1
-  else if (currentStatus === 'EM_ATENDIMENTO') activeIndex = 2
-  else if (currentStatus === 'CONCLUIDA') activeIndex = 3
 
   return (
     <div className="space-y-4">
@@ -630,307 +501,17 @@ export default function SentRequestsPage() {
           </div>
         </div>
       </div>
+<SolicitationDetailModal
+        isOpen={detailOpen}
+        onClose={closeDetail}
+        row={selectedRow}
+        detail={detail}
+        loading={detailLoading}
+        error={detailError}
+      />
+      
 
-      {/* ===== MODAL DE DETALHES ===== */}
-      {selectedRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
-            {/* Cabeçalho do modal */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">
-                  Detalhes da Solicitação
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Protocolo {detail?.protocolo ?? selectedRow.protocolo ?? '-'}
-                </p>
-              </div>
-              <button
-                onClick={closeDetail}
-                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
-              >
-                Fechar
-              </button>
-            </div>
-
-            {/* TIMELINE DENTRO DO MODAL */}
-            <div className="px-5 pt-4">
-              <div className="flex items-center gap-4 px-2">
-                {STATUS_STEPS.map((step, index) => {
-                  const isActive = !isCancelled && index <= activeIndex
-                  return (
-                    <div
-                      key={step.id}
-                      className="flex-1 flex flex-col items-center text-[11px]"
-                    >
-                      <div
-                        className={`h-1 w-full rounded-full ${
-                          isCancelled
-                            ? 'bg-slate-300'
-                            : isActive
-                            ? 'bg-emerald-500'
-                            : 'bg-slate-300'
-                        }`}
-                      />
-                      <span
-                        className={`mt-1 ${
-                          isCancelled
-                            ? 'text-slate-500'
-                            : isActive
-                            ? 'text-emerald-600 font-semibold'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {isCancelled && (
-                <p className="mt-2 text-center text-[11px] font-semibold text-red-600 uppercase">
-                  SOLICITAÇÃO CANCELADA
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-5 px-5 py-4 text-sm">
-              {detailLoading && (
-                <p className="text-xs text-slate-500">Carregando detalhes...</p>
-              )}
-
-              {detailError && (
-                <p className="text-xs text-red-600">{detailError}</p>
-              )}
-
-              {/* Só mostra os campos se já carregou algo */}
-              {detail && (
-                <>
-                  {/* Bloco principal */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={LABEL_RO}>Status</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={detail.status ?? selectedRow.status}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Protocolo</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={detail.protocolo ?? selectedRow.protocolo ?? ''}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Solicitação</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={
-                          detail.titulo ??
-                          detail.tipo?.nome ??
-                          selectedRow.titulo ??
-                          ''
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Centro Responsável</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={
-                          selectedRow.setorDestino ??
-                          detail.costCenter?.description ??
-                          ''
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Data Abertura</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={
-                          formatDate(detail.dataAbertura) ||
-                          (selectedRow.createdAt
-                            ? formatDate(selectedRow.createdAt)
-                            : '-')
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Prazo Solução</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={formatDate(detail.dataPrevista)}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Data Fechamento</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={formatDate(detail.dataFechamento)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Descrição */}
-                  {detail.descricao && (
-                    <div>
-                      <label className={LABEL_RO}>Descrição da Solicitação</label>
-                      <textarea
-                        className={`${INPUT_RO} min-h-[80px]`}
-                        readOnly
-                        value={detail.descricao}
-                      />
-                    </div>
-                  )}
-
-                  {/* Anexos da Solicitação */}
-                  {detail.anexos && detail.anexos.length > 0 && (
-                    <div>
-                      <label className={LABEL_RO}>Anexo(s) da Solicitação</label>
-                      <div className="mt-2 space-y-1 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-                        {detail.anexos.map((a) => (
-                          <div
-                            key={a.id}
-                            className="flex items-center justify-between"
-                          >
-                            <span>{a.filename}</span>
-                            <a
-                              href={a.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[11px] font-medium text-blue-600 hover:underline"
-                            >
-                              Download
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dados do Solicitante */}
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">
-                      Dados do Solicitante
-                    </p>
-
-                    <div className="space-y-3 text-xs">
-                      <div>
-                        <label className={LABEL_RO}>Nome completo</label>
-                        <input
-                          className={INPUT_RO}
-                          readOnly
-                          value={payloadSolic.fullName ?? ''}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className={LABEL_RO}>E-mail</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={payloadSolic.email ?? ''}
-                          />
-                        </div>
-                        <div>
-                          <label className={LABEL_RO}>Login</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={payloadSolic.login ?? ''}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className={LABEL_RO}>Telefone</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={payloadSolic.phone ?? ''}
-                          />
-                        </div>
-                        <div>
-                          <label className={LABEL_RO}>Centro de Custo</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={payloadSolic.costCenterText ?? ''}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Formulário do tipo de solicitação */}
-                  {camposSchema.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700 mb-2">
-                        Formulário do tipo de solicitação
-                      </p>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        {camposSchema.map((campo) => (
-                          <div key={campo.name}>
-                            <label className={LABEL_RO}>{campo.label}</label>
-                            <input
-                              className={INPUT_RO}
-                              readOnly
-                              value={
-                                payloadCampos[campo.name] !== undefined
-                                  ? String(payloadCampos[campo.name])
-                                  : ''
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Comentários / Histórico simples */}
-                  {detail.comentarios && detail.comentarios.length > 0 && (
-                    <div>
-                      <label className={LABEL_RO}>Histórico de Atendimento</label>
-                      <div className="mt-2 space-y-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-                        {detail.comentarios.map((c) => (
-                          <div key={c.id}>
-                            <div className="text-[10px] text-slate-500">
-                              {formatDate(c.createdAt)} - {c.autor?.fullName ?? '—'}
-                            </div>
-                            <div>{c.texto}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="flex justify-end border-t border-slate-200 px-5 py-3">
-              <button
-                onClick={closeDetail}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            
     </div>
   )
 }
