@@ -7,12 +7,17 @@ import crypto from 'crypto'
 export const dynamic = 'force-dynamic'
 
 export async function POST(
-  _req: NextRequest,
+req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
     const me = await requireActiveUser()
     const solicitationId = params.id
+    const body = (await req.json().catch(() => ({}))) as {
+      comment?: string
+    }
+    const approvalComment = body.comment?.trim()
+
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
@@ -34,22 +39,26 @@ export async function POST(
 
     const updated = await prisma.solicitation.update({
   where: { id: solicitationId },
-  data: {
-    approvalStatus: 'APROVADO',
-    approvalAt: new Date(),
-    approverId: me.id,
-    // Depois de aprovado, volta para ABERTA,
-    // e o front interpreta como "Aguardando atendimento"
-    status: 'ABERTA',
-  },
-})
+      data: {
+        approvalStatus: 'APROVADO',
+        approvalAt: new Date(),
+        approverId: me.id,
+        approvalComment: approvalComment ?? null,
+        // Depois de aprovado, volta para ABERTA,
+        // e o front interpreta como "Aguardando atendimento"
+        status: 'ABERTA',
+      },
+    })
 
 
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
         status: 'AGUARDANDO_ATENDIMENTO',
-        message: `Solicitação aprovada por ${me.fullName ?? me.id}.`,
+        message:
+          approvalComment && approvalComment.length > 0
+            ? approvalComment
+            : `Solicitação aprovada por ${me.fullName ?? me.id}.`,
       },
     })
 
