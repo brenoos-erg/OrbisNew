@@ -425,15 +425,7 @@ export function SolicitationDetailModal({
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
-    const comment = (window.prompt(
-      'Informe o motivo da reprovação (obrigatório):',
-    ) ?? '')
-      .trim()
-
-    if (comment.length === 0) {
-      setCloseError('É necessário informar um comentário para reprovar.')
-      return
-    }
+  
 
     setClosing(true)
     setCloseError(null)

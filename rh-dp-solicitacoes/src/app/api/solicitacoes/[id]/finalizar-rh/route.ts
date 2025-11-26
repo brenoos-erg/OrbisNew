@@ -50,6 +50,7 @@ export async function POST(
         tipo: true,
         costCenter: true,
         department: true,
+        anexos: true,
       },
     })
 
@@ -218,6 +219,20 @@ export async function POST(
           tipo: 'CRIACAO_AUTOMATICA_ADMISSAO',
         },
       })
+       // 4.3) Replica os anexos enviados no RH para a solicitação do DP
+      if (solicitation.anexos && solicitation.anexos.length > 0) {
+        await tx.attachment.createMany({
+          data: solicitation.anexos.map((a) => ({
+            id: crypto.randomUUID(),
+            solicitationId: dpSolicitation.id,
+            filename: a.filename,
+            url: a.url,
+            mimeType: a.mimeType,
+            sizeBytes: a.sizeBytes,
+            createdAt: a.createdAt,
+          })),
+        })
+      }
 
       return {
         rh: updatedRh,

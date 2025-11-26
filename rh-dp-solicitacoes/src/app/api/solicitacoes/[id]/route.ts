@@ -30,7 +30,8 @@ export async function GET(
           },
           orderBy: { createdAt: 'asc' },
         },
-        anexos: true,
+         // anexos buscados separadamente (abaixo)
+        parent: true,
         eventos: {
           orderBy: { createdAt: 'asc' },
         },
@@ -55,20 +56,35 @@ export async function GET(
       )
     }
 
+    const attachmentIds = [item.id, item.parentId].filter(Boolean) as string[]
+    const allAttachments = await prisma.attachment.findMany({
+      where: { solicitationId: { in: attachmentIds } },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    // Junta anexos da própria solicitação e, se houver, da solicitação de origem
+    const seenUrls = new Set<string>()
+    const dedupedAttachments = allAttachments.filter((a) => {
+      const already = seenUrls.has(a.url)
+      if (!already) {
+        seenUrls.add(a.url)
+      }
+      return !already
+    })
     // Mapeia para o formato que o front espera
     const result = {
-  id: item.id,
-  protocolo: item.protocolo,
-  titulo: item.titulo,
-  descricao: item.descricao,
+   id: item.id,
+      protocolo: item.protocolo,
+      titulo: item.titulo,
+      descricao: item.descricao,
 
-  status: item.status,
-  approvalStatus: item.approvalStatus,   // 👈 ADICIONAR ISSO
+      status: item.status,
+      approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
 
-  dataAbertura: item.dataAbertura?.toISOString(),
-  dataPrevista: item.dataPrevista?.toISOString() ?? null,
-  dataFechamento: item.dataFechamento?.toISOString() ?? null,
-  dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
+      dataAbertura: item.dataAbertura?.toISOString(),
+      dataPrevista: item.dataPrevista?.toISOString() ?? null,
+      dataFechamento: item.dataFechamento?.toISOString() ?? null,
+      dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
       tipo: item.tipo
         ? {
             id: item.tipo.id,
@@ -83,7 +99,7 @@ export async function GET(
           }
         : null,
       payload: item.payload as any,
-      anexos: item.anexos.map((a) => ({
+      anexos: dedupedAttachments.map((a) => ({
         id: a.id,
         filename: a.filename,
         url: a.url,
