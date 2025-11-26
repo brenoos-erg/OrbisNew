@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 
-import type { CargoForm, Department } from '../types';
+import type {CargoForm as CargoFormData,
+  Department as DepartmentOption,
+} from '@/app/dashboard/configuracoes/cargos/types';
 
 export type CargoForm = {
   id: string;
@@ -14,7 +16,7 @@ export type CargoForm = {
 export default function NovoCargoPage() {
   const router = useRouter();
 
-  const [form, setForm] = useState<CargoForm>({
+  const [form, setForm] = useState<CargoFormData>({
     name: '',
     description: '',
     sectorProject: '',
@@ -30,7 +32,7 @@ export default function NovoCargoPage() {
     departmentId: null,
   });
 
-  const [departamentos, setDepartamentos] = useState<Department[]>([]);
+  const [departamentos, setDepartamentos] = useState<DepartmentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function NovoCargoPage() {
       try {
         setLoading(true);
         const res = await fetch('/api/departments');
-        const data = (await res.json()) as Department[];
+        const data = (await res.json()) as DepartmentOption[];
         setDepartamentos(data);
       } catch (err) {
         console.error(err);
@@ -54,14 +56,17 @@ export default function NovoCargoPage() {
     loadDepts();
   }, []);
 
-  function handleChange<K extends keyof CargoForm>(
+  function handleChange<K extends keyof CargoFormData>(
     field: K,
-    value: CargoForm[K],
+    value: CargoFormData[K],
   ) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    } satisfies CargoFormData));
   }
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     try {

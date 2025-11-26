@@ -512,17 +512,17 @@ export default function Page() {
             </div>
 
             {/* Tabela */}
-            <div className="mt-3 rounded-xl border border-slate-100 overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="mt-3 rounded-xl border border-slate-100 overflow-x-auto">
+              <table className="w-full min-w-[1200px] text-sm table-fixed">
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-2 w-[28%] text-left">Nome</th>
-                    <th className="px-4 py-2 w-[16%] text-left">Login</th>
-                    <th className="px-4 py-2 w-[28%] text-left">E-mail</th>
-                    <th className="px-4 py-2 w-[16%] text-left">
+                    <th className="px-4 py-2 w-[20%] text-left">Nome</th>
+                    <th className="px-4 py-2 w-[14%] text-left">Login</th>
+                    <th className="px-4 py-2 w-[25%] text-left">E-mail</th>
+                    <th className="px-4 py-2 w-[18%] text-left">
                       Centro de Custo
                     </th>
-                    <th className="px-4 py-2 w-[12%] text-right whitespace-nowrap">
+                    <th className="px-4 py-2 w-[15%] text-right whitespace-nowrap">
                       Ações
                     </th>
                   </tr>
@@ -558,31 +558,31 @@ export default function Page() {
                           )
                         }
                       >
-                        <td className="px-4 py-2">
-                          <div className="font-medium text-slate-900">
+                        <td className="px-4 py-2 align-top">
+                          <div className="font-medium text-slate-900 truncate" title={u.fullName}>
                             {u.fullName}
                           </div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-[11px] text-slate-500 whitespace-nowrap">
                             criado recentemente
                           </div>
                         </td>
 
-                        <td className="px-4 py-2 text-slate-700">
+                        <td className="px-4 py-2 text-slate-700 truncate" title={u.login}>
                           {u.login}
                         </td>
 
-                        <td className="px-4 py-2 text-slate-700 break-all">
+                        <td className="px-4 py-2 text-slate-700 truncate" title={u.email}>
                           {u.email}
                         </td>
 
                         <td className="px-4 py-2">
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700">
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 max-w-[11rem] truncate" title={u.costCenterName || '—'}>
                             {u.costCenterName || '—'}
                           </span>
                         </td>
 
-                        <td className="px-4 py-2">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-4 py-2 pl-6">
+                          <div className="flex items-center justify-end gap-1">
                             {/* Visualizar */}
                             <button
                               onClick={(e) => {
@@ -591,7 +591,7 @@ export default function Page() {
                                   `/dashboard/configuracoes/usuarios/${u.id}`,
                                 )
                               }}
-                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
                               disabled={!u.id}
                             >
                               <Eye size={14} /> Ver
@@ -603,7 +603,7 @@ export default function Page() {
                                 e.stopPropagation()
                                 openEdit(u)
                               }}
-                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
                               disabled={!u.id}
                               title="Editar"
                             >
@@ -616,7 +616,7 @@ export default function Page() {
                                 e.stopPropagation()
                                 handleDelete(u)
                               }}
-                              className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 whitespace-nowrap"
                               disabled={!u.id}
                               title="Excluir"
                             >
@@ -639,6 +639,7 @@ export default function Page() {
         </div>
 
       </form>
+
 
       {/* MODAL DE EDIÇÃO */}
       {editing && (

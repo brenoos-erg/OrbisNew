@@ -1,5 +1,3 @@
-'use client';
-
 export type CargoForm = {
   name: string;
   description: string;
