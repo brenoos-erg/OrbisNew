@@ -305,12 +305,21 @@ export default function SentRequestsPage() {
     setDetailError(null)
   }
 
-  const payload = (detail?.payload ?? {}) as Payload
+   const payload = (detail?.payload ?? {}) as Payload
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
+
   const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
   const camposSchema = schema.camposEspecificos ?? []
 
+  const tipoNome =
+    detail?.tipo?.nome ??
+    selectedRow?.tipo?.nome ?? // <-- aqui usamos selectedRow, não row
+    ''
+
+  const isSolicitacaoPessoal =
+    tipoNome.toUpperCase().includes('RQ_063') ||
+    tipoNome.toUpperCase().includes('SOLICITAÇÃO DE PESSOAL')
   // status atual para timeline
   const currentStatus = detail?.status ?? selectedRow?.status ?? 'ABERTA'
   const isCancelled = currentStatus === 'CANCELADA'

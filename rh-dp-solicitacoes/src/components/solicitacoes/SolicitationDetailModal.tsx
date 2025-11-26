@@ -306,9 +306,9 @@ export function SolicitationDetailModal({
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
 
-  const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
-  const camposSchema = schema.camposEspecificos ?? []
-
+const camposSchema: CampoEspecifico[] =
+    detail?.tipo?.schemaJson?.camposEspecificos ?? []
+    
   // Só RQ_063 segue esse fluxo especial de RH → DP
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
@@ -767,34 +767,35 @@ export function SolicitationDetailModal({
               </div>
 
               {/* Formulário do tipo de solicitação */}
-              {isSolicitacaoPessoal ? (
-                <RQ063ResumoCampos payloadCampos={payloadCampos} />
-              ) : (
-                camposSchema.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                      Formulário do tipo de solicitação
-                    </p>
+              {/* Formulário do tipo de solicitação / RQ_063 */}
+{isSolicitacaoPessoal ? (
+  <RQ063ResumoCampos payloadCampos={payloadCampos} />
+) : (
+  camposSchema.length > 0 && (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+        Formulário do tipo de solicitação
+      </p>
 
-                    <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                      {camposSchema.map((campo) => (
-                        <div key={campo.name}>
-                          <label className={LABEL_RO}>{campo.label}</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={
-                              payloadCampos[campo.name] !== undefined
-                                ? String(payloadCampos[campo.name])
-                                : ''
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              )}
+      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        {camposSchema.map((campo) => (
+          <div key={campo.name}>
+            <label className={LABEL_RO}>{campo.label}</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={
+                payloadCampos[campo.name] !== undefined
+                  ? String(payloadCampos[campo.name])
+                  : ''
+              }
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+)}
 
               {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && (
@@ -964,49 +965,45 @@ function RQ063ResumoCampos({
 }: {
   payloadCampos: Record<string, any>
 }) {
-  // helper para pegar a primeira chave que tiver valor
-  const pick = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = payloadCampos[k]
-      if (v !== undefined && v !== null && String(v).trim() !== '') {
-        return String(v)
-      }
-    }
-    return ''
+  const get = (key: string) =>
+    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+
+  // helpers para checkboxes (salvos como 'true' / 'false')
+  const bool = (key: string) => {
+    const v = (payloadCampos[key] ?? '').toString().toLowerCase()
+    if (!v) return ''
+    return v === 'true' ? 'Sim' : 'Não'
   }
 
-  // helpers para campos booleanos salvos como 'true' / 'false'
-  const pickBoolLabel = (key: string) => {
-    const v = payloadCampos[key]
-    if (v === true || v === 'true') return 'Sim'
-    if (v === false || v === 'false') return 'Não'
-    return ''
-  }
+  const joinIfTrue = (entries: [string, string][]) =>
+    entries
+      .filter(([k]) => (payloadCampos[k] ?? '').toString().toLowerCase() === 'true')
+      .map(([, label]) => label)
+      .join(', ')
 
-  // Motivo da vaga (checkboxes + texto)
-  const buildMotivoVaga = () => {
-    const motivos: string[] = []
+  const motivoVaga = joinIfTrue([
+    ['motivoSubstituicao', 'Substituição'],
+    ['motivoAumentoQuadro', 'Aumento de quadro'],
+  ])
 
-    if (payloadCampos.motivoSubstituicao === 'true')
-      motivos.push('Substituição')
-    if (payloadCampos.motivoAumentoQuadro === 'true')
-      motivos.push('Aumento de quadro')
+  const contratacao = joinIfTrue([
+    ['contratacaoTemporaria', 'Temporária'],
+    ['contratacaoPermanente', 'Permanente'],
+  ])
 
-    const base = motivos.join(' / ')
-    const just = pick('justificativaVaga')
+  const solicitacoesNovoFunc = joinIfTrue([
+    ['solicitacaoCracha', 'Crachá'],
+    ['solicitacaoRepublica', 'República'],
+    ['solicitacaoUniforme', 'Uniforme'],
+    ['solicitacaoTesteDirecao', 'Teste direção'],
+    ['solicitacaoEpis', 'EPIs'],
+    ['solicitacaoPostoTrabalho', 'Ponto / Posto de trabalho'],
+  ])
 
-    if (base && just) return `${base} - ${just}`
-    if (base) return base
-    return just
-  }
-
-  // Tipo de contratação (temporária / permanente)
-  const buildContratacao = () => {
-    const partes: string[] = []
-    if (payloadCampos.contratacaoTemporaria === 'true') partes.push('Temporária')
-    if (payloadCampos.contratacaoPermanente === 'true') partes.push('Permanente')
-    return partes.join(' / ')
-  }
+  const localMatrizFilial = joinIfTrue([
+    ['escritorioMatriz', 'Matriz'],
+    ['escritorioFilial', 'Filial'],
+  ])
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -1015,106 +1012,56 @@ function RQ063ResumoCampos({
       </p>
 
       {/* Informações básicas */}
-      <div className="mb-4">
+      <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Informações básicas
         </p>
-
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Cargo</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('cargo', 'cargoNome')}
-            />
+            <input className={INPUT_RO} readOnly value={get('cargoNome')} />
           </div>
-
           <div>
             <label className={LABEL_RO}>Setor e/ou Projeto</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('setorProjeto')}
-            />
+            <input className={INPUT_RO} readOnly value={get('setorProjeto')} />
           </div>
-
           <div>
             <label className={LABEL_RO}>Vaga prevista em contrato?</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('vagaPrevistaContrato', 'vagaPrevista')}
-            />
+            <input className={INPUT_RO} readOnly value={get('vagaPrevista')} />
           </div>
-
           <div>
-            <label className={LABEL_RO}>Local de Trabalho</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('localTrabalho')}
-            />
+            <label className={LABEL_RO}>Local de trabalho</label>
+            <input className={INPUT_RO} readOnly value={get('localTrabalho')} />
           </div>
-
           <div>
-            <label className={LABEL_RO}>Horário de Trabalho</label>
+            <label className={LABEL_RO}>Coordenador do contrato</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={pick('horarioTrabalho')}
+              value={get('coordenadorContrato')}
             />
           </div>
-
-          <div>
-            <label className={LABEL_RO}>Coordenador do Contrato</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('coordenadorContrato')}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Motivo da vaga / Contratação */}
-      <div className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Motivo da vaga / Contratação
-        </p>
-
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Motivo da vaga</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={buildMotivoVaga()}
-            />
+            <input className={INPUT_RO} readOnly value={motivoVaga} />
           </div>
-
           <div>
             <label className={LABEL_RO}>Contratação</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={buildContratacao()}
-            />
+            <input className={INPUT_RO} readOnly value={contratacao} />
           </div>
-
           <div>
             <label className={LABEL_RO}>Justificativa da vaga</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={pick('justificativaVaga')}
+              value={get('justificativaVaga')}
             />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Atividades */}
-      <div className="mb-4">
+      <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Atividades
         </p>
@@ -1124,7 +1071,7 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={pick('principaisAtividades')}
+              value={get('principaisAtividades')}
             />
           </div>
           <div>
@@ -1132,34 +1079,25 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={pick('atividadesComplementares')}
+              value={get('atividadesComplementares')}
             />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Requisitos acadêmicos */}
-      <div className="mb-4">
+      <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Requisitos acadêmicos
         </p>
-
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
             <label className={LABEL_RO}>Escolaridade</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('escolaridade')}
-            />
+            <input className={INPUT_RO} readOnly value={get('escolaridade')} />
           </div>
           <div>
             <label className={LABEL_RO}>Curso</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('curso')}
-            />
+            <input className={INPUT_RO} readOnly value={get('curso')} />
           </div>
         </div>
 
@@ -1169,7 +1107,7 @@ function RQ063ResumoCampos({
             <input
               className={INPUT_RO}
               readOnly
-              value={pickBoolLabel('escolaridadeCompleta')}
+              value={bool('escolaridadeCompleta')}
             />
           </div>
           <div>
@@ -1177,23 +1115,23 @@ function RQ063ResumoCampos({
             <input
               className={INPUT_RO}
               readOnly
-              value={pickBoolLabel('cursoEmAndamento')}
+              value={bool('cursoEmAndamento')}
             />
           </div>
         </div>
 
         <div className="mt-3">
-          <label className={LABEL_RO}>Período / Módulo - mínimo ou máximo</label>
+          <label className={LABEL_RO}>Período / módulo - mínimo ou máximo</label>
           <input
             className={INPUT_RO}
             readOnly
-            value={pick('periodoModulo')}
+            value={get('periodoModulo')}
           />
         </div>
-      </div>
+      </section>
 
-      {/* Requisitos e competências */}
-      <div className="mb-4">
+      {/* Requisitos / competências */}
+      <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Requisitos e competências
         </p>
@@ -1205,7 +1143,7 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={pick('requisitosConhecimentos')}
+              value={get('requisitosConhecimentos')}
             />
           </div>
           <div>
@@ -1215,64 +1153,72 @@ function RQ063ResumoCampos({
             <textarea
               className={`${INPUT_RO} min-h-[70px]`}
               readOnly
-              value={pick('competenciasComportamentais')}
+              value={get('competenciasComportamentais')}
             />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Solicitações para o novo funcionário */}
-      <div className="mb-4">
+      <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Solicitações para o novo funcionário
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
-            <label className={LABEL_RO}>Crachá</label>
+            <label className={LABEL_RO}>Crachá / República / Uniforme / Outros</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={pickBoolLabel('solicitacaoCracha')}
+              value={
+                solicitacoesNovoFunc ||
+                get('solicitacaoOutros')
+              }
             />
           </div>
           <div>
-            <label className={LABEL_RO}>República</label>
+            <label className={LABEL_RO}>Local (Matriz ou Filial)</label>
             <input
               className={INPUT_RO}
               readOnly
-              value={pickBoolLabel('solicitacaoRepublica')}
-            />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Uniforme</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pickBoolLabel('solicitacaoUniforme')}
-            />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Outros (descrever)</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={pick('solicitacaoOutros')}
+              value={localMatrizFilial}
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Observações (RH etc.) */}
-      <div>
+      {/* RH */}
+      <section>
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Observações
+          Preenchimento RH
         </p>
-        <textarea
-          className={`${INPUT_RO} min-h-[70px]`}
-          readOnly
-          value={pick('observacoesRh', 'observacoes')}
-        />
-      </div>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Nome do profissional</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('nomeProfissional')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Data de admissão</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('dataAdmissao')}
+            />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className={LABEL_RO}>Observações</label>
+          <textarea
+            className={`${INPUT_RO} min-h-[70px]`}
+            readOnly
+            value={get('observacoesRh')}
+          />
+        </div>
+      </section>
     </div>
   )
 }
