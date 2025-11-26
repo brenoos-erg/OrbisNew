@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
 /**
  * Helper para montar o payload que o frontend espera
@@ -31,6 +32,19 @@ async function buildUserPayload(email: string) {
       moduleId: r.moduleId,
       level: r.level,
     }))
+     if (user.departmentId) {
+      const departmentModules = await prisma.departmentModule.findMany({
+        where: { departmentId: user.departmentId },
+        select: { moduleId: true },
+      })
+
+      const existing = new Set(access.map((a) => a.moduleId))
+      departmentModules.forEach(({ moduleId }) => {
+        if (!existing.has(moduleId)) {
+          access.push({ moduleId, level: ModuleLevel.NIVEL_1 })
+        }
+      })
+    }
   }
 
   return {
@@ -119,6 +133,38 @@ export async function PATCH(req: NextRequest) {
           departmentId: departmentId || null,
         },
       })
+      if (departmentId) {
+        const departmentModules = await prisma.departmentModule.findMany({
+          where: { departmentId },
+          select: { moduleId: true },
+        })
+
+        if (departmentModules.length > 0) {
+          const existing = await prisma.userModuleAccess.findMany({
+            where: {
+              userId: user.id,
+              moduleId: { in: departmentModules.map((d) => d.moduleId) },
+            },
+            select: { moduleId: true },
+          })
+
+          const existingSet = new Set(existing.map((e) => e.moduleId))
+          const missing = departmentModules.filter(
+            ({ moduleId }) => !existingSet.has(moduleId),
+          )
+
+          if (missing.length > 0) {
+            await prisma.userModuleAccess.createMany({
+              data: missing.map(({ moduleId }) => ({
+                userId: user.id,
+                moduleId,
+                level: ModuleLevel.NIVEL_1,
+              })),
+              skipDuplicates: true,
+            })
+          }
+        }
+      }
     }
 
     // 2) Atualizar acesso de módulo, se veio moduleId

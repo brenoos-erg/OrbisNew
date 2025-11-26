@@ -123,10 +123,25 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
-    // 2) exclui no Prisma primeiro
+        // 2) remove vínculos que bloqueiam a exclusão
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: {
+          costCenterId: null,
+          departmentId: null,
+        },
+      }),
+      prisma.event.deleteMany({ where: { actorId: id } }),
+      prisma.userModuleAccess.deleteMany({ where: { userId: id } }),
+      prisma.userCostCenter.deleteMany({ where: { userId: id } }),
+      prisma.groupMember.deleteMany({ where: { userId: id } }),
+    ])
+
+    // 3) exclui no Prisma depois de limpar vínculos
     await prisma.user.delete({ where: { id } })
 
-    // 3) tenta excluir no Auth (não falha se der erro)
+    // 4) tenta excluir no Auth (não falha se der erro)
     if (existing.authId) {
       const admin = getSupabaseAdmin()
       await admin.auth.admin.deleteUser(existing.authId).catch((err) => {
