@@ -254,6 +254,7 @@ type Props = {
   loading: boolean
   error: string | null
   mode?: 'default' | 'approval'
+  onActionCompleted?: (action: 'APROVAR' | 'REPROVAR') => void
 }
 
 export function SolicitationDetailModal({
@@ -264,6 +265,7 @@ export function SolicitationDetailModal({
   loading,
   error,
   mode = 'default',
+  onActionCompleted,  
 }: Props) {
   if (!isOpen || !row) return null
 
@@ -272,6 +274,9 @@ export function SolicitationDetailModal({
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
   const [closeSuccess, setCloseSuccess] = useState<string | null>(null)
+  const [approvalAction, setApprovalAction] =
+    useState<'APROVAR' | 'REPROVAR' | null>(null)
+  const [approvalComment, setApprovalComment] = useState('')
 
   const [assumindo, setAssumindo] = useState(false)
   const [assumirError, setAssumirError] = useState<string | null>(null)
@@ -416,7 +421,7 @@ const camposSchema: CampoEspecifico[] =
   }
 
   // Aprovação pelo gestor (modo approval)
-  async function handleAprovarGestor() {
+  async function handleAprovarGestor(comment?: string) {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
    
@@ -425,14 +430,17 @@ const camposSchema: CampoEspecifico[] =
     setCloseError(null)
     setCloseSuccess(null)
 
-    try {
+   try {
       const res = await fetch(
         `/api/solicitacoes/${solicitationId}/aprovar`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: comment
+            ? {
+                'Content-Type': 'application/json',
+              }
+            : undefined,
+          body: comment ? JSON.stringify({ comment }) : undefined,
         },
       )
 
@@ -442,6 +450,7 @@ const camposSchema: CampoEspecifico[] =
       }
 
       setCloseSuccess('Solicitação aprovada com sucesso.')
+      onActionCompleted?.('APROVAR')
     } catch (err: any) {
       console.error('Erro ao aprovar', err)
       setCloseError(err?.message ?? 'Erro ao aprovar a solicitação.')
@@ -450,10 +459,13 @@ const camposSchema: CampoEspecifico[] =
     }
   }
 
-  async function handleReprovarGestor() {
+  async function handleReprovarGestor(comment: string) {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-    
+    if (!comment || comment.trim().length === 0) {
+      setCloseError('Informe um comentário para reprovar a solicitação.')
+      return
+    }
 
     setClosing(true)
     setCloseError(null)
@@ -476,6 +488,7 @@ const camposSchema: CampoEspecifico[] =
       }
 
       setCloseSuccess('Solicitação reprovada.')
+      onActionCompleted?.('REPROVAR')
     } catch (err: any) {
       console.error('Erro ao reprovar', err)
       setCloseError(err?.message ?? 'Erro ao reprovar a solicitação.')
@@ -483,6 +496,45 @@ const camposSchema: CampoEspecifico[] =
       setClosing(false)
     }
   }
+   function handleStartApproval(action: 'APROVAR' | 'REPROVAR') {
+    setCloseError(null)
+    setCloseSuccess(null)
+    setApprovalAction(action)
+
+    if (!approvalComment.trim()) {
+      setApprovalComment(
+        action === 'APROVAR'
+          ? 'Solicitação aprovada.'
+          : 'Solicitação reprovada.',
+      )
+    }
+  }
+
+  async function handleConfirmApprovalAction() {
+    if (!approvalAction) return
+
+    const comment = approvalComment.trim()
+
+    if (approvalAction === 'REPROVAR' && comment.length === 0) {
+      setCloseError('Informe um comentário para reprovar a solicitação.')
+      return
+    }
+
+    if (approvalAction === 'APROVAR') {
+      await handleAprovarGestor(comment || undefined)
+    } else {
+      await handleReprovarGestor(comment)
+    }
+
+    setApprovalAction(null)
+    setApprovalComment('')
+  }
+
+  function handleCancelApprovalAction() {
+    setApprovalAction(null)
+    setCloseError(null)
+  }
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -505,7 +557,7 @@ const camposSchema: CampoEspecifico[] =
             {isApprovalMode ? (
               <>
                 <button
-                  onClick={handleAprovarGestor}
+                  onClick={() => handleStartApproval('APROVAR')}
                   disabled={closing}
                   className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                 >
@@ -513,7 +565,7 @@ const camposSchema: CampoEspecifico[] =
                 </button>
 
                 <button
-                  onClick={handleReprovarGestor}
+                  onClick={() => handleStartApproval('REPROVAR')}
                   disabled={closing}
                   className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-60"
                 >
@@ -563,6 +615,62 @@ const camposSchema: CampoEspecifico[] =
             </button>
           </div>
         </div>
+        {isApprovalMode && approvalAction && (
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 space-y-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-800">
+                    {approvalAction === 'APROVAR'
+                      ? 'Confirme a aprovação'
+                      : 'Confirme a reprovação'}
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Informe um comentário para registrar se a solicitação foi
+                    aprovada ou reprovada.
+                  </p>
+                </div>
+
+                <div>
+                  <label className={LABEL_RO}>
+                    Comentário {approvalAction === 'REPROVAR' && '(obrigatório)'}
+                  </label>
+                  <textarea
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    rows={3}
+                    value={approvalComment}
+                    onChange={(e) => setApprovalComment(e.target.value)}
+                    placeholder={
+                      approvalAction === 'APROVAR'
+                        ? 'Ex.: Solicitação aprovada pelo gestor.'
+                        : 'Descreva o motivo da reprovação.'
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-start">
+                <button
+                  onClick={handleConfirmApprovalAction}
+                  disabled={closing}
+                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  {approvalAction === 'APROVAR'
+                    ? 'Confirmar aprovação'
+                    : 'Confirmar reprovação'}
+                </button>
+
+                <button
+                  onClick={handleCancelApprovalAction}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* CONTEÚDO */}
         <div className="space-y-5 px-5 py-4 text-sm">

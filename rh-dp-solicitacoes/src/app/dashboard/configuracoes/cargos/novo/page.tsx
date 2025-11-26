@@ -1,25 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
-type CargoForm = {
-  name: string;
-  description: string;
-  sectorProject: string;
-  workplace: string;
-  workSchedule: string;
-  mainActivities: string;
-  schooling: string;
-  experience: string;
-  requiredKnowledge: string;
-  behavioralCompetencies: string;
-  site: string;
-  workPoint: string;
-  departmentId: string | null;
-};
+import type { CargoForm, Department } from '../types';
 
-type Department = {
+export type CargoForm = {
   id: string;
   label: string;
   description: string;
@@ -75,7 +61,7 @@ export default function NovoCargoPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     try {
