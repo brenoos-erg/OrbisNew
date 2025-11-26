@@ -353,6 +353,14 @@ const camposSchema: CampoEspecifico[] =
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
+    const comment = window.prompt(
+      'Informe o motivo da reprovação (obrigatório):',
+    )
+
+    if (!comment || comment.trim().length === 0) {
+      setCloseError('É necessário informar um comentário para reprovar.')
+      return
+    }
 
     setClosing(true)
     setCloseError(null)
@@ -409,6 +417,21 @@ const camposSchema: CampoEspecifico[] =
   async function handleAprovarGestor() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
+    const rawComment = window.prompt(
+      'Informe o motivo da reprovação (obrigatório):',
+    )
+
+    if (!rawComment) {
+      setCloseError('É necessário informar um comentário para reprovar.')
+      return
+    }
+
+    const comment = rawComment.trim()
+
+    if (comment.length === 0) {
+      setCloseError('É necessário informar um comentário para reprovar.')
+      return
+    }
 
     setClosing(true)
     setCloseError(null)
@@ -417,7 +440,13 @@ const camposSchema: CampoEspecifico[] =
     try {
       const res = await fetch(
         `/api/solicitacoes/${solicitationId}/aprovar`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ comment }),
+        },
       )
 
       if (!res.ok) {
@@ -445,7 +474,13 @@ const camposSchema: CampoEspecifico[] =
     try {
       const res = await fetch(
         `/api/solicitacoes/${solicitationId}/reprovar`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ comment }),
+        },
       )
 
       if (!res.ok) {

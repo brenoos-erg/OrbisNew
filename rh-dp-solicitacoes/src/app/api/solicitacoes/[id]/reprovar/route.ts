@@ -38,7 +38,11 @@ export const POST = withModuleLevel<RouteParams>(
         )
       }
 
-      if (!solicit.requiresApproval || solicit.approvalStatus !== 'PENDENTE') {
+      const isPendingApproval =
+        solicit.approvalStatus === 'PENDENTE' ||
+        solicit.status === 'AGUARDANDO_APROVACAO'
+
+      if (!isPendingApproval) {
         return NextResponse.json(
           { error: 'Solicitação não está pendente de aprovação.' },
           { status: 400 },

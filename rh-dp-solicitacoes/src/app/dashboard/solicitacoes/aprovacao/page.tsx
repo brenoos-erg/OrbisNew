@@ -88,37 +88,70 @@ export default function ApprovalsPage() {
   // ===== AÇÕES DE APROVAR / REPROVAR (botões da lista) =====
   async function handleApprove(e: React.MouseEvent, row: Row) {
     e.stopPropagation() // não abrir o modal ao clicar no botão
+    const comment = window.prompt(
+      'Informe o motivo da reprovação (obrigatório):',
+    )
+
+    if (!comment || comment.trim().length === 0) {
+      alert('É necessário informar um comentário para reprovar.')
+      return
+    }
+
 
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}/aprovar`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ comment }),
+
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Erro ao aprovar a solicitação.')
       }
       await loadApprovals()
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      alert('Erro ao aprovar a solicitação.')
+      alert(err?.message ?? 'Erro ao reprovar a solicitação.')
     }
   }
 
   async function handleReject(e: React.MouseEvent, row: Row) {
     e.stopPropagation()
+    const rawComment = window.prompt(
+      'Informe o motivo da reprovação (obrigatório):',
+    )
+
+    if (!rawComment) {
+      alert('É necessário informar um comentário para reprovar.')
+      return
+    }
+
+    const comment = rawComment.trim()
+
+    if (comment.length === 0) {
+      alert('É necessário informar um comentário para reprovar.')
+      return
+    }
 
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}/reprovar`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ comment }),
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Erro ao reprovar a solicitação.')
       }
       await loadApprovals()
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
-      alert('Erro ao reprovar a solicitação.')
+      alert(err?.message ?? 'Erro ao reprovar a solicitação.')
     }
   }
 

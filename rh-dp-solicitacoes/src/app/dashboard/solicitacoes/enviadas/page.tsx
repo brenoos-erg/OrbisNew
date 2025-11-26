@@ -314,13 +314,11 @@ export default function SentRequestsPage() {
   
   
 
-  const tipoNome = detail?.tipo?.nome ?? selectedRow?.tipo?.nome ?? '' // <-- aqui usamos selectedRow, não row
-
+  const tipoNome = detail?.tipo?.nome ?? selectedRow?.tipo?.nome ?? ''
   const isSolicitacaoPessoal =
     tipoNome.toUpperCase().includes('RQ_063') ||
     tipoNome.toUpperCase().includes('SOLICITAÇÃO DE PESSOAL')
-    void isSolicitacaoPessoal
-  // status atual para timeline
+  void isSolicitacaoPessoal
   const currentStatus = detail?.status ?? selectedRow?.status ?? 'ABERTA'
   const isCancelled = currentStatus === 'CANCELADA'
 
