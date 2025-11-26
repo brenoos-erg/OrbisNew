@@ -308,46 +308,36 @@ export default function NovaSolicitacaoPage() {
     if (extras.solicitacaoPostoTrabalho === 'true')
       enxovalParts.push('Ponto / Posto de trabalho');
 
-    // === AQUI É O FORMATO QUE O MODAL ESPERA ===
-    const payload = {
-      solicitante: {
-        fullName: me?.fullName ?? '',
-        email: me?.email ?? '',
-        login: me?.login ?? '',
-        phone: me?.phone ?? '',
-        costCenterText: me?.costCenterName ?? '',
-      },
-      campos: {
-        // guarda tudo cru também, se quiser aproveitar em outras telas
-        ...extras,
+     // === CAMPOS ENVIADOS PARA A API (e exibidos no modal) ===
+    const campos = {
+      // guarda tudo cru também, se quiser aproveitar em outras telas
+      ...extras,
 
         // CHAVES QUE O RQ063ResumoCampos USA:
         cargo: cargoSelecionado,
-        setorProjeto: extras.setorProjeto ?? '',
-        localTrabalho: extras.localTrabalho ?? '',
-        horarioTrabalho: extras.horarioTrabalho ?? '',
+      setorProjeto: extras.setorProjeto ?? '',
+      localTrabalho: extras.localTrabalho ?? '',
+      horarioTrabalho: extras.horarioTrabalho ?? '',
 
         vagaPrevistaContrato: extras.vagaPrevista ?? '',
 
         motivoVaga: motivoParts.join(' / '),
-        tipoContratacao: tipoContrParts.join(' / '),
+      tipoContratacao: tipoContrParts.join(' / '),
 
         principaisAtividades: extras.principaisAtividades ?? '',
-        atividadesComplementares: extras.atividadesComplementares ?? '',
+      atividadesComplementares: extras.atividadesComplementares ?? '',
 
         escolaridade: extras.escolaridade ?? '',
-        curso: extras.curso ?? '',
-        periodoModulo: extras.periodoModulo ?? '',
+      curso: extras.curso ?? '',
+      periodoModulo: extras.periodoModulo ?? '',
 
         requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
-        competenciasComportamentais:
-          extras.competenciasComportamentais ?? '',
+      competenciasComportamentais: extras.competenciasComportamentais ?? '',
 
         enxoval: enxovalParts.join(' / '),
-        outros: extras.solicitacaoOutros ?? '',
+      outros: extras.solicitacaoOutros ?? '',
 
         observacoes: extras.observacoesRh ?? '',
-      },
     };
 
     const body = {
@@ -355,7 +345,7 @@ export default function NovaSolicitacaoPage() {
       costCenterId: centroId,
       departmentId: departamentoId,
       tipoId,
-      payload, // 👈 agora vai tudo dentro de payload
+      campos, // a API monta o payload a partir desses campos
     };
 
     const res = await fetch('/api/solicitacoes', {

@@ -311,15 +311,15 @@ export default function SentRequestsPage() {
 
   const schema = (detail?.tipo?.schemaJson ?? {}) as SchemaJson
   const camposSchema = schema.camposEspecificos ?? []
+  
+  
 
-  const tipoNome =
-    detail?.tipo?.nome ??
-    selectedRow?.tipo?.nome ?? // <-- aqui usamos selectedRow, não row
-    ''
+  const tipoNome = detail?.tipo?.nome ?? selectedRow?.tipo?.nome ?? '' // <-- aqui usamos selectedRow, não row
 
   const isSolicitacaoPessoal =
     tipoNome.toUpperCase().includes('RQ_063') ||
     tipoNome.toUpperCase().includes('SOLICITAÇÃO DE PESSOAL')
+    void isSolicitacaoPessoal
   // status atual para timeline
   const currentStatus = detail?.status ?? selectedRow?.status ?? 'ABERTA'
   const isCancelled = currentStatus === 'CANCELADA'
