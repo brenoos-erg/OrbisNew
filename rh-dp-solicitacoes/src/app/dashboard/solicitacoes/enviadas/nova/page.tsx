@@ -1,7 +1,13 @@
 // src/app/dashboard/solicitacoes/enviadas/nova/page.tsx
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+  ChangeEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 
 /* ================================================================
@@ -59,6 +65,10 @@ type Position = {
 };
 
 type Extras = Record<string, string>;
+
+type InputChange = ChangeEvent<HTMLInputElement>;
+type SelectChange = ChangeEvent<HTMLSelectElement>;
+type TextAreaChange = ChangeEvent<HTMLTextAreaElement>;
 
 /* ================================================================
    COMPONENTE PRINCIPAL
@@ -173,8 +183,7 @@ export default function NovaSolicitacaoPage() {
         });
 
         const res = await fetch(`/api/tipos-solicitacao?${params}`);
-        if (!res.ok)
-          throw new Error('Erro ao buscar tipos de solicitação');
+        if (!res.ok) throw new Error('Erro ao buscar tipos de solicitação');
 
         const data = (await res.json()) as TipoSolicitacao[];
         setTipos(data);
@@ -194,10 +203,11 @@ export default function NovaSolicitacaoPage() {
   );
 
   const isRQ063 =
-    selectedTipo &&
+    !!selectedTipo &&
     (selectedTipo.id.toUpperCase() === 'RQ_063' ||
       selectedTipo.nome.toUpperCase().includes('RQ_063'));
-       const isAbonoEducacional =
+
+  const isAbonoEducacional =
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
 
   useEffect(() => {
@@ -205,7 +215,6 @@ export default function NovaSolicitacaoPage() {
       setAbonoCampos({});
     }
   }, [isAbonoEducacional]);
-
 
   /* ============================================================
    4) /api/positions
@@ -236,7 +245,7 @@ export default function NovaSolicitacaoPage() {
   }, []);
 
   /* ============================================================
-   5) EXTRAS / RQ_063
+   5) EXTRAS / RQ_063 / ABONO
   ============================================================ */
   const handleExtraChange = (name: string, value: string) => {
     setExtras((prev) => ({
@@ -244,13 +253,13 @@ export default function NovaSolicitacaoPage() {
       [name]: value,
     }));
   };
+
   const handleAbonoChange = (name: string, value: string) => {
     setAbonoCampos((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
-
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
     handleExtraChange(name, checked ? 'true' : 'false');
@@ -286,25 +295,23 @@ export default function NovaSolicitacaoPage() {
    6) SUBMIT
   ============================================================ */
   const handleSubmit = async (e: FormEvent) => {
- e.preventDefault();
+    e.preventDefault();
 
     if (isRQ063 && !cargoId) {
       setSubmitError('Selecione o cargo para continuar.');
       return;
     }
-    }
-setSubmitError(null);
+
+    setSubmitError(null);
     setSubmitting(true);
 
     try {
       let campos: Record<string, string> = {};
 
       if (isRQ063) {
-        // nome do cargo selecionado
         const cargoSelecionado =
           positions.find((p) => p.id === cargoId)?.name ?? '';
 
-        // monta strings “bonitinhas” para os campos agregados
         const motivoParts: string[] = [];
         if (extras.motivoSubstituicao === 'true')
           motivoParts.push('Substituição');
@@ -329,35 +336,24 @@ setSubmitError(null);
         if (extras.solicitacaoPostoTrabalho === 'true')
           enxovalParts.push('Ponto / Posto de trabalho');
 
-        // === CAMPOS ENVIADOS PARA A API (e exibidos no modal) ===
         campos = {
-          // guarda tudo cru também, se quiser aproveitar em outras telas
           ...extras,
-
-          // CHAVES QUE O RQ063ResumoCampos USA:
           cargo: cargoSelecionado,
           setorProjeto: extras.setorProjeto ?? '',
           localTrabalho: extras.localTrabalho ?? '',
           horarioTrabalho: extras.horarioTrabalho ?? '',
-
           vagaPrevistaContrato: extras.vagaPrevista ?? '',
-
           motivoVaga: motivoParts.join(' / '),
           tipoContratacao: tipoContrParts.join(' / '),
-
           principaisAtividades: extras.principaisAtividades ?? '',
           atividadesComplementares: extras.atividadesComplementares ?? '',
-
           escolaridade: extras.escolaridade ?? '',
           curso: extras.curso ?? '',
           periodoModulo: extras.periodoModulo ?? '',
-
           requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
           competenciasComportamentais: extras.competenciasComportamentais ?? '',
-
           enxoval: enxovalParts.join(' / '),
           outros: extras.solicitacaoOutros ?? '',
-
           observacoes: extras.observacoesRh ?? '',
         };
       } else if (isAbonoEducacional) {
@@ -390,7 +386,7 @@ setSubmitError(null);
         costCenterId: centroId,
         departmentId: departamentoId,
         tipoId,
-        campos, // a API monta o payload a partir desses campos
+        campos,
       };
 
       const res = await fetch('/api/solicitacoes', {
@@ -462,7 +458,7 @@ setSubmitError(null);
               <select
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={centroId}
-                onChange={(e) => setCentroId(e.target.value)}
+                onChange={(e: SelectChange) => setCentroId(e.target.value)}
                 required
               >
                 <option value="">Selecione...</option>
@@ -482,7 +478,9 @@ setSubmitError(null);
               <select
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={departamentoId}
-                onChange={(e) => setDepartamentoId(e.target.value)}
+                onChange={(e: SelectChange) =>
+                  setDepartamentoId(e.target.value)
+                }
                 required
               >
                 <option value="">Selecione...</option>
@@ -501,7 +499,7 @@ setSubmitError(null);
               <select
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={tipoId}
-                onChange={(e) => setTipoId(e.target.value)}
+                onChange={(e: SelectChange) => setTipoId(e.target.value)}
                 disabled={!centroId || !departamentoId}
                 required
               >
@@ -595,6 +593,7 @@ setSubmitError(null);
             </p>
           )}
 
+          {/* =================== FORM RQ_063 =================== */}
           {selectedTipo && isRQ063 && (
             <>
               <h2 className="text-sm font-semibold mb-4">
@@ -615,7 +614,9 @@ setSubmitError(null);
                   <select
                     className="w-full border rounded px-3 py-2 text-sm"
                     value={cargoId}
-                    onChange={(e) => handleCargoChange(e.target.value)}
+                    onChange={(e: SelectChange) =>
+                      handleCargoChange(e.target.value)
+                    }
                     required
                   >
                     <option value="">Selecione o cargo...</option>
@@ -637,7 +638,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.setorProjeto ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('setorProjeto', e.target.value)
                       }
                       required
@@ -688,7 +689,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.localTrabalho ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('localTrabalho', e.target.value)
                       }
                       required
@@ -706,7 +707,7 @@ setSubmitError(null);
                       value={
                         extras.centroCustoForm ?? me?.costCenterName ?? ''
                       }
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('centroCustoForm', e.target.value)
                       }
                       required
@@ -724,7 +725,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.horarioTrabalho ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('horarioTrabalho', e.target.value)
                       }
                       required
@@ -740,7 +741,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.chefiaImediata ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('chefiaImediata', e.target.value)
                       }
                       required
@@ -757,11 +758,8 @@ setSubmitError(null);
                   <input
                     className="w-full border rounded px-3 py-2 text-sm"
                     value={extras.coordenadorContrato ?? ''}
-                    onChange={(e) =>
-                      handleExtraChange(
-                        'coordenadorContrato',
-                        e.target.value,
-                      )
+                    onChange={(e: InputChange) =>
+                      handleExtraChange('coordenadorContrato', e.target.value)
                     }
                     required
                   />
@@ -778,7 +776,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.motivoSubstituicao === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'motivoSubstituicao',
                           e.target.checked,
@@ -791,7 +789,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.motivoAumentoQuadro === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'motivoAumentoQuadro',
                           e.target.checked,
@@ -813,7 +811,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.contratacaoTemporaria === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'contratacaoTemporaria',
                           e.target.checked,
@@ -826,7 +824,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.contratacaoPermanente === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'contratacaoPermanente',
                           e.target.checked,
@@ -846,7 +844,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.justificativaVaga ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange('justificativaVaga', e.target.value)
                     }
                     required
@@ -868,11 +866,8 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[80px]"
                     value={extras.principaisAtividades ?? ''}
-                    onChange={(e) =>
-                      handleExtraChange(
-                        'principaisAtividades',
-                        e.target.value,
-                      )
+                    onChange={(e: TextAreaChange) =>
+                      handleExtraChange('principaisAtividades', e.target.value)
                     }
                     required
                   />
@@ -885,7 +880,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.atividadesComplementares ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange(
                         'atividadesComplementares',
                         e.target.value,
@@ -909,7 +904,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.escolaridade ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('escolaridade', e.target.value)
                       }
                       required
@@ -922,7 +917,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.curso ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('curso', e.target.value)
                       }
                     />
@@ -934,7 +929,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.escolaridadeCompleta === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'escolaridadeCompleta',
                           e.target.checked,
@@ -947,7 +942,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.cursoEmAndamento === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'cursoEmAndamento',
                           e.target.checked,
@@ -965,7 +960,7 @@ setSubmitError(null);
                   <input
                     className="w-full border rounded px-3 py-2 text-sm"
                     value={extras.periodoModulo ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: InputChange) =>
                       handleExtraChange('periodoModulo', e.target.value)
                     }
                   />
@@ -986,7 +981,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.requisitosConhecimentos ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange(
                         'requisitosConhecimentos',
                         e.target.value,
@@ -1004,7 +999,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.competenciasComportamentais ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange(
                         'competenciasComportamentais',
                         e.target.value,
@@ -1027,7 +1022,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoCracha === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoCracha',
                             e.target.checked,
@@ -1041,7 +1036,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoRepublica === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoRepublica',
                             e.target.checked,
@@ -1055,7 +1050,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoUniforme === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoUniforme',
                             e.target.checked,
@@ -1072,7 +1067,7 @@ setSubmitError(null);
                       <input
                         className="mt-1 w-full border rounded px-3 py-2 text-sm"
                         value={extras.solicitacaoOutros ?? ''}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleExtraChange(
                             'solicitacaoOutros',
                             e.target.value,
@@ -1087,7 +1082,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoTesteDirecao === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoTesteDirecao',
                             e.target.checked,
@@ -1101,7 +1096,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoEpis === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoEpis',
                             e.target.checked,
@@ -1115,7 +1110,7 @@ setSubmitError(null);
                       <input
                         type="checkbox"
                         checked={extras.solicitacaoPostoTrabalho === 'true'}
-                        onChange={(e) =>
+                        onChange={(e: InputChange) =>
                           handleCheckboxChange(
                             'solicitacaoPostoTrabalho',
                             e.target.checked,
@@ -1139,7 +1134,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.escritorioMatriz === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'escritorioMatriz',
                           e.target.checked,
@@ -1152,7 +1147,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={extras.escritorioFilial === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleCheckboxChange(
                           'escritorioFilial',
                           e.target.checked,
@@ -1171,7 +1166,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.previstoContrato ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange('previstoContrato', e.target.value)
                     }
                   />
@@ -1192,11 +1187,8 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.nomeProfissional ?? ''}
-                      onChange={(e) =>
-                        handleExtraChange(
-                          'nomeProfissional',
-                          e.target.value,
-                        )
+                      onChange={(e: InputChange) =>
+                        handleExtraChange('nomeProfissional', e.target.value)
                       }
                     />
                   </div>
@@ -1208,7 +1200,7 @@ setSubmitError(null);
                       type="date"
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={extras.dataAdmissao ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleExtraChange('dataAdmissao', e.target.value)
                       }
                     />
@@ -1222,7 +1214,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={extras.observacoesRh ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleExtraChange('observacoesRh', e.target.value)
                     }
                   />
@@ -1231,7 +1223,8 @@ setSubmitError(null);
             </>
           )}
 
-           {selectedTipo && isAbonoEducacional && (
+          {/* =================== FORM ABONO EDUCACIONAL =================== */}
+          {selectedTipo && isAbonoEducacional && (
             <>
               <h2 className="text-sm font-semibold mb-4">
                 {selectedTipo.nome}
@@ -1244,13 +1237,17 @@ setSubmitError(null);
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Nome do colaborador <span className="text-red-500">*</span>
+                      Nome do colaborador{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.nomeColaborador ?? ''}
-                      onChange={(e) =>
-                        handleAbonoChange('nomeColaborador', e.target.value)
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange(
+                          'nomeColaborador',
+                          e.target.value,
+                        )
                       }
                       required
                     />
@@ -1262,7 +1259,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.matricula ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('matricula', e.target.value)
                       }
                       required
@@ -1275,7 +1272,9 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.cargo ?? ''}
-                      onChange={(e) => handleAbonoChange('cargo', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('cargo', e.target.value)
+                      }
                       required
                     />
                   </div>
@@ -1286,19 +1285,20 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.contatoSetor ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('contatoSetor', e.target.value)
                       }
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Centro de custo <span className="text-red-500">*</span>
+                      Centro de custo{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.centroCusto ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('centroCusto', e.target.value)
                       }
                       required
@@ -1312,7 +1312,9 @@ setSubmitError(null);
                       type="email"
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.email ?? ''}
-                      onChange={(e) => handleAbonoChange('email', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('email', e.target.value)
+                      }
                       required
                     />
                   </div>
@@ -1323,7 +1325,9 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.empresa ?? ''}
-                      onChange={(e) => handleAbonoChange('empresa', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('empresa', e.target.value)
+                      }
                     />
                   </div>
                   <div>
@@ -1333,7 +1337,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.localTrabalho ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('localTrabalho', e.target.value)
                       }
                     />
@@ -1345,7 +1349,9 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.telefone ?? ''}
-                      onChange={(e) => handleAbonoChange('telefone', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('telefone', e.target.value)
+                      }
                     />
                   </div>
                   <div>
@@ -1355,7 +1361,9 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.cbo ?? ''}
-                      onChange={(e) => handleAbonoChange('cbo', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('cbo', e.target.value)
+                      }
                     />
                   </div>
                   <div>
@@ -1365,7 +1373,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.escolaridade ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('escolaridade', e.target.value)
                       }
                     />
@@ -1377,7 +1385,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.tipoContratacao ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('tipoContratacao', e.target.value)
                       }
                     />
@@ -1389,7 +1397,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.beneficio ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('beneficio', e.target.value)
                       }
                     />
@@ -1401,7 +1409,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.valorBeneficio ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('valorBeneficio', e.target.value)
                       }
                     />
@@ -1413,7 +1421,9 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.nivel ?? ''}
-                      onChange={(e) => handleAbonoChange('nivel', e.target.value)}
+                      onChange={(e: InputChange) =>
+                        handleAbonoChange('nivel', e.target.value)
+                      }
                     />
                   </div>
                 </div>
@@ -1425,8 +1435,11 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={abonoCampos.observacaoSolicitante ?? ''}
-                    onChange={(e) =>
-                      handleAbonoChange('observacaoSolicitante', e.target.value)
+                    onChange={(e: TextAreaChange) =>
+                      handleAbonoChange(
+                        'observacaoSolicitante',
+                        e.target.value,
+                      )
                     }
                   />
                 </div>
@@ -1441,7 +1454,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={abonoCampos.contratadaUmAno === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange(
                           'contratadaUmAno',
                           e.target.checked ? 'true' : 'false',
@@ -1455,7 +1468,7 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={abonoCampos.ausenciaAdvertencias === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange(
                           'ausenciaAdvertencias',
                           e.target.checked ? 'true' : 'false',
@@ -1469,14 +1482,16 @@ setSubmitError(null);
                     <input
                       type="checkbox"
                       checked={abonoCampos.cursosConcluidos === 'true'}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange(
                           'cursosConcluidos',
                           e.target.checked ? 'true' : 'false',
                         )
                       }
                     />
-                    <span>Cursos concluídos com notas/exercícios/provas</span>
+                    <span>
+                      Cursos concluídos com notas/exercícios/provas
+                    </span>
                   </label>
                 </div>
 
@@ -1488,7 +1503,9 @@ setSubmitError(null);
                     <select
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.statusRh ?? ''}
-                      onChange={(e) => handleAbonoChange('statusRh', e.target.value)}
+                      onChange={(e: SelectChange) =>
+                        handleAbonoChange('statusRh', e.target.value)
+                      }
                     >
                       <option value="">Selecione...</option>
                       <option value="Deferido">Deferido</option>
@@ -1502,7 +1519,7 @@ setSubmitError(null);
                     <input
                       className="w-full border rounded px-3 py-2 text-sm"
                       value={abonoCampos.assistenteRh ?? ''}
-                      onChange={(e) =>
+                      onChange={(e: InputChange) =>
                         handleAbonoChange('assistenteRh', e.target.value)
                       }
                     />
@@ -1516,7 +1533,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={abonoCampos.calculoAbono ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleAbonoChange('calculoAbono', e.target.value)
                     }
                   />
@@ -1529,7 +1546,7 @@ setSubmitError(null);
                   <textarea
                     className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
                     value={abonoCampos.observacoesRh ?? ''}
-                    onChange={(e) =>
+                    onChange={(e: TextAreaChange) =>
                       handleAbonoChange('observacoesRh', e.target.value)
                     }
                   />
@@ -1538,6 +1555,7 @@ setSubmitError(null);
             </>
           )}
 
+          {/* =================== DEFAULT =================== */}
           {selectedTipo && !isRQ063 && !isAbonoEducacional && (
             <p className="text-xs text-gray-500">
               Tipo selecionado ainda não tem formulário específico
