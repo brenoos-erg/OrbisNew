@@ -29,7 +29,7 @@ async function main() {
      ========================= */
 
   const vidalUser = await prisma.user.upsert({
-    where: { email: 'eduardo.vidal@ergengenharia.com.br' }, // ajuste se o e-mail for outro
+    where: { email: 'eduardo.vidal@ergengenharia.com.br' },
     update: {},
     create: {
       login: 'vidal',
@@ -37,12 +37,12 @@ async function main() {
       email: 'eduardo.vidal@ergengenharia.com.br',
       phone: '',
       status: UserStatus.ATIVO,
-      role: 'RH', // enum Role
+      role: 'RH',
     },
   })
 
   const lorenaUser = await prisma.user.upsert({
-    where: { email: 'lorena.oliveira@ergengenharia.com.br' }, // ajuste se o e-mail for outro
+    where: { email: 'lorena.oliveira@ergengenharia.com.br' },
     update: {},
     create: {
       login: 'lorena',
@@ -98,7 +98,7 @@ async function main() {
 
   for (const d of departamentos) {
     await prisma.department.upsert({
-      where: { code: d.code }, // code é unique no model
+      where: { code: d.code },
       update: { name: d.name },
       create: {
         code: d.code,
@@ -125,7 +125,7 @@ async function main() {
           centros: [],
           departamentos: [],
         },
-       camposEspecificos: [
+        camposEspecificos: [
           {
             name: 'linha',
             label: 'Linha de ônibus',
@@ -154,6 +154,10 @@ async function main() {
     where: { name: 'RECURSOS HUMANOS' },
   })
 
+  const dpDepartment = await prisma.department.findFirst({
+    where: { name: { contains: 'DEPARTAMENTO PESSOAL', mode: 'insensitive' } },
+  })
+
   /* =========================
      TIPO SOLICITAÇÃO DE ABONO EDUCACIONAL (RH)
      ========================= */
@@ -164,22 +168,91 @@ async function main() {
         departamentos: [rhDepartment.id],
       },
       camposEspecificos: [
-        { name: 'nomeColaborador', label: 'Nome do colaborador', type: 'text', required: true },
-        { name: 'matricula', label: 'Matrícula', type: 'text', required: true },
-        { name: 'cargo', label: 'Cargo', type: 'text', required: true },
-        { name: 'contatoSetor', label: 'Contato setor', type: 'text' },
-        { name: 'centroCusto', label: 'Centro de custo', type: 'text', required: true },
-        { name: 'email', label: 'E-mail', type: 'text', required: true },
-        { name: 'empresa', label: 'Empresa', type: 'text' },
-        { name: 'localTrabalho', label: 'Local de trabalho', type: 'text' },
-        { name: 'telefone', label: 'Telefone', type: 'text' },
-        { name: 'cbo', label: 'CBO', type: 'text' },
-        { name: 'escolaridade', label: 'Escolaridade', type: 'text' },
-        { name: 'tipoContratacao', label: 'Tipo de contratação', type: 'text' },
-        { name: 'beneficio', label: 'Benefício', type: 'text' },
-        { name: 'valorBeneficio', label: 'Valor do benefício', type: 'text' },
-        { name: 'nivel', label: 'Nível', type: 'text' },
-        { name: 'observacaoSolicitante', label: 'Observações do solicitante', type: 'textarea' },
+        {
+          name: 'nomeColaborador',
+          label: 'Nome do colaborador',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'matricula',
+          label: 'Matrícula',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'cargo',
+          label: 'Cargo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'contatoSetor',
+          label: 'Contato setor',
+          type: 'text',
+        },
+        {
+          name: 'centroCusto',
+          label: 'Centro de custo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'email',
+          label: 'E-mail',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'empresa',
+          label: 'Empresa',
+          type: 'text',
+        },
+        {
+          name: 'localTrabalho',
+          label: 'Local de trabalho',
+          type: 'text',
+        },
+        {
+          name: 'telefone',
+          label: 'Telefone',
+          type: 'text',
+        },
+        {
+          name: 'cbo',
+          label: 'CBO',
+          type: 'text',
+        },
+        {
+          name: 'escolaridade',
+          label: 'Escolaridade',
+          type: 'text',
+        },
+        {
+          name: 'tipoContratacao',
+          label: 'Tipo de contratação',
+          type: 'text',
+        },
+        {
+          name: 'beneficio',
+          label: 'Benefício',
+          type: 'text',
+        },
+        {
+          name: 'valorBeneficio',
+          label: 'Valor do benefício',
+          type: 'text',
+        },
+        {
+          name: 'nivel',
+          label: 'Nível',
+          type: 'text',
+        },
+        {
+          name: 'observacaoSolicitante',
+          label: 'Observações do solicitante',
+          type: 'textarea',
+        },
         {
           name: 'contratadaUmAno',
           label: 'Contratada há, no mínimo, 01 ano',
@@ -211,7 +284,11 @@ async function main() {
           label: 'Cálculo do abono (se mensal ou será pago)',
           type: 'textarea',
         },
-        { name: 'observacoesRh', label: 'Observações', type: 'textarea' },
+        {
+          name: 'observacoesRh',
+          label: 'Observações',
+          type: 'textarea',
+        },
       ],
     }
 
@@ -236,7 +313,230 @@ async function main() {
     )
   } else {
     console.warn(
-      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional e RQ_063) não foram criados.',
+      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional, RQ_063 e RQ_091) não foram criados.',
+    )
+  }
+
+  /* =========================
+     TIPO RQ_091 - SOLICITAÇÃO DE INCENTIVO À EDUCAÇÃO (RH)
+     ========================= */
+
+  if (rhDepartment) {
+    const schemaRQ091 = {
+      meta: {
+        departamentos: [rhDepartment.id],
+      },
+      camposEspecificos: [
+        {
+          name: 'nomeColaborador',
+          label: 'Nome do colaborador',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'matricula',
+          label: 'Matrícula',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'cargo',
+          label: 'Cargo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'contratante',
+          label: 'Contratante',
+          type: 'text',
+        },
+        {
+          name: 'tipoContrato',
+          label: 'Tipo de contrato',
+          type: 'text',
+        },
+        {
+          name: 'nivelInstrucao',
+          label: 'Nível de instrução',
+          type: 'text',
+        },
+        {
+          name: 'escolaridade',
+          label: 'Escolaridade',
+          type: 'text',
+        },
+        {
+          name: 'curso',
+          label: 'Curso',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'instituicao',
+          label: 'Instituição de ensino',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'semestre',
+          label: 'Semestre',
+          type: 'text',
+        },
+        {
+          name: 'dataInicio',
+          label: 'Data de início',
+          type: 'date',
+        },
+        {
+          name: 'dataFim',
+          label: 'Data fim',
+          type: 'date',
+        },
+        {
+          name: 'cidadeUf',
+          label: 'Cidade/UF',
+          type: 'text',
+        },
+        {
+          name: 'forma',
+          label: 'Forma (Presencial/online)',
+          type: 'text',
+        },
+        {
+          name: 'telefone',
+          label: 'Telefone',
+          type: 'text',
+        },
+        {
+          name: 'centroCusto',
+          label: 'Centro de Custo',
+          type: 'text',
+        },
+        {
+          name: 'valorMensalDespesas',
+          label: 'Valor (mensal) das despesas de estudo',
+          type: 'text',
+        },
+        {
+          name: 'areaCurso',
+          label: 'Área do curso',
+          type: 'text',
+        },
+        {
+          name: 'declaracao',
+          label: 'Declaro que',
+          type: 'textarea',
+        },
+        {
+          name: 'cienteRegras',
+          label: 'Declaro ter lido e estou ciente das regras.',
+          type: 'checkbox',
+        },
+        {
+          name: 'obrigatorioAnexoTermo',
+          label:
+            'Obrigatório anexar Termo de Compromisso assinado, Comprovante de Matrícula e Comprovante de Pagamento da Mensalidade. Se anexado, marque este checkbox.',
+          type: 'checkbox',
+        },
+        {
+          name: 'recebimentoAguardado',
+          label: 'Recebimento aguardado para 2023/2024.',
+          type: 'checkbox',
+        },
+        {
+          name: 'contratadaUmAno',
+          label: 'Contratado(a) há, no mínimo, 01 ano',
+          type: 'checkbox',
+        },
+        {
+          name: 'ausenciaAdvertencias',
+          label: 'Ausência de faltas, advertências disciplinares.',
+          type: 'checkbox',
+        },
+        {
+          name: 'cursoCursadoComFrequencia',
+          label: 'Curso cursado com frequência/presença',
+          type: 'checkbox',
+        },
+        {
+          name: 'statusRh',
+          label: 'Status',
+          type: 'select',
+          options: ['Deferido', 'Indeferido'],
+        },
+        {
+          name: 'avaliacaoRh',
+          label: 'Avaliação Recursos Humanos',
+          type: 'textarea',
+        },
+        {
+          name: 'calculoValor',
+          label: 'Cálculo do valor mensal a ser pago',
+          type: 'textarea',
+        },
+        {
+          name: 'observacoes',
+          label: 'Observações',
+          type: 'textarea',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ_091 - Solicitação de Incentivo à Educação' },
+      update: {
+        descricao: 'Solicitação de incentivo à educação (Recursos Humanos)',
+        schemaJson: schemaRQ091,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_091',
+        nome: 'RQ_091 - Solicitação de Incentivo à Educação',
+        descricao: 'Solicitação de incentivo à educação (Recursos Humanos)',
+        schemaJson: schemaRQ091,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      '✅ Tipo de solicitação "RQ_091 - Solicitação de Incentivo à Educação" criado/atualizado.',
+    )
+  }
+
+  /* =========================
+     TIPO DE ADMISSÃO (DP)
+     ========================= */
+
+  if (dpDepartment) {
+    const schemaAdmissao = {
+      meta: {
+        departamentos: [dpDepartment.id],
+      },
+      camposEspecificos: [],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'Solicitação de Admissão' },
+      update: {
+        descricao: 'Solicitação de admissão (Departamento Pessoal)',
+        schemaJson: schemaAdmissao,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: randomUUID(),
+        nome: 'Solicitação de Admissão',
+        descricao: 'Solicitação de admissão (Departamento Pessoal)',
+        schemaJson: schemaAdmissao,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      '✅ Tipo de solicitação "Solicitação de Admissão" criado/atualizado.',
+    )
+  } else {
+    console.warn(
+      '⚠️ Departamento Pessoal não encontrado. Tipo "Solicitação de Admissão" não foi atualizado.',
     )
   }
 
@@ -247,21 +547,16 @@ async function main() {
   if (rhDepartment) {
     const schemaRQ063 = {
       meta: {
-        // Esse tipo só aparece para RH
         departamentos: [rhDepartment.id],
       },
-
       camposEspecificos: [
-        // CARGO (select especial)
         {
           name: 'cargo',
           label: 'Cargo',
           type: 'select',
           required: true,
-          // deixamos vazio porque o FRONT vai buscar em /api/positions
           options: [],
         },
-
         {
           name: 'setorOuProjeto',
           label: 'Setor e/ou Projeto',
@@ -291,8 +586,6 @@ async function main() {
           label: 'Coordenador do Contrato',
           type: 'text',
         },
-
-        // BLOCO 2
         {
           name: 'motivoVaga',
           label: 'Motivo da vaga',
@@ -323,8 +616,6 @@ async function main() {
           label: 'Atividades complementares',
           type: 'textarea',
         },
-
-        // BLOCO 3 – Requisitos
         {
           name: 'escolaridade',
           label: 'Escolaridade',
@@ -362,8 +653,6 @@ async function main() {
           label: 'Competências comportamentais exigidas',
           type: 'textarea',
         },
-
-        // BLOCO 4 – Solicitações para o novo funcionário
         {
           name: 'solicitacaoCracha',
           label: 'Crachá',
@@ -405,8 +694,6 @@ async function main() {
           type: 'select',
           options: ['Sim', 'Não'],
         },
-
-        // BLOCO 5 – Escritório de Projetos
         {
           name: 'projetosLocal',
           label: 'Local (Matriz ou Filial)',
@@ -418,8 +705,6 @@ async function main() {
           label: 'Previsto em contrato (Salários, Benefícios, Carga horária e Outros)',
           type: 'textarea',
         },
-
-        // BLOCO 6 – RH
         {
           name: 'rhNomeProfissional',
           label: 'Nome do profissional',
@@ -438,18 +723,13 @@ async function main() {
       ],
     }
 
-
     await prisma.tipoSolicitacao.upsert({
       where: { nome: 'RQ_063 - Solicitação de Pessoal' },
-
-      // atualiza se já existir
       update: {
         descricao: 'Requisição de pessoal (Recursos Humanos)',
         schemaJson: schemaRQ063,
         updatedAt: new Date(),
       },
-
-      // cria se não existir
       create: {
         id: randomUUID(),
         nome: 'RQ_063 - Solicitação de Pessoal',
@@ -468,7 +748,6 @@ async function main() {
      CONTROLE DE ACESSO
      ========================= */
 
-  // 1️⃣ Criar módulo Solicitações
   const solicitacoesModule = await prisma.module.upsert({
     where: { key: 'solicitacoes' },
     update: {},
@@ -476,7 +755,6 @@ async function main() {
   })
   console.log('✅ Módulo criado:', solicitacoesModule.name)
 
-  // 2️⃣ Criar módulo Configurações
   const configModule = await prisma.module.upsert({
     where: { key: 'configuracoes' },
     update: {},
@@ -484,7 +762,6 @@ async function main() {
   })
   console.log('✅ Módulo criado:', configModule.name)
 
-  // 3️⃣ Criar grupo Administradores
   const adminGroup = await prisma.accessGroup.upsert({
     where: { name: 'Administradores' },
     update: {},
@@ -495,7 +772,6 @@ async function main() {
   })
   console.log('✅ Grupo criado:', adminGroup.name)
 
-  // 4️⃣ Permissões de Administradores no módulo Solicitações
   await prisma.accessGroupGrant.upsert({
     where: {
       groupId_moduleId: {
@@ -513,7 +789,6 @@ async function main() {
     },
   })
 
-  // 5️⃣ Adicionar usuário admin ao grupo Administradores
   await prisma.groupMember.upsert({
     where: {
       userId_groupId: {
@@ -530,7 +805,6 @@ async function main() {
   })
   console.log('✅ Usuário admin adicionado ao grupo Administradores')
 
-  // 6️⃣ Criar grupo Tecnologia da Informação
   const tiGroup = await prisma.accessGroup.upsert({
     where: { name: 'Tecnologia da Informação' },
     update: {},
@@ -538,7 +812,6 @@ async function main() {
   })
   console.log('✅ Grupo criado:', tiGroup.name)
 
-  // 7️⃣ Permissões de TI no módulo Configurações
   await prisma.accessGroupGrant.upsert({
     where: {
       groupId_moduleId: {
@@ -555,7 +828,6 @@ async function main() {
   })
   console.log('✅ Permissões de TI aplicadas ao módulo Configurações')
 
-  // 8️⃣ Criar grupo Aprovadores RQ_063
   const rq063ApproversGroup = await prisma.accessGroup.upsert({
     where: { name: 'Aprovadores RQ_063' },
     update: {},
@@ -566,7 +838,6 @@ async function main() {
   })
   console.log('✅ Grupo criado:', rq063ApproversGroup.name)
 
-  // 9️⃣ Permissões dos Aprovadores RQ_063 no módulo Solicitações (VIEW + APPROVE)
   await prisma.accessGroupGrant.upsert({
     where: {
       groupId_moduleId: {
@@ -587,7 +858,6 @@ async function main() {
     '✅ Permissões de Aprovadores RQ_063 aplicadas ao módulo Solicitações',
   )
 
-  // 🔟 Adicionar Vidal e Lorena ao grupo Aprovadores RQ_063
   await prisma.groupMember.upsert({
     where: {
       userId_groupId: {
