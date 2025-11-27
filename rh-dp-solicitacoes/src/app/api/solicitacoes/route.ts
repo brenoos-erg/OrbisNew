@@ -308,8 +308,8 @@ export async function POST(req: NextRequest) {
       tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isAbonoEducacional = tipo.nome === 'Solicitação de Abono Educacional'
 
-    // 3) Regras específicas para RQ_063 / RQ_091 - seguem o mesmo fluxo de aprovação
-    if (isSolicitacaoPessoal || isSolicitacaoIncentivo) {
+    // 3) RQ_063 segue fluxo de aprovação; RQ_091 não precisa de aprovador nível 3
+    if (isSolicitacaoPessoal) {
       const rawCampo =
         (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
         (payload?.campos?.vagaPrevista as string | undefined) ??
@@ -377,7 +377,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated, { status: 201 })
     }
 
-   if (isAbonoEducacional) {
+    if (isSolicitacaoIncentivo) {
+      // Não precisa de aprovação: segue direto para atendimento do RH
+      return NextResponse.json(created, { status: 201 })
+    }
+
+    if (isSolicitacaoIncentivo) {
+      const updated = await prisma.solicitation.update({
+        where: { id: created.id },
+        data: {
+          requiresApproval: true,
+          approvalStatus: 'PENDENTE',
+          approverId: null,
+          status: 'AGUARDANDO_APROVACAO',
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: crypto.randomUUID(),
+          solicitationId: created.id,
+          actorId: solicitanteId,
+          tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+        },
+      })
+
+      return NextResponse.json(updated, { status: 201 })
+    }
+
+    if (isAbonoEducacional) {
       const approver = await findLevel3ApproverForCostCenter(costCenterId)
       const approverId = approver?.id ?? null
 

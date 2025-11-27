@@ -79,6 +79,37 @@ export async function POST(
     const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
     const solicitanteOrigem = payloadOrigem.solicitante ?? {}
+    
+    const nomeFinalIncentivo =
+      (outrasInfos?.nomeColaborador as string | undefined)?.trim() ??
+      (camposOrigem.nomeColaborador as string | undefined)?.trim() ??
+      ''
+
+    const valorContribuicaoFinal =
+      (outrasInfos?.calculoValor as string | undefined)?.trim() ??
+      (outrasInfos?.valorContribuicao as string | undefined)?.trim() ??
+      (camposOrigem.calculoValor as string | undefined)?.trim() ??
+      ''
+
+    if (isSolicitacaoIncentivo) {
+      if (!nomeFinalIncentivo) {
+        return NextResponse.json(
+          { error: 'Informe o nome do usuário antes de enviar ao DP.' },
+          { status: 400 },
+        )
+      }
+
+      if (!valorContribuicaoFinal) {
+        return NextResponse.json(
+          {
+            error:
+              'Informe o valor de contribuição (cálculo do valor mensal a ser pago) antes de enviar ao DP.',
+          },
+          { status: 400 },
+        )
+      }
+    }
+
 /*
     // 2) Tipo de solicitação do DP
     const tipoAdmissao = await prisma.tipoSolicitacao.findFirst({
@@ -165,7 +196,9 @@ export async function POST(
           status: 'CONCLUIDA',
           message: isSolicitacaoPessoal
             ? `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`
-            : `Finalizada no RH por ${me.fullName ?? me.id}.`,
+           : isSolicitacaoIncentivo
+              ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
+              : `Finalizada no RH por ${me.fullName ?? me.id}.`,
         },
       })
 
@@ -273,11 +306,11 @@ export async function POST(
           },
         })
 
-      await tx.event.create({
+     await tx.event.create({
           data: {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             solicitationId: dpSolicitation.id,
-           actorId: me.id,
+            actorId: me.id,
             tipo: 'CRIACAO_AUTOMATICA_ADMISSAO',
           },
 
@@ -286,7 +319,127 @@ export async function POST(
         if (solicitation.anexos && solicitation.anexos.length > 0) {
           await tx.attachment.createMany({
             data: solicitation.anexos.map((a) => ({
-              id: crypto.randomUUID(),
+                 id: randomUUID(),
+              solicitationId: dpSolicitation.id,
+              filename: a.filename,
+              url: a.url,
+              mimeType: a.mimeType,
+              sizeBytes: a.sizeBytes,
+              createdAt: a.createdAt,
+            })),
+          })
+        }
+      }
+
+      if (isSolicitacaoIncentivo) {
+        const tipoIncentivo = await tx.tipoSolicitacao.findFirst({
+          where: { nome: 'RQ_091 - Solicitação de Incentivo à Educação' },
+        })
+
+        if (!tipoIncentivo) {
+          throw new Error(
+            'Tipo "RQ_091 - Solicitação de Incentivo à Educação" não cadastrado.',
+          )
+        }
+
+        const ccDp = await tx.costCenter.findFirst({
+          where: { externalCode: '590' },
+        })
+
+        if (!ccDp) {
+          throw new Error(
+            'Centro de custo do DP (externalCode = 590) não encontrado.',
+          )
+        }
+
+        const deptDp = await tx.department.findFirst({
+          where: {
+            OR: [
+              { code: 'DP' },
+              { name: { contains: 'Pessoal', mode: 'insensitive' } },
+            ],
+          },
+        })
+
+        dpSolicitation = await tx.solicitation.create({
+          data: {
+            protocolo: generateProtocolo(),
+            tipoId: tipoIncentivo.id,
+            costCenterId: ccDp.id,
+            departmentId: deptDp?.id ?? solicitation.departmentId,
+            solicitanteId: solicitation.solicitanteId,
+            parentId: solicitation.id,
+            titulo: 'RQ_091 - Solicitação de Incentivo à Educação',
+            descricao: `Solicitação encaminhada pelo RH para o DP a partir da ${solicitation.protocolo}.`,
+            requiresApproval: false,
+            approvalStatus: 'NAO_PRECISA',
+            status: 'ABERTA',
+            payload: {
+              origem: {
+                rhSolicitationId: solicitation.id,
+                rhProtocolo: solicitation.protocolo,
+              },
+              campos: {
+                ...camposOrigem,
+                ...(candidatoNome
+                  ? { candidatoNome }
+                  : camposOrigem.candidatoNome
+                    ? { candidatoNome: camposOrigem.candidatoNome }
+                    : {}),
+                ...(candidatoDocumento
+                  ? { candidatoDocumento }
+                  : camposOrigem.candidatoDocumento
+                    ? { candidatoDocumento: camposOrigem.candidatoDocumento }
+                    : {}),
+                ...(dataAdmissaoPrevista
+                  ? { dataAdmissaoPrevista }
+                  : camposOrigem.dataAdmissaoPrevista
+                    ? { dataAdmissaoPrevista: camposOrigem.dataAdmissaoPrevista }
+                    : {}),
+                ...(salario
+                  ? { salario }
+                  : camposOrigem.salario
+                    ? { salario: camposOrigem.salario }
+                    : {}),
+                ...(cargo
+                  ? { cargoFinal: cargo }
+                  : camposOrigem.cargoFinal
+                    ? { cargoFinal: camposOrigem.cargoFinal }
+                    : {}),
+                ...(outrasInfos ?? {}),
+                ...(isSolicitacaoIncentivo
+                  ? {
+                      nomeColaborador: nomeFinalIncentivo,
+                      calculoValor: valorContribuicaoFinal,
+                    }
+                  : {}),
+              },
+              solicitante: solicitanteOrigem,
+            },
+          },
+        })
+
+        await tx.solicitationTimeline.create({
+          data: {
+            solicitationId: dpSolicitation.id,
+            status: 'ABERTA',
+            message: `Solicitação encaminhada para o DP a partir da ${solicitation.protocolo}.`,
+          },
+        })
+
+        await tx.event.create({
+          data: {
+            id: randomUUID(),
+            solicitationId: dpSolicitation.id,
+            actorId: me.id,
+            tipo: 'CRIACAO_AUTOMATICA_INCENTIVO',
+          },
+        })
+
+        if (solicitation.anexos && solicitation.anexos.length > 0) {
+          await tx.attachment.createMany({
+            data: solicitation.anexos.map((a) => ({
+              id: randomUUID(),
               solicitationId: dpSolicitation.id,
               filename: a.filename,
               url: a.url,
@@ -313,3 +466,4 @@ export async function POST(
     )
   }
 }
+

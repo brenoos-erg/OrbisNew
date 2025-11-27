@@ -300,6 +300,10 @@ export function SolicitationDetailModal({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  // formulário específico para a RQ_091 (nome e valor de contribuição)
+  const [showIncentivoForm, setShowIncentivoForm] = useState(false)
+  const [incentivoNome, setIncentivoNome] = useState('')
+  const [incentivoValor, setIncentivoValor] = useState('')
 
   const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ??
@@ -342,6 +346,29 @@ export function SolicitationDetailModal({
 
   // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH)
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
+  const nomeIncentivoAtual =
+    incentivoNome.trim() || (payloadCampos.nomeColaborador as string) || ''
+  const valorIncentivoAtual =
+    incentivoValor.trim() || (payloadCampos.calculoValor as string) || ''
+
+  const canEnviarParaDp =
+    canFinalizarRh &&
+    (!isSolicitacaoIncentivo ||
+      (nomeIncentivoAtual.trim().length > 0 &&
+        valorIncentivoAtual.trim().length > 0))
+
+  useEffect(() => {
+    if (isSolicitacaoIncentivo) {
+      setIncentivoNome(
+        (payloadCampos.nomeColaborador as string) ?? incentivoNome ?? '',
+      )
+      setIncentivoValor(
+        (payloadCampos.calculoValor as string) ?? incentivoValor ?? '',
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSolicitacaoIncentivo, payloadCampos])
+
 
   // ===== AÇÕES =====
   async function refreshDetailFromServer() {
@@ -429,7 +456,17 @@ export function SolicitationDetailModal({
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
-  
+   if (isSolicitacaoIncentivo) {
+      if (!nomeIncentivoAtual.trim()) {
+        setCloseError('Preencha o nome do usuário antes de enviar ao DP.')
+        return
+      }
+
+      if (!valorIncentivoAtual.trim()) {
+        setCloseError('Informe o valor de contribuição antes de enviar ao DP.')
+        return
+      }
+    }
 
     setClosing(true)
     setCloseError(null)
@@ -461,7 +498,12 @@ export function SolicitationDetailModal({
             dataAdmissaoPrevista,
             salario,
             cargo,
-            outrasInfos: {},
+            outrasInfos: isSolicitacaoIncentivo
+              ? {
+                  nomeColaborador: nomeIncentivoAtual,
+                  calculoValor: valorIncentivoAtual,
+                }
+              : {},
           }),
         },
       )
@@ -474,7 +516,7 @@ export function SolicitationDetailModal({
       setCloseSuccess(
         isSolicitacaoPessoal
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
-          : 'Solicitação finalizada no RH.',
+          : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
       )
     } catch (err: any) {
       console.error('Erro ao finalizar RH', err)
@@ -658,16 +700,35 @@ export function SolicitationDetailModal({
                       : 'Dados do contratado'}
                   </button>
                 )}
+                {canFinalizarRh && isSolicitacaoIncentivo && (
+                  <button
+                    onClick={() => setShowIncentivoForm((v) => !v)}
+                    className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    {showIncentivoForm ? 'Ocultar dados' : 'Incluir dados'}
+                  </button>
+                )}
+
+
+                {canFinalizarRh && (
+                  <button
+                    onClick={() => handleStartApproval('REPROVAR')}
+                    disabled={closing}
+                    className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+                  >
+                    Reprovar chamado
+                  </button>
+                )}
 
                 {canFinalizarRh && (
                   <button
                     onClick={handleFinalizarRh}
-                    disabled={closing}
+                    disabled={closing || !canEnviarParaDp}
                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                   >
                     {closing
                       ? 'Enviando...'
-                      : isSolicitacaoPessoal
+                      : isSolicitacaoPessoal || isSolicitacaoIncentivo
                         ? 'Enviar para o DP'
                         : 'Finalizar no RH'}
                   </button>
@@ -683,7 +744,7 @@ export function SolicitationDetailModal({
             </button>
           </div>
         </div>
-        {isApprovalMode && approvalAction && (
+        {approvalAction && (isApprovalMode || approvalAction === 'REPROVAR') && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 space-y-2">
@@ -1086,6 +1147,39 @@ export function SolicitationDetailModal({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+              {showIncentivoForm && isSolicitacaoIncentivo && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Dados para envio ao DP (RQ_091)
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div>
+                      <label className={LABEL_RO}>Nome do usuário</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={incentivoNome}
+                        onChange={(e) => setIncentivoNome(e.target.value)}
+                        placeholder="Nome do colaborador"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={LABEL_RO}>Valor de contribuição</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={incentivoValor}
+                        onChange={(e) => setIncentivoValor(e.target.value)}
+                        placeholder="Ex.: 750,00"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-emerald-800">
+                    Preencha o nome do usuário e o valor de contribuição para habilitar o envio ao DP.
+                  </p>
                 </div>
               )}
 
