@@ -71,6 +71,7 @@ export async function GET(
       }
       return !already
     })
+
     // Mapeia para o formato que o front espera
     const result = {
    id: item.id,

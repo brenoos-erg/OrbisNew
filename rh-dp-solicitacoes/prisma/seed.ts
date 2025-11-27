@@ -125,7 +125,7 @@ async function main() {
           centros: [],
           departamentos: [],
         },
-        camposEspecificos: [
+       camposEspecificos: [
           {
             name: 'linha',
             label: 'Linha de ônibus',
@@ -150,19 +150,101 @@ async function main() {
 
   console.log('✅ Tipo de solicitação "Vale-transporte" criado/atualizado.')
 
-  /* =========================
-     TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (RH)
-     ========================= */
-
   const rhDepartment = await prisma.department.findFirst({
     where: { name: 'RECURSOS HUMANOS' },
   })
 
-  if (!rhDepartment) {
-    console.warn(
-      '⚠️ Departamento de Recursos Humanos (code=17) não encontrado. Tipo RQ_063 não foi criado.',
+  /* =========================
+     TIPO SOLICITAÇÃO DE ABONO EDUCACIONAL (RH)
+     ========================= */
+
+  if (rhDepartment) {
+    const schemaAbonoEducacional = {
+      meta: {
+        departamentos: [rhDepartment.id],
+      },
+      camposEspecificos: [
+        { name: 'nomeColaborador', label: 'Nome do colaborador', type: 'text', required: true },
+        { name: 'matricula', label: 'Matrícula', type: 'text', required: true },
+        { name: 'cargo', label: 'Cargo', type: 'text', required: true },
+        { name: 'contatoSetor', label: 'Contato setor', type: 'text' },
+        { name: 'centroCusto', label: 'Centro de custo', type: 'text', required: true },
+        { name: 'email', label: 'E-mail', type: 'text', required: true },
+        { name: 'empresa', label: 'Empresa', type: 'text' },
+        { name: 'localTrabalho', label: 'Local de trabalho', type: 'text' },
+        { name: 'telefone', label: 'Telefone', type: 'text' },
+        { name: 'cbo', label: 'CBO', type: 'text' },
+        { name: 'escolaridade', label: 'Escolaridade', type: 'text' },
+        { name: 'tipoContratacao', label: 'Tipo de contratação', type: 'text' },
+        { name: 'beneficio', label: 'Benefício', type: 'text' },
+        { name: 'valorBeneficio', label: 'Valor do benefício', type: 'text' },
+        { name: 'nivel', label: 'Nível', type: 'text' },
+        { name: 'observacaoSolicitante', label: 'Observações do solicitante', type: 'textarea' },
+        {
+          name: 'contratadaUmAno',
+          label: 'Contratada há, no mínimo, 01 ano',
+          type: 'checkbox',
+        },
+        {
+          name: 'ausenciaAdvertencias',
+          label: 'Ausência de faltas, advertências disciplinares.',
+          type: 'checkbox',
+        },
+        {
+          name: 'cursosConcluidos',
+          label: 'Cursos concluídos com notas/exercícios/provas',
+          type: 'checkbox',
+        },
+        {
+          name: 'statusRh',
+          label: 'Status',
+          type: 'select',
+          options: ['Deferido', 'Indeferido'],
+        },
+        {
+          name: 'assistenteRh',
+          label: 'Assistente Recursos Humanos',
+          type: 'text',
+        },
+        {
+          name: 'calculoAbono',
+          label: 'Cálculo do abono (se mensal ou será pago)',
+          type: 'textarea',
+        },
+        { name: 'observacoesRh', label: 'Observações', type: 'textarea' },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'Solicitação de Abono Educacional' },
+      update: {
+        descricao: 'Solicitação para avaliação e concessão de abono educacional',
+        schemaJson: schemaAbonoEducacional,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: randomUUID(),
+        nome: 'Solicitação de Abono Educacional',
+        descricao: 'Solicitação para avaliação e concessão de abono educacional',
+        schemaJson: schemaAbonoEducacional,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      '✅ Tipo de solicitação "Solicitação de Abono Educacional" criado/atualizado.',
     )
   } else {
+    console.warn(
+      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional e RQ_063) não foram criados.',
+    )
+  }
+
+  /* =========================
+     TIPO RQ_063 - SOLICITAÇÃO DE PESSOAL (RH)
+     ========================= */
+
+  if (rhDepartment) {
     const schemaRQ063 = {
       meta: {
         // Esse tipo só aparece para RH

@@ -89,6 +89,7 @@ export default function NovaSolicitacaoPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
+  const [abonoCampos, setAbonoCampos] = useState<Extras>({});
 
   /* ============================================================
    1) /api/me
@@ -196,6 +197,15 @@ export default function NovaSolicitacaoPage() {
     selectedTipo &&
     (selectedTipo.id.toUpperCase() === 'RQ_063' ||
       selectedTipo.nome.toUpperCase().includes('RQ_063'));
+       const isAbonoEducacional =
+    selectedTipo?.nome === 'Solicitação de Abono Educacional';
+
+  useEffect(() => {
+    if (!isAbonoEducacional) {
+      setAbonoCampos({});
+    }
+  }, [isAbonoEducacional]);
+
 
   /* ============================================================
    4) /api/positions
@@ -234,6 +244,13 @@ export default function NovaSolicitacaoPage() {
       [name]: value,
     }));
   };
+  const handleAbonoChange = (name: string, value: string) => {
+    setAbonoCampos((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
     handleExtraChange(name, checked ? 'true' : 'false');
@@ -269,116 +286,143 @@ export default function NovaSolicitacaoPage() {
    6) SUBMIT
   ============================================================ */
   const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
+ e.preventDefault();
 
-  if (!centroId || !departamentoId || !tipoId) {
-    setSubmitError(
-      'Preencha Centro de Custo, Departamento e Tipo de Solicitação.',
-    );
-    return;
-  }
-
-  if (isRQ063 && !cargoId) {
-    setSubmitError('Selecione o cargo para continuar.');
-    return;
-  }
-
-  setSubmitError(null);
-  setSubmitting(true);
-
-  try {
-    // nome do cargo selecionado
-    const cargoSelecionado = positions.find((p) => p.id === cargoId)?.name ?? '';
-
-    // monta strings “bonitinhas” para os campos agregados
-    const motivoParts: string[] = [];
-    if (extras.motivoSubstituicao === 'true') motivoParts.push('Substituição');
-    if (extras.motivoAumentoQuadro === 'true') motivoParts.push('Aumento de quadro');
-
-    const tipoContrParts: string[] = [];
-    if (extras.contratacaoTemporaria === 'true') tipoContrParts.push('Temporária');
-    if (extras.contratacaoPermanente === 'true') tipoContrParts.push('Permanente');
-
-    const enxovalParts: string[] = [];
-    if (extras.solicitacaoCracha === 'true') enxovalParts.push('Crachá');
-    if (extras.solicitacaoRepublica === 'true') enxovalParts.push('República');
-    if (extras.solicitacaoUniforme === 'true') enxovalParts.push('Uniforme');
-    if (extras.solicitacaoTesteDirecao === 'true') enxovalParts.push('Teste direção');
-    if (extras.solicitacaoEpis === 'true') enxovalParts.push('EPIs');
-    if (extras.solicitacaoPostoTrabalho === 'true')
-      enxovalParts.push('Ponto / Posto de trabalho');
-
-     // === CAMPOS ENVIADOS PARA A API (e exibidos no modal) ===
-    const campos = {
-      // guarda tudo cru também, se quiser aproveitar em outras telas
-      ...extras,
-
-        // CHAVES QUE O RQ063ResumoCampos USA:
-        cargo: cargoSelecionado,
-      setorProjeto: extras.setorProjeto ?? '',
-      localTrabalho: extras.localTrabalho ?? '',
-      horarioTrabalho: extras.horarioTrabalho ?? '',
-
-        vagaPrevistaContrato: extras.vagaPrevista ?? '',
-
-        motivoVaga: motivoParts.join(' / '),
-      tipoContratacao: tipoContrParts.join(' / '),
-
-        principaisAtividades: extras.principaisAtividades ?? '',
-      atividadesComplementares: extras.atividadesComplementares ?? '',
-
-        escolaridade: extras.escolaridade ?? '',
-      curso: extras.curso ?? '',
-      periodoModulo: extras.periodoModulo ?? '',
-
-        requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
-      competenciasComportamentais: extras.competenciasComportamentais ?? '',
-
-        enxoval: enxovalParts.join(' / '),
-      outros: extras.solicitacaoOutros ?? '',
-
-        observacoes: extras.observacoesRh ?? '',
-    };
-
-    const body = {
-      solicitanteId: me?.id ?? null,
-      costCenterId: centroId,
-      departmentId: departamentoId,
-      tipoId,
-      campos, // a API monta o payload a partir desses campos
-    };
-
-    const res = await fetch('/api/solicitacoes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      let msg = 'Falha ao registrar a solicitação.';
-      try {
-        const json = await res.json();
-        if (json?.error) msg = json.error;
-      } catch {
-        // ignore
-      }
-      throw new Error(msg);
+    if (isRQ063 && !cargoId) {
+      setSubmitError('Selecione o cargo para continuar.');
+      return;
     }
+    }
+setSubmitError(null);
+    setSubmitting(true);
 
-    const data = await res.json();
-    console.log('Solicitação criada:', data);
+    try {
+      let campos: Record<string, string> = {};
 
-    router.push('/dashboard/solicitacoes/enviadas');
-  } catch (err: any) {
-    console.error('Erro ao enviar solicitação', err);
-    setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
-  } finally {
-    setSubmitting(false);
-  }
-};
+      if (isRQ063) {
+        // nome do cargo selecionado
+        const cargoSelecionado =
+          positions.find((p) => p.id === cargoId)?.name ?? '';
 
+        // monta strings “bonitinhas” para os campos agregados
+        const motivoParts: string[] = [];
+        if (extras.motivoSubstituicao === 'true')
+          motivoParts.push('Substituição');
+        if (extras.motivoAumentoQuadro === 'true')
+          motivoParts.push('Aumento de quadro');
+
+        const tipoContrParts: string[] = [];
+        if (extras.contratacaoTemporaria === 'true')
+          tipoContrParts.push('Temporária');
+        if (extras.contratacaoPermanente === 'true')
+          tipoContrParts.push('Permanente');
+
+        const enxovalParts: string[] = [];
+        if (extras.solicitacaoCracha === 'true') enxovalParts.push('Crachá');
+        if (extras.solicitacaoRepublica === 'true')
+          enxovalParts.push('República');
+        if (extras.solicitacaoUniforme === 'true')
+          enxovalParts.push('Uniforme');
+        if (extras.solicitacaoTesteDirecao === 'true')
+          enxovalParts.push('Teste direção');
+        if (extras.solicitacaoEpis === 'true') enxovalParts.push('EPIs');
+        if (extras.solicitacaoPostoTrabalho === 'true')
+          enxovalParts.push('Ponto / Posto de trabalho');
+
+        // === CAMPOS ENVIADOS PARA A API (e exibidos no modal) ===
+        campos = {
+          // guarda tudo cru também, se quiser aproveitar em outras telas
+          ...extras,
+
+          // CHAVES QUE O RQ063ResumoCampos USA:
+          cargo: cargoSelecionado,
+          setorProjeto: extras.setorProjeto ?? '',
+          localTrabalho: extras.localTrabalho ?? '',
+          horarioTrabalho: extras.horarioTrabalho ?? '',
+
+          vagaPrevistaContrato: extras.vagaPrevista ?? '',
+
+          motivoVaga: motivoParts.join(' / '),
+          tipoContratacao: tipoContrParts.join(' / '),
+
+          principaisAtividades: extras.principaisAtividades ?? '',
+          atividadesComplementares: extras.atividadesComplementares ?? '',
+
+          escolaridade: extras.escolaridade ?? '',
+          curso: extras.curso ?? '',
+          periodoModulo: extras.periodoModulo ?? '',
+
+          requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
+          competenciasComportamentais: extras.competenciasComportamentais ?? '',
+
+          enxoval: enxovalParts.join(' / '),
+          outros: extras.solicitacaoOutros ?? '',
+
+          observacoes: extras.observacoesRh ?? '',
+        };
+      } else if (isAbonoEducacional) {
+        const obrigatorios = [
+          'nomeColaborador',
+          'matricula',
+          'cargo',
+          'centroCusto',
+          'email',
+        ];
+
+        const faltantes = obrigatorios.filter((k) => !abonoCampos[k]);
+        if (faltantes.length > 0) {
+          setSubmitError('Preencha os campos obrigatórios do formulário.');
+          setSubmitting(false);
+          return;
+        }
+
+        campos = { ...abonoCampos };
+      } else {
+        setSubmitError(
+          'Este tipo de solicitação ainda não possui formulário configurado.',
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const body = {
+        solicitanteId: me?.id ?? null,
+        costCenterId: centroId,
+        departmentId: departamentoId,
+        tipoId,
+        campos, // a API monta o payload a partir desses campos
+      };
+
+      const res = await fetch('/api/solicitacoes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        let msg = 'Falha ao registrar a solicitação.';
+        try {
+          const json = await res.json();
+          if (json?.error) msg = json.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      console.log('Solicitação criada:', data);
+
+      router.push('/dashboard/solicitacoes/enviadas');
+    } catch (err: any) {
+      console.error('Erro ao enviar solicitação', err);
+      setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   /* ============================================================
    RENDER
@@ -1187,7 +1231,314 @@ export default function NovaSolicitacaoPage() {
             </>
           )}
 
-          {selectedTipo && !isRQ063 && (
+           {selectedTipo && isAbonoEducacional && (
+            <>
+              <h2 className="text-sm font-semibold mb-4">
+                {selectedTipo.nome}
+              </h2>
+
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase">
+                  Dados do colaborador
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Nome do colaborador <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.nomeColaborador ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('nomeColaborador', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Matrícula <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.matricula ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('matricula', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Cargo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.cargo ?? ''}
+                      onChange={(e) => handleAbonoChange('cargo', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Contato do setor
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.contatoSetor ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('contatoSetor', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Centro de custo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.centroCusto ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('centroCusto', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      E-mail <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.email ?? ''}
+                      onChange={(e) => handleAbonoChange('email', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Empresa
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.empresa ?? ''}
+                      onChange={(e) => handleAbonoChange('empresa', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Local de trabalho
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.localTrabalho ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('localTrabalho', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Telefone
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.telefone ?? ''}
+                      onChange={(e) => handleAbonoChange('telefone', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      CBO
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.cbo ?? ''}
+                      onChange={(e) => handleAbonoChange('cbo', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Escolaridade
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.escolaridade ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('escolaridade', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Tipo de contratação
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.tipoContratacao ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('tipoContratacao', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Benefício
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.beneficio ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('beneficio', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Valor do benefício
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.valorBeneficio ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('valorBeneficio', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Nível
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.nivel ?? ''}
+                      onChange={(e) => handleAbonoChange('nivel', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Observações do solicitante
+                  </label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
+                    value={abonoCampos.observacaoSolicitante ?? ''}
+                    onChange={(e) =>
+                      handleAbonoChange('observacaoSolicitante', e.target.value)
+                    }
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-3 pt-4 border-t">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase">
+                  Requisitos de RH
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={abonoCampos.contratadaUmAno === 'true'}
+                      onChange={(e) =>
+                        handleAbonoChange(
+                          'contratadaUmAno',
+                          e.target.checked ? 'true' : 'false',
+                        )
+                      }
+                    />
+                    <span>Contratada há, no mínimo, 01 ano</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={abonoCampos.ausenciaAdvertencias === 'true'}
+                      onChange={(e) =>
+                        handleAbonoChange(
+                          'ausenciaAdvertencias',
+                          e.target.checked ? 'true' : 'false',
+                        )
+                      }
+                    />
+                    <span>Ausência de faltas, advertências disciplinares.</span>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={abonoCampos.cursosConcluidos === 'true'}
+                      onChange={(e) =>
+                        handleAbonoChange(
+                          'cursosConcluidos',
+                          e.target.checked ? 'true' : 'false',
+                        )
+                      }
+                    />
+                    <span>Cursos concluídos com notas/exercícios/provas</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Status
+                    </label>
+                    <select
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.statusRh ?? ''}
+                      onChange={(e) => handleAbonoChange('statusRh', e.target.value)}
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="Deferido">Deferido</option>
+                      <option value="Indeferido">Indeferido</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                      Assistente Recursos Humanos
+                    </label>
+                    <input
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      value={abonoCampos.assistenteRh ?? ''}
+                      onChange={(e) =>
+                        handleAbonoChange('assistenteRh', e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Cálculo do abono (se mensal ou será pago)
+                  </label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
+                    value={abonoCampos.calculoAbono ?? ''}
+                    onChange={(e) =>
+                      handleAbonoChange('calculoAbono', e.target.value)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    Observações
+                  </label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
+                    value={abonoCampos.observacoesRh ?? ''}
+                    onChange={(e) =>
+                      handleAbonoChange('observacoesRh', e.target.value)
+                    }
+                  />
+                </div>
+              </section>
+            </>
+          )}
+
+          {selectedTipo && !isRQ063 && !isAbonoEducacional && (
             <p className="text-xs text-gray-500">
               Tipo selecionado ainda não tem formulário específico
               implementado ({selectedTipo.nome}).

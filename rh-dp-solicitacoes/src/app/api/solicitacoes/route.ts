@@ -302,8 +302,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const isSolicitacaoPessoal = tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isAbonoEducacional = tipo.nome === 'Solicitação de Abono Educacional'
+
     // 3) Regras específicas para RQ_063 - Solicitação de Pessoal
-    if (tipo.nome === 'RQ_063 - Solicitação de Pessoal') {
+    if (isSolicitacaoPessoal) {
       const rawCampo =
         (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
         (payload?.campos?.vagaPrevista as string | undefined) ??
@@ -371,7 +374,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated, { status: 201 })
     }
 
-    // 4) Se não for RQ_063, devolve a criada normal
+   if (isAbonoEducacional) {
+      const approver = await findLevel3ApproverForCostCenter(costCenterId)
+      const approverId = approver?.id ?? null
+
+      const updated = await prisma.solicitation.update({
+        where: { id: created.id },
+        data: {
+          requiresApproval: true,
+          approvalStatus: 'PENDENTE',
+          approverId,
+          status: 'AGUARDANDO_APROVACAO',
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: crypto.randomUUID(),
+          solicitationId: created.id,
+          actorId: approverId ?? solicitanteId,
+          tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+        },
+      })
+
+      return NextResponse.json(updated, { status: 201 })
+    }
+
+    // 4) Se não for RQ_063 nem Abono Educacional, devolve a criada normal
     return NextResponse.json(created, { status: 201 })
   } catch (e) {
     console.error('POST /api/solicitacoes error', e)

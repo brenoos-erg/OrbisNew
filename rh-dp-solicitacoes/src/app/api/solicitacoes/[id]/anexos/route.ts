@@ -6,10 +6,12 @@ import { supabase } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 const ATTACHMENTS_BUCKET =
   process.env.SUPABASE_ATTACHMENTS_BUCKET || 'attachments'
+
+const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
+const ALLOWED_MIME_PREFIXES = ['image/', 'application/pdf']
 
 class HttpError extends Error {
   status: number
@@ -20,12 +22,6 @@ class HttpError extends Error {
   }
 }
 
-type StorageApiError = {
-  message: string
-  statusCode?: number
-  error?: string
-}
-
 async function ensureAttachmentsBucket() {
   const { data: bucket, error } = await supabase.storage.getBucket(
     ATTACHMENTS_BUCKET,
@@ -33,11 +29,21 @@ async function ensureAttachmentsBucket() {
 
   if (bucket) return
 
-  // 👉 FIX DO TYPE ERROR
-  const err = error as StorageApiError
+  if (error) {
+    const rawStatusCode =
+      (error as { statusCode?: number | string }).statusCode ??
+      (error as { status?: number | string }).status
 
-  if (err && err.statusCode !== 404) {
-    throw error
+    const statusCode =
+      typeof rawStatusCode === 'string'
+        ? Number.parseInt(rawStatusCode, 10)
+        : typeof rawStatusCode === 'number'
+          ? rawStatusCode
+          : undefined
+
+    if (statusCode !== 404) {
+      throw error
+    }
   }
 
   const { error: createError } = await supabase.storage.createBucket(
@@ -74,7 +80,16 @@ export async function POST(
     for (const file of files) {
       if (!(file instanceof File)) continue
 
-      const buffer = Buffer.from(await file.arrayBuffer())
+      if (file.size > MAX_SIZE) {
+        throw new HttpError(413, 'Arquivo muito grande (máx. 10 MB).')
+      }
+
+      if (!ALLOWED_MIME_PREFIXES.some(prefix => file.type.startsWith(prefix))) {
+        throw new HttpError(400, 'Tipo de arquivo não permitido.')
+      }
+
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
 
       const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
       const path = `solicitation-${solicitationId}/${randomUUID()}.${ext}`
