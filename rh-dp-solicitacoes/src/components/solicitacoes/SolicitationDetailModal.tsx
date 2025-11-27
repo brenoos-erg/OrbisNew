@@ -325,10 +325,14 @@ export function SolicitationDetailModal({
 
   const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
+    // Fluxo especial de RH (RQ_063 e RQ_091)
 
-  // Só RQ_063 segue esse fluxo especial de RH → DP
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoIncentivo =
+    detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+  const followsRhFinalizationFlow =
+    isSolicitacaoPessoal || isSolicitacaoIncentivo
 
   const isFinalizadaOuCancelada =
     effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
@@ -336,8 +340,8 @@ export function SolicitationDetailModal({
   // pode assumir se não estiver concluída/cancelada
   const canAssumir = !isFinalizadaOuCancelada
 
-  // pode enviar para o DP se for RQ_063
-  const canEnviarDp = isSolicitacaoPessoal && !isFinalizadaOuCancelada
+  // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH)
+  const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
 
   // ===== AÇÕES =====
   async function refreshDetailFromServer() {
@@ -468,10 +472,12 @@ export function SolicitationDetailModal({
       }
 
       setCloseSuccess(
-        'Solicitação finalizada no RH e chamada de admissão criada no DP.',
+        isSolicitacaoPessoal
+          ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
+          : 'Solicitação finalizada no RH.',
       )
     } catch (err: any) {
-      console.error('Erro ao finalizar RH → DP', err)
+      console.error('Erro ao finalizar RH', err)
       setCloseError(err?.message ?? 'Erro ao finalizar solicitação.')
     } finally {
       setClosing(false)
@@ -642,7 +648,7 @@ export function SolicitationDetailModal({
                   </button>
                 )}
 
-                {canEnviarDp && (
+                {canFinalizarRh && isSolicitacaoPessoal && (
                   <button
                     onClick={() => setShowContratadoForm((v) => !v)}
                     className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
@@ -653,13 +659,17 @@ export function SolicitationDetailModal({
                   </button>
                 )}
 
-                {canEnviarDp && (
+                {canFinalizarRh && (
                   <button
                     onClick={handleFinalizarRh}
                     disabled={closing}
                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                   >
-                    {closing ? 'Enviando...' : 'Enviar para o DP'}
+                    {closing
+                      ? 'Enviando...'
+                      : isSolicitacaoPessoal
+                        ? 'Enviar para o DP'
+                        : 'Finalizar no RH'}
                   </button>
                 )}
               </>

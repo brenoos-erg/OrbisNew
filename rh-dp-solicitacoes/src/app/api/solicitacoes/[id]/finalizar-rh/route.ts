@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import crypto from 'crypto'
+import { randomUUID } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,9 +61,17 @@ export async function POST(
       )
     }
 
-    if (solicitation.tipo?.nome !== 'RQ_063 - Solicitação de Pessoal') {
+    const isSolicitacaoPessoal =
+      solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoIncentivo =
+      solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+
+    if (!isSolicitacaoPessoal && !isSolicitacaoIncentivo) {
       return NextResponse.json(
-        { error: 'Esta rota só pode ser usada para RQ_063 - Solicitação de Pessoal.' },
+        {
+          error:
+            'Esta rota só pode ser usada para RQ_063 ou RQ_091 finalizadas pelo RH.',
+        },
         { status: 400 },
       )
     }
@@ -71,7 +79,7 @@ export async function POST(
     const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
     const solicitanteOrigem = payloadOrigem.solicitante ?? {}
-
+/*
     // 2) Tipo de solicitação do DP
     const tipoAdmissao = await prisma.tipoSolicitacao.findFirst({
       where: { nome: 'Solicitação de Admissão' },
@@ -105,6 +113,7 @@ export async function POST(
         ],
       },
     })
+      */
 
     const agora = new Date()
 
@@ -119,13 +128,31 @@ export async function POST(
             ...payloadOrigem,
             campos: {
               ...camposOrigem,
-              candidatoNome: candidatoNome ?? camposOrigem.candidatoNome,
-              candidatoDocumento:
-                candidatoDocumento ?? camposOrigem.candidatoDocumento,
-              dataAdmissaoPrevista:
-                dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
-              salario: salario ?? camposOrigem.salario,
-              cargoFinal: cargo ?? camposOrigem.cargoFinal,
+              ...(candidatoNome
+                ? { candidatoNome }
+                : camposOrigem.candidatoNome
+                  ? { candidatoNome: camposOrigem.candidatoNome }
+                  : {}),
+              ...(candidatoDocumento
+                ? { candidatoDocumento }
+                : camposOrigem.candidatoDocumento
+                  ? { candidatoDocumento: camposOrigem.candidatoDocumento }
+                  : {}),
+              ...(dataAdmissaoPrevista
+                ? { dataAdmissaoPrevista }
+                : camposOrigem.dataAdmissaoPrevista
+                  ? { dataAdmissaoPrevista: camposOrigem.dataAdmissaoPrevista }
+                  : {}),
+              ...(salario
+                ? { salario }
+                : camposOrigem.salario
+                  ? { salario: camposOrigem.salario }
+                  : {}),
+              ...(cargo
+                ? { cargoFinal: cargo }
+                : camposOrigem.cargoFinal
+                  ? { cargoFinal: camposOrigem.cargoFinal }
+                  : {}),
               ...(outrasInfos ?? {}),
             },
           },
@@ -136,102 +163,139 @@ export async function POST(
         data: {
           solicitationId: solicitation.id,
           status: 'CONCLUIDA',
-          message: `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`,
+          message: isSolicitacaoPessoal
+            ? `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`
+            : `Finalizada no RH por ${me.fullName ?? me.id}.`,
         },
       })
 
       await tx.event.create({
         data: {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           solicitationId: solicitation.id,
           actorId: me.id,
           tipo: 'FINALIZADA_RH',
         },
       })
 
-      // 4.2) Cria a nova solicitação para o DP – Solicitação de Admissão
-      const dpSolicitation = await tx.solicitation.create({
-        data: {
-          protocolo: generateProtocolo(),
-          tipoId: tipoAdmissao.id,
-          costCenterId: ccDp.id,
-          departmentId: deptDp?.id ?? solicitation.departmentId,
-          solicitanteId: solicitation.solicitanteId, // ou me.id, se preferir
-          parentId: solicitation.id, // vínculo pai/filho
-          titulo: 'Solicitação de Admissão',
-          descricao: `Solicitação de admissão gerada automaticamente a partir da ${solicitation.protocolo}.`,
-          requiresApproval: false,
-          approvalStatus: 'NAO_PRECISA',
-          status: 'ABERTA',
-          payload: {
-            origem: {
-              rhSolicitationId: solicitation.id,
-              rhProtocolo: solicitation.protocolo,
-            },
-            campos: {
-              // campos reaproveitados da RQ_063:
-              cargo: cargo ?? camposOrigem.cargo,
-              setorProjeto:
-                camposOrigem.setorProjeto ?? camposOrigem.setorOuProjeto,
-              localTrabalho: camposOrigem.localTrabalho,
-              horarioTrabalho: camposOrigem.horarioTrabalho,
-              centroCusto: camposOrigem.centroCusto,
-              chefiaImediata: camposOrigem.chefiaImediata,
-              motivoVaga: camposOrigem.motivoDaVaga,
-              tipoContratacao: camposOrigem.contratacao,
-              beneficios: camposOrigem.beneficios,
-              cbo: camposOrigem.cbo,
-              matriz: camposOrigem.matriz,
-              filial: camposOrigem.filial,
-              observacao:
-                outrasInfos?.observacao ?? camposOrigem.observacao,
+      let dpSolicitation: any = null
 
-              // dados do contratado (vindos do formulário de finalização):
-              nomeProfissional:
-                candidatoNome ??
-                camposOrigem.nomeProfissional ??
-                camposOrigem.nomeCandidato,
-              documento:
-                candidatoDocumento ?? camposOrigem.cpf ?? camposOrigem.documento,
-              salario: salario ?? camposOrigem.salario,
-              dataAdmissao:
-                dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
-            },
-            // mantém os dados do solicitante original (quem pediu a vaga)
-            solicitante: solicitanteOrigem,
+      if (isSolicitacaoPessoal) {
+        // Tipo de solicitação do DP
+        const tipoAdmissao = await tx.tipoSolicitacao.findFirst({
+          where: { nome: 'Solicitação de Admissão' },
+        })
+
+        if (!tipoAdmissao) {
+          throw new Error('Tipo "Solicitação de Admissão" não cadastrado.')
+        }
+
+        // Centro de custo do DP (externalCode = 590)
+        const ccDp = await tx.costCenter.findFirst({
+          where: { externalCode: '590' },
+        })
+
+        if (!ccDp) {
+          throw new Error(
+            'Centro de custo do DP (externalCode = 590) não encontrado.',
+          )
+        }
+
+        // Departamento do DP (ajuste o critério se for diferente)
+        const deptDp = await tx.department.findFirst({
+          where: {
+            OR: [
+              { code: 'DP' },
+              { name: { contains: 'Pessoal', mode: 'insensitive' } },
+            ],
           },
-        },
-      })
+        })
 
+        // 4.2) Cria a nova solicitação para o DP – Solicitação de Admissão
+        dpSolicitation = await tx.solicitation.create({
+          data: {
+            protocolo: generateProtocolo(),
+            tipoId: tipoAdmissao.id,
+            costCenterId: ccDp.id,
+            departmentId: deptDp?.id ?? solicitation.departmentId,
+            solicitanteId: solicitation.solicitanteId, // ou me.id, se preferir
+            parentId: solicitation.id, // vínculo pai/filho
+            titulo: 'Solicitação de Admissão',
+            descricao: `Solicitação de admissão gerada automaticamente a partir da ${solicitation.protocolo}.`,
+            requiresApproval: false,
+            approvalStatus: 'NAO_PRECISA',
+            status: 'ABERTA',
+            payload: {
+              origem: {
+                rhSolicitationId: solicitation.id,
+                rhProtocolo: solicitation.protocolo,
+              },
+              campos: {
+                // campos reaproveitados da RQ_063:
+                cargo: cargo ?? camposOrigem.cargo,
+                setorProjeto:
+                  camposOrigem.setorProjeto ?? camposOrigem.setorOuProjeto,
+                localTrabalho: camposOrigem.localTrabalho,
+                horarioTrabalho: camposOrigem.horarioTrabalho,
+                centroCusto: camposOrigem.centroCusto,
+                chefiaImediata: camposOrigem.chefiaImediata,
+                motivoVaga: camposOrigem.motivoDaVaga,
+                tipoContratacao: camposOrigem.contratacao,
+                beneficios: camposOrigem.beneficios,
+                cbo: camposOrigem.cbo,
+                matriz: camposOrigem.matriz,
+                filial: camposOrigem.filial,
+                observacao:
+                  outrasInfos?.observacao ?? camposOrigem.observacao,
+
+                // dados do contratado (vindos do formulário de finalização):
+                nomeProfissional:
+                  candidatoNome ??
+                  camposOrigem.nomeProfissional ??
+                  camposOrigem.nomeCandidato,
+                documento:
+                  candidatoDocumento ?? camposOrigem.cpf ?? camposOrigem.documento,
+                salario: salario ?? camposOrigem.salario,
+                dataAdmissao:
+                  dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
+              },
+              // mantém os dados do solicitante original (quem pediu a vaga)
+              solicitante: solicitanteOrigem,
+            },
+          },
+
+})
       await tx.solicitationTimeline.create({
-        data: {
-          solicitationId: dpSolicitation.id,
-          status: 'ABERTA',
-          message: `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo}.`,
-        },
-      })
+          data: {
+            solicitationId: dpSolicitation.id,
+            status: 'ABERTA',
+            message: `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo}.`,
+          },
+        })
 
       await tx.event.create({
-        data: {
-          id: crypto.randomUUID(),
-          solicitationId: dpSolicitation.id,
-          actorId: me.id,
-          tipo: 'CRIACAO_AUTOMATICA_ADMISSAO',
-        },
-      })
-       // 4.3) Replica os anexos enviados no RH para a solicitação do DP
-      if (solicitation.anexos && solicitation.anexos.length > 0) {
-        await tx.attachment.createMany({
-          data: solicitation.anexos.map((a) => ({
+          data: {
             id: crypto.randomUUID(),
             solicitationId: dpSolicitation.id,
-            filename: a.filename,
-            url: a.url,
-            mimeType: a.mimeType,
-            sizeBytes: a.sizeBytes,
-            createdAt: a.createdAt,
-          })),
+           actorId: me.id,
+            tipo: 'CRIACAO_AUTOMATICA_ADMISSAO',
+          },
+
         })
+        // 4.3) Replica os anexos enviados no RH para a solicitação do DP
+        if (solicitation.anexos && solicitation.anexos.length > 0) {
+          await tx.attachment.createMany({
+            data: solicitation.anexos.map((a) => ({
+              id: crypto.randomUUID(),
+              solicitationId: dpSolicitation.id,
+              filename: a.filename,
+              url: a.url,
+              mimeType: a.mimeType,
+              sizeBytes: a.sizeBytes,
+              createdAt: a.createdAt,
+            })),
+          })
+        }
       }
 
       return {
@@ -244,7 +308,7 @@ export async function POST(
   } catch (err: any) {
     console.error('POST /api/solicitacoes/[id]/finalizar-rh error', err)
     return NextResponse.json(
-      { error: 'Erro ao finalizar solicitação no RH / criar admissão.' },
+      { error: 'Erro ao finalizar solicitação no RH.' },
       { status: 500 },
     )
   }

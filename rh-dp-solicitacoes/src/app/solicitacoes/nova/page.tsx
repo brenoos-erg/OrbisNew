@@ -12,9 +12,8 @@ type TipoCampo = {
 type TipoSolicitacao = {
     id: string
     nome: string
-    schemaJson?: {
-        campos?: TipoCampo[]
-    }
+    descricao?: string
+    camposEspecificos?: TipoCampo[]
 }
 
 type Position = {
@@ -157,6 +156,7 @@ export default function NovaSolicitacaoPage() {
     }
 
     const tipoSelecionado = tipos.find((t) => t.id === form.tipoId)
+    const camposEspecificos = tipoSelecionado?.camposEspecificos ?? []
 
     return (
         <div className="max-w-2xl">
@@ -204,11 +204,11 @@ export default function NovaSolicitacaoPage() {
                 </select>
 
                 {/* CAMPOS DINÂMICOS */}
-                {tipoSelecionado?.schemaJson?.campos?.length ? (
+                {camposEspecificos.length ? (
                     <div className="rounded border p-3">
                         <p className="mb-2 font-medium">Campos específicos</p>
 
-                        {tipoSelecionado.schemaJson.campos.map((c) => {
+                        {camposEspecificos.map((c) => {
                             // campo de cargo vira SELECT ligado na tabela Position
                             if (c.name === 'cargo') {
                                 return (

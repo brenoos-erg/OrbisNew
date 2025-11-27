@@ -38,10 +38,19 @@ type Departamento = {
   description: string;
 };
 
+type CampoEspecifico = {
+  name: string;
+  label: string;
+  type?: string;
+  required?: boolean;
+  options?: string[];
+};
+
 type TipoSolicitacao = {
   id: string;
   nome: string;
   descricao?: string;
+  camposEspecificos?: CampoEspecifico[];
 };
 
 type Position = {
@@ -69,6 +78,18 @@ type Extras = Record<string, string>;
 type InputChange = ChangeEvent<HTMLInputElement>;
 type SelectChange = ChangeEvent<HTMLSelectElement>;
 type TextAreaChange = ChangeEvent<HTMLTextAreaElement>;
+
+/* ================================================================
+   ESTILOS COMPARTILHADOS
+================================================================ */
+
+const labelClass =
+  'block text-xs font-semibold text-slate-600 mb-1 tracking-wide';
+const inputClass =
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
+const textareaClass =
+  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
+const selectClass = inputClass;
 
 /* ================================================================
    COMPONENTE PRINCIPAL
@@ -208,13 +229,21 @@ export default function NovaSolicitacaoPage() {
       selectedTipo.nome.toUpperCase().includes('RQ_063'));
 
   const isAbonoEducacional =
+    selectedTipo?.nome === 'Solicitação de Incentivo à Educação' ||
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
+
+  const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
 
   useEffect(() => {
     if (!isAbonoEducacional) {
       setAbonoCampos({});
     }
   }, [isAbonoEducacional]);
+
+  useEffect(() => {
+    setExtras({});
+    setCargoId('');
+  }, [tipoId]);
 
   /* ============================================================
    4) /api/positions
@@ -374,11 +403,24 @@ export default function NovaSolicitacaoPage() {
 
         campos = { ...abonoCampos };
       } else {
-        setSubmitError(
-          'Este tipo de solicitação ainda não possui formulário configurado.',
+        const obrigatorios = camposEspecificos
+          .filter((c) => c.required)
+          .map((c) => c.name);
+
+        const faltantes = obrigatorios.filter((name) => !extras[name]);
+        if (faltantes.length > 0) {
+          setSubmitError('Preencha os campos obrigatórios do formulário.');
+          setSubmitting(false);
+          return;
+        }
+
+        campos = camposEspecificos.reduce<Record<string, string>>(
+          (acc, campo) => {
+            acc[campo.name] = extras[campo.name] ?? '';
+            return acc;
+          },
+          {},
         );
-        setSubmitting(false);
-        return;
       }
 
       const body = {
@@ -424,1146 +466,1252 @@ export default function NovaSolicitacaoPage() {
    RENDER
   ============================================================ */
   return (
-    <main className="p-8">
-      <form
-        id="form-solicitacao"
-        onSubmit={handleSubmit}
-        className="space-y-4"
-      >
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-semibold">Nova Solicitação</h1>
+    <main className="min-h-screen bg-slate-50 py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 lg:px-0">
+        <form
+          id="form-solicitacao"
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
+          {/* HEADER */}
+          <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-xl font-semibold text-slate-900">
+                  Nova Solicitação
+                </h1>
+                <p className="mt-1 text-xs text-slate-500">
+                  Preencha os dados abaixo para registrar uma nova solicitação.
+                </p>
+              </div>
 
-          <button
-            type="submit"
-            className="bg-orange-500 text-white rounded px-4 py-2 text-sm shadow-md disabled:opacity-60"
-            disabled={submitting || !tipoId}
-          >
-            {submitting ? 'Enviando...' : 'Enviar Solicitação'}
-          </button>
-        </div>
-
-        {submitError && (
-          <p className="text-sm text-red-600 mb-2">{submitError}</p>
-        )}
-
-        {/* TOPO: CABEÇALHO + SOLICITANTE */}
-        <div className="grid grid-cols-[2fr_minmax(320px,1fr)] gap-8 items-start mb-4">
-          {/* ESQUERDA – Centro / Depto / Tipo */}
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
-                CENTRO DE CUSTO <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full border rounded px-3 py-2 text-sm"
-                value={centroId}
-                onChange={(e: SelectChange) => setCentroId(e.target.value)}
-                required
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-full bg-orange-500 px-5 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={submitting || !tipoId}
               >
-                <option value="">Selecione...</option>
-                {centros.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code ? `${c.code} - ` : ''}
-                    {c.description}
-                  </option>
-                ))}
-              </select>
+                {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
-                DEPARTAMENTO <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full border rounded px-3 py-2 text-sm"
-                value={departamentoId}
-                onChange={(e: SelectChange) =>
-                  setDepartamentoId(e.target.value)
-                }
-                required
-              >
-                <option value="">Selecione...</option>
-                {departamentos.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
-                TIPO DE SOLICITAÇÃO <span className="text-red-500">*</span>
-              </label>
-              <select
-                className="w-full border rounded px-3 py-2 text-sm"
-                value={tipoId}
-                onChange={(e: SelectChange) => setTipoId(e.target.value)}
-                disabled={!centroId || !departamentoId}
-                required
-              >
-                <option value="">Selecione...</option>
-                {tipos.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {submitError && (
+              <p className="mt-3 text-xs text-red-600">{submitError}</p>
+            )}
           </div>
 
-          {/* DIREITA – Dados do Solicitante */}
-          <aside className="border rounded-lg p-4 bg-white shadow-sm">
-            <h2 className="text-sm font-semibold mb-3">
-              Dados do Solicitante
-            </h2>
-
-            {meLoading && (
-              <p className="text-xs text-gray-500">
-                Carregando dados do solicitante...
-              </p>
-            )}
-
-            {meError && (
-              <p className="text-xs text-red-500 mb-2">{meError}</p>
-            )}
-
-            {me && (
-              <div className="space-y-2">
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Nome"
-                  value={me.fullName}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="E-mail"
-                  value={me.email}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Login"
-                  value={me.login}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Cargo"
-                  value={me.positionName ?? ''}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Setor"
-                  value={me.departmentName ?? ''}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Líder"
-                  value={me.leaderName ?? ''}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Telefone"
-                  value={me.phone ?? ''}
-                  readOnly
-                />
-                <input
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="Centro de Custo"
-                  value={me.costCenterName ?? ''}
-                  readOnly
-                />
-              </div>
-            )}
-          </aside>
-        </div>
-
-        {/* PARTE DE BAIXO – FORMULÁRIO DO TIPO SELECIONADO */}
-        <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-          {!selectedTipo && (
-            <p className="text-xs text-gray-500">
-              Selecione um tipo de solicitação para exibir os campos
-              específicos.
-            </p>
-          )}
-
-          {/* =================== FORM RQ_063 =================== */}
-          {selectedTipo && isRQ063 && (
-            <>
-              <h2 className="text-sm font-semibold mb-4">
-                {selectedTipo.nome}
+          {/* TOPO: CABEÇALHO + SOLICITANTE */}
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+            {/* ESQUERDA – Centro / Depto / Tipo */}
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <h2 className="mb-2 text-sm font-semibold text-slate-800">
+                Dados da solicitação
               </h2>
 
-              {/* =================== INFORMAÇÕES BÁSICAS =================== */}
-              <section className="space-y-3">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Informações básicas
-                </h3>
-
-                {/* Cargo */}
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Cargo <span className="text-red-500">*</span>
+                  <label className={labelClass}>
+                    CENTRO DE CUSTO <span className="text-red-500">*</span>
                   </label>
                   <select
-                    className="w-full border rounded px-3 py-2 text-sm"
-                    value={cargoId}
-                    onChange={(e: SelectChange) =>
-                      handleCargoChange(e.target.value)
-                    }
+                    className={selectClass}
+                    value={centroId}
+                    onChange={(e: SelectChange) => setCentroId(e.target.value)}
                     required
                   >
-                    <option value="">Selecione o cargo...</option>
-                    {positions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
+                    <option value="">Selecione...</option>
+                    {centros.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code ? `${c.code} - ` : ''}
+                        {c.description}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Setor/Projeto */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Setor e/ou Projeto{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.setorProjeto ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('setorProjeto', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-
-                  {/* Vaga prevista em contrato */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Vaga prevista em contrato?{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex items-center gap-4 text-xs mt-1">
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name="vagaPrevista"
-                          checked={extras.vagaPrevista === 'SIM'}
-                          onChange={() =>
-                            handleExtraChange('vagaPrevista', 'SIM')
-                          }
-                          required
-                        />
-                        <span>Sim</span>
-                      </label>
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="radio"
-                          name="vagaPrevista"
-                          checked={extras.vagaPrevista === 'NAO'}
-                          onChange={() =>
-                            handleExtraChange('vagaPrevista', 'NAO')
-                          }
-                        />
-                        <span>Não</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Local de trabalho */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Local de Trabalho{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.localTrabalho ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('localTrabalho', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-
-                  {/* Centro de Custo (texto livre – pode repetir o do topo) */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Centro de Custo{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={
-                        extras.centroCustoForm ?? me?.costCenterName ?? ''
-                      }
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('centroCustoForm', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Horário de trabalho */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Horário de Trabalho{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.horarioTrabalho ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('horarioTrabalho', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-
-                  {/* Chefia imediata */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Chefia Imediata{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.chefiaImediata ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('chefiaImediata', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Coordenador do Contrato */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Coordenador do Contrato{' '}
-                    <span className="text-red-500">*</span>
+                  <label className={labelClass}>
+                    DEPARTAMENTO <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    className="w-full border rounded px-3 py-2 text-sm"
-                    value={extras.coordenadorContrato ?? ''}
-                    onChange={(e: InputChange) =>
-                      handleExtraChange('coordenadorContrato', e.target.value)
+                  <select
+                    className={selectClass}
+                    value={departamentoId}
+                    onChange={(e: SelectChange) =>
+                      setDepartamentoId(e.target.value)
                     }
                     required
-                  />
-                </div>
-              </section>
-
-              {/* =================== MOTIVO DA VAGA =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Motivo da Vaga
-                </h3>
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.motivoSubstituicao === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'motivoSubstituicao',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Substituição</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.motivoAumentoQuadro === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'motivoAumentoQuadro',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Aumento de quadro</span>
-                  </label>
-                </div>
-              </section>
-
-              {/* =================== CONTRATAÇÃO =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Contratação
-                </h3>
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.contratacaoTemporaria === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'contratacaoTemporaria',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Temporária</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.contratacaoPermanente === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'contratacaoPermanente',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Permanente</span>
-                  </label>
+                  >
+                    <option value="">Selecione...</option>
+                    {departamentos.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Justificativa */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Justificativa da Vaga{' '}
+                  <label className={labelClass}>
+                    TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
                   </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.justificativaVaga ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange('justificativaVaga', e.target.value)
-                    }
+                  <select
+                    className={selectClass}
+                    value={tipoId}
+                    onChange={(e: SelectChange) => setTipoId(e.target.value)}
+                    disabled={!centroId || !departamentoId}
                     required
-                  />
+                  >
+                    <option value="">Selecione...</option>
+                    {tipos.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </section>
+              </div>
+            </div>
 
-              {/* =================== ATIVIDADES =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Atividades
-                </h3>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Principais atividades{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[80px]"
-                    value={extras.principaisAtividades ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange('principaisAtividades', e.target.value)
-                    }
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Atividades complementares
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.atividadesComplementares ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange(
-                        'atividadesComplementares',
-                        e.target.value,
-                      )
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* =================== REQUISITOS ACADÊMICOS =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Requisitos acadêmicos
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Escolaridade <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.escolaridade ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('escolaridade', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Curso
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.curso ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('curso', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.escolaridadeCompleta === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'escolaridadeCompleta',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Completo</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.cursoEmAndamento === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'cursoEmAndamento',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Em andamento</span>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Período/Módulo - mínimo ou máximo
-                  </label>
-                  <input
-                    className="w-full border rounded px-3 py-2 text-sm"
-                    value={extras.periodoModulo ?? ''}
-                    onChange={(e: InputChange) =>
-                      handleExtraChange('periodoModulo', e.target.value)
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* =================== REQUISITOS / COMPETÊNCIAS =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Requisitos e conhecimentos
-                </h3>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Requisitos e conhecimentos necessários{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.requisitosConhecimentos ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange(
-                        'requisitosConhecimentos',
-                        e.target.value,
-                      )
-                    }
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Competências comportamentais exigidas{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.competenciasComportamentais ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange(
-                        'competenciasComportamentais',
-                        e.target.value,
-                      )
-                    }
-                    required
-                  />
-                </div>
-              </section>
-
-              {/* =================== SOLICITAÇÕES PARA O NOVO FUNCIONÁRIO =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Solicitações para o novo funcionário
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoCracha === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoCracha',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>Crachá</span>
-                    </label>
-
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoRepublica === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoRepublica',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>República</span>
-                    </label>
-
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoUniforme === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoUniforme',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>Uniforme</span>
-                    </label>
-
-                    <div>
-                      <span className="block text-[11px] font-semibold text-gray-600">
-                        Outros
-                      </span>
-                      <input
-                        className="mt-1 w-full border rounded px-3 py-2 text-sm"
-                        value={extras.solicitacaoOutros ?? ''}
-                        onChange={(e: InputChange) =>
-                          handleExtraChange(
-                            'solicitacaoOutros',
-                            e.target.value,
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoTesteDirecao === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoTesteDirecao',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>Teste direção</span>
-                    </label>
-
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoEpis === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoEpis',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>EPIs</span>
-                    </label>
-
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={extras.solicitacaoPostoTrabalho === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'solicitacaoPostoTrabalho',
-                            e.target.checked,
-                          )
-                        }
-                      />
-                      <span>Ponto / Posto de trabalho</span>
-                    </label>
-                  </div>
-                </div>
-              </section>
-
-              {/* =================== ESCRITÓRIO DE PROJETOS =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Preenchimento do setor Escritório de Projetos
-                </h3>
-
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.escritorioMatriz === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'escritorioMatriz',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Matriz</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={extras.escritorioFilial === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleCheckboxChange(
-                          'escritorioFilial',
-                          e.target.checked,
-                        )
-                      }
-                    />
-                    <span>Filial</span>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Previsto em contrato (Salários, Benefícios, Carga Horária e
-                    outros)
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.previstoContrato ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange('previstoContrato', e.target.value)
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* =================== RH =================== */}
-              <section className="space-y-2 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Preenchimento do setor Recursos Humanos
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Nome do Profissional
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.nomeProfissional ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('nomeProfissional', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Data de Admissão
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={extras.dataAdmissao ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('dataAdmissao', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Observações
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={extras.observacoesRh ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleExtraChange('observacoesRh', e.target.value)
-                    }
-                  />
-                </div>
-              </section>
-            </>
-          )}
-
-          {/* =================== FORM ABONO EDUCACIONAL =================== */}
-          {selectedTipo && isAbonoEducacional && (
-            <>
-              <h2 className="text-sm font-semibold mb-4">
-                {selectedTipo.nome}
+            {/* DIREITA – Dados do Solicitante */}
+            <aside className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Dados do Solicitante
               </h2>
 
-              <section className="space-y-3">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Dados do colaborador
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {meLoading && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Carregando dados do solicitante...
+                </p>
+              )}
+
+              {meError && (
+                <p className="mt-2 text-xs text-red-500">{meError}</p>
+              )}
+
+              {me && (
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  <input
+                    className={inputClass}
+                    placeholder="Nome"
+                    value={me.fullName}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="E-mail"
+                    value={me.email}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Login"
+                    value={me.login}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Cargo"
+                    value={me.positionName ?? ''}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Setor"
+                    value={me.departmentName ?? ''}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Líder"
+                    value={me.leaderName ?? ''}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Telefone"
+                    value={me.phone ?? ''}
+                    readOnly
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Centro de Custo"
+                    value={me.costCenterName ?? ''}
+                    readOnly
+                  />
+                </div>
+              )}
+            </aside>
+          </div>
+
+          {/* PARTE DE BAIXO – FORMULÁRIO DO TIPO SELECIONADO */}
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur space-y-5">
+            {!selectedTipo && (
+              <p className="text-xs text-slate-500">
+                Selecione um tipo de solicitação para exibir os campos
+                específicos.
+              </p>
+            )}
+
+            {/* =================== FORM RQ_063 =================== */}
+            {selectedTipo && isRQ063 && (
+              <>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {selectedTipo.nome}
+                </h2>
+
+                {/* =================== INFORMAÇÕES BÁSICAS =================== */}
+                <section className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Informações básicas
+                  </h3>
+
+                  {/* Cargo */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Nome do colaborador{' '}
+                    <label className={labelClass}>
+                      Cargo <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      className={selectClass}
+                      value={cargoId}
+                      onChange={(e: SelectChange) =>
+                        handleCargoChange(e.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Selecione o cargo...</option>
+                      {positions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {/* Setor/Projeto */}
+                    <div>
+                      <label className={labelClass}>
+                        Setor e/ou Projeto{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={extras.setorProjeto ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('setorProjeto', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+
+                    {/* Vaga prevista em contrato */}
+                    <div>
+                      <label className={labelClass}>
+                        Vaga prevista em contrato?{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <div className="mt-1 flex items-center gap-4 text-xs">
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="radio"
+                            name="vagaPrevista"
+                            checked={extras.vagaPrevista === 'SIM'}
+                            onChange={() =>
+                              handleExtraChange('vagaPrevista', 'SIM')
+                            }
+                            required
+                          />
+                          <span>Sim</span>
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="radio"
+                            name="vagaPrevista"
+                            checked={extras.vagaPrevista === 'NAO'}
+                            onChange={() =>
+                              handleExtraChange('vagaPrevista', 'NAO')
+                            }
+                          />
+                          <span>Não</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {/* Local de trabalho */}
+                    <div>
+                      <label className={labelClass}>
+                        Local de Trabalho{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={extras.localTrabalho ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('localTrabalho', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+
+                    {/* Centro de Custo (texto livre – pode repetir o do topo) */}
+                    <div>
+                      <label className={labelClass}>
+                        Centro de Custo{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={
+                          extras.centroCustoForm ?? me?.costCenterName ?? ''
+                        }
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('centroCustoForm', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {/* Horário de trabalho */}
+                    <div>
+                      <label className={labelClass}>
+                        Horário de Trabalho{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={extras.horarioTrabalho ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('horarioTrabalho', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+
+                    {/* Chefia imediata */}
+                    <div>
+                      <label className={labelClass}>
+                        Chefia Imediata{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={extras.chefiaImediata ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('chefiaImediata', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Coordenador do Contrato */}
+                  <div>
+                    <label className={labelClass}>
+                      Coordenador do Contrato{' '}
                       <span className="text-red-500">*</span>
                     </label>
                     <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.nomeColaborador ?? ''}
+                      className={inputClass}
+                      value={extras.coordenadorContrato ?? ''}
                       onChange={(e: InputChange) =>
-                        handleAbonoChange(
-                          'nomeColaborador',
+                        handleExtraChange('coordenadorContrato', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                </section>
+
+                {/* =================== MOTIVO DA VAGA =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Motivo da Vaga
+                  </h3>
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.motivoSubstituicao === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'motivoSubstituicao',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Substituição</span>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.motivoAumentoQuadro === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'motivoAumentoQuadro',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Aumento de quadro</span>
+                    </label>
+                  </div>
+                </section>
+
+                {/* =================== CONTRATAÇÃO =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Contratação
+                  </h3>
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.contratacaoTemporaria === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'contratacaoTemporaria',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Temporária</span>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.contratacaoPermanente === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'contratacaoPermanente',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Permanente</span>
+                    </label>
+                  </div>
+
+                  {/* Justificativa */}
+                  <div>
+                    <label className={labelClass}>
+                      Justificativa da Vaga{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      className={textareaClass}
+                      value={extras.justificativaVaga ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange('justificativaVaga', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                </section>
+
+                {/* =================== ATIVIDADES =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Atividades
+                  </h3>
+
+                  <div>
+                    <label className={labelClass}>
+                      Principais atividades{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      className={`${textareaClass} min-h-[80px]`}
+                      value={extras.principaisAtividades ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange(
+                          'principaisAtividades',
                           e.target.value,
                         )
                       }
                       required
                     />
                   </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Matrícula <span className="text-red-500">*</span>
+                    <label className={labelClass}>
+                      Atividades complementares
                     </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.matricula ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('matricula', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Cargo <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.cargo ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('cargo', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Contato do setor
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.contatoSetor ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('contatoSetor', e.target.value)
+                    <textarea
+                      className={`${textareaClass} min-h-[60px]`}
+                      value={extras.atividadesComplementares ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange(
+                          'atividadesComplementares',
+                          e.target.value,
+                        )
                       }
                     />
                   </div>
+                </section>
+
+                {/* =================== REQUISITOS ACADÊMICOS =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Requisitos acadêmicos
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>
+                        Escolaridade{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={extras.escolaridade ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('escolaridade', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Curso</label>
+                      <input
+                        className={inputClass}
+                        value={extras.curso ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('curso', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.escolaridadeCompleta === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'escolaridadeCompleta',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Completo</span>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.cursoEmAndamento === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'cursoEmAndamento',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Em andamento</span>
+                    </label>
+                  </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Centro de custo{' '}
+                    <label className={labelClass}>
+                      Período/Módulo - mínimo ou máximo
+                    </label>
+                    <input
+                      className={inputClass}
+                      value={extras.periodoModulo ?? ''}
+                      onChange={(e: InputChange) =>
+                        handleExtraChange('periodoModulo', e.target.value)
+                      }
+                    />
+                  </div>
+                </section>
+
+                {/* =================== REQUISITOS / COMPETÊNCIAS =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Requisitos e conhecimentos
+                  </h3>
+
+                  <div>
+                    <label className={labelClass}>
+                      Requisitos e conhecimentos necessários{' '}
                       <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.centroCusto ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('centroCusto', e.target.value)
+                    <textarea
+                      className={textareaClass}
+                      value={extras.requisitosConhecimentos ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange(
+                          'requisitosConhecimentos',
+                          e.target.value,
+                        )
                       }
                       required
                     />
                   </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      E-mail <span className="text-red-500">*</span>
+                    <label className={labelClass}>
+                      Competências comportamentais exigidas{' '}
+                      <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="email"
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.email ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('email', e.target.value)
+                    <textarea
+                      className={textareaClass}
+                      value={extras.competenciasComportamentais ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange(
+                          'competenciasComportamentais',
+                          e.target.value,
+                        )
                       }
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Empresa
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.empresa ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('empresa', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Local de trabalho
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.localTrabalho ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('localTrabalho', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Telefone
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.telefone ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('telefone', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      CBO
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.cbo ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('cbo', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Escolaridade
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.escolaridade ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('escolaridade', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Tipo de contratação
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.tipoContratacao ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('tipoContratacao', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Benefício
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.beneficio ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('beneficio', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Valor do benefício
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.valorBeneficio ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('valorBeneficio', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Nível
-                    </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.nivel ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('nivel', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
+                </section>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Observações do solicitante
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={abonoCampos.observacaoSolicitante ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleAbonoChange(
-                        'observacaoSolicitante',
-                        e.target.value,
-                      )
-                    }
-                  />
-                </div>
-              </section>
+                {/* =================== SOLICITAÇÕES PARA O NOVO FUNCIONÁRIO =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Solicitações para o novo funcionário
+                  </h3>
 
-              <section className="space-y-3 pt-4 border-t">
-                <h3 className="text-xs font-semibold text-gray-700 uppercase">
-                  Requisitos de RH
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={abonoCampos.contratadaUmAno === 'true'}
-                      onChange={(e: InputChange) =>
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoCracha === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoCracha',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>Crachá</span>
+                      </label>
+
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoRepublica === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoRepublica',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>República</span>
+                      </label>
+
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoUniforme === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoUniforme',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>Uniforme</span>
+                      </label>
+
+                      <div>
+                        <span className="block text-[11px] font-semibold text-slate-600">
+                          Outros
+                        </span>
+                        <input
+                          className={inputClass}
+                          value={extras.solicitacaoOutros ?? ''}
+                          onChange={(e: InputChange) =>
+                            handleExtraChange(
+                              'solicitacaoOutros',
+                              e.target.value,
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoTesteDirecao === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoTesteDirecao',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>Teste direção</span>
+                      </label>
+
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoEpis === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoEpis',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>EPIs</span>
+                      </label>
+
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={extras.solicitacaoPostoTrabalho === 'true'}
+                          onChange={(e: InputChange) =>
+                            handleCheckboxChange(
+                              'solicitacaoPostoTrabalho',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                        <span>Ponto / Posto de trabalho</span>
+                      </label>
+                    </div>
+                  </div>
+                </section>
+
+                {/* =================== ESCRITÓRIO DE PROJETOS =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Preenchimento do setor Escritório de Projetos
+                  </h3>
+
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.escritorioMatriz === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'escritorioMatriz',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Matriz</span>
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={extras.escritorioFilial === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleCheckboxChange(
+                            'escritorioFilial',
+                            e.target.checked,
+                          )
+                        }
+                      />
+                      <span>Filial</span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Previsto em contrato (Salários, Benefícios, Carga
+                      Horária e outros)
+                    </label>
+                    <textarea
+                      className={textareaClass}
+                      value={extras.previstoContrato ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange('previstoContrato', e.target.value)
+                      }
+                    />
+                  </div>
+                </section>
+
+                {/* =================== RH =================== */}
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Preenchimento do setor Recursos Humanos
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>Nome do Profissional</label>
+                      <input
+                        className={inputClass}
+                        value={extras.nomeProfissional ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange(
+                            'nomeProfissional',
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Data de Admissão</label>
+                      <input
+                        type="date"
+                        className={inputClass}
+                        value={extras.dataAdmissao ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleExtraChange('dataAdmissao', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Observações</label>
+                    <textarea
+                      className={textareaClass}
+                      value={extras.observacoesRh ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleExtraChange('observacoesRh', e.target.value)
+                      }
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* =================== FORM ABONO EDUCACIONAL =================== */}
+            {selectedTipo && isAbonoEducacional && (
+              <>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {selectedTipo.nome}
+                </h2>
+
+                <section className="space-y-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Dados do colaborador
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className={labelClass}>
+                        Nome do colaborador{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.nomeColaborador ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'nomeColaborador',
+                            e.target.value,
+                          )
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Matrícula <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.matricula ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('matricula', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Cargo <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.cargo ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('cargo', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Contato do setor</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.contatoSetor ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('contatoSetor', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Centro de custo{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.centroCusto ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('centroCusto', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        E-mail <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        className={inputClass}
+                        value={abonoCampos.email ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('email', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Empresa</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.empresa ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('empresa', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Local de trabalho</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.localTrabalho ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('localTrabalho', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Telefone</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.telefone ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('telefone', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>CBO</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.cbo ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('cbo', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Escolaridade</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.escolaridade ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('escolaridade', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Tipo de contratação
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.tipoContratacao ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'tipoContratacao',
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Benefício</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.beneficio ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('beneficio', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Valor do benefício
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.valorBeneficio ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'valorBeneficio',
+                            e.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Nível</label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.nivel ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('nivel', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Observações do solicitante
+                    </label>
+                    <textarea
+                      className={textareaClass}
+                      value={abonoCampos.observacaoSolicitante ?? ''}
+                      onChange={(e: TextAreaChange) =>
                         handleAbonoChange(
-                          'contratadaUmAno',
-                          e.target.checked ? 'true' : 'false',
+                          'observacaoSolicitante',
+                          e.target.value,
                         )
                       }
                     />
-                    <span>Contratada há, no mínimo, 01 ano</span>
-                  </label>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={abonoCampos.ausenciaAdvertencias === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange(
-                          'ausenciaAdvertencias',
-                          e.target.checked ? 'true' : 'false',
-                        )
-                      }
-                    />
-                    <span>Ausência de faltas, advertências disciplinares.</span>
-                  </label>
-
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={abonoCampos.cursosConcluidos === 'true'}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange(
-                          'cursosConcluidos',
-                          e.target.checked ? 'true' : 'false',
-                        )
-                      }
-                    />
-                    <span>
-                      Cursos concluídos com notas/exercícios/provas
-                    </span>
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Status
-                    </label>
-                    <select
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.statusRh ?? ''}
-                      onChange={(e: SelectChange) =>
-                        handleAbonoChange('statusRh', e.target.value)
-                      }
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="Deferido">Deferido</option>
-                      <option value="Indeferido">Indeferido</option>
-                    </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Assistente Recursos Humanos
+                </section>
+
+                <section className="space-y-4 border-t border-slate-100 pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Requisitos de RH
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={abonoCampos.contratadaUmAno === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'contratadaUmAno',
+                            e.target.checked ? 'true' : 'false',
+                          )
+                        }
+                      />
+                      <span>Contratada há, no mínimo, 01 ano</span>
                     </label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={abonoCampos.assistenteRh ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleAbonoChange('assistenteRh', e.target.value)
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={abonoCampos.ausenciaAdvertencias === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'ausenciaAdvertencias',
+                            e.target.checked ? 'true' : 'false',
+                          )
+                        }
+                      />
+                      <span>
+                        Ausência de faltas, advertências disciplinares.
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={abonoCampos.cursosConcluidos === 'true'}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange(
+                            'cursosConcluidos',
+                            e.target.checked ? 'true' : 'false',
+                          )
+                        }
+                      />
+                      <span>
+                        Cursos concluídos com notas/exercícios/provas
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>Status</label>
+                      <select
+                        className={selectClass}
+                        value={abonoCampos.statusRh ?? ''}
+                        onChange={(e: SelectChange) =>
+                          handleAbonoChange('statusRh', e.target.value)
+                        }
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Deferido">Deferido</option>
+                        <option value="Indeferido">Indeferido</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Assistente Recursos Humanos
+                      </label>
+                      <input
+                        className={inputClass}
+                        value={abonoCampos.assistenteRh ?? ''}
+                        onChange={(e: InputChange) =>
+                          handleAbonoChange('assistenteRh', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
+                      Cálculo do abono (se mensal ou será pago)
+                    </label>
+                    <textarea
+                      className={textareaClass}
+                      value={abonoCampos.calculoAbono ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleAbonoChange('calculoAbono', e.target.value)
                       }
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Cálculo do abono (se mensal ou será pago)
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={abonoCampos.calculoAbono ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleAbonoChange('calculoAbono', e.target.value)
-                    }
-                  />
-                </div>
+                  <div>
+                    <label className={labelClass}>Observações</label>
+                    <textarea
+                      className={textareaClass}
+                      value={abonoCampos.observacoesRh ?? ''}
+                      onChange={(e: TextAreaChange) =>
+                        handleAbonoChange('observacoesRh', e.target.value)
+                      }
+                    />
+                  </div>
+                </section>
+              </>
+            )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    Observações
-                  </label>
-                  <textarea
-                    className="w-full border rounded px-3 py-2 text-sm min-h-[60px]"
-                    value={abonoCampos.observacoesRh ?? ''}
-                    onChange={(e: TextAreaChange) =>
-                      handleAbonoChange('observacoesRh', e.target.value)
+            {/* =================== FORM GENÉRICO (camposEspecíficos) =================== */}
+          {selectedTipo && !isRQ063 && !isAbonoEducacional && (
+            <>
+              <h2 className="text-sm font-semibold mb-4">{selectedTipo.nome}</h2>
+
+              {camposEspecificos.length === 0 && (
+                <p className="text-xs text-gray-500">
+                  Este tipo de solicitação não possui campos configurados.
+                </p>
+              )}
+
+              {camposEspecificos.length > 0 && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {camposEspecificos.map((campo) => {
+                    const value = extras[campo.name] ?? '';
+
+                    // ----- CHECKBOX EM LINHA INTEIRA (RESPONSIVO) -----
+                    if (campo.type === 'checkbox') {
+                      return (
+                        <div key={campo.name} className="md:col-span-2">
+                          <label className="flex items-start gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={value === 'true'}
+                              onChange={(e: InputChange) =>
+                                handleExtraChange(
+                                  campo.name,
+                                  e.target.checked ? 'true' : 'false',
+                                )
+                              }
+                            />
+                            <span className="text-gray-700 leading-snug">
+                              {campo.label}
+                              {campo.required && (
+                                <span className="ml-1 text-red-500">*</span>
+                              )}
+                            </span>
+                          </label>
+                        </div>
+                      );
                     }
-                  />
+
+                    // ----- CAMPOS NORMAIS (TEXT / NUMBER / DATE / SELECT / TEXTAREA) -----
+                    const commonProps = {
+                      id: campo.name,
+                      name: campo.name,
+                      required: campo.required,
+                      value,
+                      onChange: (
+                        e:
+                          | InputChange
+                          | TextAreaChange
+                          | SelectChange,
+                      ) => handleExtraChange(campo.name, e.target.value),
+                      className:
+                        'w-full border rounded px-3 py-2 text-sm bg-white',
+                    };
+
+                    return (
+                      <div key={campo.name}>
+                        <label className="space-y-1 text-sm block">
+                          <span className="block text-xs font-semibold text-gray-700">
+                            {campo.label}{' '}
+                            {campo.required && (
+                              <span className="text-red-500">*</span>
+                            )}
+                          </span>
+
+                          {/* TEXTAREA */}
+                          {campo.type === 'textarea' && (
+                            <textarea
+                              {...commonProps}
+                              className={`${commonProps.className} min-h-[80px]`}
+                            />
+                          )}
+
+                          {/* SELECT */}
+                          {campo.type === 'select' && campo.options && (
+                            <select {...(commonProps as any)}>
+                              <option value="">Selecione...</option>
+                              {campo.options.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {/* INPUT TEXT PADRÃO (quando não vem type) */}
+                          {!campo.type && (
+                            <input type="text" {...commonProps} />
+                          )}
+
+                          {/* INPUT COM TYPE ESPECÍFICO (text, number, date, etc) */}
+                          {campo.type &&
+                            campo.type !== 'textarea' &&
+                            campo.type !== 'select' && (
+                              <input type={campo.type} {...commonProps} />
+                            )}
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
-              </section>
+              )}
             </>
           )}
-
-          {/* =================== DEFAULT =================== */}
-          {selectedTipo && !isRQ063 && !isAbonoEducacional && (
-            <p className="text-xs text-gray-500">
-              Tipo selecionado ainda não tem formulário específico
-              implementado ({selectedTipo.nome}).
-            </p>
-          )}
-        </div>
-      </form>
+          </div>
+        </form>
+      </div>
     </main>
   );
 }

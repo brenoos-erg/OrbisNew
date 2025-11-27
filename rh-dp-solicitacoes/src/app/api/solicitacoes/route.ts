@@ -302,11 +302,14 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    const isSolicitacaoPessoal = tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoPessoal =
+      tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoIncentivo =
+      tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isAbonoEducacional = tipo.nome === 'Solicitação de Abono Educacional'
 
-    // 3) Regras específicas para RQ_063 - Solicitação de Pessoal
-    if (isSolicitacaoPessoal) {
+    // 3) Regras específicas para RQ_063 / RQ_091 - seguem o mesmo fluxo de aprovação
+    if (isSolicitacaoPessoal || isSolicitacaoIncentivo) {
       const rawCampo =
         (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
         (payload?.campos?.vagaPrevista as string | undefined) ??
@@ -323,7 +326,7 @@ export async function POST(req: NextRequest) {
 
       const isSim = normalized === 'SIM' || normalized === 'S'
 
-      if (isSim) {
+      if (isSolicitacaoPessoal && isSim) {
         // vaga já prevista em contrato -> aprovação automática
         const updated = await prisma.solicitation.update({
           where: { id: created.id },
