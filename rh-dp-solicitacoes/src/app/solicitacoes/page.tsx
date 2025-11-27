@@ -17,6 +17,7 @@ export default function ListaSolicitacoesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let interval: NodeJS.Timeout | undefined
     async function load() {
       try {
         const res = await fetch('/api/solicitacoes', { cache: 'no-store' })
@@ -49,6 +50,11 @@ export default function ListaSolicitacoesPage() {
     }
 
     load()
+    interval = setInterval(load, 5000)
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
   }, [])
 
   return (

@@ -71,7 +71,9 @@ export default function ReceivedRequestsPage() {
       if (filters.status) params.set('status', filters.status)
       if (filters.text) params.set('text', filters.text)
 
-      const res = await fetch(`/api/solicitacoes?${params.toString()}`)
+      const res = await fetch(`/api/solicitacoes?${params.toString()}`, {
+        cache: 'no-store',
+      })
       if (!res.ok) {
         throw new Error('Erro ao buscar solicitações recebidas.')
       }
@@ -109,8 +111,31 @@ export default function ReceivedRequestsPage() {
 
   useEffect(() => {
     fetchList()
+    const interval = setInterval(fetchList, 5000)
+
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.page, filters.pageSize])
+  }, [filters])
+
+  useEffect(() => {
+    if (!detailOpen || !selectedRow) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/solicitacoes/${selectedRow.id}`, {
+          cache: 'no-store',
+        })
+        if (!res.ok) return
+
+        const json = (await res.json()) as SolicitationDetail
+        setDetail(json)
+      } catch (err) {
+        console.error('Erro ao atualizar detalhes da solicitação', err)
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [detailOpen, selectedRow])
 
   const rows = data?.rows ?? []
   const total = data?.total ?? 0

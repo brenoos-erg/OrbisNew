@@ -127,8 +127,23 @@ export default function SentRequestsPage() {
 
   useEffect(() => {
     load()
+    const interval = setInterval(load, 5000)
+
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize])
+  }, [
+    page,
+    pageSize,
+    dateStart,
+    dateEnd,
+    centerId,
+    tipoId,
+    categoriaId,
+    protocolo,
+    solicitante,
+    status,
+    text,
+  ])
 
   function onSearch() {
     setPage(1)

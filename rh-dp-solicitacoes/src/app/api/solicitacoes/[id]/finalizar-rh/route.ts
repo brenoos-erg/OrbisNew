@@ -256,7 +256,7 @@ export async function POST(
             titulo: 'Solicitação de Admissão',
             descricao: `Solicitação de admissão gerada automaticamente a partir da ${solicitation.protocolo}.`,
             requiresApproval: false,
-            approvalStatus: 'NAO_PRECISA',
+            approvalStatus: 'APROVADO',
             status: 'ABERTA',
             payload: {
               origem: {
@@ -301,8 +301,9 @@ export async function POST(
       await tx.solicitationTimeline.create({
           data: {
             solicitationId: dpSolicitation.id,
-            status: 'ABERTA',
-            message: `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo}.`,
+             status: 'AGUARDANDO_ATENDIMENTO',
+            message:
+              `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo} e aguardando atendimento do DP.`,
           },
         })
 
@@ -372,7 +373,7 @@ export async function POST(
             titulo: 'RQ_091 - Solicitação de Incentivo à Educação',
             descricao: `Solicitação encaminhada pelo RH para o DP a partir da ${solicitation.protocolo}.`,
             requiresApproval: false,
-            approvalStatus: 'NAO_PRECISA',
+            approvalStatus: 'APROVADO',
             status: 'ABERTA',
             payload: {
               origem: {
@@ -422,8 +423,9 @@ export async function POST(
         await tx.solicitationTimeline.create({
           data: {
             solicitationId: dpSolicitation.id,
-            status: 'ABERTA',
-            message: `Solicitação encaminhada para o DP a partir da ${solicitation.protocolo}.`,
+            status: 'AGUARDANDO_ATENDIMENTO',
+            message:
+              `Solicitação encaminhada para o DP a partir da ${solicitation.protocolo} e aguardando atendimento.`,
           },
         })
 

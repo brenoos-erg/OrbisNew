@@ -368,6 +368,17 @@ export function SolicitationDetailModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSolicitacaoIncentivo, payloadCampos])
+  useEffect(() => {
+    if (!isOpen) return
+
+    const interval = setInterval(() => {
+      refreshDetailFromServer()
+    }, 5000)
+
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, row?.id, detail?.id])
+
 
 
   // ===== AÇÕES =====
@@ -444,6 +455,7 @@ export function SolicitationDetailModal({
       }
 
       setCloseSuccess('Chamado assumido por você.')
+      await refreshDetailFromServer()
     } catch (err: any) {
       console.error('Erro ao assumir chamado', err)
       setAssumirError(err?.message ?? 'Erro ao assumir chamado.')
@@ -512,7 +524,7 @@ export function SolicitationDetailModal({
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Falha ao finalizar solicitação.')
       }
-
+await refreshDetailFromServer()
       setCloseSuccess(
         isSolicitacaoPessoal
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
@@ -585,6 +597,7 @@ export function SolicitationDetailModal({
           headers: {
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ comment }),
         },
       )
 
@@ -592,7 +605,7 @@ export function SolicitationDetailModal({
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Erro ao reprovar a solicitação.')
       }
-
+await refreshDetailFromServer()
       setCloseSuccess('Solicitação reprovada.')
       onActionCompleted?.('REPROVAR')
     } catch (err: any) {
