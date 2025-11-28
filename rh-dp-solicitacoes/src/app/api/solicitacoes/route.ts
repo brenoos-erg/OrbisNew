@@ -307,6 +307,15 @@ export async function POST(req: NextRequest) {
     const isSolicitacaoIncentivo =
       tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isAbonoEducacional = tipo.nome === 'Solicitação de Abono Educacional'
+    const rhCostCenter = await prisma.costCenter.findFirst({
+      where: {
+        OR: [
+          { description: { contains: 'Recursos Humanos', mode: 'insensitive' } },
+          { abbreviation: { contains: 'RH', mode: 'insensitive' } },
+          { code: { contains: 'RH', mode: 'insensitive' } },
+        ],
+      },
+    })
 
     // 3) RQ_063 segue fluxo de aprovação; RQ_091 não precisa de aprovador nível 3
     if (isSolicitacaoPessoal) {
@@ -327,7 +336,17 @@ export async function POST(req: NextRequest) {
       const isSim = normalized === 'SIM' || normalized === 'S'
 
       if (isSolicitacaoPessoal && isSim) {
-        // vaga já prevista em contrato -> aprovação automática
+        if (!rhCostCenter) {
+          return NextResponse.json(
+            {
+              error:
+                'Centro de custo de Recursos Humanos não encontrado para encaminhar a vaga prevista.',
+            },
+            { status: 400 },
+          )
+        }
+
+        // vaga já prevista em contrato -> aprovação automática e direcionamento ao RH
         const updated = await prisma.solicitation.update({
           where: { id: created.id },
           data: {
@@ -336,6 +355,8 @@ export async function POST(req: NextRequest) {
             approvalAt: new Date(),
             approverId: null,
             status: 'ABERTA',
+            costCenterId: rhCostCenter.id,
+            departmentId: rhCostCenter.departmentId ?? departmentId,
           },
         })
 
@@ -345,6 +366,14 @@ export async function POST(req: NextRequest) {
             solicitationId: created.id,
             actorId: solicitanteId,
             tipo: 'APROVACAO_AUTOMATICA_CONTRATO',
+          },
+        })
+        await prisma.solicitationTimeline.create({
+          data: {
+            solicitationId: created.id,
+            status: 'AGUARDANDO_ATENDIMENTO',
+            message:
+              'Solicitação aprovada automaticamente e encaminhada para o RH preencher os dados do candidato.',
           },
         })
 
@@ -378,11 +407,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (isSolicitacaoIncentivo) {
-      // Não precisa de aprovação: segue direto para atendimento do RH
-      return NextResponse.json(created, { status: 201 })
-    }
+      if (!rhCostCenter) {
+        return NextResponse.json(
+          {
+            error:
+              'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
+          },
+          { status: 400 },
+        )
+      }
 
-    if (isSolicitacaoIncentivo) {
       const updated = await prisma.solicitation.update({
         where: { id: created.id },
         data: {
@@ -390,6 +424,8 @@ export async function POST(req: NextRequest) {
           approvalStatus: 'PENDENTE',
           approverId: null,
           status: 'AGUARDANDO_APROVACAO',
+          costCenterId: rhCostCenter.id,
+          departmentId: rhCostCenter.departmentId ?? departmentId,
         },
       })
 
@@ -399,6 +435,14 @@ export async function POST(req: NextRequest) {
           solicitationId: created.id,
           actorId: solicitanteId,
           tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+        },
+      })
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: created.id,
+          status: 'AGUARDANDO_APROVACAO',
+          message:
+            'Solicitação enviada diretamente ao RH para aprovação e tratamento.',
         },
       })
 

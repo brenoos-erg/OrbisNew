@@ -109,6 +109,8 @@ export type SolicitationDetail = {
   } | null
   costCenter?: {
     description: string
+    code?: string | null
+    externalCode?: string | null
   } | null
   payload?: Payload
   anexos?: Attachment[]
@@ -296,6 +298,8 @@ export function SolicitationDetailModal({
   const [dataAdmissaoPrevista, setDataAdmissaoPrevista] = useState('')
   const [salario, setSalario] = useState('')
   const [cargo, setCargo] = useState('')
+  const [duracaoCursoMeses, setDuracaoCursoMeses] = useState('')
+  const [valorMensalCurso, setValorMensalCurso] = useState('')
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -322,6 +326,43 @@ export function SolicitationDetailModal({
   const payload = (detail?.payload ?? {}) as Payload
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
+   useEffect(() => {
+    setCandidatoNome(
+      (payloadCampos.nomeColaborador as string) ||
+        (payloadCampos.nomeCandidato as string) ||
+        (payloadCampos.candidatoNome as string) ||
+        '',
+    )
+    setCandidatoDocumento(
+      (payloadCampos.candidatoDocumento as string) ||
+        (payloadCampos.documento as string) ||
+        '',
+    )
+    setDataAdmissaoPrevista(
+      (payloadCampos.dataAdmissaoPrevista as string) || '',
+    )
+    setSalario(
+      payloadCampos.salario !== undefined
+        ? String(payloadCampos.salario)
+        : '',
+    )
+    setCargo(
+      (payloadCampos.cargoFinal as string) ||
+        (payloadCampos.cargo as string) ||
+        '',
+    )
+    setDuracaoCursoMeses(
+      payloadCampos.duracaoMeses !== undefined
+        ? String(payloadCampos.duracaoMeses)
+        : '',
+    )
+    setValorMensalCurso(
+      payloadCampos.valorMensal !== undefined
+        ? String(payloadCampos.valorMensal)
+        : '',
+    )
+  }, [detail?.id])
+
 
   const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
@@ -331,8 +372,25 @@ export function SolicitationDetailModal({
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+    const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+  const isDpDestino = !!(
+    detail?.costCenter?.externalCode === '590' ||
+    detail?.costCenter?.description?.toLowerCase().includes('pessoal')
+  )
+
+  const duracaoNumber = Number.parseFloat(
+    duracaoCursoMeses.replace(',', '.').trim() || 'NaN',
+  )
+  const valorMensalNumber = Number.parseFloat(
+    valorMensalCurso.replace(',', '.').trim() || 'NaN',
+  )
+  const valorTotalCurso =
+    Number.isFinite(duracaoNumber) && Number.isFinite(valorMensalNumber)
+      ? duracaoNumber * valorMensalNumber
+      : null
+
   const followsRhFinalizationFlow =
-    isSolicitacaoPessoal || isSolicitacaoIncentivo
+   isSolicitacaoPessoal || isSolicitacaoIncentivo || isDpChildFromRh
 
   const isFinalizadaOuCancelada =
     effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
@@ -342,6 +400,11 @@ export function SolicitationDetailModal({
 
   // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH)
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
+  const finalizarLabel = isDpDestino
+    ? 'Finalizar chamado'
+    : isSolicitacaoPessoal
+      ? 'Enviar para o DP'
+      : 'Finalizar no RH'
 
   // ===== AÇÕES =====
   async function refreshDetailFromServer() {
@@ -461,7 +524,13 @@ export function SolicitationDetailModal({
             dataAdmissaoPrevista,
             salario,
             cargo,
-            outrasInfos: {},
+            duracaoMeses: duracaoCursoMeses,
+            valorMensal: valorMensalCurso,
+            outrasInfos: {
+              ...(valorTotalCurso !== null
+                ? { valorTotalCalculado: valorTotalCurso }
+                : {}),
+            },
           }),
         },
       )
@@ -648,7 +717,7 @@ export function SolicitationDetailModal({
                   </button>
                 )}
 
-                {canFinalizarRh && isSolicitacaoPessoal && (
+                {!isDpDestino && canFinalizarRh && isSolicitacaoPessoal && (
                   <button
                     onClick={() => setShowContratadoForm((v) => !v)}
                     className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
@@ -665,11 +734,7 @@ export function SolicitationDetailModal({
                     disabled={closing}
                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                   >
-                    {closing
-                      ? 'Enviando...'
-                      : isSolicitacaoPessoal
-                        ? 'Enviar para o DP'
-                        : 'Finalizar no RH'}
+                    {closing ? 'Enviando...' : finalizarLabel}
                   </button>
                 )}
               </>
@@ -1084,6 +1149,57 @@ export function SolicitationDetailModal({
                           <span className="text-red-600">{uploadError}</span>
                         )}
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {isSolicitacaoIncentivo && (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
+                    Informações para incentivo à educação
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div>
+                      <label className={LABEL_RO}>Nome do colaborador/aluno</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={candidatoNome}
+                        onChange={(e) => setCandidatoNome(e.target.value)}
+                        placeholder="Nome completo"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={LABEL_RO}>Duração do curso (meses)</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={duracaoCursoMeses}
+                        onChange={(e) => setDuracaoCursoMeses(e.target.value)}
+                        placeholder="Ex.: 12"
+                      />
+                    </div>
+
+                    <div>
+                      <label className={LABEL_RO}>Valor mensal (R$)</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        value={valorMensalCurso}
+                        onChange={(e) => setValorMensalCurso(e.target.value)}
+                        placeholder="Ex.: 500,00"
+                      />
+                    </div>
+
+                    <div className="flex flex-col justify-end text-[12px] text-slate-700">
+                      <span className="font-semibold">Valor total estimado</span>
+                      <span className="text-sm text-emerald-700">
+                        {valorTotalCurso !== null
+                          ? valorTotalCurso.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })
+                          : '—'}
+                      </span>
                     </div>
                   </div>
                 </div>

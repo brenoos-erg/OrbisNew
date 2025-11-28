@@ -97,6 +97,8 @@ export async function GET(
       costCenter: item.costCenter
         ? {
             description: item.costCenter.description,
+            code: item.costCenter.code,
+            externalCode: item.costCenter.externalCode,
           }
         : null,
       payload: item.payload as any,

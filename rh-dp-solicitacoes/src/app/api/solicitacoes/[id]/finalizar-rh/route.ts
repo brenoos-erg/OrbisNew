@@ -34,6 +34,8 @@ export async function POST(
       salario,
       cargo,
       outrasInfos,
+    duracaoMeses,
+      valorMensal,
     } = body as {
       candidatoNome?: string
       candidatoDocumento?: string
@@ -41,6 +43,8 @@ export async function POST(
       salario?: string
       cargo?: string
       outrasInfos?: Record<string, any>
+      duracaoMeses?: string | number
+      valorMensal?: string | number
     }
 
     // 1) Busca a solicitação original (RH)
@@ -65,33 +69,48 @@ export async function POST(
       solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-
-    if (!isSolicitacaoPessoal && !isSolicitacaoIncentivo) {
-      return NextResponse.json(
-        {
-          error:
-            'Esta rota só pode ser usada para RQ_063 ou RQ_091 finalizadas pelo RH.',
-        },
-        { status: 400 },
-      )
-    }
+    const isAdmissaoGerada =
+      solicitation.tipo?.nome === 'Solicitação de Admissão'
 
     const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
     const solicitanteOrigem = payloadOrigem.solicitante ?? {}
+    const vemDeRh = Boolean(payloadOrigem?.origem?.rhSolicitationId)
+
+    if (!isSolicitacaoPessoal && !isSolicitacaoIncentivo && !isAdmissaoGerada) {
+      return NextResponse.json(
+        {
+          error:
+            'Esta rota só pode ser usada para RQ_063, RQ_091 ou solicitações de admissão oriundas do RH.',
+        },
+        { status: 400 },
+      )
+    }
     
     const nomeFinalIncentivo =
       (outrasInfos?.nomeColaborador as string | undefined)?.trim() ??
       (camposOrigem.nomeColaborador as string | undefined)?.trim() ??
       ''
 
-    const valorContribuicaoFinal =
-      (outrasInfos?.calculoValor as string | undefined)?.trim() ??
-      (outrasInfos?.valorContribuicao as string | undefined)?.trim() ??
-      (camposOrigem.calculoValor as string | undefined)?.trim() ??
-      ''
+    const duracaoMesesFinal =
+      duracaoMeses ?? outrasInfos?.duracaoMeses ?? camposOrigem.duracaoMeses
+    const valorMensalFinal =
+      valorMensal ?? outrasInfos?.valorMensal ?? camposOrigem.valorMensal
 
-    if (isSolicitacaoIncentivo) {
+    const duracaoNumber =
+      typeof duracaoMesesFinal === 'number'
+        ? duracaoMesesFinal
+        : Number.parseFloat((duracaoMesesFinal ?? '').toString().replace(',', '.'))
+    const valorMensalNumber =
+      typeof valorMensalFinal === 'number'
+        ? valorMensalFinal
+        : Number.parseFloat((valorMensalFinal ?? '').toString().replace(',', '.'))
+    const valorTotalNumber =
+      Number.isFinite(duracaoNumber) && Number.isFinite(valorMensalNumber)
+        ? duracaoNumber * valorMensalNumber
+        : null
+
+    if (isSolicitacaoIncentivo && !vemDeRh) {
       if (!nomeFinalIncentivo) {
         return NextResponse.json(
           { error: 'Informe o nome do usuário antes de enviar ao DP.' },
@@ -99,15 +118,95 @@ export async function POST(
         )
       }
 
-      if (!valorContribuicaoFinal) {
+      if (!Number.isFinite(duracaoNumber) || duracaoNumber <= 0) {
         return NextResponse.json(
-          {
-            error:
-              'Informe o valor de contribuição (cálculo do valor mensal a ser pago) antes de enviar ao DP.',
-          },
+          { error: 'Informe a duração do curso (em meses) para prosseguir.' },
           { status: 400 },
         )
       }
+
+      if (!Number.isFinite(valorMensalNumber) || valorMensalNumber <= 0) {
+        return NextResponse.json(
+          { error: 'Informe o valor mensal do curso para prosseguir.' },
+          { status: 400 },
+        )
+      }
+    }
+    if (isAdmissaoGerada && vemDeRh) {
+      const agora = new Date()
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: `Solicitação finalizada pelo DP em ${agora.toLocaleDateString('pt-BR')}.`,
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_DP',
+        },
+      })
+
+      return NextResponse.json({ dp: updated }, { status: 200 })
+    }
+
+    if (isSolicitacaoIncentivo && vemDeRh) {
+      const agora = new Date()
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+          payload: {
+            ...payloadOrigem,
+            campos: {
+              ...camposOrigem,
+              ...(outrasInfos ?? {}),
+              nomeColaborador: nomeFinalIncentivo || camposOrigem.nomeColaborador,
+              duracaoMeses: Number.isFinite(duracaoNumber)
+                ? duracaoNumber
+                : camposOrigem.duracaoMeses,
+              valorMensal: Number.isFinite(valorMensalNumber)
+                ? valorMensalNumber
+                : camposOrigem.valorMensal,
+              valorTotal: Number.isFinite(valorTotalNumber)
+                ? valorTotalNumber
+                : camposOrigem.valorTotal,
+            },
+          },
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: `Solicitação finalizada pelo DP em ${agora.toLocaleDateString('pt-BR')}.`,
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_DP',
+        },
+      })
+
+      return NextResponse.json({ dp: updated }, { status: 200 })
     }
 
 /*
@@ -185,6 +284,20 @@ export async function POST(
                   ? { cargoFinal: camposOrigem.cargoFinal }
                   : {}),
               ...(outrasInfos ?? {}),
+              ...(isSolicitacaoIncentivo
+                ? {
+                    nomeColaborador: nomeFinalIncentivo,
+                    duracaoMeses: Number.isFinite(duracaoNumber)
+                      ? duracaoNumber
+                      : undefined,
+                    valorMensal: Number.isFinite(valorMensalNumber)
+                      ? valorMensalNumber
+                      : undefined,
+                    valorTotal: Number.isFinite(valorTotalNumber)
+                      ? valorTotalNumber
+                      : undefined,
+                  }
+                : {}),
             },
           },
         },
@@ -408,12 +521,16 @@ export async function POST(
                     ? { cargoFinal: camposOrigem.cargoFinal }
                     : {}),
                 ...(outrasInfos ?? {}),
-                ...(isSolicitacaoIncentivo
-                  ? {
-                      nomeColaborador: nomeFinalIncentivo,
-                      calculoValor: valorContribuicaoFinal,
-                    }
-                  : {}),
+                nomeColaborador: nomeFinalIncentivo,
+                duracaoMeses: Number.isFinite(duracaoNumber)
+                  ? duracaoNumber
+                  : null,
+                valorMensal: Number.isFinite(valorMensalNumber)
+                  ? valorMensalNumber
+                  : null,
+                valorTotal: Number.isFinite(valorTotalNumber)
+                  ? valorTotalNumber
+                  : null,
               },
               solicitante: solicitanteOrigem,
             },
