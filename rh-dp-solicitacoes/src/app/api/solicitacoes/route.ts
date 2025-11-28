@@ -306,18 +306,34 @@ export async function POST(req: NextRequest) {
       tipo.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-    const isAbonoEducacional = tipo.nome === 'Solicitação de Abono Educacional'
+    const isAbonoEducacional =
+      tipo.nome === 'Solicitação de Abono Educacional'
+
     const rhCostCenter = await prisma.costCenter.findFirst({
       where: {
         OR: [
-          { description: { contains: 'Recursos Humanos', mode: 'insensitive' } },
-          { abbreviation: { contains: 'RH', mode: 'insensitive' } },
-          { code: { contains: 'RH', mode: 'insensitive' } },
+          {
+            description: {
+              contains: 'Recursos Humanos',
+              mode: 'insensitive',
+            },
+          },
+          {
+            abbreviation: {
+              contains: 'RH',
+              mode: 'insensitive',
+            },
+          },
+          {
+            code: { contains: 'RH', mode: 'insensitive' },
+          },
         ],
       },
     })
 
-    // 3) RQ_063 segue fluxo de aprovação; RQ_091 não precisa de aprovador nível 3
+    /* =====================================================================
+       3) RQ_063 - Solicitação de Pessoal
+       ===================================================================== */
     if (isSolicitacaoPessoal) {
       const rawCampo =
         (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
@@ -335,7 +351,7 @@ export async function POST(req: NextRequest) {
 
       const isSim = normalized === 'SIM' || normalized === 'S'
 
-      if (isSolicitacaoPessoal && isSim) {
+      if (isSim) {
         if (!rhCostCenter) {
           return NextResponse.json(
             {
@@ -368,6 +384,7 @@ export async function POST(req: NextRequest) {
             tipo: 'APROVACAO_AUTOMATICA_CONTRATO',
           },
         })
+
         await prisma.solicitationTimeline.create({
           data: {
             solicitationId: created.id,
@@ -406,6 +423,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated, { status: 201 })
     }
 
+    /* =====================================================================
+       4) RQ_091 - Solicitação de Incentivo à Educação
+       ===================================================================== */
     if (isSolicitacaoIncentivo) {
       if (!rhCostCenter) {
         return NextResponse.json(
@@ -422,7 +442,7 @@ export async function POST(req: NextRequest) {
         data: {
           requiresApproval: true,
           approvalStatus: 'PENDENTE',
-          approverId: null,
+          approverId: null, // RH vai tratar
           status: 'AGUARDANDO_APROVACAO',
           costCenterId: rhCostCenter.id,
           departmentId: rhCostCenter.departmentId ?? departmentId,
@@ -437,6 +457,7 @@ export async function POST(req: NextRequest) {
           tipo: 'AGUARDANDO_APROVACAO_GESTOR',
         },
       })
+
       await prisma.solicitationTimeline.create({
         data: {
           solicitationId: created.id,
@@ -449,6 +470,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated, { status: 201 })
     }
 
+    /* =====================================================================
+       5) Solicitação de Abono Educacional
+       ===================================================================== */
     if (isAbonoEducacional) {
       const approver = await findLevel3ApproverForCostCenter(costCenterId)
       const approverId = approver?.id ?? null
@@ -475,12 +499,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(updated, { status: 201 })
     }
 
-    // 4) Se não for RQ_063 nem Abono Educacional, devolve a criada normal
+    // ======================================================================
+    // 6) Demais tipos: segue fluxo simples, sem aprovação especial
+    // ======================================================================
     return NextResponse.json(created, { status: 201 })
   } catch (e) {
     console.error('POST /api/solicitacoes error', e)
     return NextResponse.json(
-      { error: 'Erro ao registrar a solicitação.' },
+      { error: 'Erro ao criar solicitação.' },
       { status: 500 },
     )
   }

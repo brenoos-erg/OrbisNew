@@ -370,7 +370,7 @@ export function SolicitationDetailModal({
 
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
-    const isSolicitacaoIncentivo =
+     const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
   const isDpDestino = !!(
