@@ -151,7 +151,7 @@ export default function UserMenu({ collapsed }: Props) {
           <div className="my-2 h-px bg-white/10" />
 
           <button
-            onClick={() => (window.location.href = '/dashboard/configuracoes/perfil')}
+            onClick={() => (window.location.href = '/dashboard/perfil')}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
           >
             <SettingsIcon size={16} /> Gerenciar perfil

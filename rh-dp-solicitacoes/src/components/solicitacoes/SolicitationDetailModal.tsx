@@ -257,6 +257,11 @@ type Props = {
   error: string | null
   mode?: 'default' | 'approval'
   onActionCompleted?: (action: 'APROVAR' | 'REPROVAR') => void
+  /**
+   * Se false, esconde ações de assumir/finalizar (modo consulta).
+   * Na tela de "Solicitações Enviadas" usar canManage={false}.
+   */
+  canManage?: boolean
 }
 
 export function SolicitationDetailModal({
@@ -268,18 +273,16 @@ export function SolicitationDetailModal({
   error,
   mode = 'default',
   onActionCompleted,
+  canManage = true,
 }: Props) {
   if (!isOpen || !row) return null
 
   const isApprovalMode = mode === 'approval'
-  const [detail, setDetail] = useState<SolicitationDetail | null>(
-    detailProp,
-  )
+  const [detail, setDetail] = useState<SolicitationDetail | null>(detailProp)
 
   useEffect(() => {
     setDetail(detailProp)
   }, [detailProp])
-
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -291,7 +294,7 @@ export function SolicitationDetailModal({
   const [assumindo, setAssumindo] = useState(false)
   const [assumirError, setAssumirError] = useState<string | null>(null)
 
-  // formulário de dados do contratado
+  // formulário de dados do contratado / incentivo
   const [showContratadoForm, setShowContratadoForm] = useState(false)
   const [candidatoNome, setCandidatoNome] = useState('')
   const [candidatoDocumento, setCandidatoDocumento] = useState('')
@@ -306,8 +309,7 @@ export function SolicitationDetailModal({
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
-  const approvalStatus = (detail?.approvalStatus ??
-    null) as ApprovalStatus | null
+  const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
 
   const { steps: timelineSteps, currentIndex } = buildTimeline(
     effectiveStatus,
@@ -326,7 +328,9 @@ export function SolicitationDetailModal({
   const payload = (detail?.payload ?? {}) as Payload
   const payloadSolic = payload.solicitante ?? {}
   const payloadCampos = payload.campos ?? {}
-   useEffect(() => {
+
+  // Preenche campos extras a partir do payload quando abre o detalhe
+  useEffect(() => {
     setCandidatoNome(
       (payloadCampos.nomeColaborador as string) ||
         (payloadCampos.nomeCandidato as string) ||
@@ -361,18 +365,19 @@ export function SolicitationDetailModal({
         ? String(payloadCampos.valorMensal)
         : '',
     )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
-
 
   const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
-    // Fluxo especial de RH (RQ_063 e RQ_091)
 
+  // Fluxos especiais
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
-     const isSolicitacaoIncentivo =
+  const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-    const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+  const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+
   const isDpDestino = !!(
     detail?.costCenter?.externalCode === '590' ||
     detail?.costCenter?.description?.toLowerCase().includes('pessoal')
@@ -390,7 +395,7 @@ export function SolicitationDetailModal({
       : null
 
   const followsRhFinalizationFlow =
-   isSolicitacaoPessoal || isSolicitacaoIncentivo || isDpChildFromRh
+    isSolicitacaoPessoal || isSolicitacaoIncentivo || isDpChildFromRh
 
   const isFinalizadaOuCancelada =
     effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
@@ -398,13 +403,17 @@ export function SolicitationDetailModal({
   // pode assumir se não estiver concluída/cancelada
   const canAssumir = !isFinalizadaOuCancelada
 
-  // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH)
+  // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH ou DP)
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
   const finalizarLabel = isDpDestino
     ? 'Finalizar chamado'
     : isSolicitacaoPessoal
       ? 'Enviar para o DP'
       : 'Finalizar no RH'
+
+  // Se for tela de aprovação não mostramos ações de gestão;
+  // se canManage=false (Solicitações Enviadas) também não.
+  const showManagementActions = !isApprovalMode && canManage
 
   // ===== AÇÕES =====
   async function refreshDetailFromServer() {
@@ -418,7 +427,7 @@ export function SolicitationDetailModal({
       const json = (await res.json()) as SolicitationDetail
       setDetail(json)
     } catch (err) {
-      console.error('Erro ao atualizar detalhes após upload', err)
+      console.error('Erro ao atualizar detalhes após ação', err)
     }
   }
 
@@ -480,6 +489,7 @@ export function SolicitationDetailModal({
       }
 
       setCloseSuccess('Chamado assumido por você.')
+      await refreshDetailFromServer()
     } catch (err: any) {
       console.error('Erro ao assumir chamado', err)
       setAssumirError(err?.message ?? 'Erro ao assumir chamado.')
@@ -491,8 +501,6 @@ export function SolicitationDetailModal({
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
-
-  
 
     setClosing(true)
     setCloseError(null)
@@ -540,6 +548,8 @@ export function SolicitationDetailModal({
         throw new Error(json?.error ?? 'Falha ao finalizar solicitação.')
       }
 
+      await refreshDetailFromServer()
+
       setCloseSuccess(
         isSolicitacaoPessoal
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
@@ -558,7 +568,6 @@ export function SolicitationDetailModal({
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
-
     setClosing(true)
     setCloseError(null)
     setCloseSuccess(null)
@@ -570,8 +579,8 @@ export function SolicitationDetailModal({
           method: 'POST',
           headers: comment
             ? {
-              'Content-Type': 'application/json',
-            }
+                'Content-Type': 'application/json',
+              }
             : undefined,
           body: comment ? JSON.stringify({ comment }) : undefined,
         },
@@ -612,6 +621,7 @@ export function SolicitationDetailModal({
           headers: {
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ comment }),
         },
       )
 
@@ -619,6 +629,8 @@ export function SolicitationDetailModal({
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Erro ao reprovar a solicitação.')
       }
+
+      await refreshDetailFromServer()
 
       setCloseSuccess('Solicitação reprovada.')
       onActionCompleted?.('REPROVAR')
@@ -629,6 +641,7 @@ export function SolicitationDetailModal({
       setClosing(false)
     }
   }
+
   function handleStartApproval(action: 'APROVAR' | 'REPROVAR') {
     setCloseError(null)
     setCloseSuccess(null)
@@ -668,7 +681,6 @@ export function SolicitationDetailModal({
     setCloseError(null)
   }
 
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
@@ -687,7 +699,8 @@ export function SolicitationDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {isApprovalMode ? (
+            {/* Modo de aprovação (tela do gestor) */}
+            {isApprovalMode && (
               <>
                 <button
                   onClick={() => handleStartApproval('APROVAR')}
@@ -705,7 +718,10 @@ export function SolicitationDetailModal({
                   Reprovar
                 </button>
               </>
-            ) : (
+            )}
+
+            {/* Ações de assumir/finalizar – só quando pode gerenciar */}
+            {showManagementActions && (
               <>
                 {canAssumir && (
                   <button
@@ -748,6 +764,7 @@ export function SolicitationDetailModal({
             </button>
           </div>
         </div>
+
         {isApprovalMode && approvalAction && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -803,7 +820,6 @@ export function SolicitationDetailModal({
             </div>
           </div>
         )}
-
 
         {/* CONTEÚDO */}
         <div className="space-y-5 px-5 py-4 text-sm">
@@ -1030,35 +1046,34 @@ export function SolicitationDetailModal({
               </div>
 
               {/* Formulário do tipo de solicitação */}
-                {/* Formulário do tipo de solicitação / RQ_063 */}
-                {isSolicitacaoPessoal ? (
-                  <RQ063ResumoCampos payloadCampos={payloadCampos} />
-                ) : (
-                  camposSchema.length > 0 && (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                        Formulário do tipo de solicitação
-                      </p>
+              {isSolicitacaoPessoal ? (
+                <RQ063ResumoCampos payloadCampos={payloadCampos} />
+              ) : (
+                camposSchema.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                      Formulário do tipo de solicitação
+                    </p>
 
-                      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                        {camposSchema.map((campo) => (
-                          <div key={campo.name}>
-                            <label className={LABEL_RO}>{campo.label}</label>
-                            <input
-                              className={INPUT_RO}
-                              readOnly
-                              value={
-                                payloadCampos[campo.name] !== undefined
-                                  ? String(payloadCampos[campo.name])
-                                  : ''
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
+                    <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                      {camposSchema.map((campo) => (
+                        <div key={campo.name}>
+                          <label className={LABEL_RO}>{campo.label}</label>
+                          <input
+                            className={INPUT_RO}
+                            readOnly
+                            value={
+                              payloadCampos[campo.name] !== undefined
+                                ? String(payloadCampos[campo.name])
+                                : ''
+                            }
+                          />
+                        </div>
+                      ))}
                     </div>
-                  )
-                )}
+                  </div>
+                )
+              )}
 
               {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && (
@@ -1123,7 +1138,8 @@ export function SolicitationDetailModal({
                         placeholder="Ex: 3500,00"
                       />
                     </div>
-                     <div className="space-y-1">
+
+                    <div className="space-y-1">
                       <label className={LABEL_RO}>Anexar documento(s)</label>
                       <input
                         type="file"
@@ -1143,7 +1159,9 @@ export function SolicitationDetailModal({
                         </button>
 
                         {uploadSuccess && (
-                          <span className="text-emerald-600">{uploadSuccess}</span>
+                          <span className="text-emerald-600">
+                            {uploadSuccess}
+                          </span>
                         )}
                         {uploadError && (
                           <span className="text-red-600">{uploadError}</span>
@@ -1153,6 +1171,8 @@ export function SolicitationDetailModal({
                   </div>
                 </div>
               )}
+
+              {/* Bloco de incentivo / educação */}
               {isSolicitacaoIncentivo && (
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
@@ -1161,7 +1181,9 @@ export function SolicitationDetailModal({
 
                   <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                     <div>
-                      <label className={LABEL_RO}>Nome do colaborador/aluno</label>
+                      <label className={LABEL_RO}>
+                        Nome do colaborador/aluno
+                      </label>
                       <input
                         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                         value={candidatoNome}
@@ -1171,7 +1193,9 @@ export function SolicitationDetailModal({
                     </div>
 
                     <div>
-                      <label className={LABEL_RO}>Duração do curso (meses)</label>
+                      <label className={LABEL_RO}>
+                        Duração do curso (meses)
+                      </label>
                       <input
                         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                         value={duracaoCursoMeses}
@@ -1318,7 +1342,10 @@ function RQ063ResumoCampos({
 
   const joinIfTrue = (entries: [string, string][]) =>
     entries
-      .filter(([k]) => (payloadCampos[k] ?? '').toString().toLowerCase() === 'true')
+      .filter(
+        ([k]) =>
+          (payloadCampos[k] ?? '').toString().toLowerCase() === 'true',
+      )
       .map(([, label]) => label)
       .join(', ')
 
@@ -1507,7 +1534,9 @@ function RQ063ResumoCampos({
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
           <div>
-            <label className={LABEL_RO}>Crachá / República / Uniforme / Outros</label>
+            <label className={LABEL_RO}>
+              Crachá / República / Uniforme / Outros
+            </label>
             <input
               className={INPUT_RO}
               readOnly

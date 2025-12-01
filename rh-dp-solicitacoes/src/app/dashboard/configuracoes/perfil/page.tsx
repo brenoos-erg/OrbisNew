@@ -95,69 +95,68 @@ export default function PerfilPage() {
   }
 
   // Upload de avatar → Storage bucket "avatars"
-// Upload de avatar → Storage bucket "avatars"
-async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
-  const inputEl = e.currentTarget
-  const file = inputEl.files?.[0]
-  if (!file) return
+const AVATAR_BUCKET = 'avatars'
 
-  setError(null)
-  setOk(null)
+    async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const inputEl = e.currentTarget
+    const file = inputEl.files?.[0]
+    if (!file) return
 
-  try {
-    // validações básicas (opcional)
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Selecione uma imagem (JPG, PNG, WEBP, etc).')
-    }
-    if (file.size > 5 * 1024 * 1024) { // 5MB
-      throw new Error('Imagem muito grande. Máximo: 5 MB.')
-    }
+    setError(null)
+    setOk(null)
+
+    try {
+      // validações básicas (opcional)
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Selecione uma imagem (JPG, PNG, WEBP, etc).')
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        throw new Error('Imagem muito grande. Máximo: 5 MB.')
+      }
 
     const { data: { user } } = await sb.auth.getUser()
-    if (!user) throw new Error('Sessão expirada. Faça login novamente.')
+      if (!user) throw new Error('Sessão expirada. Faça login novamente.')
 
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
-    const path = `user-${user.id}/${Date.now()}.${ext}`
+      const path = `user-${user.id}/${Date.now()}.${ext}`
 
-    // ✅ use o MESMO bucket nas duas chamadas
-    const bucket = 'avatars'
-
-    // 1) upload
-    const up = await sb.storage.from(bucket).upload(path, file, {
-      cacheControl: '3600',
-      upsert: true,
-    })
-    if (up.error) throw up.error
+     // 1) upload
+      const up = await sb.storage.from(AVATAR_BUCKET).upload(path, file, {
+        cacheControl: '3600',
+        upsert: true,
+      })
+      if (up.error) throw up.error
 
     // 2) URL pública (se o bucket for público)
-    const { data } = sb.storage.from(bucket).getPublicUrl(path)
-    const publicUrl = data?.publicUrl
-    if (!publicUrl) throw new Error('Não foi possível obter a URL do avatar.')
+      const { data } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+      const publicUrl = data?.publicUrl
+      if (!publicUrl) throw new Error('Não foi possível obter a URL do avatar.')
 
-    // 3) atualiza preview
-    setAvatarUrl(publicUrl)
-    setOk('Foto enviada! Clique em "Salvar alterações" para aplicar.')
+      // 3) atualiza preview
+      setAvatarUrl(publicUrl)
+      setOk('Foto enviada! Clique em "Salvar alterações" para aplicar.')
 
-    // 4) (opcional) salva automaticamente no perfil
-    //    — remova este bloco se quiser salvar apenas no botão
-    setSaving(true)
-    const r = await fetch('/api/me', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avatarUrl: publicUrl }),
-    })
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}))
-      throw new Error(err?.error || `Falha ao salvar avatar (${r.status})`)
+      // 4) (opcional) salva automaticamente no perfil
+      //    — remova este bloco se quiser salvar apenas no botão
+      setSaving(true)
+      const r = await fetch('/api/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: publicUrl }),
+      })
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        throw new Error(err?.error || `Falha ao salvar avatar (${r.status})`)
+      }
+      setOk('Foto enviada e salva no perfil!')
+    } catch (err: any) {
+      setError(err?.message || 'Falha ao enviar a foto.')
+    } finally {
+      if (inputEl) inputEl.value = '' // permite escolher o mesmo arquivo depois
+      setSaving(false)
     }
-    setOk('Foto enviada e salva no perfil!')
-  } catch (err: any) {
-    setError(err?.message || 'Falha ao enviar a foto.')
-  } finally {
-    if (inputEl) inputEl.value = '' // permite escolher o mesmo arquivo depois
-    setSaving(false)
+    
   }
-}
 
 
 

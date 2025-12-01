@@ -220,7 +220,9 @@ export default function SentRequestsPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-800">Solicitações Enviadas</h1>
           <p className="text-sm text-slate-500">
-            Visualize e gerencie as solicitações que você abriu.
+            Acompanhe o andamento das solicitações que você abriu. Esta tela é apenas
+            para consulta: assumir ou finalizar o chamado deve ser feito pela equipe
+            responsável.
           </p>
         </div>
 
@@ -523,6 +525,7 @@ export default function SentRequestsPage() {
         detail={detail}
         loading={detailLoading}
         error={detailError}
+        canManage={false}   // aqui bloqueia assumir/finalizar
       />
       
 
