@@ -1,4 +1,3 @@
-// src/app/api/solicitacoes/[id]/aprovar/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
@@ -7,7 +6,7 @@ import crypto from 'crypto'
 export const dynamic = 'force-dynamic'
 
 export async function POST(
-req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
@@ -21,6 +20,10 @@ req: NextRequest,
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
+      include: {
+        tipo: true,
+        costCenter: true,
+      },
     })
 
     if (!solic) {
@@ -37,8 +40,50 @@ req: NextRequest,
       )
     }
 
+    const isSolicitacaoPessoal =
+      solic.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+
+    let rhCostCenter = null
+
+    if (isSolicitacaoPessoal) {
+      rhCostCenter = await prisma.costCenter.findFirst({
+        where: {
+          OR: [
+            {
+              description: { contains: 'Recursos Humanos', mode: 'insensitive' },
+            },
+            { abbreviation: { contains: 'RH', mode: 'insensitive' } },
+            { code: { contains: 'RH', mode: 'insensitive' } },
+          ],
+        },
+      })
+
+      if (!rhCostCenter) {
+        return NextResponse.json(
+          {
+            error:
+              'Centro de custo de Recursos Humanos não encontrado para encaminhar a solicitação aprovada.',
+          },
+          { status: 400 },
+        )
+      }
+    }
+
+    const rhDepartmentId =
+      rhCostCenter?.departmentId ?? solic.costCenter?.departmentId ?? solic.departmentId
+
+    if (rhCostCenter && !rhDepartmentId) {
+      return NextResponse.json(
+        {
+          error:
+            'Departamento do centro de custo de RH não encontrado para encaminhar a solicitação aprovada.',
+        },
+        { status: 400 },
+      )
+    }
+
     const updated = await prisma.solicitation.update({
-  where: { id: solicitationId },
+      where: { id: solicitationId },
       data: {
         approvalStatus: 'APROVADO',
         approvalAt: new Date(),
@@ -47,18 +92,32 @@ req: NextRequest,
         // Depois de aprovado, volta para ABERTA,
         // e o front interpreta como "Aguardando atendimento"
         status: 'ABERTA',
+        ...(rhCostCenter
+          ? {
+              costCenterId: rhCostCenter.id,
+              departmentId: rhDepartmentId,
+            }
+          : {}),
       },
     })
+
+    let timelineMessage: string
+
+    if (approvalComment && approvalComment.length > 0) {
+      timelineMessage = approvalComment
+    } else if (rhCostCenter) {
+      const rhName = rhCostCenter.description ?? rhCostCenter.code ?? rhCostCenter.id
+      timelineMessage = `Solicitação aprovada e encaminhada para o RH (${rhName}).`
+    } else {
+      timelineMessage = `Solicitação aprovada por ${me.fullName ?? me.id}.`
+    }
 
 
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
         status: 'AGUARDANDO_ATENDIMENTO',
-        message:
-          approvalComment && approvalComment.length > 0
-            ? approvalComment
-            : `Solicitação aprovada por ${me.fullName ?? me.id}.`,
+        message: timelineMessage,
       },
     })
 

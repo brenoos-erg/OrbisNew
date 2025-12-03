@@ -132,6 +132,19 @@ export async function GET(req: NextRequest) {
       } else {
         where.costCenterId = { in: [...ccIds] }
       }
+      // RQ_063 só deve chegar na fila após aprovação (nível 3)
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          NOT: {
+            AND: [
+              { requiresApproval: true },
+              { approvalStatus: 'PENDENTE' },
+              { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+            ],
+          },
+        },
+      ]
     } else if (scope === 'to-approve') {
       where.requiresApproval = true
       where.approvalStatus = 'PENDENTE'
