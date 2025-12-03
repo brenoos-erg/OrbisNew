@@ -7,6 +7,7 @@ type CampoEspecifico = {
   type: string
   required?: boolean
   options?: string[]
+  defaultValue?: string
 }
 
 type TipoMeta = {

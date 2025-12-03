@@ -44,6 +44,8 @@ type CampoEspecifico = {
   type?: string;
   required?: boolean;
   options?: string[];
+    defaultValue?: string;
+  
 };
 
 type TipoSolicitacao = {
@@ -241,9 +243,26 @@ export default function NovaSolicitacaoPage() {
   }, [isAbonoEducacional]);
 
   useEffect(() => {
-    setExtras({});
+    if (!selectedTipo) {
+      setExtras({});
+      setCargoId('');
+      return;
+    }
+
+    const defaults = (selectedTipo.camposEspecificos ?? []).reduce(
+      (acc, campo) => {
+        if (campo.defaultValue !== undefined) {
+          acc[campo.name] = campo.defaultValue;
+        }
+
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
+    setExtras(defaults);
     setCargoId('');
-  }, [tipoId]);
+  }, [selectedTipo]);
 
   /* ============================================================
    4) /api/positions

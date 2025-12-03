@@ -313,13 +313,166 @@ async function main() {
     )
   } else {
     console.warn(
-      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional, RQ_063 e RQ_091) não foram criados.',
+      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional, Checklist de Documentos para Admissão, RQ_063 e RQ_091) não foram criados.',
     )
   }
 
   /* =========================
-     TIPO RQ_091 - SOLICITAÇÃO DE INCENTIVO À EDUCAÇÃO (RH)
+      TIPOS RH ESPECÍFICOS
+     - Checklist de Documentos para Admissão (RH)
+     - RQ_091 - Solicitação de Incentivo à Educação (RH)
      ========================= */
+      if (rhDepartment) {
+    /* =========================
+       CHECKLIST DE DOCUMENTOS PARA ADMISSÃO (RH)
+       ========================= */
+
+    const schemaChecklistDocs = {
+      meta: {
+        departamentos: [rhDepartment.id],
+      },
+      camposEspecificos: [
+        {
+          name: 'descricaoSolicitacao',
+          label: 'Descrição da solicitação',
+          type: 'textarea',
+          required: true,
+          // Texto fornecido pelo solicitante para ser exibido já preenchido no formulário
+          defaultValue:
+            'Prezado candidato, seja muito bem vindo a ERG Engenharia! Para que possamos seguir com o seu processo de admissão é INDISPENSÁVEL que você apresente toda a sua documentação pessoal conforme indicação abaixo, via postagem eletrônica. Todos os arquivos devem ser individuais e renomeados conforme exemplo: RG-João Silva; CPF-João Silva; Endereço-João Silva, Foto-João Silva, etc.\n\nImportante: Neste momento não há necessidade de comparecimento na empresa de forma presencial. Toda a documentação após recebida será analisada pela equipe de RH, que entrará em contato para avançarmos com o processo. O sucesso da sua admissão depende desta etapa, portanto não deixe de anexar os todos documentos devidamente renomeados em até 24 horas a partir o recebimento deste link.\n\nDúvidas quanto a postagem dos documentos, gentileza entrar em contato com o RH pelo telefone (31) 2138-4700 ou e-mail rh@ergbh.com.br.\n\nObs.: Obrigatório o preenchimento do primeiro campo logo abaixo " E-mail Solicitante"',
+        },
+        {
+          name: 'nomeCompleto',
+          label: 'Nome completo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'telefone',
+          label: 'Telefone',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'documentoPaisRepresentantes',
+          label: 'Doc. desde pais/representantes (A)',
+          type: 'checkbox',
+        },
+        { name: 'rg', label: 'RG', type: 'checkbox' },
+        { name: 'cpf', label: 'CPF', type: 'checkbox' },
+        { name: 'cnh', label: 'CNH', type: 'checkbox' },
+        {
+          name: 'comprovacaoRenda',
+          label: 'Documento comprovação renda ?',
+          type: 'checkbox',
+        },
+        {
+          name: 'carteiraTrabalhoOpcao1',
+          label: 'Carteira de trabalho (Opção 1 - Verificar candidato na CM)',
+          type: 'checkbox',
+        },
+        {
+          name: 'carteiraTrabalhoOpcao2',
+          label:
+            'Carteira trabalho (Opção 2 - Preencher manualmente no site (link do Maria))',
+          type: 'checkbox',
+        },
+        {
+          name: 'tituloEleitor',
+          label: 'Título de eleitor',
+          type: 'checkbox',
+        },
+        {
+          name: 'carteiraReservista',
+          label: 'Carteira de reservista (se ex-militar ou sexo masculino)',
+          type: 'checkbox',
+        },
+        {
+          name: 'cadastroSus',
+          label: 'Cadastro no SUS (se sexo masculino)',
+          type: 'checkbox',
+        },
+        {
+          name: 'comprovanteEscolaridade',
+          label:
+            'Comprovante de escolaridade (se o nível de escolaridade exigir comprovação)',
+          type: 'checkbox',
+        },
+        {
+          name: 'comprovanteResidencia',
+          label: 'Comprovante de residência',
+          type: 'checkbox',
+        },
+        {
+          name: 'comprovanteConjuge',
+          label: 'Comprovante do cônjuge (se casado)',
+          type: 'checkbox',
+        },
+        {
+          name: 'comprovanteNascimentoFilhos',
+          label: 'Comprovante de nascimento do(s) filho(s)',
+          type: 'checkbox',
+        },
+        {
+          name: 'comprovanteEstadoCivil',
+          label: 'Comprovante de estado civil',
+          type: 'checkbox',
+        },
+        { name: 'exameAdmissionais', label: 'Exames admissionais', type: 'checkbox' },
+        { name: 'carteiraVacina', label: 'Carteira de vacina', type: 'checkbox' },
+        {
+          name: 'cpfDependentesIrpf',
+          label: 'CPF (dependentes de IRPF)',
+          type: 'checkbox',
+        },
+        {
+          name: 'exameAudiometria',
+          label: 'Exame de audiometria (se tiver função que exige)',
+          type: 'checkbox',
+        },
+        {
+          name: 'documentosDependentesIrpf',
+          label: 'Documentos dos dependentes de IRPF (anexo anterior na CM)',
+          type: 'checkbox',
+        },
+        {
+          name: 'declaracaoCpf',
+          label: 'Declaração do Cadastro de Pessoa Física (2ª via da Receita Federal)',
+          type: 'checkbox',
+        },
+        {
+          name: 'cursoMopp',
+          label: 'Curso MOPP (Caminhão de carga/Resíduos - PCD)',
+          type: 'checkbox',
+        },
+        {
+          name: 'cidDependentes',
+          label: 'CID: (dependentes de IRPF)',
+          type: 'checkbox',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'Checklist de Documentos para Admissão' },
+      update: {
+        descricao: 'Checklist de documentos para encaminhamento ao RH',
+        schemaJson: schemaChecklistDocs,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: randomUUID(),
+        nome: 'Checklist de Documentos para Admissão',
+        descricao: 'Checklist de documentos para encaminhamento ao RH',
+        schemaJson: schemaChecklistDocs,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      '✅ Tipo de solicitação "Checklist de Documentos para Admissão" criado/atualizado.',
+    )
+  }
 
   if (rhDepartment) {
     const schemaRQ091 = {
