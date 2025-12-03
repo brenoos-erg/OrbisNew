@@ -42,6 +42,35 @@ export async function POST(
 
     const isSolicitacaoPessoal =
       solic.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoIncentivo =
+      solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+
+    if (isSolicitacaoIncentivo) {
+      const allowedCostCenters = new Set<string>()
+
+      if (me.costCenterId) {
+        allowedCostCenters.add(me.costCenterId)
+      }
+
+      const links = await prisma.userCostCenter.findMany({
+        where: { userId: me.id },
+        select: { costCenterId: true },
+      })
+
+      for (const link of links) {
+        allowedCostCenters.add(link.costCenterId)
+      }
+
+      if (!solic.costCenterId || !allowedCostCenters.has(solic.costCenterId)) {
+        return NextResponse.json(
+          {
+            error:
+              'Somente usuários do setor responsável podem aprovar esta solicitação.',
+          },
+          { status: 403 },
+        )
+      }
+    }
 
     let rhCostCenter = null
 

@@ -51,6 +51,9 @@ export default function ReceivedRequestsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+   const [detailMode, setDetailMode] = useState<'default' | 'approval'>(
+    'default',
+  )
 
   async function fetchList() {
     setLoading(true)
@@ -93,6 +96,12 @@ export default function ReceivedRequestsPage() {
     setDetailOpen(true)
     setDetailLoading(true)
     setDetailError(null)
+    const shouldOpenInApprovalMode =
+      row.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação' &&
+      row.requiresApproval &&
+      row.approvalStatus === 'PENDENTE'
+
+    setDetailMode(shouldOpenInApprovalMode ? 'approval' : 'default')
 
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}`)
@@ -305,6 +314,7 @@ export default function ReceivedRequestsPage() {
         detail={detail}
         loading={detailLoading}
         error={detailError}
+        mode={detailMode}
       />
     </div>
   )

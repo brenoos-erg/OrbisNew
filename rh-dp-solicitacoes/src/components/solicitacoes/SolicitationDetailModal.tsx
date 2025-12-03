@@ -22,6 +22,9 @@ export type Row = {
   autor?: { fullName: string } | null
   sla?: string | null
   setorDestino?: string | null
+  requiresApproval?: boolean
+  approvalStatus?: string | null
+  costCenterId?: string | null
 }
 
 type CampoEspecifico = {
