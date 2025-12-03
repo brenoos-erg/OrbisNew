@@ -313,13 +313,14 @@ async function main() {
     )
   } else {
     console.warn(
-      '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional, Checklist de Documentos para Admissão, RQ_063 e RQ_091) não foram criados.',
+        '⚠️ Departamento de Recursos Humanos não encontrado. Tipos RH (Abono Educacional, Checklist de Documentos para Admissão, RQ_063, RQ.RH.103 e RQ_091) não foram criados.',
     )
   }
 
   /* =========================
       TIPOS RH ESPECÍFICOS
      - Checklist de Documentos para Admissão (RH)
+     - RQ.RH.103 - Avaliação do Período de Experiência (RH)
      - RQ_091 - Solicitação de Incentivo à Educação (RH)
      ========================= */
       if (rhDepartment) {
@@ -655,6 +656,143 @@ async function main() {
       '✅ Tipo de solicitação "RQ_091 - Solicitação de Incentivo à Educação" criado/atualizado.',
     )
   }
+  /* =========================
+     TIPO RQ.RH.103 - AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA (RH)
+     ========================= */
+
+  if (rhDepartment) {
+    const notaOptions = ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA']
+
+    const schemaRQ103 = {
+      meta: {
+        departamentos: [rhDepartment.id],
+      },
+      camposEspecificos: [
+        {
+          name: 'colaboradorAvaliado',
+          label: 'Colaborador avaliado',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'cargo',
+          label: 'Cargo',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'contratoSetor',
+          label: 'Contrato / Setor',
+          type: 'text',
+        },
+        {
+          name: 'dataAdmissao',
+          label: 'Data de Admissão',
+          type: 'date',
+        },
+        {
+          name: 'matricula',
+          label: 'Matrícula',
+          type: 'text',
+        },
+        {
+          name: 'gestor',
+          label: 'Gestor',
+          type: 'text',
+        },
+        {
+          name: 'unidade',
+          label: 'Unidade',
+          type: 'text',
+        },
+        {
+          name: 'periodoAvaliacao',
+          label: 'Período de Avaliação',
+          type: 'text',
+        },
+        {
+          name: 'notaRelacionamento',
+          label:
+            'Relacionamento — Relaciona-se com os colaboradores de forma igualitária, respeitando individualidades e estabelecendo relações positivas.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaComunicacao',
+          label:
+            'Comunicação — Se comunica de forma adequada e boa apresentação do trabalho realizado.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaAtitude',
+          label:
+            'Atitude — Presença, participação e demonstração de disponibilidade e entusiasmo.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaSaudeSeguranca',
+          label:
+            'Saúde e Segurança — Trabalha de forma segura, não se expõe a riscos e não desrespeita as regras e normas de segurança.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaDominioTecnico',
+          label:
+            'Domínio Técnico/Processos — Possui domínio técnico das atividades, apresenta boas entregas e atende prazos.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaAdaptabilidade',
+          label:
+            'Adaptabilidade, Mobilidade e Gestão da Mudança — Capacidade de adaptação e disposição para mudanças e deslocamentos quando necessário.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'notaAdequacaoCultura',
+          label:
+            'Adequação à Cultura e aos Valores — Age em conformidade com os valores e a cultura da empresa.',
+          type: 'select',
+          options: notaOptions,
+        },
+        {
+          name: 'recomendacaoEfetivacao',
+          label: 'É recomendada a efetivação do colaborador?',
+          type: 'select',
+          options: ['Sim', 'Não', 'Prorrogar período de experiência'],
+        },
+        {
+          name: 'observacoesFinais',
+          label:
+            'Deseja registrar alguma observação sobre o colaborador ou sobre a avaliação?',
+          type: 'textarea',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ.RH.103 - Avaliação do Período de Experiência' },
+      update: {
+        descricao: 'Avaliação do período de experiência para colaboradores (Recursos Humanos)',
+        schemaJson: schemaRQ103,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_RH_103',
+        nome: 'RQ.RH.103 - Avaliação do Período de Experiência',
+        descricao: 'Avaliação do período de experiência para colaboradores (Recursos Humanos)',
+        schemaJson: schemaRQ103,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log('✅ Tipo de solicitação "RQ.RH.103 - Avaliação do Período de Experiência" criado/atualizado.')
+  }
+
 
   /* =========================
      TIPO DE ADMISSÃO (DP)
