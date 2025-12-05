@@ -30,6 +30,7 @@ export default async function DashboardLayout({
   let showSolic = false
   let showConfig = false
   let canApprove = false
+   let showFleet = true
 
  if (appUser.id) {
     const [access, hasStructure] = await Promise.all([
@@ -45,6 +46,9 @@ export default async function DashboardLayout({
     showSolic = !!access['solicitacoes'] && hasStructure
     showConfig = !!access['configuracoes']
 
+    const fleetAccess = access['gestao-de-frotas'] ?? access['gestao_frotas']
+    showFleet = fleetAccess ? true : showFleet
+
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
      canApprove = access['solicitacoes'] === 'NIVEL_3' && hasStructure
   }
@@ -54,6 +58,7 @@ export default async function DashboardLayout({
       <Sidebar
         showSolic={showSolic}
         showConfig={showConfig}
+        showFleet={showFleet}
         canApprove={canApprove}
         userMenu={<UserMenu collapsed={false} />}
       />

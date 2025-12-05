@@ -12,36 +12,47 @@ import {
   Settings,
   Users,
   Shield,
+  Truck,
+  ClipboardCheck,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 type Props = {
   showSolic: boolean
   showConfig: boolean
+  showFleet: boolean
   canApprove: boolean
   userMenu: React.ReactNode
 }
 
-export default function Sidebar({ showSolic, showConfig, canApprove, userMenu }: Props) {
+export default function Sidebar({ showSolic, showConfig, showFleet, canApprove, userMenu }: Props) {
   const [collapsed, setCollapsed] = useState(false)
 
   const pathname = usePathname()
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
+  const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
+  const [openFleet, setOpenFleet] = useState(inFleet)
 
   // quando mudar de rota, abre o grupo correspondente e fecha o outro
   useEffect(() => {
     if (inSolic) {
       setOpenSolic(true)
       setOpenConfig(false)
+      setOpenFleet(false)
     } else if (inConfig) {
       setOpenConfig(true)
       setOpenSolic(false)
+      setOpenFleet(false)
+    } else if (inFleet) {
+      setOpenFleet(true)
+      setOpenSolic(false)
+      setOpenConfig(false)
     }
-  }, [inSolic, inConfig])
+  }, [inSolic, inConfig, inFleet])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -82,6 +93,48 @@ export default function Sidebar({ showSolic, showConfig, canApprove, userMenu }:
 
         {/* MENU */}
         <nav className="px-3 space-y-2 mt-2">
+          {showFleet && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenFleet((v) => !v)}
+                className={`${baseSection} ${
+                  inFleet ? activeSection : inactiveSection
+                }`}
+              >
+                <Truck className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>Gestão de Frotas</span>}
+              </button>
+
+              {openFleet && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/gestao-de-frotas/veiculos"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/gestao-de-frotas/veiculos')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <Truck size={16} /> <span>Veículos</span>
+                  </Link>
+
+                  <Link
+                    href="/dashboard/gestao-de-frotas/checkins"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/gestao-de-frotas/checkins')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardCheck size={16} /> <span>Check-ins diários</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
           {showSolic && (
             <div>
               {/* Cabeçalho do grupo Solicitações */}
