@@ -4,6 +4,24 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+const CORE_MODULES = [
+  { key: 'solicitacoes', name: 'Solicitações' },
+  { key: 'configuracoes', name: 'Configurações' },
+  { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
+]
+
+async function ensureCoreModules() {
+  await Promise.all(
+    CORE_MODULES.map((module) =>
+      prisma.module.upsert({
+        where: { key: module.key },
+        update: { name: module.name },
+        create: module,
+      }),
+    ),
+  )
+}
+
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +39,7 @@ export async function GET(_req: NextRequest) {
     const me = await requireActiveUser()
     // 🔐 Só NIVEL_3 no módulo "configuracoes" pode mexer nisso
     await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await ensureCoreModules()
 
     const [departments, modules, links] = await Promise.all([
       prisma.department.findMany({

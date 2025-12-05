@@ -1052,6 +1052,12 @@ async function main() {
     create: { key: 'configuracoes', name: 'Configurações' },
   })
   console.log('✅ Módulo criado:', configModule.name)
+  const fleetModule = await prisma.module.upsert({
+    where: { key: 'gestao-de-frotas' },
+    update: {},
+    create: { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
+  })
+  console.log('✅ Módulo criado:', fleetModule.name)
 
   const adminGroup = await prisma.accessGroup.upsert({
     where: { name: 'Administradores' },

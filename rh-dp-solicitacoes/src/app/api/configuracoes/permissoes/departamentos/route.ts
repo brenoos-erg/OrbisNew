@@ -3,10 +3,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
+const CORE_MODULES = [
+  { key: 'solicitacoes', name: 'Solicitações' },
+  { key: 'configuracoes', name: 'Configurações' },
+  { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
+]
+
+async function ensureCoreModules() {
+  await Promise.all(
+    CORE_MODULES.map((module) =>
+      prisma.module.upsert({
+        where: { key: module.key },
+        update: { name: module.name },
+        create: module,
+      }),
+    ),
+  )
+}
+
 export const dynamic = 'force-dynamic'
 
 // GET: todos departamentos + módulos + links
 export async function GET() {
+  await ensureCoreModules()
   const departments = await prisma.department.findMany({
     orderBy: { name: 'asc' },
     select: { id: true, code: true, name: true },

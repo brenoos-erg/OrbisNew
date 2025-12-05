@@ -63,3 +63,41 @@ export async function GET(req: Request) {
   // 🧾 Sempre devolve { items, total }
   return NextResponse.json({ items: rows, total })
 }
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}))
+  const {
+    description,
+    code,
+    externalCode,
+    abbreviation,
+    area,
+    managementType,
+    groupName,
+    status,
+    notes,
+  } = body || {}
+
+  if (!description?.trim()) {
+    return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
+  }
+
+  const normalizedStatus =
+    status === 'INATIVO' || status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'
+
+  const created = await prisma.costCenter.create({
+    data: {
+      description: description.trim(),
+      code: code?.trim() ?? null,
+      externalCode: externalCode?.trim() ?? null,
+      abbreviation: abbreviation?.trim() ?? null,
+      area: area?.trim() ?? null,
+      managementType: managementType?.trim() ?? null,
+      groupName: groupName?.trim() ?? null,
+      status: normalizedStatus,
+      observations: notes?.trim() ?? null,
+    },
+    select: { id: true, description: true },
+  })
+
+  return NextResponse.json({ ok: true, row: created }, { status: 201 })
+}
