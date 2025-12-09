@@ -1,12 +1,22 @@
 // src/app/primeiro-acesso/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { KeyRound, Loader2 } from 'lucide-react'
+export const dynamic = 'force-dynamic'
+
 
 export default function PrimeiroAcessoPage() {
+  return (
+    <Suspense fallback={null}>
+      <PrimeiroAcessoContent />
+    </Suspense>
+  )
+}
+
+function PrimeiroAcessoContent() {
   const router = useRouter()
   const search = useSearchParams()
   const nextUrl = search.get('next') || '/dashboard'

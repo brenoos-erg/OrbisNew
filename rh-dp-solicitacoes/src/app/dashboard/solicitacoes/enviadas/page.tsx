@@ -9,6 +9,7 @@ import {
   SolicitationDetail,
   SolicitationDetailModal,
 } from '@/components/solicitacoes/SolicitationDetailModal'
+export const dynamic = 'force-dynamic'
 
 type ApiResponse = {
   rows: Row[]

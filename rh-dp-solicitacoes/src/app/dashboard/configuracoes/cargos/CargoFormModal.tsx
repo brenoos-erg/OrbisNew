@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import type { PositionRow } from './page'
+
 
 const INPUT =
   'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
@@ -31,6 +31,7 @@ export type Position = {
   site?: string | null
   experience?: string | null
 }
+export type PositionRow = Position & { id: string }
 
 /**
  * Modal de criação/edição do cargo

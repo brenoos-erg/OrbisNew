@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Search, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
+export const dynamic = 'force-dynamic'
 
 type Solicitation = {
   id: string

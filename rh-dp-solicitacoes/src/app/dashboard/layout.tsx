@@ -1,5 +1,5 @@
 // src/app/dashboard/layout.tsx
-import type { ReactNode } from 'react' 
+import type { ReactNode } from 'react'
 import { getCurrentAppUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
@@ -8,6 +8,7 @@ import {
   loadUserModuleAccess,
   userHasDepartmentOrCostCenter,
 } from '@/lib/moduleAccess'
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({
   children,

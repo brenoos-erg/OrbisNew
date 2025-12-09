@@ -1,3 +1,6 @@
+
+export const dynamic = 'force-dynamic'
+
 const vehicles = [
   {
     plate: 'ABC-1D23',

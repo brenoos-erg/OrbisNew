@@ -1,10 +1,20 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, Loader2 } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
+  )
+}
+
+function LoginPageContent() {
   const router = useRouter()
   const search = useSearchParams()
   const nextUrl = search.get('next') || '/dashboard'

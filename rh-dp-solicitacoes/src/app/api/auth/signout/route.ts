@@ -3,8 +3,8 @@ import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 export async function POST() {
-  const cookieStore = await cookies()
-  const supabase = createRouteHandlerClient({ cookies: async () => cookieStore })
+  const cookieStore = cookies()
+  const supabase = createRouteHandlerClient({ cookies })
 
   await supabase.auth.signOut({ scope: 'global' })
 
