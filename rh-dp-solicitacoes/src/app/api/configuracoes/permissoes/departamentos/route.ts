@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import { requireActiveUser } from '@/lib/auth'
+import { assertUserMinLevel } from '@/lib/access'
+import { ModuleLevel } from '@prisma/client'
 
 const CORE_MODULES = [
   { key: 'solicitacoes', name: 'Solicitações' },
@@ -25,6 +28,8 @@ export const dynamic = 'force-dynamic'
 
 // GET: todos departamentos + módulos + links
 export async function GET() {
+  const me = await requireActiveUser()
+  await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
   await ensureCoreModules()
   const departments = await prisma.department.findMany({
     orderBy: { name: 'asc' },
@@ -46,6 +51,8 @@ export async function GET() {
 // POST: habilitar / desabilitar módulo para um departamento
 export async function POST(req: NextRequest) {
   try {
+     const me = await requireActiveUser()
+    await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
     const body = await req.json()
     const departmentId = String(body.departmentId || '').trim()
     const moduleId = String(body.moduleId || '').trim()

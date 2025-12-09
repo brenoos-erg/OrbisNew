@@ -1,10 +1,14 @@
 // src/app/api/configuracoes/permissoes/usuarios/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireActiveUser } from '@/lib/auth'
+import { assertUserMinLevel } from '@/lib/access'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  const me = await requireActiveUser()
+  await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
   const modules = await prisma.module.findMany({
     orderBy: { name: 'asc' },
     select: { id: true, key: true, name: true },

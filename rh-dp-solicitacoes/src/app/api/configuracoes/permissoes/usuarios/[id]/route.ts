@@ -3,11 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import type { ModuleLevel } from '@prisma/client'
 import crypto from 'crypto'
+import { requireActiveUser } from '@/lib/auth'
+import { assertUserMinLevel } from '@/lib/access'
 
 export const dynamic = 'force-dynamic'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+     const me = await requireActiveUser()
+    await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
     const userId = params.id
     const body = await req.json()
     const moduleKey = String(body.moduleKey || '').trim()

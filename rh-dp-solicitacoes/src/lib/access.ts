@@ -26,17 +26,14 @@ export async function assertUserMinLevel(
   moduleKey: string,
   minLevel: ModuleLevel,
 ) {
-  const { levels, departmentCode } = await getUserModuleContext(userId)
+const { levels } = await getUserModuleContext(userId)
   const normalizedKey = moduleKey.toLowerCase()
   const level = levels[normalizedKey]
 
   if (!level) {
     throw new Error('Usuário não possui acesso a este módulo.')
   }
-  // Configurações continua restrito a TI, mesmo se outro departamento tiver o módulo
-  if (normalizedKey === 'configuracoes' && departmentCode !== 'TI') {
-    throw new Error('Módulo restrito ao departamento de TI.')
-  }
+  
 
 
   const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']

@@ -20,12 +20,20 @@ import { usePathname } from 'next/navigation'
 type Props = {
   showSolic: boolean
   showConfig: boolean
+   showConfigPermissions: boolean
   showFleet: boolean
   canApprove: boolean
   userMenu: React.ReactNode
 }
 
-export default function Sidebar({ showSolic, showConfig, showFleet, canApprove, userMenu }: Props) {
+export default function Sidebar({
+  showSolic,
+  showConfig,
+  showConfigPermissions,
+  showFleet,
+  canApprove,
+  userMenu,
+}: Props) {
   const [collapsed, setCollapsed] = useState(false)
 
   const pathname = usePathname()
@@ -250,19 +258,21 @@ export default function Sidebar({ showSolic, showConfig, showFleet, canApprove, 
                     <Users size={16} /> <span>Usuários</span>
                   </Link>
 
-                  <Link
-                    href="/dashboard/configuracoes/permissoes"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith(
-                          '/dashboard/configuracoes/permissoes',
-                        )
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Shield size={16} /> <span>Permissões</span>
-                  </Link>
+                  {showConfigPermissions && (
+                    <Link
+                      href="/dashboard/configuracoes/permissoes"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/permissoes',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Shield size={16} /> <span>Permissões</span>
+                    </Link>
+                  )}
 
                   <Link
                     href="/dashboard/configuracoes/centros-de-custo"

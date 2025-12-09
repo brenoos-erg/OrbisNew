@@ -27,7 +27,8 @@ export default async function DashboardLayout({
   if (appUser.status === 'INATIVO') {
     redirect('/login?inactive=1')
   }
-const hasMinLevel = (level: ModuleLevel | undefined, min: ModuleLevel) => {
+
+  const hasMinLevel = (level: ModuleLevel | undefined, min: ModuleLevel) => {
     const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
     const current = level ? order.indexOf(level) : -1
     return current >= order.indexOf(min)
@@ -39,7 +40,7 @@ const hasMinLevel = (level: ModuleLevel | undefined, min: ModuleLevel) => {
   let canApprove = false
   let showFleet = false
 
- if (appUser.id) {
+  if (appUser.id) {
     const [{ levels, departmentCode }, hasStructure] = await Promise.all([
       getUserModuleContext(appUser.id),
       userHasDepartmentOrCostCenter(
@@ -60,7 +61,7 @@ const hasMinLevel = (level: ModuleLevel | undefined, min: ModuleLevel) => {
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
-      canApprove = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_3) && hasStructure
+    canApprove = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_3) && hasStructure
   }
 
   return (

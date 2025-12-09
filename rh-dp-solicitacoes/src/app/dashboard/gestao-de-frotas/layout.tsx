@@ -24,7 +24,7 @@ const { levels } = await getUserModuleContext(appUser.id)
   const fleetAccess = levels['gestao-de-frotas'] ?? levels['gestao_frotas']
   const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
-  if (!fleetAccess) {
+  if (fleetAccess === undefined || order.indexOf(fleetAccess) < order.indexOf(ModuleLevel.NIVEL_1)) {
     redirect('/dashboard')
   }
 
