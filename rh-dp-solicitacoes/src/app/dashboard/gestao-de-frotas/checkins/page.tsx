@@ -135,10 +135,18 @@ export default function VehicleCheckinPage() {
       <header className="space-y-2">
         <p className="text-sm font-semibold uppercase text-slate-500">Gestão de Frotas</p>
         <h1 className="text-3xl font-bold text-slate-900">Checklist de veículos</h1>
-        <p className="text-slate-600 max-w-4xl">
-          Preencha os dados da inspeção diária, valide os itens do veículo e registre o controle de fadiga. O
-          processamento calcula automaticamente o status do veículo e do motorista.
-        </p>
+       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-slate-600 max-w-3xl">
+            Preencha os dados da inspeção diária, valide os itens do veículo e registre o controle de fadiga. O
+            processamento calcula automaticamente o status do veículo e do motorista.
+          </p>
+          <a
+            href="/dashboard/gestao-de-frotas/checkins/registro-rapido"
+            className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Abrir check-in rápido
+          </a>
+        </div>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-8">

@@ -58,8 +58,14 @@ export default async function DashboardLayout({
 
     // Módulos aparecem com nível final >= NIVEL_1 (departamento já libera)
     showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure
-    showConfig = isTi && hasMinLevel(configLevel, ModuleLevel.NIVEL_1)
     showConfigPermissions = hasMinLevel(configLevel, ModuleLevel.NIVEL_3)
+    
+    // Exibe o menu de Configurações para TI ou para usuários com acesso total
+    // ao módulo, garantindo que quem pode acessar Permissões também veja o menu
+    showConfig =
+      (isTi && hasMinLevel(configLevel, ModuleLevel.NIVEL_1)) ||
+      showConfigPermissions
+    showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações

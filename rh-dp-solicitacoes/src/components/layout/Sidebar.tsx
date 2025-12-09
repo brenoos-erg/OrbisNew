@@ -14,6 +14,8 @@ import {
   Shield,
   Truck,
   ClipboardCheck,
+   Clock3,
+  User2,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -139,6 +141,7 @@ export default function Sidebar({
                   >
                     <ClipboardCheck size={16} /> <span>Check-ins diários</span>
                   </Link>
+                  
                 </div>
               )}
             </div>
