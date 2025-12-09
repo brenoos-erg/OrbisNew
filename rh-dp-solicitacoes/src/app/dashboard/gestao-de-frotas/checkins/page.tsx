@@ -2,30 +2,71 @@
 
 import { FormEvent, useMemo, useState } from 'react'
 
-const vehicleChecklistItems = [
-  { name: '9', label: 'Documentação e CRLV em dia' },
-  { name: '10', label: 'Pneus calibrados e sem danos' },
-  { name: '11', label: 'Estepe e triângulo' },
-  { name: '12', label: 'Macaco e chave de roda' },
-  { name: '13', label: 'Freios (pedal e estacionamento)' },
-  { name: '14', label: 'Luzes dianteiras e traseiras' },
-  { name: '15', label: 'Setas e pisca-alerta' },
-  { name: '16', label: 'Limpador e lavador de para-brisa' },
-  { name: '17', label: 'Nível de combustível' },
-  { name: '18', label: 'Nível de óleo do motor' },
-  { name: '19', label: 'Nível de água/radiador' },
-  { name: '20', label: 'Painel de instrumentos sem alertas' },
-  { name: '21', label: 'Cintos de segurança' },
-  { name: '22', label: 'Buzina' },
-  { name: '23', label: 'Retrovisores e espelhos' },
-  { name: '24', label: 'Portas e travas' },
-  { name: '25', label: 'Vidros e para-brisa' },
-  { name: '26', label: 'Assentos e apoios de cabeça' },
-  { name: '27', label: 'Ar-condicionado/ventilação' },
-  { name: '28', label: 'Limpeza interna/externa' },
-  { name: '29', label: 'Ruídos ou vibrações anormais' },
-  { name: '30', label: 'Observações gerais' },
+type ChecklistItem = {
+  name: string
+  label: string
+  category: 'CRITICO' | 'NAO_CRITICO'
+}
+
+const criticalChecklistItems: ChecklistItem[] = [
+  { name: '01', label: 'Freios', category: 'CRITICO' },
+  {
+    name: '05',
+    label: 'Limpadores e sistema de injeção de água no para-brisa',
+    category: 'CRITICO',
+  },
+  { name: '06', label: 'Calibragem de pneus', category: 'CRITICO' },
+  {
+    name: '07',
+    label: 'Farol alto/baxo direito e esquerdo',
+    category: 'CRITICO',
+  },
+  {
+    name: '08',
+    label: 'Faroletes / pisca alerta / setas',
+    category: 'CRITICO',
+  },
+  {
+    name: '09',
+    label: 'Macaco / triângulo de segurança / chave de roda',
+    category: 'CRITICO',
+  },
+  { name: '10', label: 'Calço de segurança', category: 'CRITICO' },
+  {
+    name: '11',
+    label: 'Retrovisores externos e interno',
+    category: 'CRITICO',
+  },
+  { name: '13', label: 'Cinto de segurança', category: 'CRITICO' },
+  {
+    name: '19',
+    label: 'Sistema de telemetria / sensor de fadiga',
+    category: 'CRITICO',
+  },
+  {
+    name: '20',
+    label:
+      'Documentos do veículo (Renavan, DUT, IPVA, Licenciamento, Seguro obrigatório, CNH, etc)',
+    category: 'CRITICO',
+  },
 ]
+
+const nonCriticalChecklistItems: ChecklistItem[] = [
+  {
+    name: '02',
+    label: 'Buzina / sinal sonoro de ré / sinal luminoso de ré',
+    category: 'NAO_CRITICO',
+  },
+  { name: '15', label: 'Ar-condicionado em perfeito funcionamento', category: 'NAO_CRITICO' },
+  { name: '16', label: 'Condições gerais de limpeza (interna e externa)', category: 'NAO_CRITICO' },
+  {
+    name: '18',
+    label: 'Nível de óleo do motor, água do radiador e fluído de freio',
+    category: 'NAO_CRITICO',
+  },
+]
+const vehicleChecklistItems = [...criticalChecklistItems, ...nonCriticalChecklistItems]
+
 
 const fatigueQuestions = [
   { name: '31', label: 'Dormiu menos de 8h?' },
@@ -38,6 +79,16 @@ const fatigueQuestions = [
   { name: '38', label: 'Ingeriu bebida alcoólica nas últimas 8h?' },
   { name: '39', label: 'Tomou medicamento nas últimas 8h?' },
   { name: '40', label: 'Está com dificuldade de adaptação?' },
+]
+const criticalOptions = [
+  { value: 'OK', label: 'OK' },
+  { value: 'COM_PROBLEMA', label: 'Com problema (paralisar veículo)' },
+]
+
+const nonCriticalOptions = [
+  { value: 'OK', label: 'OK' },
+  { value: 'PROGRAMAR_MANUTENCAO', label: 'Programar manutenção' },
+  { value: 'NAO_SE_APLICA', label: 'Não se aplica' },
 ]
 
 type SubmissionResult = {
@@ -80,8 +131,12 @@ export default function VehicleCheckinPage() {
     const vehicleChecklist = vehicleChecklistItems.map((item) => ({
       name: item.name,
       label: item.label,
+      category: item.category,
       status: (formData.get(`checklist-${item.name}`) as string) || 'OK',
     }))
+    const hasCriticalIssue = vehicleChecklist.some(
+      (item) => item.category === 'CRITICO' && item.status === 'COM_PROBLEMA'
+    )
 
     const fatigue = fatigueQuestions.map((item) => ({
       name: item.name,
@@ -100,11 +155,13 @@ export default function VehicleCheckinPage() {
       vehicleKm: Number(formData.get('vehicleKm') ?? 0),
       vehicleChecklist,
       fatigue,
-      hasNonConformity: formData.get('hasNonConformity'),
-      nonConformityCriticality: formData.get('nonConformityCriticality'),
-      nonConformityActions: formData.get('nonConformityActions'),
-      nonConformityManager: formData.get('nonConformityManager'),
-      nonConformityHandlingDate: formData.get('nonConformityHandlingDate'),
+      hasNonConformity: hasCriticalIssue ? 'SIM' : 'NAO',
+      nonConformityCriticality: hasCriticalIssue ? 'ALTA' : undefined,
+      nonConformityActions: hasCriticalIssue
+        ? 'Veículo paralisado até manutenção do item crítico.'
+        : undefined,
+      nonConformityManager: undefined,
+      nonConformityHandlingDate: undefined,
     }
 
     try {
@@ -131,56 +188,79 @@ export default function VehicleCheckinPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <p className="text-sm font-semibold uppercase text-slate-500">Gestão de Frotas</p>
-        <h1 className="text-3xl font-bold text-slate-900">Checklist de veículos</h1>
-       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="text-slate-600 max-w-3xl">
-            Preencha os dados da inspeção diária, valide os itens do veículo e registre o controle de fadiga. O
-            processamento calcula automaticamente o status do veículo e do motorista.
-          </p>
+    <div className="mx-auto max-w-3xl space-y-6 pb-10">
+      <header className="space-y-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase text-slate-500">Gestão de Frotas</p>
+            <h1 className="text-2xl font-bold text-slate-900">Checklist diário</h1>
+          </div>
           <a
             href="/dashboard/gestao-de-frotas/checkins/registro-rapido"
-            className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          >
-            Abrir check-in rápido
+           className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+           >  
+           Check-in rápido
           </a>
         </div>
+        <p className="text-sm text-slate-600">
+          Formulário otimizado para celular: preencha, valide itens críticos e registre o controle de fadiga.
+          O cálculo retorna automaticamente veículo liberado/restrito e motorista apto/inapto.
+        </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Seção 1</p>
-            <h2 className="text-xl font-semibold text-slate-900">Dados da inspeção</h2>
-            <p className="text-sm text-slate-600">Informações do veículo e do colaborador.</p>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase text-slate-500">Etapa 1</p>
+            <h2 className="text-lg font-semibold text-slate-900">Dados da inspeção</h2>
+            <p className="text-xs text-slate-500">Informações essenciais do condutor e veículo.</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Data da inspeção
               <input required name="inspectionDate" type="date" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Horário
-              <input name="inspectionTime" type="time" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+             <input
+                name="inspectionTime"
+                type="time"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Centro de custo
-              <input name="costCenter" type="text" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+              <input
+                name="costCenter"
+                type="text"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Setor / atividade
-              <input name="sectorActivity" type="text" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+              <input
+                name="sectorActivity"
+                type="text"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Nome do motorista
-              <input required name="driverName" type="text" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+              <input
+                required
+                name="driverName"
+                type="text"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Tipo de veículo
-              <select name="vehicleType" defaultValue="VEICULO_LEVE" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none">
+              <select
+                name="vehicleType"
+                defaultValue="VEICULO_LEVE"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              >
                 <option value="VEICULO_LEVE">Veículo leve</option>
                 <option value="4X4">4x4</option>
                 <option value="SUV">SUV</option>
@@ -188,61 +268,123 @@ export default function VehicleCheckinPage() {
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Placa do veículo
-              <input required name="vehiclePlate" type="text" placeholder="ABC1234" className="rounded-lg border border-slate-300 px-3 py-2 uppercase focus:border-slate-500 focus:outline-none" />
+              <input
+                required
+                name="vehiclePlate"
+                type="text"
+                placeholder="ABC1234"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase focus:border-slate-500 focus:outline-none"
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Quilometragem atual
-              <input required name="vehicleKm" type="number" min={0} className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+              <input
+                required
+                name="vehicleKm"
+                type="number"
+                min={0}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
             </label>
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Seção 2</p>
-            <h2 className="text-xl font-semibold text-slate-900">Itens de verificação do veículo</h2>
-            <p className="text-sm text-slate-600">Itens 9–30 do checklist.</p>
+        <section className="space-y-4">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase text-red-500">Etapa 2A</p>
+              <h2 className="text-lg font-semibold text-red-800">Itens críticos (paralisar se houver problema)</h2>
+              <p className="text-xs text-red-700">
+                Qualquer item abaixo com “Com problema” torna o veículo automaticamente <strong>não conforme</strong>
+                e deve ser paralisado até manutenção.
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {criticalChecklistItems.map((item) => (
+                <label
+                  key={item.name}
+                  className="flex flex-col gap-1 rounded-xl border border-red-100 bg-white p-3 text-sm font-medium text-red-900 shadow-sm"
+                >
+                  <span className="flex items-start justify-between gap-2 text-red-800">
+                    <span>{item.label}</span>
+                    <span className="text-xs font-semibold text-red-500">#{item.name}</span>
+                  </span>
+                  <select
+                    name={`checklist-${item.name}`}
+                    defaultValue={checklistInitialState[item.name]}
+                    className="rounded-lg border border-red-200 px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
+                  >
+                    {criticalOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {vehicleChecklistItems.map((item) => (
-              <label key={item.name} className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                <span className="flex items-start justify-between gap-2">
-                  <span>{item.label}</span>
-                  <span className="text-xs font-semibold text-slate-400">#{item.name}</span>
-                </span>
-                <select
-                  name={`checklist-${item.name}`}
-                  defaultValue={checklistInitialState[item.name]}
-                  className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase text-slate-500">Etapa 2B</p>
+              <h2 className="text-lg font-semibold text-slate-900">Itens não críticos (programar manutenção)</h2>
+              <p className="text-xs text-slate-600">
+                Marque “Programar manutenção” para itens que precisam de ajuste mas não paralisam o veículo.
+              </p>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {nonCriticalChecklistItems.map((item) => (
+                <label
+                  key={item.name}
+                  className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-800 shadow-sm"
                 >
-                  <option value="OK">OK</option>
-                  <option value="COM_PROBLEMA">Com problema</option>
-                  <option value="NAO_SE_APLICA">Não se aplica</option>
-                </select>
-              </label>
-            ))}
+                  <span className="flex items-start justify-between gap-2">
+                    <span>{item.label}</span>
+                    <span className="text-xs font-semibold text-slate-500">#{item.name}</span>
+                  </span>
+                  <select
+                    name={`checklist-${item.name}`}
+                    defaultValue={checklistInitialState[item.name]}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+                  >
+                    {nonCriticalOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Seção 3</p>
-            <h2 className="text-xl font-semibold text-slate-900">Controle de fadiga</h2>
-            <p className="text-sm text-slate-600">Itens 31–40. Respostas alimentam o cálculo automático.</p>
+        <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase text-slate-500">Etapa 3</p>
+            <h2 className="text-lg font-semibold text-slate-900">Controle de fadiga</h2>
+            <p className="text-xs text-slate-600">
+              Respostas alimentam o cálculo automático e indicam se o condutor está apto ou inapto.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mt-3 space-y-3">
             {fatigueQuestions.map((item) => (
-              <label key={item.name} className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              <label
+                key={item.name}
+                className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-800 shadow-sm"
+              >
                 <span className="flex items-start justify-between gap-2">
                   <span>{item.label}</span>
-                  <span className="text-xs font-semibold text-slate-400">#{item.name}</span>
+                  <span className="text-xs font-semibold text-slate-500">#{item.name}</span>
                 </span>
                 <select
                   name={`fatigue-${item.name}`}
                   defaultValue={fatigueInitialState[item.name]}
-                  className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
                 >
                   <option value="NAO">Não</option>
                   <option value="SIM">Sim</option>
@@ -252,61 +394,16 @@ export default function VehicleCheckinPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Seção 4</p>
-            <h2 className="text-xl font-semibold text-slate-900">Não conformidades</h2>
-            <p className="text-sm text-slate-600">Informe se existe alguma não conformidade e os detalhes.</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Há não conformidade?
-              <select
-                name="hasNonConformity"
-                defaultValue="NAO"
-                className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
-              >
-                <option value="NAO">Não</option>
-                <option value="SIM">Sim</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Criticidade
-              <select
-                name="nonConformityCriticality"
-                defaultValue=""
-                className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
-              >
-                <option value="">Selecione</option>
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 md:col-span-2">
-              Ações corretivas
-              <textarea
-                name="nonConformityActions"
-                className="min-h-[80px] rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Responsável/gestor
-              <input name="nonConformityManager" type="text" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Prazo / data de tratativa
-              <input name="nonConformityHandlingDate" type="date" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
-            </label>
-          </div>
-        </section>
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 shadow-sm">
+          Itens críticos com problema geram não conformidade automática e orientam a paralisação do veículo. O
+          controle de fadiga calcula a condição do condutor ao enviar o formulário.
+        </div>
 
         <div className="flex flex-col gap-3">
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex w-full justify-center rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-75 md:w-auto"
+            className="inline-flex w-full justify-center rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-75"
           >
             {submitting ? 'Enviando...' : 'Enviar check-in'}
           </button>
@@ -315,9 +412,9 @@ export default function VehicleCheckinPage() {
       </form>
 
       {result && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <p className="text-xs font-semibold uppercase text-slate-500">Retorno do checklist</p>
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-lg bg-slate-50 p-3">
               <p className="text-xs text-slate-500">Status do veículo</p>
               <p className="text-lg font-semibold text-slate-900">{result.vehicleStatus}</p>
