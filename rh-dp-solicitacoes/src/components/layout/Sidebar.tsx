@@ -1,7 +1,7 @@
 // src/components/layout/Sidebar.tsx
 'use client'
 import { CheckCircle2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ClipboardList,
@@ -20,10 +20,10 @@ import { usePathname } from 'next/navigation'
 type Props = {
   showSolic: boolean
   showConfig: boolean
-   showConfigPermissions: boolean
+showConfigPermissions: boolean
   showFleet: boolean
   canApprove: boolean
-  userMenu: React.ReactNode
+ userMenu: ReactNode
 }
 
 export default function Sidebar({

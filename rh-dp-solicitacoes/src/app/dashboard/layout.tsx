@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const { appUser } = await getCurrentAppUser()
 
@@ -37,6 +37,7 @@ export default async function DashboardLayout({
   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
   let showSolic = false
   let showConfig = false
+  let showConfigPermissions = false
   let canApprove = false
   let showFleet = false
 
@@ -58,6 +59,7 @@ export default async function DashboardLayout({
     // Módulos aparecem com nível final >= NIVEL_1 (departamento já libera)
     showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure
     showConfig = isTi && hasMinLevel(configLevel, ModuleLevel.NIVEL_1)
+    showConfigPermissions = hasMinLevel(configLevel, ModuleLevel.NIVEL_3)
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
@@ -69,6 +71,7 @@ export default async function DashboardLayout({
       <Sidebar
         showSolic={showSolic}
         showConfig={showConfig}
+        showConfigPermissions={showConfigPermissions}
         showFleet={showFleet}
         canApprove={canApprove}
         userMenu={<UserMenu collapsed={false} />}
