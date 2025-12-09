@@ -141,7 +141,17 @@ export default function Sidebar({
                   >
                     <ClipboardCheck size={16} /> <span>Check-ins diários</span>
                   </Link>
-                  
+                   <Link
+                    href="/dashboard/gestao-de-frotas/motoristas"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/gestao-de-frotas/motoristas')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <User2 size={16} /> <span>Motoristas</span>
+                  </Link>                  
                 </div>
               )}
             </div>
