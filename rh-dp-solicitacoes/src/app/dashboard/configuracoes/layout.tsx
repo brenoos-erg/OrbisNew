@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { ModuleLevel } from '@prisma/client'
+import { getUserModuleContext } from '@/lib/moduleAccess'
 
 export default async function ConfiguracoesLayout({
   children,
@@ -11,16 +12,14 @@ export default async function ConfiguracoesLayout({
   // 1) Garante usuário logado (via Supabase/Prisma)
   const me = await requireActiveUser()
 
-  // 2) Carrega usuário com departamento + acessos de módulo
-  const user = await prisma.user.findUnique({
-    where: { id: me.id },
-    include: {
-      department: true,
-      moduleAccesses: {
-        include: { module: true },
-      },
-    },
-  })
+   // 2) Carrega usuário com departamento para a regra de TI
+  const [user, { levels, departmentCode }] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: me.id },
+      include: { department: true },
+    }),
+    getUserModuleContext(me.id),
+  ])
 
   if (!user) {
     return (
@@ -30,9 +29,8 @@ export default async function ConfiguracoesLayout({
     )
   }
 
-  // 🔐 Regra 1: PRECISA ser do departamento de TI
-  // aqui estou usando o code = '20' como TI (ajusta se for outro)
-  const isTiDepartment = user.department?.code === '20'
+ // 🔐 Regra 1: PRECISA ser do departamento de TI (code = "TI")
+  const isTiDepartment = departmentCode === 'TI'
 
   if (!isTiDepartment) {
     return (
@@ -42,12 +40,11 @@ export default async function ConfiguracoesLayout({
     )
   }
 
-  // 🔐 Regra 2: precisa ter acesso ao módulo "configuracoes" e ser NIVEL_3
-  const configAccess = user.moduleAccesses.find(
-    (a) => a.module.key === 'configuracoes',
-  )
+// 🔐 Regra 2: precisa ter acesso ao módulo "configuracoes" (herdado do departamento ou sobrescrito)
+  const configLevel = levels['configuracoes']
+  const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
-  if (!configAccess || configAccess.level !== ModuleLevel.NIVEL_3) {
+  if (configLevel === undefined || order.indexOf(configLevel) < order.indexOf(ModuleLevel.NIVEL_1)) {
     return (
       <div className="p-8 text-center text-red-600 font-semibold">
         Você não tem permissão suficiente para acessar CONFIGURAÇÕES.
@@ -55,6 +52,6 @@ export default async function ConfiguracoesLayout({
     )
   }
 
-  // ✅ Passou nas duas regras: TI + NIVEL_3 em CONFIGURACOES
+  // ✅ Passou nas duas regras: TI + NIVEL_1+ em CONFIGURACOES
   return <>{children}</>
 }

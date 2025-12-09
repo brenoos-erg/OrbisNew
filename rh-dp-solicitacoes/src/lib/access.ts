@@ -1,7 +1,7 @@
 // src/lib/access.ts
-import { prisma } from '@/lib/prisma'
 import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
+import { getUserModuleContext } from '@/lib/moduleAccess'
 
 /**
  * Carrega o nível do usuário para um módulo.
@@ -11,19 +11,9 @@ export async function getUserModuleLevel(
   userId: string,
   moduleKey: string,
 ): Promise<ModuleLevel | null> {
-  const access = await prisma.userModuleAccess.findFirst({
-    where: {
-      userId,
-      module: {
-        key: moduleKey,
-      },
-    },
-    include: {
-      module: true,
-    },
-  })
+  const { levels } = await getUserModuleContext(userId)
 
-  return access?.level ?? null
+  return levels[moduleKey.toLowerCase()] ?? null
 }
 
 /**
@@ -36,11 +26,18 @@ export async function assertUserMinLevel(
   moduleKey: string,
   minLevel: ModuleLevel,
 ) {
-  const level = await getUserModuleLevel(userId, moduleKey)
+  const { levels, departmentCode } = await getUserModuleContext(userId)
+  const normalizedKey = moduleKey.toLowerCase()
+  const level = levels[normalizedKey]
 
   if (!level) {
     throw new Error('Usuário não possui acesso a este módulo.')
   }
+  // Configurações continua restrito a TI, mesmo se outro departamento tiver o módulo
+  if (normalizedKey === 'configuracoes' && departmentCode !== 'TI') {
+    throw new Error('Módulo restrito ao departamento de TI.')
+  }
+
 
   const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
   const userIndex = order.indexOf(level)

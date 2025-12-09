@@ -5,9 +5,10 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
 import {
-  loadUserModuleAccess,
+  getUserModuleContext,
   userHasDepartmentOrCostCenter,
 } from '@/lib/moduleAccess'
+import { ModuleLevel } from '@prisma/client'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({
@@ -26,16 +27,21 @@ export default async function DashboardLayout({
   if (appUser.status === 'INATIVO') {
     redirect('/login?inactive=1')
   }
+const hasMinLevel = (level: ModuleLevel | undefined, min: ModuleLevel) => {
+    const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+    const current = level ? order.indexOf(level) : -1
+    return current >= order.indexOf(min)
+  }
 
-  // cálculo de módulos liberados com base em UserModuleAccess
+  // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
   let showSolic = false
   let showConfig = false
   let canApprove = false
   let showFleet = false
 
  if (appUser.id) {
-    const [access, hasStructure] = await Promise.all([
-      loadUserModuleAccess(appUser.id),
+    const [{ levels, departmentCode }, hasStructure] = await Promise.all([
+      getUserModuleContext(appUser.id),
       userHasDepartmentOrCostCenter(
         appUser.id,
         appUser.costCenterId,
@@ -43,15 +49,18 @@ export default async function DashboardLayout({
       ),
     ])
 
-    // se tiver qualquer nível no módulo, ele aparece no menu
-    showSolic = !!access['solicitacoes'] && hasStructure
-    showConfig = !!access['configuracoes']
+    const solicitLevel = levels['solicitacoes']
+    const configLevel = levels['configuracoes']
+    const fleetLevel = levels['gestao-de-frotas'] ?? levels['gestao_frotas']
+    const isTi = departmentCode === 'TI'
 
-    const fleetAccess = access['gestao-de-frotas'] ?? access['gestao_frotas']
-    showFleet = !!fleetAccess
+    // Módulos aparecem com nível final >= NIVEL_1 (departamento já libera)
+    showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure
+    showConfig = isTi && hasMinLevel(configLevel, ModuleLevel.NIVEL_1)
+    showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
-     canApprove = access['solicitacoes'] === 'NIVEL_3' && hasStructure
+      canApprove = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_3) && hasStructure
   }
 
   return (

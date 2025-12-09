@@ -3,9 +3,10 @@ import { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { getCurrentAppUser } from '@/lib/auth'
 import {
-  loadUserModuleAccess,
+  getUserModuleContext,
   userHasDepartmentOrCostCenter,
 } from '@/lib/moduleAccess'
+import { ModuleLevel } from '@prisma/client'
 
 export default async function SolicitacoesLayout({
   children,
@@ -22,8 +23,8 @@ export default async function SolicitacoesLayout({
     redirect('/login?inactive=1')
   }
 
-  const [access, hasStructure] = await Promise.all([
-    loadUserModuleAccess(appUser.id),
+  const [context, hasStructure] = await Promise.all([
+    getUserModuleContext(appUser.id),
     userHasDepartmentOrCostCenter(
       appUser.id,
       appUser.costCenterId,
@@ -31,7 +32,12 @@ export default async function SolicitacoesLayout({
     ),
   ])
 
-  const canAccess = !!access['solicitacoes'] && hasStructure
+ const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+  const solicitLevel = context.levels['solicitacoes']
+  const canAccess =
+    solicitLevel !== undefined &&
+    order.indexOf(solicitLevel) >= order.indexOf(ModuleLevel.NIVEL_1) &&
+    hasStructure
 
   if (!canAccess) {
     redirect('/dashboard')

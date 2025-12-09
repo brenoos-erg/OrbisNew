@@ -2,7 +2,8 @@
 import { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { getCurrentAppUser } from '@/lib/auth'
-import { loadUserModuleAccess } from '@/lib/moduleAccess'
+import { getUserModuleContext } from '@/lib/moduleAccess'
+import { ModuleLevel } from '@prisma/client'
 
 export default async function FleetLayout({
   children,
@@ -19,8 +20,9 @@ export default async function FleetLayout({
     redirect('/login?inactive=1')
   }
 
-  const access = await loadUserModuleAccess(appUser.id)
-  const fleetAccess = access['gestao-de-frotas'] ?? access['gestao_frotas']
+const { levels } = await getUserModuleContext(appUser.id)
+  const fleetAccess = levels['gestao-de-frotas'] ?? levels['gestao_frotas']
+  const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
   if (!fleetAccess) {
     redirect('/dashboard')

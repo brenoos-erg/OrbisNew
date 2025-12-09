@@ -2,7 +2,7 @@
 import { cookies } from 'next/headers'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { prisma } from '@/lib/prisma'
-
+import { getUserModuleLevels } from '@/lib/moduleAccess'
 export async function getCurrentAppUser() {
   // cria client do Supabase usando cookies do Next
   const supabase = createServerComponentClient({
@@ -37,12 +37,13 @@ export async function getCurrentAppUser() {
       fullName: true,
       login: true,
         phone: true,
-        status: true,
-        role: true,
-        costCenterId: true,
-        departmentId: true,
-      },
-    })
+      status: true,
+      role: true,
+      costCenterId: true,
+      departmentId: true,
+      department: { select: { id: true, code: true, name: true } },
+    },
+  })
 
   // 2) se não achar, tenta pelo e-mail e “cola” o authId nele
   if (!appUser && email) {
@@ -52,14 +53,15 @@ export async function getCurrentAppUser() {
         id: true,
         email: true,
         fullName: true,
-      login: true,
-      phone: true,
-      status: true,
-      role: true,
-      costCenterId: true,
-      departmentId: true,
-    },
-  })
+     login: true,
+        phone: true,
+        status: true,
+        role: true,
+        costCenterId: true,
+        departmentId: true,
+        department: { select: { id: true, code: true, name: true } },
+      },
+    })
 
     if (userByEmail) {
       await prisma.user.update({
@@ -70,7 +72,10 @@ export async function getCurrentAppUser() {
       appUser = userByEmail
     }
   }
-
+ if (appUser) {
+    const moduleLevels = await getUserModuleLevels(appUser.id)
+    return { appUser: { ...appUser, moduleLevels }, session }
+  }
   return { appUser, session }
 }
 
