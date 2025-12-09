@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
+import { sendMail } from '@/lib/mailer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,6 +45,18 @@ function calculateFatigue(fatigue: Array<{ name: string; answer?: string }>) {
 
   return { fatigueScore, fatigueRisk, driverStatus }
 }
+async function findFleetLevel2Emails() {
+  const fleetModule = await prisma.module.findFirst({ where: { key: 'gestao-de-frotas' } })
+  if (!fleetModule) return [] as string[]
+
+  const accesses = await prisma.userModuleAccess.findMany({
+    where: { moduleId: fleetModule.id, level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] } },
+    include: { user: { select: { email: true } } },
+  })
+
+  return accesses.map((access) => access.user.email).filter(Boolean) as string[]
+}
+
 
 export async function POST(req: Request) {
   try {
@@ -85,9 +99,9 @@ export async function POST(req: Request) {
 
     const { fatigueScore, fatigueRisk, driverStatus } = calculateFatigue(fatigue)
 
-    const itemsWithProblem = (vehicleChecklist as Array<{ status?: string }>).filter(
-      (item) => item.status?.toUpperCase() === 'COM_PROBLEMA'
-    )
+    const itemsWithProblem = (
+      vehicleChecklist as Array<{ status?: string; category?: string }>
+    ).filter((item) => item.category?.toUpperCase() === 'CRITICO' && item.status?.toUpperCase() === 'COM_PROBLEMA')
     const hasVehicleProblem = itemsWithProblem.length > 0
     const hasNonConformityBool = String(hasNonConformity).toUpperCase() === 'SIM'
 
@@ -107,6 +121,12 @@ export async function POST(req: Request) {
           kmCurrent: vehicleKm,
           status: 'DISPONIVEL',
         },
+      })
+    }
+    if (driverName && driverName !== appUser.fullName) {
+      await prisma.user.update({
+        where: { id: appUser.id },
+        data: { fullName: driverName },
       })
     }
 
@@ -145,7 +165,33 @@ export async function POST(req: Request) {
       },
     })
 
-    // Futuro: envio de e-mail/alerta poderia ser disparado aqui após o registro.
+    const shouldNotify = vehicleStatus === 'RESTRITO' || driverStatus === 'INAPTO' || hasNonConformityBool
+
+    if (shouldNotify) {
+      const recipients = await findFleetLevel2Emails()
+
+      if (recipients.length > 0) {
+        const subject = 'Alerta de check-in de veículo'
+        const text = [
+          `Veículo: ${normalizedPlate} (${normalizedType})`,
+          `Status do veículo: ${vehicleStatus}`,
+          `Motorista: ${driverName || appUser.fullName || '—'}`,
+          `Status do motorista: ${driverStatus}`,
+          `Não conformidade: ${hasNonConformityBool ? 'Sim' : 'Não'}`,
+          `Data/hora: ${inspectionDateTime.toLocaleString('pt-BR')}`,
+          hasVehicleProblem ? 'Itens com problema informados no checklist.' : undefined,
+        ]
+          .filter(Boolean)
+          .join('\n')
+
+        const mailResult = await sendMail({ to: recipients, subject, text })
+
+        if (!mailResult.sent) {
+          console.warn('Falha ao enviar alerta de check-in', mailResult.error)
+        }
+      }
+    }
+
 
     return NextResponse.json({
       vehicleStatus,

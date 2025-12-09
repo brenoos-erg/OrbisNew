@@ -81,13 +81,13 @@ const fatigueQuestions = [
   { name: '40', label: 'Está com dificuldade de adaptação?' },
 ]
 const criticalOptions = [
-  { value: 'OK', label: 'OK' },
-  { value: 'COM_PROBLEMA', label: 'Com problema (paralisar veículo)' },
+{ value: 'OK', label: 'Ok' },
+  { value: 'COM_PROBLEMA', label: 'Com problema' },
 ]
 
 const nonCriticalOptions = [
-  { value: 'OK', label: 'OK' },
-  { value: 'PROGRAMAR_MANUTENCAO', label: 'Programar manutenção' },
+  { value: 'OK', label: 'Ok' },
+  { value: 'COM_PROBLEMA', label: 'Com problema' },
   { value: 'NAO_SE_APLICA', label: 'Não se aplica' },
 ]
 

@@ -1,7 +1,12 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+type CostCenterOption = {
+  id: string
+  label: string
+}
+
 
 type QuickEntry = {
   id: string
@@ -20,38 +25,162 @@ const criticalOptions = ['Pneus', 'Freios', 'Luzes', 'Documentação']
 export default function QuickCheckinPage() {
   const [entries, setEntries] = useState<QuickEntry[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [vehicleExists, setVehicleExists] = useState<boolean | null>(null)
+  const [lastKm, setLastKm] = useState<number | null>(null)
+  const [plateInput, setPlateInput] = useState('')
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
+  const [costCenterInput, setCostCenterInput] = useState('')
+  const [costCenterId, setCostCenterId] = useState<string | undefined>()
 
   const lastEntry = useMemo(() => entries[0], [entries])
+  const plateRegex = /^[A-Z]{3}\d{4}$/
+  const plateIsValid = plateRegex.test(plateInput)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    async function loadCostCenters() {
+      try {
+        const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Falha ao buscar centros de custo')
+        const data: Array<{ id: string; code: string | null; description: string }> = await res.json()
+        setCostCenters(
+          data.map((cc) => ({
+            id: cc.id,
+            label: `${cc.code ? `${cc.code} - ` : ''}${cc.description}`,
+          }))
+        )
+      } catch (err) {
+        console.error(err)
+        setCostCenters([])
+      }
+    }
+
+    loadCostCenters()
+  }, [])
+
+  useEffect(() => {
+    const match = costCenters.find((cc) => cc.label.toLowerCase() === costCenterInput.trim().toLowerCase())
+    setCostCenterId(match?.id)
+  }, [costCenterInput, costCenters])
+
+  useEffect(() => {
+    async function checkVehicle(plate: string) {
+      setVehicleExists(null)
+      setLastKm(null)
+
+      try {
+        const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, { cache: 'no-store' })
+        if (!res.ok) throw new Error('Erro ao buscar veículo')
+        const vehicles: Array<{ plate: string; kmCurrent?: number }> = await res.json()
+        const found = vehicles.find((v) => v.plate.toUpperCase() === plate)
+        setVehicleExists(Boolean(found))
+        setLastKm(found?.kmCurrent ?? null)
+      } catch (err) {
+        console.error(err)
+        setVehicleExists(false)
+        setLastKm(null)
+      }
+    }
+
+    if (plateIsValid) {
+      checkVehicle(plateInput)
+    } else {
+      setVehicleExists(null)
+      setLastKm(null)
+    }
+  }, [plateInput, plateIsValid])
+
+  function buildDatePieces() {
+    const now = new Date()
+    const date = now.toISOString().slice(0, 10)
+    const time = now.toTimeString().slice(0, 5)
+    return { date, time }
+  }
+
+
+async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+     if (!plateIsValid) {
+      setError('Informe uma placa no formato ABC1234')
+      return
+    }
+
+    if (costCenterInput && !costCenterId) {
+      setError('Selecione um centro de custo existente para prosseguir')
+      return
+    }
+
     setSubmitting(true)
+    setError(null)
     const formData = new FormData(event.currentTarget)
 
     const driverName = (formData.get('driverName') as string)?.trim()
-    const vehiclePlate = (formData.get('vehiclePlate') as string)?.toUpperCase().trim()
+    const vehiclePlate = plateInput.trim().toUpperCase()
     const km = Number(formData.get('km') ?? 0)
     const shift = (formData.get('shift') as string) || 'Manhã'
     const fuelLevel = (formData.get('fuelLevel') as string) || 'Não informado'
     const notes = (formData.get('notes') as string) || ''
     const criticalFailures = criticalOptions.filter((option) => formData.get(`critical-${option}`))
     const status: QuickEntry['status'] = criticalFailures.length > 0 ? 'Restrito' : 'Disponível'
+    const { date, time } = buildDatePieces()
 
-    const entry: QuickEntry = {
-      id: crypto.randomUUID(),
+    const vehicleChecklist = criticalOptions.map((option) => ({
+      name: option,
+      label: option,
+      category: 'CRITICO',
+      status: criticalFailures.includes(option) ? 'COM_PROBLEMA' : 'OK',
+    }))
+
+    const payload = {
+      inspectionDate: date,
+      inspectionTime: time,
+      costCenter: costCenterInput || undefined,
+      sectorActivity: undefined,
       driverName,
+       vehicleType: 'VEICULO_LEVE',
       vehiclePlate,
-      km,
-      shift,
-      fuelLevel,
-      notes,
-      criticalFailures,
-      status,
+     vehicleKm: km,
+      vehicleChecklist,
+      fatigue: [],
+      hasNonConformity: criticalFailures.length > 0 ? 'SIM' : 'NAO',
     }
 
-    setEntries((prev) => [entry, ...prev].slice(0, 5))
-    event.currentTarget.reset()
-    setSubmitting(false)
+    try {
+      const res = await fetch('/api/fleet/checkins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Não foi possível enviar o check-in')
+      }
+
+      const entry: QuickEntry = {
+        id: crypto.randomUUID(),
+        driverName,
+        vehiclePlate,
+        km,
+        shift,
+        fuelLevel,
+        notes,
+        criticalFailures,
+        status,
+      }
+
+      setEntries((prev) => [entry, ...prev].slice(0, 5))
+      setLastKm(km)
+      event.currentTarget.reset()
+      setPlateInput('')
+      setVehicleExists(null)
+      setCostCenterInput('')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro inesperado'
+      setError(message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -72,28 +201,72 @@ export default function QuickCheckinPage() {
             <input
               required
               name="vehiclePlate"
-              placeholder="ABC1D23"
+              placeholder="ABC1234"
+              value={plateInput}
+              pattern="[A-Z]{3}[0-9]{4}"
+              onChange={(event) => {
+                const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                setPlateInput(value.slice(0, 7))
+              }}
               className="rounded-lg border border-slate-300 px-3 py-2 uppercase focus:border-orange-500 focus:outline-none"
             />
+             <span className="text-xs text-slate-500">
+              Use apenas letras e números no formato <strong>ABC1234</strong>.
+            </span>
+            {vehicleExists !== null && (
+              <span
+                className={`text-xs font-medium ${vehicleExists ? 'text-green-700' : 'text-orange-700'}`}
+              >
+                {vehicleExists
+                  ? 'Veículo localizado no sistema'
+                  : 'Veículo ainda não cadastrado. Será criado ao registrar.'}
+              </span>
+            )}
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Motorista
+            Centro de custo
+            <input
+               name="costCenter"
+              list="cost-center-options"
+              value={costCenterInput}
+              onChange={(event) => setCostCenterInput(event.target.value)}
+              placeholder="Digite para buscar"
+              className="rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+            />
+             <datalist id="cost-center-options">
+              {costCenters.map((cc) => (
+                <option key={cc.id} value={cc.label} />
+              ))}
+            </datalist>
+            <span className="text-xs text-slate-500">Campo livre, mas ligado aos centros cadastrados.</span>
+            {costCenterInput && !costCenterId && (
+              <span className="text-xs text-orange-700">Selecione uma opção existente para vincular corretamente.</span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+             Motorista
             <input
               required
               name="driverName"
               className="rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Quilometragem
-            <input
-              required
-              type="number"
-              min={0}
-              name="km"
-              className="rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
-            />
-          </label>
+          {plateIsValid && (
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Quilometragem
+              <input
+                required
+                type="number"
+                min={lastKm ?? 0}
+                name="km"
+                inputMode="numeric"
+                className="rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+              />
+              <span className="text-xs text-slate-500">
+                Última quilometragem registrada: {lastKm !== null ? lastKm.toLocaleString('pt-BR') : '—'} km
+              </span>
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
             Turno
             <select
@@ -162,6 +335,7 @@ export default function QuickCheckinPage() {
           </button>
           <p className="text-xs text-slate-500">Sem redirecionamento: salva e já fica pronto para o próximo.</p>
         </div>
+         {error && <p className="text-sm text-red-700">{error}</p>}
       </form>
 
       {lastEntry && (
