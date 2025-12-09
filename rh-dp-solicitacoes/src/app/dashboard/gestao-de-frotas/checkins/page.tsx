@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 
 type ChecklistItem = {
   name: string
@@ -102,6 +102,12 @@ export default function VehicleCheckinPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<SubmissionResult | null>(null)
+  const [plateInput, setPlateInput] = useState('')
+  const [vehicleExists, setVehicleExists] = useState<boolean | null>(null)
+  const [lastKm, setLastKm] = useState<number | null>(null)
+  const [costCenters, setCostCenters] = useState<Array<{ id: string; label: string }>>([])
+  const [costCenterInput, setCostCenterInput] = useState('')
+  const [costCenterId, setCostCenterId] = useState<string | undefined>()
 
   const checklistInitialState = useMemo(
     () =>
@@ -120,9 +126,81 @@ export default function VehicleCheckinPage() {
       }, {}),
     []
   )
+  const plateRegex = /^[A-Z]{3}\d{4}$/
+
+  useEffect(() => {
+    async function loadCostCenters() {
+      try {
+        const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Falha ao buscar centros de custo')
+        const data: Array<{ id: string; description: string; externalCode: string | null }> = await res.json()
+        setCostCenters(
+          data.map((cc) => ({
+            id: cc.id,
+            label: `${cc.externalCode ? `${cc.externalCode} - ` : ''}${cc.description}`,
+          }))
+        )
+      } catch (err) {
+        console.error(err)
+        setCostCenters([])
+      }
+    }
+
+    loadCostCenters()
+  }, [])
+
+  useEffect(() => {
+    const match = costCenters.find((cc) => cc.label.toLowerCase() === costCenterInput.trim().toLowerCase())
+    setCostCenterId(match?.id)
+  }, [costCenterInput, costCenters])
+
+  useEffect(() => {
+    async function checkVehicle(plate: string) {
+      setVehicleExists(null)
+      setLastKm(null)
+
+      try {
+        const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, { cache: 'no-store' })
+        if (!res.ok) throw new Error('Erro ao buscar veículo')
+        const vehicles: Array<{ plate: string; kmCurrent?: number }> = await res.json()
+        const found = vehicles.find((v) => v.plate.toUpperCase() === plate)
+        setVehicleExists(Boolean(found))
+        setLastKm(found?.kmCurrent ?? null)
+      } catch (err) {
+        console.error(err)
+        setVehicleExists(false)
+        setLastKm(null)
+      }
+    }
+
+    const normalizedPlate = plateInput.trim().toUpperCase()
+    if (plateRegex.test(normalizedPlate)) {
+      checkVehicle(normalizedPlate)
+    } else {
+      setVehicleExists(null)
+      setLastKm(null)
+    }
+  }, [plateInput])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const normalizedPlate = plateInput.trim().toUpperCase()
+
+    if (!plateRegex.test(normalizedPlate)) {
+      setError('Informe uma placa no formato ABC1234')
+      return
+    }
+
+    if (vehicleExists === false) {
+      setError('A placa informada não está cadastrada no sistema')
+      return
+    }
+
+    if (costCenterInput && !costCenterId) {
+      setError('Selecione um centro de custo válido da lista')
+      return
+    }
+
     setSubmitting(true)
     setError(null)
     setResult(null)
@@ -147,11 +225,11 @@ export default function VehicleCheckinPage() {
     const payload = {
       inspectionDate: formData.get('inspectionDate'),
       inspectionTime: formData.get('inspectionTime'),
-      costCenter: formData.get('costCenter'),
+      costCenter: costCenterInput || undefined,
       sectorActivity: formData.get('sectorActivity'),
       driverName: formData.get('driverName'),
       vehicleType: formData.get('vehicleType'),
-      vehiclePlate: (formData.get('vehiclePlate') as string | null)?.toUpperCase(),
+      vehiclePlate: normalizedPlate,
       vehicleKm: Number(formData.get('vehicleKm') ?? 0),
       vehicleChecklist,
       fatigue,
@@ -179,6 +257,10 @@ export default function VehicleCheckinPage() {
       const data: SubmissionResult = await res.json()
       setResult(data)
       event.currentTarget.reset()
+      setPlateInput('')
+      setVehicleExists(null)
+      setLastKm(null)
+      setCostCenterInput('')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado'
       setError(message)
@@ -233,9 +315,21 @@ export default function VehicleCheckinPage() {
               Centro de custo
               <input
                 name="costCenter"
-                type="text"
+                list="cost-center-options"
+                value={costCenterInput}
+                onChange={(event) => setCostCenterInput(event.target.value)}
+                placeholder="Digite para buscar"
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               />
+               <datalist id="cost-center-options">
+                {costCenters.map((cc) => (
+                  <option key={cc.id} value={cc.label} />
+                ))}
+              </datalist>
+              <span className="text-xs text-slate-500">Selecione uma opção cadastrada (cód. externo - nome).</span>
+              {costCenterInput && !costCenterId && (
+                <span className="text-xs text-orange-700">Centro de custo inválido.</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Setor / atividade
@@ -273,8 +367,20 @@ export default function VehicleCheckinPage() {
                 name="vehiclePlate"
                 type="text"
                 placeholder="ABC1234"
+                pattern="[A-Z]{3}[0-9]{4}"
+                value={plateInput}
+                onChange={(event) => {
+                  const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                  setPlateInput(value.slice(0, 7))
+                }}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase focus:border-slate-500 focus:outline-none"
               />
+              <span className="text-xs text-slate-500">Digite apenas placas já cadastradas no sistema.</span>
+              {vehicleExists !== null && (
+                <span className={`text-xs font-medium ${vehicleExists ? 'text-green-700' : 'text-orange-700'}`}>
+                  {vehicleExists ? 'Veículo localizado no sistema' : 'Placa não cadastrada. Cadastre antes de fazer check-in.'}
+                </span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Quilometragem atual
@@ -282,9 +388,12 @@ export default function VehicleCheckinPage() {
                 required
                 name="vehicleKm"
                 type="number"
-                min={0}
+                min={lastKm ?? 0}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               />
+              {lastKm !== null && (
+                <span className="text-xs text-slate-500">Último registro: {lastKm} km</span>
+              )}
             </label>
           </div>
         </section>

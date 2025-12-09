@@ -9,17 +9,17 @@ export async function POST() {
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+data: { user },
+  } = await supabase.auth.getUser()
 
   // Se não tiver sessão, não faz nada
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.json({ ok: true })
   }
 
-  const authId = session.user.id
-  const email = session.user.email ?? ''
-  const name = (session.user.user_metadata as any)?.name ?? ''
+  const authId = user.id
+  const email = user.email ?? ''
+  const name = (user.user_metadata as any)?.name ?? ''
 
   const appUser = await prisma.user.upsert({
     where: { authId }, // authId precisa ser @unique no schema

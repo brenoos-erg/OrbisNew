@@ -13,12 +13,12 @@ export default function Sidebar() {
     async function load() {
       // tenta direto da sessão do supabase (mais rápido)
       const sb = supabaseBrowser()
-      const { data: { session } } = await sb.auth.getSession()
-      if (alive && session?.user) {
+      const { data: { user } } = await sb.auth.getUser()
+      if (alive && user) {
         // tenta o espelho do banco para pegar fullName salvo
         const r = await fetch('/api/me', { cache: 'no-store' })
         if (r.ok) setMe(await r.json())
-        else setMe({ fullName: session.user.user_metadata?.name ?? session.user.email, email: session.user.email })
+        else setMe({ fullName: user.user_metadata?.name ?? user.email, email: user.email })
       } else if (alive) {
         setMe(null)
       }

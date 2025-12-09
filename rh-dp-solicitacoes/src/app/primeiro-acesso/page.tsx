@@ -31,8 +31,8 @@ function PrimeiroAcessoContent() {
   // garante que existe sessão; se não, manda pro login
   useEffect(() => {
     ;(async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
         router.replace(`/login?next=${encodeURIComponent('/primeiro-acesso')}`)
         return
       }

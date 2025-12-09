@@ -109,19 +109,15 @@ export async function POST(req: Request) {
     const vehicleStatus =
       hasVehicleProblem || hasNonConformityBool ? 'RESTRITO' : 'DISPONIVEL'
 
-    let vehicle = await prisma.vehicle.findUnique({
+    const vehicle = await prisma.vehicle.findUnique({
       where: { plate: normalizedPlate },
     })
 
     if (!vehicle) {
-      vehicle = await prisma.vehicle.create({
-        data: {
-          plate: normalizedPlate,
-          type: normalizedType,
-          kmCurrent: vehicleKm,
-          status: 'DISPONIVEL',
-        },
-      })
+      return NextResponse.json(
+        { error: 'Placa não cadastrada. Cadastre o veículo antes do check-in.' },
+        { status: 400 }
+      )
     }
     if (driverName && driverName !== appUser.fullName) {
       await prisma.user.update({

@@ -4,6 +4,6 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 export async function isAuthenticated() {
   const supabase = createRouteHandlerClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
-  return !!session
+  const { data: { user } } = await supabase.auth.getUser()
+  return !!user
 }

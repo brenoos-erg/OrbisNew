@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
+
 export async function getCurrentAppUser() {
   // cria client do Supabase usando cookies do Next
   const supabase = createServerComponentClient({
@@ -10,6 +11,7 @@ export async function getCurrentAppUser() {
   })
 
    const { data: userResult, error: userError } = await supabase.auth.getUser()
+
 
   if (userError) {
     console.error('Erro ao buscar usuário autenticado', userError)
@@ -36,7 +38,7 @@ export async function getCurrentAppUser() {
       email: true,
       fullName: true,
       login: true,
-        phone: true,
+      phone: true,
       status: true,
       role: true,
       costCenterId: true,
@@ -53,7 +55,7 @@ export async function getCurrentAppUser() {
         id: true,
         email: true,
         fullName: true,
-     login: true,
+        login: true,
         phone: true,
         status: true,
         role: true,
