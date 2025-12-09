@@ -117,4 +117,29 @@ export async function PATCH(req: Request) {
       { status: 500 }
     )
   }
+  }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID do veículo é obrigatório' },
+        { status: 400 }
+      )
+    }
+
+    await prisma.vehicleCheckin.deleteMany({ where: { vehicleId: id } })
+    await prisma.vehicle.delete({ where: { id } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Erro ao excluir veículo', error)
+    return NextResponse.json(
+      { error: 'Erro ao excluir veículo' },
+      { status: 500 }
+    )
+  }
 }

@@ -56,7 +56,23 @@ async function findFleetLevel2Emails() {
 
   return accesses.map((access) => access.user.email).filter(Boolean) as string[]
 }
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const vehicleId = searchParams.get('vehicleId') ?? undefined
 
+  const checkins = await prisma.vehicleCheckin.findMany({
+    where: {
+      ...(vehicleId ? { vehicleId } : {}),
+    },
+    include: {
+      vehicle: { select: { plate: true, type: true, status: true } },
+      driver: { select: { fullName: true, email: true } },
+    },
+    orderBy: { inspectionDate: 'desc' },
+  })
+
+  return NextResponse.json(checkins)
+}
 
 export async function POST(req: Request) {
   try {

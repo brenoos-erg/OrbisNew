@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Loader2, Plus, RefreshCw, Edit3, Trash2, List
+  } from 'lucide-react'
 
 type ApiVehicle = {
   id: string
@@ -14,6 +15,17 @@ type ApiVehicle = {
   status?: string | null
   createdAt?: string | null
 }
+type VehicleCheckin = {
+  id: string
+  inspectionDate: string
+  costCenter?: string | null
+  sectorActivity?: string | null
+  kmAtInspection: number
+  driverName?: string | null
+  driverStatus: string
+  vehicleStatus?: string
+}
+
 
 type VehicleStatusInfo = {
   label: string
@@ -56,8 +68,24 @@ export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [selectedVehicle, setSelectedVehicle] = useState<ApiVehicle | null>(null)
+  const [checkins, setCheckins] = useState<VehicleCheckin[]>([])
+  const [loadingCheckins, setLoadingCheckins] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
 
-   const restrictedVehicles = useMemo(
+   const [formValues, setFormValues] = useState({
+    plate: '',
+    type: '',
+    model: '',
+    costCenter: '',
+    sector: '',
+    kmCurrent: '',
+  })
+
+  const restrictedVehicles = useMemo(
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
     [vehicles]
   )
@@ -65,6 +93,13 @@ export default function VehiclesPage() {
   useEffect(() => {
     loadVehicles()
   }, [])
+  useEffect(() => {
+    if (selectedVehicle) {
+      loadCheckins(selectedVehicle.id)
+    }
+  }, [selectedVehicle])
+
+  
 
   async function loadVehicles() {
     setLoading(true)
@@ -86,6 +121,121 @@ export default function VehiclesPage() {
 
   }
 
+  async function loadCheckins(vehicleId: string) {
+    setLoadingCheckins(true)
+
+    try {
+      const res = await fetch(`/api/fleet/checkins?vehicleId=${vehicleId}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('Falha ao buscar check-ins')
+
+      const data: Array<VehicleCheckin & { vehicleStatus?: string }> = await res.json()
+      setCheckins(
+        data.map((item) => ({
+          ...item,
+          vehicleStatus: (item as any).vehicle?.status || item.vehicleStatus,
+        }))
+      )
+    } catch (err) {
+      console.error(err)
+      setCheckins([])
+    } finally {
+      setLoadingCheckins(false)
+    }
+  }
+
+  function openCreateForm() {
+    setEditingVehicle(null)
+    setFormValues({
+      plate: '',
+      type: '',
+      model: '',
+      costCenter: '',
+      sector: '',
+      kmCurrent: '',
+    })
+    setFormError(null)
+    setFormOpen(true)
+  }
+
+  function openEditForm(vehicle: ApiVehicle) {
+    setEditingVehicle(vehicle)
+    setFormValues({
+      plate: vehicle.plate,
+      type: vehicle.type,
+      model: vehicle.model || '',
+      costCenter: vehicle.costCenter || '',
+      sector: vehicle.sector || '',
+      kmCurrent: vehicle.kmCurrent?.toString() || '',
+    })
+    setFormError(null)
+    setFormOpen(true)
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true)
+    setFormError(null)
+
+    const payload = {
+      plate: formValues.plate.trim().toUpperCase(),
+      type: formValues.type,
+      model: formValues.model || undefined,
+      costCenter: formValues.costCenter || undefined,
+      sector: formValues.sector || undefined,
+      kmCurrent: formValues.kmCurrent ? Number(formValues.kmCurrent) : undefined,
+    }
+
+    try {
+      if (editingVehicle) {
+        const res = await fetch(`/api/fleet/vehicles?id=${editingVehicle.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) throw new Error('Falha ao atualizar veículo')
+      } else {
+        const res = await fetch('/api/fleet/vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Falha ao criar veículo')
+        }
+      }
+
+      await loadVehicles()
+      setFormOpen(false)
+    } catch (err: any) {
+      console.error(err)
+      setFormError(err.message || 'Erro ao salvar veículo')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(vehicle: ApiVehicle) {
+    const confirmed = window.confirm(`Deseja excluir o veículo ${vehicle.plate}?`)
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`/api/fleet/vehicles?id=${vehicle.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Falha ao excluir veículo')
+
+      if (selectedVehicle?.id === vehicle.id) {
+        setSelectedVehicle(null)
+        setCheckins([])
+      }
+
+      await loadVehicles()
+    } catch (err) {
+      console.error(err)
+      alert('Não foi possível excluir o veículo.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -99,12 +249,24 @@ export default function VehiclesPage() {
 
       <div className="flex flex-wrap gap-3">
         <button
-           onClick={loadVehicles}
+          onClick={loadVehicles}
           disabled={loading}
           className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
         </button>
+        <button
+          onClick={openCreateForm}
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
+        >
+          <Plus size={16} /> Registrar veículo
+        </button>
+        <a
+          href="/api/fleet/checkins/excel"
+          className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-slate-800 hover:bg-slate-50"
+        >
+          <List size={16} /> Baixar Excel principal
+        </a>
       </div>
 
      {error && (
@@ -129,12 +291,13 @@ export default function VehiclesPage() {
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Centro de custo</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Setor</th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Cadastro</th>
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {loading && (
               <tr>
-                <td colSpan={8} className="px-6 py-8 text-center text-sm text-slate-600">
+                <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-600">
                   <div className="inline-flex items-center gap-2">
                     <Loader2 size={18} className="animate-spin" /> Carregando veículos...
                   </div>
@@ -144,7 +307,7 @@ export default function VehiclesPage() {
 
             {!loading && vehicles.length === 0 && !error && (
               <tr>
-                <td colSpan={8} className="px-6 py-10 text-center text-sm text-slate-600">
+                <td colSpan={9} className="px-6 py-10 text-center text-sm text-slate-600">
                   Nenhum veículo cadastrado até o momento.
                 </td>
               </tr>
@@ -169,12 +332,197 @@ export default function VehiclesPage() {
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.costCenter || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.sector || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{formatDate(vehicle.createdAt)}</td>
+                    <td className="px-6 py-4 text-right text-sm text-slate-700">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setSelectedVehicle(vehicle)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
+                        >
+                          <List size={14} /> Check-ins
+                        </button>
+                        <button
+                          onClick={() => openEditForm(vehicle)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
+                        >
+                          <Edit3 size={14} /> Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(vehicle)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} /> Excluir
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
           </tbody>
         </table>
       </div>
+
+      {selectedVehicle && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase text-slate-500">Check-ins do veículo</p>
+              <h2 className="text-2xl font-bold text-slate-900">{selectedVehicle.plate}</h2>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => loadCheckins(selectedVehicle.id)}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+              >
+                <RefreshCw size={14} /> Atualizar
+              </button>
+              <a
+                href={`/api/fleet/checkins/excel?vehicleId=${selectedVehicle.id}`}
+                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+              >
+                <List size={14} /> Excel deste veículo
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Data</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Motorista</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">KM</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Centro de custo</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Setor</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Status veículo</th>
+                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Status motorista</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {loadingCheckins && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-4 text-center text-slate-600">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!loadingCheckins && checkins.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-4 text-center text-slate-600">
+                      Nenhum check-in encontrado para este veículo.
+                    </td>
+                  </tr>
+                )}
+
+                {!loadingCheckins &&
+                  checkins.map((checkin) => (
+                    <tr key={checkin.id}>
+                      <td className="px-4 py-2 text-slate-800">{formatDate(checkin.inspectionDate)}</td>
+                      <td className="px-4 py-2 text-slate-800">{checkin.driverName || '—'}</td>
+                      <td className="px-4 py-2 text-slate-800">{formatKm(checkin.kmAtInspection)}</td>
+                      <td className="px-4 py-2 text-slate-800">{checkin.costCenter || '—'}</td>
+                      <td className="px-4 py-2 text-slate-800">{checkin.sectorActivity || '—'}</td>
+                      <td className="px-4 py-2 text-slate-800">{checkin.vehicleStatus || '—'}</td>
+                      <td className="px-4 py-2 text-slate-800">{checkin.driverStatus}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {formOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-500">{editingVehicle ? 'Editar' : 'Cadastrar'} veículo</p>
+                <h2 className="text-2xl font-bold text-slate-900">{editingVehicle ? editingVehicle.plate : 'Novo veículo'}</h2>
+              </div>
+              <button onClick={() => setFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">Fechar</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>Placa*</span>
+                <input
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.plate}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, plate: e.target.value }))}
+                  placeholder="ABC1234"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>Tipo*</span>
+                <input
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.type}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, type: e.target.value }))}
+                  placeholder="Ex.: 4x4"
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>Modelo</span>
+                <input
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.model}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, model: e.target.value }))}
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>Centro de custo</span>
+                <input
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.costCenter}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, costCenter: e.target.value }))}
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>Setor</span>
+                <input
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.sector}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, sector: e.target.value }))}
+                />
+              </label>
+              <label className="space-y-1 text-sm text-slate-700">
+                <span>KM atual</span>
+                <input
+                  type="number"
+                  className="w-full rounded-md border border-slate-200 px-3 py-2"
+                  value={formValues.kmCurrent}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, kmCurrent: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            {formError && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setFormOpen(false)}
+                className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                disabled={submitting}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+              >
+                {submitting && <Loader2 size={16} className="animate-spin" />}
+                {editingVehicle ? 'Salvar alterações' : 'Cadastrar veículo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
