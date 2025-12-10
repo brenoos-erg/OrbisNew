@@ -57,16 +57,24 @@ const nonCriticalChecklistItems: ChecklistItem[] = [
     label: 'Buzina / sinal sonoro de ré / sinal luminoso de ré',
     category: 'NAO_CRITICO',
   },
-  { name: '15', label: 'Ar-condicionado em perfeito funcionamento', category: 'NAO_CRITICO' },
-  { name: '16', label: 'Condições gerais de limpeza (interna e externa)', category: 'NAO_CRITICO' },
+  {
+    name: '15',
+    label: 'Ar-condicionado em perfeito funcionamento',
+    category: 'NAO_CRITICO',
+  },
+  {
+    name: '16',
+    label: 'Condições gerais de limpeza (interna e externa)',
+    category: 'NAO_CRITICO',
+  },
   {
     name: '18',
     label: 'Nível de óleo do motor, água do radiador e fluído de freio',
     category: 'NAO_CRITICO',
   },
 ]
-const vehicleChecklistItems = [...criticalChecklistItems, ...nonCriticalChecklistItems]
 
+const vehicleChecklistItems = [...criticalChecklistItems, ...nonCriticalChecklistItems]
 
 const fatigueQuestions = [
   { name: '31', label: 'Dormiu menos de 8h?' },
@@ -80,8 +88,10 @@ const fatigueQuestions = [
   { name: '39', label: 'Tomou medicamento nas últimas 8h?' },
   { name: '40', label: 'Está com dificuldade de adaptação?' },
 ]
+
 const criticalOptions = [
-{ value: 'OK', label: 'Ok' },
+  { value: '', label: '' },
+  { value: 'OK', label: 'Ok' },
   { value: 'COM_PROBLEMA', label: 'Com problema' },
 ]
 
@@ -106,13 +116,16 @@ export default function VehicleCheckinPage() {
   const [vehicleExists, setVehicleExists] = useState<boolean | null>(null)
   const [lastKm, setLastKm] = useState<number | null>(null)
   const [costCenters, setCostCenters] = useState<Array<{ id: string; label: string }>>([])
+  const [allCostCenters, setAllCostCenters] = useState<Array<{ id: string; label: string }>>([])
+  const [vehicleCostCenters, setVehicleCostCenters] = useState<Array<{ id: string; label: string }>>([])
   const [costCenterInput, setCostCenterInput] = useState('')
   const [costCenterId, setCostCenterId] = useState<string | undefined>()
+  const [driverName, setDriverName] = useState('')
 
   const checklistInitialState = useMemo(
     () =>
       vehicleChecklistItems.reduce<Record<string, string>>((acc, item) => {
-        acc[item.name] = 'OK'
+        acc[item.name] = ''
         return acc
       }, {}),
     []
@@ -126,6 +139,7 @@ export default function VehicleCheckinPage() {
       }, {}),
     []
   )
+
   const plateRegex = /^[A-Z]{3}\d{4}$/
 
   useEffect(() => {
@@ -133,16 +147,23 @@ export default function VehicleCheckinPage() {
       try {
         const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
         if (!res.ok) throw new Error('Falha ao buscar centros de custo')
-        const data: Array<{ id: string; description: string; externalCode: string | null }> = await res.json()
-        setCostCenters(
-          data.map((cc) => ({
-            id: cc.id,
-            label: `${cc.externalCode ? `${cc.externalCode} - ` : ''}${cc.description}`,
-          }))
-        )
+        const data: Array<{
+          id: string
+          description: string
+          externalCode: string | null
+        }> = await res.json()
+
+        const mapped = data.map((cc) => ({
+          id: cc.id,
+          label: `${cc.externalCode ? `${cc.externalCode} - ` : ''}${cc.description}`,
+        }))
+
+        setCostCenters(mapped)
+        setAllCostCenters(mapped)
       } catch (err) {
         console.error(err)
         setCostCenters([])
+        setAllCostCenters([])
       }
     }
 
@@ -150,26 +171,65 @@ export default function VehicleCheckinPage() {
   }, [])
 
   useEffect(() => {
-    const match = costCenters.find((cc) => cc.label.toLowerCase() === costCenterInput.trim().toLowerCase())
+    const match = costCenters.find(
+      (cc) => cc.label.toLowerCase() === costCenterInput.trim().toLowerCase()
+    )
     setCostCenterId(match?.id)
   }, [costCenterInput, costCenters])
+
+  useEffect(() => {
+    if (vehicleCostCenters.length > 0) {
+      setCostCenters(vehicleCostCenters)
+    } else {
+      setCostCenters(allCostCenters)
+    }
+  }, [vehicleCostCenters, allCostCenters])
 
   useEffect(() => {
     async function checkVehicle(plate: string) {
       setVehicleExists(null)
       setLastKm(null)
+      setVehicleCostCenters([])
 
       try {
-        const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, { cache: 'no-store' })
+        const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, {
+          cache: 'no-store',
+        })
         if (!res.ok) throw new Error('Erro ao buscar veículo')
-        const vehicles: Array<{ plate: string; kmCurrent?: number }> = await res.json()
+
+        const vehicles: Array<{
+          plate: string
+          kmCurrent?: number
+          costCenters?: Array<{
+            costCenter?: {
+              id: string
+              externalCode?: string | null
+              description?: string | null
+            } | null
+          }>
+        }> = await res.json()
+
         const found = vehicles.find((v) => v.plate.toUpperCase() === plate)
         setVehicleExists(Boolean(found))
         setLastKm(found?.kmCurrent ?? null)
+
+        const vehicleCenters =
+          found?.costCenters
+            ?.map((link) => link.costCenter)
+            .filter(Boolean)
+            .map((cc) => ({
+              id: (cc as { id: string }).id,
+              label: `${(cc as { externalCode?: string | null }).externalCode ? `${(cc as {
+                externalCode?: string | null
+              }).externalCode} - ` : ''}${(cc as { description?: string | null }).description ?? ''}`.trim(),
+            })) ?? []
+
+        setVehicleCostCenters(vehicleCenters)
       } catch (err) {
         console.error(err)
         setVehicleExists(false)
         setLastKm(null)
+        setVehicleCostCenters([])
       }
     }
 
@@ -181,6 +241,21 @@ export default function VehicleCheckinPage() {
       setLastKm(null)
     }
   }, [plateInput])
+
+  useEffect(() => {
+    async function loadDriver() {
+      try {
+        const res = await fetch('/api/session/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        setDriverName(data?.appUser?.fullName ?? '')
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    loadDriver()
+  }, [])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -206,12 +281,17 @@ export default function VehicleCheckinPage() {
     setResult(null)
 
     const formData = new FormData(event.currentTarget)
+
     const vehicleChecklist = vehicleChecklistItems.map((item) => ({
       name: item.name,
       label: item.label,
       category: item.category,
-      status: (formData.get(`checklist-${item.name}`) as string) || 'OK',
+      status: (() => {
+        const value = formData.get(`checklist-${item.name}`) as string | null
+        return value && value !== '' ? value : 'OK'
+      })(),
     }))
+
     const hasCriticalIssue = vehicleChecklist.some(
       (item) => item.category === 'CRITICO' && item.status === 'COM_PROBLEMA'
     )
@@ -226,7 +306,7 @@ export default function VehicleCheckinPage() {
       inspectionDate: formData.get('inspectionDate'),
       inspectionTime: formData.get('inspectionTime'),
       costCenter: costCenterInput || undefined,
-      sectorActivity: formData.get('sectorActivity'),
+      sectorActivity: undefined,
       driverName: formData.get('driverName'),
       vehicleType: formData.get('vehicleType'),
       vehiclePlate: normalizedPlate,
@@ -261,6 +341,7 @@ export default function VehicleCheckinPage() {
       setVehicleExists(null)
       setLastKm(null)
       setCostCenterInput('')
+      setVehicleCostCenters([])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado'
       setError(message)
@@ -279,9 +360,9 @@ export default function VehicleCheckinPage() {
           </div>
           <a
             href="/dashboard/gestao-de-frotas/checkins/registro-rapido"
-           className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
-           >  
-           Check-in rápido
+            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+          >
+            Check-in rápido
           </a>
         </div>
         <p className="text-sm text-slate-600">
@@ -301,65 +382,23 @@ export default function VehicleCheckinPage() {
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Data da inspeção
-              <input required name="inspectionDate" type="date" className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none" />
+              <input
+                required
+                name="inspectionDate"
+                type="date"
+                className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
+              />
             </label>
+
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Horário
-             <input
+              <input
                 name="inspectionTime"
                 type="time"
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Centro de custo
-              <input
-                name="costCenter"
-                list="cost-center-options"
-                value={costCenterInput}
-                onChange={(event) => setCostCenterInput(event.target.value)}
-                placeholder="Digite para buscar"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-               <datalist id="cost-center-options">
-                {costCenters.map((cc) => (
-                  <option key={cc.id} value={cc.label} />
-                ))}
-              </datalist>
-              <span className="text-xs text-slate-500">Selecione uma opção cadastrada (cód. externo - nome).</span>
-              {costCenterInput && !costCenterId && (
-                <span className="text-xs text-orange-700">Centro de custo inválido.</span>
-              )}
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Setor / atividade
-              <input
-                name="sectorActivity"
-                type="text"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Nome do motorista
-              <input
-                required
-                name="driverName"
-                type="text"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Tipo de veículo
-              <select
-                name="vehicleType"
-                defaultValue="VEICULO_LEVE"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              >
-                <option value="VEICULO_LEVE">Veículo leve</option>
-                <option value="4X4">4x4</option>
-                <option value="SUV">SUV</option>
-              </select>
-            </label>
+
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Placa do veículo
               <input
@@ -377,11 +416,18 @@ export default function VehicleCheckinPage() {
               />
               <span className="text-xs text-slate-500">Digite apenas placas já cadastradas no sistema.</span>
               {vehicleExists !== null && (
-                <span className={`text-xs font-medium ${vehicleExists ? 'text-green-700' : 'text-orange-700'}`}>
-                  {vehicleExists ? 'Veículo localizado no sistema' : 'Placa não cadastrada. Cadastre antes de fazer check-in.'}
+                <span
+                  className={`text-xs font-medium ${
+                    vehicleExists ? 'text-green-700' : 'text-orange-700'
+                  }`}
+                >
+                  {vehicleExists
+                    ? 'Veículo localizado e pronto para check-in'
+                    : 'Placa não cadastrada. Cadastre o veículo antes de usar.'}
                 </span>
               )}
             </label>
+
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Quilometragem atual
               <input
@@ -391,9 +437,58 @@ export default function VehicleCheckinPage() {
                 min={lastKm ?? 0}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               />
-              {lastKm !== null && (
-                <span className="text-xs text-slate-500">Último registro: {lastKm} km</span>
+              <span className="text-xs text-slate-500">
+                Última quilometragem registrada:{' '}
+                {lastKm !== null ? lastKm.toLocaleString('pt-BR') : '—'} km
+              </span>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Centro de custo
+              <input
+                name="costCenter"
+                list="cost-center-options"
+                value={costCenterInput}
+                onChange={(event) => setCostCenterInput(event.target.value)}
+                placeholder="Digite para buscar"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <datalist id="cost-center-options">
+                {costCenters.map((cc) => (
+                  <option key={cc.id} value={cc.label} />
+                ))}
+              </datalist>
+              <span className="text-xs text-slate-500">
+                Selecione uma opção cadastrada (cód. externo - nome).
+              </span>
+              {costCenterInput && !costCenterId && (
+                <span className="text-xs text-orange-700">Centro de custo inválido.</span>
               )}
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Nome do motorista
+              <input
+                required
+                name="driverName"
+                type="text"
+                value={driverName}
+                readOnly
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Tipo de veículo
+              <select
+                name="vehicleType"
+                defaultValue="VEICULO_LEVE"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              >
+                <option value="VEICULO_LEVE">Veículo leve</option>
+                <option value="4X4">4x4</option>
+                <option value="SUV">SUV</option>
+              </select>
             </label>
           </div>
         </section>
@@ -402,10 +497,12 @@ export default function VehicleCheckinPage() {
           <div className="rounded-2xl border border-red-200 bg-red-50 p-5 shadow-sm">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase text-red-500">Etapa 2A</p>
-              <h2 className="text-lg font-semibold text-red-800">Itens críticos (paralisar se houver problema)</h2>
+              <h2 className="text-lg font-semibold text-red-800">
+                Itens críticos (paralisar se houver problema)
+              </h2>
               <p className="text-xs text-red-700">
-                Qualquer item abaixo com “Com problema” torna o veículo automaticamente <strong>não conforme</strong>
-                e deve ser paralisado até manutenção.
+                Qualquer item abaixo com “Com problema” torna o veículo automaticamente{' '}
+                <strong>não conforme</strong> e deve ser paralisado até manutenção.
               </p>
             </div>
 
@@ -424,6 +521,7 @@ export default function VehicleCheckinPage() {
                     defaultValue={checklistInitialState[item.name]}
                     className="rounded-lg border border-red-200 px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
                   >
+                    <option value="">Selecione...</option>
                     {criticalOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -438,9 +536,12 @@ export default function VehicleCheckinPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase text-slate-500">Etapa 2B</p>
-              <h2 className="text-lg font-semibold text-slate-900">Itens não críticos (programar manutenção)</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Itens não críticos (programar manutenção)
+              </h2>
               <p className="text-xs text-slate-600">
-                Marque “Programar manutenção” para itens que precisam de ajuste mas não paralisam o veículo.
+                Marque “Programar manutenção” para itens que precisam de ajuste mas não paralisam o
+                veículo.
               </p>
             </div>
 
@@ -459,6 +560,7 @@ export default function VehicleCheckinPage() {
                     defaultValue={checklistInitialState[item.name]}
                     className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
                   >
+                    <option value="">Selecione...</option>
                     {nonCriticalOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -504,8 +606,8 @@ export default function VehicleCheckinPage() {
         </section>
 
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 shadow-sm">
-          Itens críticos com problema geram não conformidade automática e orientam a paralisação do veículo. O
-          controle de fadiga calcula a condição do condutor ao enviar o formulário.
+          Itens críticos com problema geram não conformidade automática e orientam a paralisação do
+          veículo. O controle de fadiga calcula a condição do condutor ao enviar o formulário.
         </div>
 
         <div className="flex flex-col gap-3">

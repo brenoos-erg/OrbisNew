@@ -14,6 +14,14 @@ type ApiVehicle = {
   kmCurrent?: number | null
   status?: string | null
   createdAt?: string | null
+  costCenters?: Array<{
+    costCenter?: {
+      id: string
+      code?: string | null
+      externalCode?: string | null
+      description?: string | null
+    } | null
+  }>
 }
 type VehicleCheckin = {
   id: string
@@ -62,6 +70,21 @@ function formatDate(date?: string | null) {
   const parsed = new Date(date)
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleDateString('pt-BR')
+}
+function formatVehicleCostCenters(vehicle: ApiVehicle) {
+  const related =
+    vehicle.costCenters
+      ?.map((link) => link.costCenter)
+      .filter(Boolean)
+      .map((cc) => {
+        const prefix = cc?.externalCode || cc?.code
+        const description = cc?.description ?? ''
+        return `${prefix ? `${prefix} - ` : ''}${description}`.trim()
+      }) || []
+
+  const principal = vehicle.costCenter ? [vehicle.costCenter] : []
+  const labels = [...related, ...principal].filter(Boolean)
+  return labels.length > 0 ? labels.join(', ') : '—'
 }
 
 export default function VehiclesPage() {
@@ -329,7 +352,7 @@ export default function VehiclesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">{formatKm(vehicle.kmCurrent)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{vehicle.costCenter || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{formatVehicleCostCenters(vehicle)}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.sector || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{formatDate(vehicle.createdAt)}</td>
                     <td className="px-6 py-4 text-right text-sm text-slate-700">

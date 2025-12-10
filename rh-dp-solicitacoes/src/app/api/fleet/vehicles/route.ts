@@ -22,6 +22,7 @@ export async function GET(req: Request) {
         : {}),
     },
     orderBy: { createdAt: 'desc' },
+    include: { costCenters: { include: { costCenter: true } } },
   })
 
   return NextResponse.json(vehicles)
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
       sector,
       kmCurrent = 0,
       status = 'DISPONIVEL',
+      costCenterIds,
     } = body ?? {}
 
     if (!plate) {
@@ -60,19 +62,40 @@ export async function POST(req: Request) {
       )
     }
 
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        plate: normalizedPlate,
-        type,
-        model,
-        costCenter,
-        sector,
-        kmCurrent,
-        status,
-      },
+    const costCenterIdsArray = Array.isArray(costCenterIds)
+      ? [...new Set(costCenterIds.filter((id: unknown) => typeof id === 'string'))]
+      : []
+
+    const result = await prisma.$transaction(async (tx) => {
+      const createdVehicle = await tx.vehicle.create({
+        data: {
+          plate: normalizedPlate,
+          type,
+          model,
+          costCenter,
+          sector,
+          kmCurrent,
+          status,
+        },
+      })
+
+      if (costCenterIdsArray.length > 0) {
+        await tx.vehicleCostCenter.createMany({
+          data: costCenterIdsArray.map((costCenterId: string) => ({
+            vehicleId: createdVehicle.id,
+            costCenterId,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      return tx.vehicle.findUnique({
+        where: { id: createdVehicle.id },
+        include: { costCenters: { include: { costCenter: true } } },
+      })
     })
 
-    return NextResponse.json(vehicle, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar veículo', error)
     return NextResponse.json(
@@ -95,18 +118,48 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json()
-    const { type, model, costCenter, sector, kmCurrent, status } = body ?? {}
+    const { type, model, costCenter, sector, kmCurrent, status, costCenterIds } = body ?? {}
 
-    const vehicle = await prisma.vehicle.update({
-      where: { id },
-      data: {
-        ...(type ? { type } : {}),
-        ...(model ? { model } : {}),
-        ...(costCenter ? { costCenter } : {}),
-        ...(sector ? { sector } : {}),
-        ...(typeof kmCurrent === 'number' ? { kmCurrent } : {}),
-        ...(status ? { status } : {}),
-      },
+    const costCenterIdsArray = Array.isArray(costCenterIds)
+      ? [...new Set(costCenterIds.filter((cc: unknown) => typeof cc === 'string'))]
+      : null
+
+    const vehicle = await prisma.$transaction(async (tx) => {
+      const updatedVehicle = await tx.vehicle.update({
+        where: { id },
+        data: {
+          ...(type ? { type } : {}),
+          ...(model ? { model } : {}),
+          ...(costCenter ? { costCenter } : {}),
+          ...(sector ? { sector } : {}),
+          ...(typeof kmCurrent === 'number' ? { kmCurrent } : {}),
+          ...(status ? { status } : {}),
+        },
+      })
+
+      if (costCenterIdsArray) {
+        await tx.vehicleCostCenter.deleteMany({
+          where: {
+            vehicleId: id,
+            ...(costCenterIdsArray.length > 0 ? { costCenterId: { notIn: costCenterIdsArray } } : {}),
+          },
+        })
+
+        if (costCenterIdsArray.length > 0) {
+          await tx.vehicleCostCenter.createMany({
+            data: costCenterIdsArray.map((costCenterId: string) => ({
+              vehicleId: id,
+              costCenterId,
+            })),
+            skipDuplicates: true,
+          })
+        }
+      }
+
+      return tx.vehicle.findUnique({
+        where: { id: updatedVehicle.id },
+        include: { costCenters: { include: { costCenter: true } } },
+      })
     })
 
     return NextResponse.json(vehicle)
@@ -117,7 +170,7 @@ export async function PATCH(req: Request) {
       { status: 500 }
     )
   }
-  }
+}
 
 export async function DELETE(req: Request) {
   try {

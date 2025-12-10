@@ -152,6 +152,9 @@ model CostCenter {
   // N:N via UserCostCenter
   userLinks UserCostCenter[]
 
+  // N:N veículos
+  vehicleCostCenters VehicleCostCenter[]
+
   // relação com módulos (modelo antigo)
   modules CostCenterModule[]
 
@@ -533,6 +536,20 @@ model Vehicle {
   updatedAt  DateTime @updatedAt
 
   checkins VehicleCheckin[]
+  costCenters VehicleCostCenter[]
+}
+
+model VehicleCostCenter {
+  id           String   @id @default(uuid())
+  vehicleId    String
+  costCenterId String
+  createdAt    DateTime @default(now())
+
+  vehicle    Vehicle    @relation(fields: [vehicleId], references: [id])
+  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
+
+  @@unique([vehicleId, costCenterId])
+  @@map("VehicleCostCenter")
 }
 
 model VehicleCheckin {

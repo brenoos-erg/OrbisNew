@@ -135,11 +135,28 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+    if (typeof vehicleKm === 'number' && vehicleKm < vehicle.kmCurrent) {
+      return NextResponse.json(
+        { error: 'A quilometragem informada é inferior ao último registro do veículo.' },
+        { status: 400 }
+      )
+    }
     if (driverName && driverName !== appUser.fullName) {
       await prisma.user.update({
         where: { id: appUser.id },
         data: { fullName: driverName },
       })
+    }
+     if (vehicle.status === 'RESTRITO' && vehicleStatus === 'DISPONIVEL') {
+      if (!nonConformityActions || !nonConformityHandlingDate) {
+        return NextResponse.json(
+          {
+            error:
+              'Veículo restrito requer tratativa: informe ações e data de tratativa para liberar o veículo.',
+          },
+          { status: 400 }
+        )
+      }
     }
 
     await prisma.vehicleCheckin.create({
