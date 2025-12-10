@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, RefreshCw, Edit3, Trash2, List } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X } from 'lucide-react'
 
 type CostCenterOption = {
   id: string
@@ -56,6 +56,22 @@ type VehicleStatusInfo = {
   colorClass: string
   normalized: string
 }
+type VehicleStatusLog = {
+  id: string
+  vehicleId: string
+  status: string
+  reason: string
+  createdAt: string
+  createdBy?: { fullName?: string | null; email?: string | null } | null
+}
+
+const statusOptions = [
+  { value: 'DISPONIVEL', label: 'Disponível' },
+  { value: 'EM_USO', label: 'Em uso' },
+  { value: 'RESERVADO', label: 'Reservado' },
+  { value: 'EM_MANUTENCAO', label: 'Em manutenção' },
+  { value: 'RESTRITO', label: 'Restrito' },
+]
 
 function getStatusInfo(status?: string | null): VehicleStatusInfo {
   const normalized = status?.toUpperCase() ?? 'DESCONHECIDO'
@@ -110,6 +126,13 @@ export default function VehiclesPage() {
 
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
   const [loadingCostCenters, setLoadingCostCenters] = useState(false)
+  const [statusModalVehicle, setStatusModalVehicle] = useState<ApiVehicle | null>(null)
+  const [statusSelection, setStatusSelection] = useState('DISPONIVEL')
+  const [statusReason, setStatusReason] = useState('')
+  const [statusLogs, setStatusLogs] = useState<VehicleStatusLog[]>([])
+  const [loadingStatusLogs, setLoadingStatusLogs] = useState(false)
+  const [statusSubmitting, setStatusSubmitting] = useState(false)
+  const [statusError, setStatusError] = useState<string | null>(null)
 
   const [formValues, setFormValues] = useState({
     plate: '',
@@ -197,6 +220,86 @@ export default function VehiclesPage() {
       setLoadingCheckins(false)
     }
   }
+  async function loadStatusLogs(vehicleId: string) {
+    setLoadingStatusLogs(true)
+    setStatusError(null)
+
+    try {
+      const res = await fetch(`/api/fleet/vehicles/status?vehicleId=${vehicleId}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error('Falha ao carregar histórico de status')
+
+      const data: VehicleStatusLog[] = await res.json()
+      setStatusLogs(data)
+    } catch (err) {
+      console.error(err)
+      setStatusLogs([])
+      setStatusError('Não foi possível carregar o histórico de status.')
+    } finally {
+      setLoadingStatusLogs(false)
+    }
+  }
+
+  function openStatusModal(vehicle: ApiVehicle) {
+    const normalized = getStatusInfo(vehicle.status).normalized
+    const initialStatus = statusOptions.some((option) => option.value === normalized)
+      ? normalized
+      : 'DISPONIVEL'
+
+    setStatusModalVehicle(vehicle)
+    setStatusSelection(initialStatus)
+    setStatusReason('')
+    setStatusError(null)
+    setStatusLogs([])
+    loadStatusLogs(vehicle.id)
+  }
+
+  async function submitStatusChange() {
+    if (!statusModalVehicle) return
+
+    if (statusReason.trim() === '') {
+      setStatusError('Informe o motivo para alterar o status do veículo.')
+      return
+    }
+
+    setStatusSubmitting(true)
+    setStatusError(null)
+
+    try {
+      const res = await fetch('/api/fleet/vehicles/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId: statusModalVehicle.id,
+          status: statusSelection,
+          reason: statusReason.trim(),
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Falha ao alterar status do veículo')
+      }
+
+      const log: VehicleStatusLog = await res.json()
+
+      setVehicles((prev) =>
+        prev.map((item) => (item.id === statusModalVehicle.id ? { ...item, status: statusSelection } : item))
+      )
+
+      setSelectedVehicle((prev) =>
+        prev && prev.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev
+      )
+
+      setStatusLogs((prev) => [log, ...prev])
+      setStatusReason('')
+    } catch (err: any) {
+      console.error(err)
+      setStatusError(err.message || 'Erro ao salvar status')
+    } finally {
+      setStatusSubmitting(false)
+    }
+  }
+
 
   function openCreateForm() {
     setEditingVehicle(null)
@@ -338,6 +441,7 @@ export default function VehiclesPage() {
           {error}
         </div>
       )}
+      
 
       {restrictedVehicles.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -410,15 +514,24 @@ export default function VehiclesPage() {
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900">{vehicle.plate}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.type || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.model || '—'}</td>
-                     <td className="px-6 py-4 text-sm">
+                    <td className="px-6 py-4 text-sm">
                       {(() => {
                         const info = getStatusInfo(vehicle.status)
                         return (
-                          <span
-                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${info.colorClass}`}
-                          >
-                            {info.label || '—'}
-                          </span>
+                            <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${info.colorClass}`}
+                            >
+                              {info.label || '—'}
+                            </span>
+                            <button
+                              onClick={() => openStatusModal(vehicle)}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+                              title="Alterar status"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          </div>
                         )
                       })()}
                     </td>
