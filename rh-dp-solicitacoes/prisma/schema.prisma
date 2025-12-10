@@ -373,7 +373,8 @@ model User {
   moduleAccesses UserModuleAccess[]
 
   // relação com check-ins de veículos
-  vehicleCheckins VehicleCheckin[]
+  vehicleCheckins   VehicleCheckin[]
+  vehicleStatusLogs VehicleStatusLog[]
 
   @@map("User")
 }
@@ -535,8 +536,9 @@ model Vehicle {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  checkins VehicleCheckin[]
+  checkins    VehicleCheckin[]
   costCenters VehicleCostCenter[]
+  statusLogs  VehicleStatusLog[]
 }
 
 model VehicleCostCenter {
@@ -545,7 +547,7 @@ model VehicleCostCenter {
   costCenterId String
   createdAt    DateTime @default(now())
 
-   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   costCenter CostCenter @relation(fields: [costCenterId], references: [id])
 
   @@unique([vehicleId, costCenterId])
@@ -579,3 +581,14 @@ model VehicleCheckin {
   driver  User    @relation(fields: [driverId], references: [id])
 }
 
+model VehicleStatusLog {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  status      String
+  reason      String
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id])
+}

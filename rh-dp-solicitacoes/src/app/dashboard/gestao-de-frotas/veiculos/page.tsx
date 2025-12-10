@@ -133,6 +133,8 @@ export default function VehiclesPage() {
   const [loadingStatusLogs, setLoadingStatusLogs] = useState(false)
   const [statusSubmitting, setStatusSubmitting] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
+const [viewingLogId, setViewingLogId] = useState<string | null>(null)
+  const [typedReasonBackup, setTypedReasonBackup] = useState('')
 
   const [formValues, setFormValues] = useState({
     plate: '',
@@ -248,18 +250,20 @@ export default function VehiclesPage() {
     setStatusModalVehicle(vehicle)
     setStatusSelection(initialStatus)
     setStatusReason('')
+    setTypedReasonBackup('')
     setStatusError(null)
     setStatusLogs([])
+    setViewingLogId(null)
     loadStatusLogs(vehicle.id)
   }
-
   async function submitStatusChange() {
     if (!statusModalVehicle) return
 
-    if (statusReason.trim() === '') {
-      setStatusError('Informe o motivo para alterar o status do veículo.')
+    if (viewingLogId) {
+      setStatusError('Clique em "Escrever novo motivo" para registrar uma nova alteração.')
       return
     }
+
 
     setStatusSubmitting(true)
     setStatusError(null)
@@ -292,6 +296,7 @@ export default function VehiclesPage() {
 
       setStatusLogs((prev) => [log, ...prev])
       setStatusReason('')
+      setTypedReasonBackup('')
     } catch (err: any) {
       console.error(err)
       setStatusError(err.message || 'Erro ao salvar status')
@@ -709,6 +714,365 @@ export default function VehiclesPage() {
                   </details>
                 )
               })}
+          </div>
+        </div>
+      )}
+      {statusModalVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative grid w-full max-w-5xl gap-6 rounded-2xl bg-white p-6 shadow-2xl md:grid-cols-[2fr_1fr]">
+            <button
+              onClick={() => {
+                setStatusModalVehicle(null)
+                setStatusLogs([])
+                setStatusError(null)
+                setViewingLogId(null)
+                setStatusReason('')
+              }}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+              title="Fechar"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Alterar status</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{statusModalVehicle.plate}</h2>
+                  <p className="text-sm text-slate-600">Selecione o status desejado e informe o motivo da alteração.</p>
+                </div>
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusInfo(statusModalVehicle.status).colorClass}`}>
+                  {getStatusInfo(statusModalVehicle.status).label}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900">Status do veículo</p>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                  {statusOptions.map((option) => {
+                    const active = statusSelection === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => setStatusSelection(option.value)}
+                        disabled={statusSubmitting || Boolean(viewingLogId)}
+                        className={`flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
+                          active
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
+                        } ${viewingLogId ? 'cursor-not-allowed opacity-60' : ''}`}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Motivo da alteração*</p>
+                  {viewingLogId && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Visualizando log
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => {
+                    if (viewingLogId) return
+                    setStatusReason(e.target.value)
+                    setTypedReasonBackup(e.target.value)
+                  }}
+                  readOnly={Boolean(viewingLogId)}
+                  className="min-h-[140px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder="Descreva o motivo da mudança de status"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>Obrigatório sempre que um novo status for salvo.</span>
+                  {viewingLogId ? (
+                    <button
+                      className="text-blue-700 hover:underline"
+                      onClick={() => {
+                        setViewingLogId(null)
+                        setStatusReason(typedReasonBackup)
+                      }}
+                    >
+                      Escrever novo motivo
+                    </button>
+                  ) : (
+                    <span>Clique em um log ao lado para visualizar o motivo anterior.</span>
+                  )}
+                </div>
+              </div>
+
+              {statusError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setStatusModalVehicle(null)
+                    setStatusLogs([])
+                    setStatusError(null)
+                    setViewingLogId(null)
+                    setStatusReason('')
+                  }}
+                  className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  disabled={statusSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitStatusChange}
+                  disabled={statusSubmitting || Boolean(viewingLogId)}
+                  className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {statusSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  Salvar status
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Histórico</p>
+                  <p className="text-sm font-semibold text-slate-900">Logs anteriores</p>
+                  <p className="text-xs text-slate-600">Clique em um log para visualizar o motivo.</p>
+                </div>
+                {loadingStatusLogs && <Loader2 size={16} className="mt-1 animate-spin text-slate-500" />}
+              </div>
+
+              <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
+                {statusLogs.length === 0 && !loadingStatusLogs && (
+                  <p className="text-xs text-slate-600">Nenhum log de status registrado para este veículo.</p>
+                )}
+
+                {statusLogs.map((log) => {
+                  const info = getStatusInfo(log.status)
+                  const isActive = viewingLogId === log.id
+                  const normalized = statusOptions.some((option) => option.value === info.normalized)
+                    ? info.normalized
+                    : 'DISPONIVEL'
+
+                  return (
+                    <button
+                      key={log.id}
+                      onClick={() => {
+                        setTypedReasonBackup(statusReason)
+                        setViewingLogId(log.id)
+                        setStatusReason(log.reason)
+                        setStatusSelection(normalized)
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
+                        isActive
+                          ? 'border-blue-200 bg-white'
+                          : 'border-slate-200 bg-white/70 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}
+                          >
+                            {info.label}
+                          </span>
+                          <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
+                        </div>
+                        {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm text-slate-800">{log.reason}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {log.createdBy?.fullName || log.createdBy?.email || 'Usuário não identificado'}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statusModalVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative grid w-full max-w-5xl gap-6 rounded-2xl bg-white p-6 shadow-2xl md:grid-cols-[2fr_1fr]">
+            <button
+              onClick={() => {
+                setStatusModalVehicle(null)
+                setStatusLogs([])
+                setStatusError(null)
+                setViewingLogId(null)
+                setStatusReason('')
+              }}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+              title="Fechar"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Alterar status</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{statusModalVehicle.plate}</h2>
+                  <p className="text-sm text-slate-600">Selecione o status desejado e informe o motivo da alteração.</p>
+                </div>
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusInfo(statusModalVehicle.status).colorClass}`}>
+                  {getStatusInfo(statusModalVehicle.status).label}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900">Status do veículo</p>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                  {statusOptions.map((option) => {
+                    const active = statusSelection === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => setStatusSelection(option.value)}
+                        disabled={statusSubmitting || Boolean(viewingLogId)}
+                        className={`flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
+                          active
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
+                        } ${viewingLogId ? 'cursor-not-allowed opacity-60' : ''}`}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Motivo da alteração*</p>
+                  {viewingLogId && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      Visualizando log
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => {
+                    if (viewingLogId) return
+                    setStatusReason(e.target.value)
+                    setTypedReasonBackup(e.target.value)
+                  }}
+                  readOnly={Boolean(viewingLogId)}
+                  className="min-h-[140px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder="Descreva o motivo da mudança de status"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>Obrigatório sempre que um novo status for salvo.</span>
+                  {viewingLogId ? (
+                    <button
+                      className="text-blue-700 hover:underline"
+                      onClick={() => {
+                        setViewingLogId(null)
+                        setStatusReason(typedReasonBackup)
+                      }}
+                    >
+                      Escrever novo motivo
+                    </button>
+                  ) : (
+                    <span>Clique em um log ao lado para visualizar o motivo anterior.</span>
+                  )}
+                </div>
+              </div>
+
+              {statusError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setStatusModalVehicle(null)
+                    setStatusLogs([])
+                    setStatusError(null)
+                    setViewingLogId(null)
+                    setStatusReason('')
+                  }}
+                  className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  disabled={statusSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={submitStatusChange}
+                  disabled={statusSubmitting || Boolean(viewingLogId)}
+                  className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {statusSubmitting && <Loader2 size={16} className="animate-spin" />}
+                  Salvar status
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Histórico</p>
+                  <p className="text-sm font-semibold text-slate-900">Logs anteriores</p>
+                  <p className="text-xs text-slate-600">Clique em um log para visualizar o motivo.</p>
+                </div>
+                {loadingStatusLogs && <Loader2 size={16} className="mt-1 animate-spin text-slate-500" />}
+              </div>
+
+              <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
+                {statusLogs.length === 0 && !loadingStatusLogs && (
+                  <p className="text-xs text-slate-600">Nenhum log de status registrado para este veículo.</p>
+                )}
+
+                {statusLogs.map((log) => {
+                  const info = getStatusInfo(log.status)
+                  const isActive = viewingLogId === log.id
+                  const normalized = statusOptions.some((option) => option.value === info.normalized)
+                    ? info.normalized
+                    : 'DISPONIVEL'
+
+                  return (
+                    <button
+                      key={log.id}
+                      onClick={() => {
+                        setTypedReasonBackup(statusReason)
+                        setViewingLogId(log.id)
+                        setStatusReason(log.reason)
+                        setStatusSelection(normalized)
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
+                        isActive
+                          ? 'border-blue-200 bg-white'
+                          : 'border-slate-200 bg-white/70 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}
+                          >
+                            {info.label}
+                          </span>
+                          <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
+                        </div>
+                        {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-sm text-slate-800">{log.reason}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {log.createdBy?.fullName || log.createdBy?.email || 'Usuário não identificado'}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
