@@ -16,10 +16,14 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode
 }) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, dbUnavailable } = await getCurrentAppUser()
 
   // se não tiver usuário logado, manda pro login
   if (!appUser) {
+      if (dbUnavailable) {
+      const params = new URLSearchParams({ 'db-unavailable': '1', next: '/dashboard' })
+      redirect(`/login?${params.toString()}`)
+    }
     redirect('/login')
   }
 

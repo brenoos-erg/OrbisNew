@@ -19,6 +19,7 @@ function LoginPageContent() {
   const search = useSearchParams()
   const nextUrl = search.get('next') || '/dashboard'
   const isInactive = search.get('inactive') === '1'
+  const isDbUnavailable = search.get('db-unavailable') === '1'
   const supabase = supabaseBrowser()
 
   const [loadingSession, setLoadingSession] = useState(true)
@@ -56,14 +57,35 @@ function LoginPageContent() {
 
     // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
     try {
-      await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
-    } catch {}
+     const syncRes = await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
+      if (!syncRes.ok) {
+        const body = await syncRes.json().catch(() => null)
+        if (body?.dbUnavailable) {
+          setLoading(false)
+          router.replace('/login?db-unavailable=1')
+          router.refresh()
+          return
+        }
+
+        setLoading(false)
+        alert(body?.error || 'Erro ao sincronizar usuário. Tente novamente.')
+        return
+      }
+    } catch {
+      // erro silencioso, mas não deixa travar
+    }
 
     // 3️⃣ Verifica status no backend
     try {
       const res = await fetch('/api/session/me', { cache: 'no-store' })
       if (res.ok) {
         const me = await res.json()
+        if (me?.dbUnavailable) {
+          setLoading(false)
+          router.replace('/login?db-unavailable=1')
+          router.refresh()
+          return
+        }
         if (me?.appUser?.status === 'INATIVO') {
           await supabase.auth.signOut({ scope: 'global' })
           setLoading(false)
@@ -124,6 +146,11 @@ function LoginPageContent() {
         {isInactive && (
           <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
             Sua conta está inativa. Solicite ativação ao administrador.
+          </div>
+        )}
+        {isDbUnavailable && (
+          <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
+            Não foi possível conectar ao banco de dados. Tente novamente em alguns minutos ou contate o suporte.
           </div>
         )}
 

@@ -4,6 +4,6 @@ import { getCurrentAppUser } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const { appUser, session } = await getCurrentAppUser()
-  return NextResponse.json({ appUser, session })
+  const { appUser, session, dbUnavailable } = await getCurrentAppUser()
+  return NextResponse.json({ appUser, session, dbUnavailable })
 }
