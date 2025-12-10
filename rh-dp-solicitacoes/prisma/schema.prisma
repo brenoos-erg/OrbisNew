@@ -545,7 +545,7 @@ model VehicleCostCenter {
   costCenterId String
   createdAt    DateTime @default(now())
 
-  vehicle    Vehicle    @relation(fields: [vehicleId], references: [id])
+   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   costCenter CostCenter @relation(fields: [costCenterId], references: [id])
 
   @@unique([vehicleId, costCenterId])

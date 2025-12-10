@@ -98,15 +98,24 @@ export default function VehiclesPage() {
   const [checkins, setCheckins] = useState<VehicleCheckin[]>([])
   const [loadingCheckins, setLoadingCheckins] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
+  const [costCenterOptions, setCostCenterOptions] = useState<Array<{ id: string; label: string }>>([])
+  const [selectedCostCenters, setSelectedCostCenters] = useState<Array<{ id: string; label: string }>>([])
 
-   const [formValues, setFormValues] = useState({
-    plate: '',
-    type: '',
-    model: '',
-    costCenter: '',
-    sector: '',
-    kmCurrent: '',
-  })
+ const [costCenterInput, setCostCenterInput] = useState('')
+
+const [formValues, setFormValues] = useState({
+  plate: '',
+  type: '',
+  model: '',
+  costCenter: '',
+  sector: '',
+  kmCurrent: '',
+})
+
+const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/ // Mercosul
+
+const normalizedPlate = formValues.plate.trim().toUpperCase()
+const isPlateValid = plateRegex.test(normalizedPlate)
 
   const restrictedVehicles = useMemo(
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
@@ -121,6 +130,40 @@ export default function VehiclesPage() {
       loadCheckins(selectedVehicle.id)
     }
   }, [selectedVehicle])
+
+  useEffect(() => {
+    async function loadCostCenters() {
+      try {
+        const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Falha ao carregar centros de custo')
+
+        const data: Array<{ id: string; description: string; externalCode: string | null }> = await res.json()
+        setCostCenterOptions(
+          data.map((cc) => ({
+            id: cc.id,
+            label: `${cc.externalCode ? `${cc.externalCode} - ` : ''}${cc.description}`.trim(),
+          }))
+        )
+      } catch (err) {
+        console.error(err)
+        setCostCenterOptions([])
+      }
+    }
+
+    loadCostCenters()
+  }, [])
+
+  useEffect(() => {
+    if (!isPlateValid) {
+      if (selectedCostCenters.length > 0) {
+        setSelectedCostCenters([])
+      }
+      if (costCenterInput) {
+        setCostCenterInput('')
+      }
+      setFormValues((prev) => (prev.costCenter ? { ...prev, costCenter: '' } : prev))
+    }
+  }, [isPlateValid, costCenterInput, selectedCostCenters.length])
 
   
 
@@ -176,6 +219,8 @@ export default function VehiclesPage() {
       sector: '',
       kmCurrent: '',
     })
+     setSelectedCostCenters([])
+    setCostCenterInput('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -190,21 +235,61 @@ export default function VehiclesPage() {
       sector: vehicle.sector || '',
       kmCurrent: vehicle.kmCurrent?.toString() || '',
     })
+    setSelectedCostCenters(
+  (vehicle.costCenters || [])
+    .map((link) => link.costCenter)
+    .filter(Boolean)
+    .map((cc) => ({
+      id: cc!.id,
+      label: `${cc!.externalCode ? `${cc!.externalCode} - ` : ''}${cc!.description ?? ''}`.trim(),
+    }))
+)
+    setCostCenterInput('')
     setFormError(null)
     setFormOpen(true)
   }
+
+  function addCostCenterFromInput() {
+    const normalized = costCenterInput.trim().toLowerCase()
+    if (!normalized) return
+
+    const match = costCenterOptions.find((cc) => cc.label.toLowerCase() === normalized)
+
+    if (!match) {
+      setFormError('Selecione um centro de custo válido da lista.')
+      return
+    }
+
+    if (!selectedCostCenters.some((cc) => cc.id === match.id)) {
+      setSelectedCostCenters((prev) => [...prev, match])
+    }
+
+    setCostCenterInput('')
+    setFormError(null)
+  }
+
+  function removeCostCenter(id: string) {
+    setSelectedCostCenters((prev) => prev.filter((cc) => cc.id !== id))
+  }
+
 
   async function handleSubmit() {
     setSubmitting(true)
     setFormError(null)
 
+    if (!plateRegex.test(normalizedPlate)) {
+      setFormError('Informe uma placa no formato ABC1A34 (padrão Mercosul)')
+      setSubmitting(false)
+      return
+    }
     const payload = {
-      plate: formValues.plate.trim().toUpperCase(),
+      plate: normalizedPlate,
       type: formValues.type,
       model: formValues.model || undefined,
       costCenter: formValues.costCenter || undefined,
       sector: formValues.sector || undefined,
       kmCurrent: formValues.kmCurrent ? Number(formValues.kmCurrent) : undefined,
+      costCenterIds: selectedCostCenters.map((cc) => cc.id),
     }
 
     try {
@@ -495,14 +580,20 @@ export default function VehiclesPage() {
                   onChange={(e) => setFormValues((prev) => ({ ...prev, model: e.target.value }))}
                 />
               </label>
-              <label className="space-y-1 text-sm text-slate-700">
-                <span>Centro de custo</span>
-                <input
-                  className="w-full rounded-md border border-slate-200 px-3 py-2"
-                  value={formValues.costCenter}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, costCenter: e.target.value }))}
-                />
-              </label>
+              {isPlateValid && (
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span>Centro de custo principal (opcional)</span>
+                  <input
+                    className="w-full rounded-md border border-slate-200 px-3 py-2"
+                    value={formValues.costCenter}
+                    spellCheck={false}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, costCenter: e.target.value }))}
+                  />
+                </label>
+              )}
               <label className="space-y-1 text-sm text-slate-700">
                 <span>Setor</span>
                 <input
@@ -520,6 +611,65 @@ export default function VehiclesPage() {
                   onChange={(e) => setFormValues((prev) => ({ ...prev, kmCurrent: e.target.value }))}
                 />
               </label>
+                {isPlateValid && (
+                <div className="space-y-2 text-sm text-slate-700">
+                  <span>Centros de custo vinculados</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <input
+                        list="cost-center-options"
+                        className="w-full rounded-md border border-slate-200 px-3 py-2"
+                        placeholder="Digite e selecione para adicionar"
+                        value={costCenterInput}
+                        spellCheck={false}
+                        autoComplete="off"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        onChange={(e) => setCostCenterInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addCostCenterFromInput()
+                          }
+                        }}
+                      />
+                      <datalist id="cost-center-options">
+                        {costCenterOptions.map((cc) => (
+                          <option key={cc.id} value={cc.label} />
+                        ))}
+                      </datalist>
+                      <button
+                        type="button"
+                        onClick={addCostCenterFromInput}
+                        className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                    {selectedCostCenters.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCostCenters.map((cc) => (
+                          <span
+                            key={cc.id}
+                            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
+                          >
+                            {cc.label}
+                            <button
+                              type="button"
+                              onClick={() => removeCostCenter(cc.id)}
+                              className="text-slate-500 hover:text-slate-800"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">Nenhum centro de custo adicional selecionado.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {formError && (

@@ -1,5 +1,6 @@
-// src/components/layout/Sidebar.tsx
+
 'use client'
+// src/components/layout/Sidebar.tsx
 import { CheckCircle2 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'

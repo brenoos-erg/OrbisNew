@@ -134,13 +134,20 @@ export default function VehicleCheckinPage() {
   const fatigueInitialState = useMemo(
     () =>
       fatigueQuestions.reduce<Record<string, string>>((acc, item) => {
-        acc[item.name] = 'NAO'
+        acc[item.name] = ''
         return acc
       }, {}),
     []
   )
 
-  const plateRegex = /^[A-Z]{3}\d{4}$/
+  const [fatigueOptionsVisible, setFatigueOptionsVisible] = useState<Record<string, boolean>>(() =>
+    fatigueQuestions.reduce<Record<string, boolean>>((acc, item) => {
+      acc[item.name] = false
+      return acc
+    }, {})
+  )
+
+  const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/
 
   useEffect(() => {
     async function loadCostCenters() {
@@ -262,7 +269,7 @@ export default function VehicleCheckinPage() {
     const normalizedPlate = plateInput.trim().toUpperCase()
 
     if (!plateRegex.test(normalizedPlate)) {
-      setError('Informe uma placa no formato ABC1234')
+      setError('Informe uma placa no formato ABC1A34 (padrão Mercosul)')
       return
     }
 
@@ -405,8 +412,8 @@ export default function VehicleCheckinPage() {
                 required
                 name="vehiclePlate"
                 type="text"
-                placeholder="ABC1234"
-                pattern="[A-Z]{3}[0-9]{4}"
+                placeholder="ABC1A34"
+                pattern="[A-Z]{3}[0-9][A-Z][0-9]{2}"
                 value={plateInput}
                 onChange={(event) => {
                   const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -595,10 +602,21 @@ export default function VehicleCheckinPage() {
                 <select
                   name={`fatigue-${item.name}`}
                   defaultValue={fatigueInitialState[item.name]}
+                   onFocus={() =>
+                    setFatigueOptionsVisible((prev) => ({
+                      ...prev,
+                      [item.name]: true,
+                    }))
+                  }
                   className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
                 >
-                  <option value="NAO">Não</option>
-                  <option value="SIM">Sim</option>
+                  <option value="">Selecione...</option>
+                  {fatigueOptionsVisible[item.name] && (
+                    <>
+                      <option value="NAO">Não</option>
+                      <option value="SIM">Sim</option>
+                    </>
+                  )}
                 </select>
               </label>
             ))}

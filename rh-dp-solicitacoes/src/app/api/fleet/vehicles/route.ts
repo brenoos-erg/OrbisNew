@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -50,6 +51,13 @@ export async function POST(req: Request) {
     }
 
     const normalizedPlate = String(plate).trim().toUpperCase()
+     if (!plateRegex.test(normalizedPlate)) {
+      return NextResponse.json(
+        { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul).' },
+        { status: 400 }
+      )
+    }
+
 
     const existing = await prisma.vehicle.findUnique({
       where: { plate: normalizedPlate },
