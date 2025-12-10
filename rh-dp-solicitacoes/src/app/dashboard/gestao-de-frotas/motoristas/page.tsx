@@ -11,13 +11,14 @@ type CostCenter = {
   sigla: string
   status: 'ACTIVE' | 'INACTIVE'
 }
+type MonthlyAnswers = Record<string, Record<number, Record<string, 'SIM' | 'NAO'>>>
 
 type Driver = {
   id: string
   name: string
   costCenterId: string
   lastScore: number
-  monthlyAnswers: Record<number, Record<string, 'SIM' | 'NAO'>>
+  monthlyAnswers: MonthlyAnswers
 }
 
 type Question = {
@@ -51,11 +52,13 @@ const initialDrivers: Driver[] = [
     costCenterId: 'cc1',
     lastScore: 18,
     monthlyAnswers: {
-      1: { q1: 'SIM', q2: 'NAO', q3: 'NAO', q8: 'NAO' },
-      2: { q1: 'NAO', q5: 'SIM', q6: 'SIM' },
-      3: { q2: 'SIM', q3: 'SIM', q4: 'SIM', q10: 'NAO' },
-      4: { q8: 'SIM', q9: 'SIM', q2: 'SIM' },
-      5: { q1: 'NAO', q4: 'NAO' },
+      '2024-09': {
+        1: { q1: 'SIM', q2: 'NAO', q3: 'NAO', q8: 'NAO' },
+        2: { q1: 'NAO', q5: 'SIM', q6: 'SIM' },
+        3: { q2: 'SIM', q3: 'SIM', q4: 'SIM', q10: 'NAO' },
+        4: { q8: 'SIM', q9: 'SIM', q2: 'SIM' },
+        5: { q1: 'NAO', q4: 'NAO' },
+      },
     },
   },
   {
@@ -64,10 +67,12 @@ const initialDrivers: Driver[] = [
     costCenterId: 'cc1',
     lastScore: 12,
     monthlyAnswers: {
-      1: { q1: 'NAO', q2: 'NAO', q3: 'NAO' },
-      2: { q6: 'SIM', q5: 'NAO' },
-      3: { q1: 'SIM', q8: 'NAO' },
-      4: { q1: 'NAO', q2: 'NAO', q3: 'NAO', q4: 'NAO' },
+      '2024-09': {
+        1: { q1: 'NAO', q2: 'NAO', q3: 'NAO' },
+        2: { q6: 'SIM', q5: 'NAO' },
+        3: { q1: 'SIM', q8: 'NAO' },
+        4: { q1: 'NAO', q2: 'NAO', q3: 'NAO', q4: 'NAO' },
+      },
     },
   },
   {
@@ -76,13 +81,20 @@ const initialDrivers: Driver[] = [
     costCenterId: 'cc2',
     lastScore: 32,
     monthlyAnswers: {
-      1: { q2: 'SIM', q3: 'SIM', q8: 'SIM', q9: 'SIM' },
-      2: { q1: 'SIM', q4: 'SIM', q6: 'SIM' },
+      '2024-09': {
+        1: { q2: 'SIM', q3: 'SIM', q8: 'SIM', q9: 'SIM' },
+        2: { q1: 'SIM', q4: 'SIM', q6: 'SIM' },
+      },
     },
   },
 ]
 
 const days = Array.from({ length: 31 }, (_, index) => index + 1)
+const availableMonths = [
+  { value: '2024-09', label: 'Setembro/2024' },
+  { value: '2024-08', label: 'Agosto/2024' },
+  { value: '2024-07', label: 'Julho/2024' },
+]
 
 function getRisk(score: number) {
   if (score < 20) return { risk: 'Risco leve', status: 'APTO', color: 'text-green-700 bg-green-50' }
@@ -101,11 +113,12 @@ function getDayScore(dayAnswers: Record<string, 'SIM' | 'NAO'> | undefined) {
 export default function DriversPage() {
   const [selectedCostCenter, setSelectedCostCenter] = useState(costCenters[0].id)
   const [selectedDriver, setSelectedDriver] = useState(initialDrivers[0].id)
-  const [selectedMonth] = useState('Setembro/2024')
+  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0].value)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [startDay, setStartDay] = useState(1)
   const [endDay, setEndDay] = useState(31)
   const [driverAnswers, setDriverAnswers] = useState<
-    Record<string, Record<number, Record<string, 'SIM' | 'NAO'>>>
+    Record<string, MonthlyAnswers>
   >(() => Object.fromEntries(initialDrivers.map((driver) => [driver.id, driver.monthlyAnswers])))
 
   const filteredDrivers = useMemo(
@@ -126,7 +139,10 @@ export default function DriversPage() {
   }, [endDay, startDay])
 
   const currentDriver = filteredDrivers.find((driver) => driver.id === selectedDriver) || filteredDrivers[0]
-  const currentAnswers = currentDriver ? driverAnswers[currentDriver.id] || {} : {}
+ const selectedMonthLabel = availableMonths.find((month) => month.value === selectedMonth)?.label || selectedMonth
+  const currentAnswers = currentDriver
+    ? driverAnswers[currentDriver.id]?.[selectedMonth] || {}
+    : {}
   const visibleDays = useMemo(() => days.filter((day) => day >= startDay && day <= endDay), [endDay, startDay])
 
   const latestDayWithData = useMemo(() => {
@@ -143,14 +159,18 @@ export default function DriversPage() {
     if (!currentDriver) return
     setDriverAnswers((prev) => {
       const driverData = prev[currentDriver.id] || {}
-      const dayData = driverData[day] || {}
+      const monthData = driverData[selectedMonth] || {}
+      const dayData = monthData[day] || {}
       return {
         ...prev,
         [currentDriver.id]: {
           ...driverData,
-          [day]: {
-            ...dayData,
-            [questionId]: value,
+          [selectedMonth]: {
+            ...monthData,
+            [day]: {
+              ...dayData,
+              [questionId]: value,
+            },
           },
         },
       }
@@ -205,7 +225,7 @@ export default function DriversPage() {
         </head>
         <body>
           <h1>Controle mensal de fadiga</h1>
-          <h2>${currentDriver.name} • ${selectedMonth}</h2>
+          <h2>${currentDriver.name} • ${selectedMonthLabel}</h2>
           <table>
             <thead>
               <tr>
@@ -228,7 +248,7 @@ export default function DriversPage() {
     const blob = new Blob([htmlContent], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    const monthSlug = selectedMonth.replace(/[\s/]+/g, '-').toLowerCase()
+    const monthSlug = selectedMonthLabel.replace(/[\s/]+/g, '-').toLowerCase()
     link.href = url
     link.download = `controle-fadiga-${currentDriver.name.replace(/\s+/g, '-').toLowerCase()}-${monthSlug}.html`
     link.click()
@@ -240,18 +260,19 @@ export default function DriversPage() {
   const summary = useMemo(() => {
     const totals = { aptos: 0, inaptos: 0 }
     filteredDrivers.forEach((driver) => {
-      const availableDays = Object.keys(driverAnswers[driver.id] || {})
+      const monthAnswers = driverAnswers[driver.id]?.[selectedMonth] || {}
+      const availableDays = Object.keys(monthAnswers)
         .map((day) => Number(day))
         .filter((day) => day >= startDay && day <= endDay)
         .sort((a, b) => b - a)
       const latestDay = availableDays[0] || endDay
-      const score = getDayScore(driverAnswers[driver.id]?.[latestDay])
+      const score = getDayScore(monthAnswers[latestDay])
       const status = getRisk(score).status
       if (status === 'APTO') totals.aptos += 1
       else totals.inaptos += 1
     })
     return totals
-  }, [driverAnswers, filteredDrivers, endDay, startDay])
+  }, [driverAnswers, filteredDrivers, endDay, selectedMonth, startDay])
 
   return (
     <div className="space-y-6">
@@ -383,7 +404,7 @@ export default function DriversPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => setIsFormOpen(true)}
                 disabled={!currentDriver}
                 className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
@@ -393,12 +414,13 @@ export default function DriversPage() {
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {filteredDrivers.map((driver) => {
-                const availableDays = Object.keys(driverAnswers[driver.id] || {})
+                const monthAnswers = driverAnswers[driver.id]?.[selectedMonth] || {}
+                const availableDays = Object.keys(monthAnswers)
                   .map((day) => Number(day))
                   .filter((day) => day >= startDay && day <= endDay)
                   .sort((a, b) => b - a)
                 const latestDay = availableDays[0] || endDay
-                const score = getDayScore(driverAnswers[driver.id]?.[latestDay])
+                const score = getDayScore(monthAnswers[latestDay])
                 const risk = getRisk(score)
                 const isSelected = driver.id === currentDriver?.id
 
@@ -449,188 +471,187 @@ export default function DriversPage() {
             </div>
           )}
 
-          {/* Formulário mensal */}
-          {costCenterInfo && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+           </div>
+      </div>
+
+      {isFormOpen && costCenterInfo && currentDriver && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal
+        >
+          <div
+            className="flex min-h-full items-start justify-center overflow-y-auto p-4"
+            onClick={() => setIsFormOpen(false)}
+          >
+            <div
+              className="w-full max-w-6xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
                 <div>
                   <p className="text-xs font-semibold uppercase text-slate-500">Formulário mensal</p>
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Controle de fadiga ({selectedMonth})
-                  </h2>
-                  {currentDriver && (
-                    <p className="text-sm text-slate-600">{currentDriver.name}</p>
-                  )}
+                 <h2 className="text-xl font-semibold text-slate-900">Controle de fadiga ({selectedMonthLabel})</h2>
+                  <p className="text-sm text-slate-600">{currentDriver.name}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                   <label className="text-xs font-semibold text-slate-700">
+                    Mês
+                    <select
+                      value={selectedMonth}
+                      onChange={(event) => setSelectedMonth(event.target.value)}
+                      className="mt-1 w-40 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-800 focus:border-orange-500 focus:outline-none"
+                    >
+                      {availableMonths.map((month) => (
+                        <option key={month.value} value={month.value}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     onClick={handleDownloadMonthlyReport}
-                    className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-600"
+                   className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
                   >
                     <FileDown size={16} /> Baixar documento filtrado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFormOpen(false)}
+                    className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Fechar
                   </button>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <div className="rounded-lg border border-slate-200 p-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    Situação do motorista
-                  </p>
-                  <p className="text-sm font-semibold text-slate-900">{currentDriver?.name}</p>
-                  <div
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${riskInfo.color}`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-current" /> {riskInfo.status} •{' '}
-                    {riskInfo.risk}
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Pontuação do dia {visibleDays[visibleDays.length - 1]}: {dayScore} pontos.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 p-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase text-slate-500">Resumo do mês</p>
-                  <p className="text-sm text-slate-700">
-                    Apto abaixo de 30 pontos. Inapto a partir de 30 pontos (risco grave). Registre
-                    S/N em cada dia.
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Pontuação do dia soma apenas respostas &quot;Sim&quot;.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 p-4 space-y-2">
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    Período ativo
-                  </p>
-                  <div className="text-sm text-slate-700">
-                    Dias {startDay} a {endDay} visíveis.
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Ajuste o período na tela principal para mudar a visão e os cálculos.
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <div className="flex items-start gap-2 text-slate-700">
-                  <SlidersHorizontal size={16} className="mt-1 text-orange-500" />
-                  <div className="flex-1 space-y-1 text-xs">
-                    <p className="text-sm font-semibold">
-                      Visão filtrada pelo período escolhido
-                    </p>
-                    <p className="text-slate-600">
-                      O formulário abaixo já respeita o intervalo de dias definido na visão
-                      principal.
+              <div className="space-y-4 p-5">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 p-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Situação do motorista</p>
+                    <p className="text-sm font-semibold text-slate-900">{currentDriver.name}</p>
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${riskInfo.color}`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-current" /> {riskInfo.status} • {riskInfo.risk}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Pontuação do dia {visibleDays[visibleDays.length - 1]}: {dayScore} pontos.
                     </p>
                   </div>
+                   <div className="rounded-lg border border-slate-200 p-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Resumo do mês</p>
+                    <p className="text-sm text-slate-700">
+                      Apto abaixo de 30 pontos. Inapto a partir de 30 pontos (risco grave). Registre S/N em cada dia.
+                    </p>
+                    <p className="text-xs text-slate-500">Pontuação do dia soma apenas respostas &quot;Sim&quot;.</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Período ativo</p>
+                    <div className="text-sm text-slate-700">Dias {startDay} a {endDay} visíveis.</div>
+                    <div className="text-xs text-slate-500">Ajuste o período na tela principal para mudar a visão e os cálculos.</div>
+                  </div>
                 </div>
-              </div>
 
-              <div
-                id="formulario-diario"
-                className="mt-4 overflow-x-auto rounded-lg border border-slate-200"
-              >
-                <table className="min-w-full table-fixed border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      <th className="w-1/3 px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                        Perguntas do dia
-                      </th>
-                      <th className="w-20 px-4 py-3 text-left text-sm font-semibold text-slate-700">
-                        Pts (Sim)
-                      </th>
-                      {visibleDays.map((day) => (
-                        <th
-                          key={`head-${day}`}
-                          className="px-2 py-3 text-center text-xs font-semibold text-slate-600"
-                        >
-                          Dia {day}
-                        </th>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-start gap-2 text-slate-700">
+                    <SlidersHorizontal size={16} className="mt-1 text-orange-500" />
+                    <div className="flex-1 space-y-1 text-xs">
+                      <p className="text-sm font-semibold">Visão filtrada pelo período escolhido</p>
+                      <p className="text-slate-600">
+                        O formulário abaixo já respeita o intervalo de dias definido na visão principal.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+             <div id="formulario-diario" className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full table-fixed border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="w-1/3 px-4 py-3 text-left text-sm font-semibold text-slate-700">Perguntas do dia</th>
+                        <th className="w-20 px-4 py-3 text-left text-sm font-semibold text-slate-700">Pts (Sim)</th>
+                        {visibleDays.map((day) => (
+                          <th key={`head-${day}`} className="px-2 py-3 text-center text-xs font-semibold text-slate-600">
+                            Dia {day}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {questions.map((question) => (
+                        <tr key={question.id} className="border-t border-slate-200">
+                          <td className="px-4 py-2 text-sm text-slate-800">{question.label}</td>
+                          <td className="px-4 py-2 text-center text-sm font-semibold text-slate-700">{question.weight}</td>
+                          {visibleDays.map((day) => {
+                            const dayAnswer = currentAnswers[day]?.[question.id]
+                            return (
+                              <td key={`${question.id}-${day}`} className="px-2 py-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAnswer(day, question.id, 'SIM')}
+                                    className={`h-7 w-7 rounded-md border text-xs font-bold transition ${
+                                      dayAnswer === 'SIM'
+                                        ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    S
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAnswer(day, question.id, 'NAO')}
+                                    className={`h-7 w-7 rounded-md border text-xs font-bold transition ${
+                                      dayAnswer === 'NAO'
+                                        ? 'border-slate-900 bg-slate-900 text-white'
+                                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    N
+                                  </button>
+                                </div>
+                              </td>
+                            )
+                          })}
+                        </tr>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questions.map((question) => (
-                      <tr key={question.id} className="border-t border-slate-200">
-                        <td className="px-4 py-2 text-sm text-slate-800">{question.label}</td>
-                        <td className="px-4 py-2 text-center text-sm font-semibold text-slate-700">
-                          {question.weight}
+                     </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200 bg-slate-50">
+                        <td className="px-4 py-2 text-sm font-semibold text-slate-800" colSpan={2}>
+                          Total do dia
                         </td>
                         {visibleDays.map((day) => {
-                          const dayAnswer = currentAnswers[day]?.[question.id]
+                          const total = getDayScore(currentAnswers[day])
+                          const risk = getRisk(total)
                           return (
-                            <td key={`${question.id}-${day}`} className="px-2 py-2 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleAnswer(day, question.id, 'SIM')}
-                                  className={`h-7 w-7 rounded-md border text-xs font-bold transition ${
-                                    dayAnswer === 'SIM'
-                                      ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  S
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAnswer(day, question.id, 'NAO')}
-                                  className={`h-7 w-7 rounded-md border text-xs font-bold transition ${
-                                    dayAnswer === 'NAO'
-                                      ? 'border-slate-900 bg-slate-900 text-white'
-                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  N
-                                </button>
-                              </div>
+                               <td key={`total-${day}`} className="px-2 py-2 text-center text-xs font-semibold">
+                              <div className={`rounded-md px-2 py-1 ${risk.color}`}>{total} pts</div>
                             </td>
                           )
                         })}
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t border-slate-200 bg-slate-50">
-                      <td
-                        className="px-4 py-2 text-sm font-semibold text-slate-800"
-                        colSpan={2}
-                      >
-                        Total do dia
-                      </td>
-                      {visibleDays.map((day) => {
-                        const total = getDayScore(currentAnswers[day])
-                        const risk = getRisk(total)
-                        return (
-                          <td
-                            key={`total-${day}`}
-                            className="px-2 py-2 text-center text-xs font-semibold"
-                          >
-                            <div className={`rounded-md px-2 py-1 ${risk.color}`}>{total} pts</div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                    </tfoot>
+                  </table>
+                </div>
 
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex gap-3">
-                <AlertTriangle size={18} className="mt-0.5" />
-                <div>
-                  <p className="font-semibold">Critérios para permissão de dirigir</p>
-                  <p>
-                    Apto até 29 pontos (risco leve/tolerável). Inapto a partir de 30 pontos
-                    (risco grave). Use o painel para registrar o questionário diário e manter
-                    histórico de 31 dias.
-                  </p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 flex gap-3">
+                  <AlertTriangle size={18} className="mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Critérios para permissão de dirigir</p>
+                    <p>
+                      Apto até 29 pontos (risco leve/tolerável). Inapto a partir de 30 pontos (risco grave). Use o painel
+                      para registrar o questionário diário e manter histórico de 31 dias.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
