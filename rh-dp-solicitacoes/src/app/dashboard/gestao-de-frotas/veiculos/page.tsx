@@ -1,21 +1,26 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, Plus, RefreshCw, Edit3, Trash2, List
-  } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Edit3, Trash2, List } from 'lucide-react'
+
+type CostCenterOption = {
+  id: string
+  code: string | null
+  description: string | null
+  externalCode?: string | null
+}
 
 type ApiVehicle = {
   id: string
   plate: string
   type: string
   model?: string | null
-  costCenter?: string | null
   sector?: string | null
   kmCurrent?: number | null
   status?: string | null
   createdAt?: string | null
   costCenters?: Array<{
-    costCenter?: {
+    costCenter: {
       id: string
       code?: string | null
       externalCode?: string | null
@@ -23,6 +28,7 @@ type ApiVehicle = {
     } | null
   }>
 }
+
 type VehicleCheckin = {
   id: string
   inspectionDate: string
@@ -33,7 +39,6 @@ type VehicleCheckin = {
   driverStatus: string
   vehicleStatus?: string
 }
-
 
 type VehicleStatusInfo = {
   label: string
@@ -71,51 +76,36 @@ function formatDate(date?: string | null) {
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleDateString('pt-BR')
 }
-function formatVehicleCostCenters(vehicle: ApiVehicle) {
-  const related =
-    vehicle.costCenters
-      ?.map((link) => link.costCenter)
-      .filter(Boolean)
-      .map((cc) => {
-        const prefix = cc?.externalCode || cc?.code
-        const description = cc?.description ?? ''
-        return `${prefix ? `${prefix} - ` : ''}${description}`.trim()
-      }) || []
-
-  const principal = vehicle.costCenter ? [vehicle.costCenter] : []
-  const labels = [...related, ...principal].filter(Boolean)
-  return labels.length > 0 ? labels.join(', ') : '—'
-}
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
   const [formOpen, setFormOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
+
   const [selectedVehicle, setSelectedVehicle] = useState<ApiVehicle | null>(null)
   const [checkins, setCheckins] = useState<VehicleCheckin[]>([])
   const [loadingCheckins, setLoadingCheckins] = useState(false)
-  const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
-  const [costCenterOptions, setCostCenterOptions] = useState<Array<{ id: string; label: string }>>([])
-  const [selectedCostCenters, setSelectedCostCenters] = useState<Array<{ id: string; label: string }>>([])
 
- const [costCenterInput, setCostCenterInput] = useState('')
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
+  const [loadingCostCenters, setLoadingCostCenters] = useState(false)
 
-const [formValues, setFormValues] = useState({
-  plate: '',
-  type: '',
-  model: '',
-  costCenter: '',
-  sector: '',
-  kmCurrent: '',
-})
+  const [formValues, setFormValues] = useState({
+    plate: '',
+    type: '',
+    model: '',
+    sector: '',
+    kmCurrent: '',
+    costCenterIds: [] as string[],
+  })
 
-const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/ // Mercosul
-
-const normalizedPlate = formValues.plate.trim().toUpperCase()
-const isPlateValid = plateRegex.test(normalizedPlate)
+  const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/ // Mercosul
+  const normalizedPlate = formValues.plate.trim().toUpperCase()
+  const isPlateValid = plateRegex.test(normalizedPlate)
 
   const restrictedVehicles = useMemo(
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
@@ -124,48 +114,29 @@ const isPlateValid = plateRegex.test(normalizedPlate)
 
   useEffect(() => {
     loadVehicles()
+    loadCostCenters()
   }, [])
+
   useEffect(() => {
     if (selectedVehicle) {
       loadCheckins(selectedVehicle.id)
     }
   }, [selectedVehicle])
 
-  useEffect(() => {
-    async function loadCostCenters() {
-      try {
-        const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
-        if (!res.ok) throw new Error('Falha ao carregar centros de custo')
-
-        const data: Array<{ id: string; description: string; externalCode: string | null }> = await res.json()
-        setCostCenterOptions(
-          data.map((cc) => ({
-            id: cc.id,
-            label: `${cc.externalCode ? `${cc.externalCode} - ` : ''}${cc.description}`.trim(),
-          }))
-        )
-      } catch (err) {
-        console.error(err)
-        setCostCenterOptions([])
-      }
+  async function loadCostCenters() {
+    setLoadingCostCenters(true)
+    try {
+      const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      if (!res.ok) throw new Error('Falha ao buscar centros de custo')
+      const data: CostCenterOption[] = await res.json()
+      setCostCenters(data)
+    } catch (err) {
+      console.error(err)
+      setCostCenters([])
+    } finally {
+      setLoadingCostCenters(false)
     }
-
-    loadCostCenters()
-  }, [])
-
-  useEffect(() => {
-    if (!isPlateValid) {
-      if (selectedCostCenters.length > 0) {
-        setSelectedCostCenters([])
-      }
-      if (costCenterInput) {
-        setCostCenterInput('')
-      }
-      setFormValues((prev) => (prev.costCenter ? { ...prev, costCenter: '' } : prev))
-    }
-  }, [isPlateValid, costCenterInput, selectedCostCenters.length])
-
-  
+  }
 
   async function loadVehicles() {
     setLoading(true)
@@ -184,7 +155,6 @@ const isPlateValid = plateRegex.test(normalizedPlate)
     } finally {
       setLoading(false)
     }
-
   }
 
   async function loadCheckins(vehicleId: string) {
@@ -215,12 +185,10 @@ const isPlateValid = plateRegex.test(normalizedPlate)
       plate: '',
       type: '',
       model: '',
-      costCenter: '',
       sector: '',
       kmCurrent: '',
+      costCenterIds: [],
     })
-     setSelectedCostCenters([])
-    setCostCenterInput('')
     setFormError(null)
     setFormOpen(true)
   }
@@ -231,65 +199,34 @@ const isPlateValid = plateRegex.test(normalizedPlate)
       plate: vehicle.plate,
       type: vehicle.type,
       model: vehicle.model || '',
-      costCenter: vehicle.costCenter || '',
       sector: vehicle.sector || '',
       kmCurrent: vehicle.kmCurrent?.toString() || '',
+      costCenterIds:
+        vehicle.costCenters
+          ?.map((link) => link.costCenter?.id || null)
+          .filter((id): id is string => Boolean(id)) || [],
     })
-    setSelectedCostCenters(
-  (vehicle.costCenters || [])
-    .map((link) => link.costCenter)
-    .filter(Boolean)
-    .map((cc) => ({
-      id: cc!.id,
-      label: `${cc!.externalCode ? `${cc!.externalCode} - ` : ''}${cc!.description ?? ''}`.trim(),
-    }))
-)
-    setCostCenterInput('')
     setFormError(null)
     setFormOpen(true)
   }
-
-  function addCostCenterFromInput() {
-    const normalized = costCenterInput.trim().toLowerCase()
-    if (!normalized) return
-
-    const match = costCenterOptions.find((cc) => cc.label.toLowerCase() === normalized)
-
-    if (!match) {
-      setFormError('Selecione um centro de custo válido da lista.')
-      return
-    }
-
-    if (!selectedCostCenters.some((cc) => cc.id === match.id)) {
-      setSelectedCostCenters((prev) => [...prev, match])
-    }
-
-    setCostCenterInput('')
-    setFormError(null)
-  }
-
-  function removeCostCenter(id: string) {
-    setSelectedCostCenters((prev) => prev.filter((cc) => cc.id !== id))
-  }
-
 
   async function handleSubmit() {
     setSubmitting(true)
     setFormError(null)
 
-    if (!plateRegex.test(normalizedPlate)) {
+    if (!isPlateValid) {
       setFormError('Informe uma placa no formato ABC1A34 (padrão Mercosul)')
       setSubmitting(false)
       return
     }
+
     const payload = {
       plate: normalizedPlate,
       type: formValues.type,
       model: formValues.model || undefined,
-      costCenter: formValues.costCenter || undefined,
       sector: formValues.sector || undefined,
       kmCurrent: formValues.kmCurrent ? Number(formValues.kmCurrent) : undefined,
-      costCenterIds: selectedCostCenters.map((cc) => cc.id),
+      costCenterIds: formValues.costCenterIds,
     }
 
     try {
@@ -349,9 +286,9 @@ const isPlateValid = plateRegex.test(normalizedPlate)
       <header>
         <p className="text-sm font-semibold uppercase text-slate-500">Gestão de Frotas</p>
         <h1 className="text-3xl font-bold text-slate-900">Veículos</h1>
-        <p className="text-slate-600 mt-2 max-w-3xl">
-          Visualize as informações dos veículos já cadastrados. O status é atualizado automaticamente conforme os check-ins
-          realizados pela equipe.
+        <p className="mt-2 max-w-3xl text-slate-600">
+          Visualize as informações dos veículos já cadastrados. O status é atualizado automaticamente conforme os
+          check-ins realizados pela equipe.
         </p>
       </header>
 
@@ -377,8 +314,10 @@ const isPlateValid = plateRegex.test(normalizedPlate)
         </a>
       </div>
 
-     {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </div>
       )}
 
       {restrictedVehicles.length > 0 && (
@@ -391,21 +330,30 @@ const isPlateValid = plateRegex.test(normalizedPlate)
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Placa</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Tipo</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Modelo</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">KM atual</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Centro de custo</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Setor</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Cadastro</th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Placa
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Tipo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Modelo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Centros de custo
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                KM atual
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {loading && (
               <tr>
-                <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-600">
+                <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-600">
                   <div className="inline-flex items-center gap-2">
                     <Loader2 size={18} className="animate-spin" /> Carregando veículos...
                   </div>
@@ -415,7 +363,7 @@ const isPlateValid = plateRegex.test(normalizedPlate)
 
             {!loading && vehicles.length === 0 && !error && (
               <tr>
-                <td colSpan={9} className="px-6 py-10 text-center text-sm text-slate-600">
+                <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-600">
                   Nenhum veículo cadastrado até o momento.
                 </td>
               </tr>
@@ -423,23 +371,25 @@ const isPlateValid = plateRegex.test(normalizedPlate)
 
             {!loading &&
               vehicles.map((vehicle) => {
-                const statusInfo = getStatusInfo(vehicle.status)
+                const vehicleCostCenters =
+                  vehicle.costCenters
+                    ?.map((link) => {
+                      const cc = link.costCenter
+                      if (!cc) return null
+                      return cc.description || cc.code || cc.externalCode || null
+                    })
+                    .filter(Boolean) || []
+
+                const vehicleCostCentersText =
+                  vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
 
                 return (
                   <tr key={vehicle.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900">{vehicle.plate}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.type || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.model || '—'}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}>
-                        {statusInfo.normalized === 'RESTRITO' && <AlertTriangle size={14} className="mr-2" />}
-                        {statusInfo.label}
-                      </span>
-                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">{vehicleCostCentersText}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{formatKm(vehicle.kmCurrent)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{formatVehicleCostCenters(vehicle)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{vehicle.sector || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{formatDate(vehicle.createdAt)}</td>
                     <td className="px-6 py-4 text-right text-sm text-slate-700">
                       <div className="flex justify-end gap-2">
                         <button
@@ -469,6 +419,7 @@ const isPlateValid = plateRegex.test(normalizedPlate)
         </table>
       </div>
 
+      {/* painel de check-ins do veículo selecionado (se quiser tirar, pode remover tudo isso) */}
       {selectedVehicle && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
@@ -547,10 +498,19 @@ const isPlateValid = plateRegex.test(normalizedPlate)
           <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">{editingVehicle ? 'Editar' : 'Cadastrar'} veículo</p>
-                <h2 className="text-2xl font-bold text-slate-900">{editingVehicle ? editingVehicle.plate : 'Novo veículo'}</h2>
+                <p className="text-xs font-semibold uppercase text-slate-500">
+                  {editingVehicle ? 'Editar' : 'Cadastrar'} veículo
+                </p>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {editingVehicle ? editingVehicle.plate : 'Novo veículo'}
+                </h2>
               </div>
-              <button onClick={() => setFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">Fechar</button>
+              <button
+                onClick={() => setFormOpen(false)}
+                className="text-sm text-slate-500 hover:text-slate-800"
+              >
+                Fechar
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -559,8 +519,13 @@ const isPlateValid = plateRegex.test(normalizedPlate)
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.plate}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, plate: e.target.value }))}
-                  placeholder="ABC1234"
+                  onChange={(e) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      plate: e.target.value,
+                    }))
+                  }
+                  placeholder="ABC1A34"
                 />
               </label>
               <label className="space-y-1 text-sm text-slate-700">
@@ -568,8 +533,13 @@ const isPlateValid = plateRegex.test(normalizedPlate)
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.type}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, type: e.target.value }))}
-                  placeholder="Ex.: 4x4"
+                  onChange={(e) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      type: e.target.value,
+                    }))
+                  }
+                  placeholder="Ex.: SUV"
                 />
               </label>
               <label className="space-y-1 text-sm text-slate-700">
@@ -577,103 +547,85 @@ const isPlateValid = plateRegex.test(normalizedPlate)
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.model}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, model: e.target.value }))}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      model: e.target.value,
+                    }))
+                  }
+                  placeholder="Ex.: Toro"
                 />
               </label>
-              {isPlateValid && (
-                <label className="space-y-1 text-sm text-slate-700">
-                  <span>Centro de custo principal (opcional)</span>
-                  <input
-                    className="w-full rounded-md border border-slate-200 px-3 py-2"
-                    value={formValues.costCenter}
-                    spellCheck={false}
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    onChange={(e) => setFormValues((prev) => ({ ...prev, costCenter: e.target.value }))}
-                  />
-                </label>
-              )}
               <label className="space-y-1 text-sm text-slate-700">
                 <span>Setor</span>
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.sector}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, sector: e.target.value }))}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      sector: e.target.value,
+                    }))
+                  }
                 />
               </label>
+
+              <div className="space-y-2 text-sm text-slate-700">
+                <div className="flex items-center justify-between">
+                  <span>Centros de custo</span>
+                  {loadingCostCenters && <Loader2 size={14} className="animate-spin text-slate-500" />}
+                </div>
+                <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">
+                  {costCenters.length === 0 && !loadingCostCenters && (
+                    <p className="text-xs text-slate-500">Nenhum centro de custo disponível.</p>
+                  )}
+                  {costCenters.map((cc) => {
+                    const label =
+                      cc.description || cc.code || cc.externalCode || 'Centro de custo'
+
+                    return (
+                      <label key={cc.id} className="flex items-center gap-2 text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          checked={formValues.costCenterIds.includes(cc.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setFormValues((prev) => ({
+                              ...prev,
+                              costCenterIds: checked
+                                ? [...prev.costCenterIds, cc.id]
+                                : prev.costCenterIds.filter((id) => id !== cc.id),
+                            }))
+                          }}
+                        />
+                        <span className="text-sm">{label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
               <label className="space-y-1 text-sm text-slate-700">
                 <span>KM atual</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\\d*"
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.kmCurrent}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, kmCurrent: e.target.value }))}
+                  onChange={(e) => {
+                    const onlyNumbers = e.target.value.replace(/\D/g, '')
+                    setFormValues((prev) => ({ ...prev, kmCurrent: onlyNumbers }))
+                  }}
                 />
               </label>
-                {isPlateValid && (
-                <div className="space-y-2 text-sm text-slate-700">
-                  <span>Centros de custo vinculados</span>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                      <input
-                        list="cost-center-options"
-                        className="w-full rounded-md border border-slate-200 px-3 py-2"
-                        placeholder="Digite e selecione para adicionar"
-                        value={costCenterInput}
-                        spellCheck={false}
-                        autoComplete="off"
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        onChange={(e) => setCostCenterInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addCostCenterFromInput()
-                          }
-                        }}
-                      />
-                      <datalist id="cost-center-options">
-                        {costCenterOptions.map((cc) => (
-                          <option key={cc.id} value={cc.label} />
-                        ))}
-                      </datalist>
-                      <button
-                        type="button"
-                        onClick={addCostCenterFromInput}
-                        className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                      >
-                        Adicionar
-                      </button>
-                    </div>
-                    {selectedCostCenters.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedCostCenters.map((cc) => (
-                          <span
-                            key={cc.id}
-                            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800"
-                          >
-                            {cc.label}
-                            <button
-                              type="button"
-                              onClick={() => removeCostCenter(cc.id)}
-                              className="text-slate-500 hover:text-slate-800"
-                            >
-                              &times;
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500">Nenhum centro de custo adicional selecionado.</p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {formError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {formError}
+              </div>
             )}
 
             <div className="mt-6 flex justify-end gap-3">
