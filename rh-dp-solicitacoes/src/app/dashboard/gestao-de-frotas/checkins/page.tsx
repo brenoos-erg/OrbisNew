@@ -115,12 +115,14 @@ export default function VehicleCheckinPage() {
   const [plateInput, setPlateInput] = useState('')
   const [vehicleExists, setVehicleExists] = useState<boolean | null>(null)
   const [lastKm, setLastKm] = useState<number | null>(null)
+  const [vehicleStatus, setVehicleStatus] = useState<string | null>(null)
   const [costCenters, setCostCenters] = useState<Array<{ id: string; label: string }>>([])
   const [allCostCenters, setAllCostCenters] = useState<Array<{ id: string; label: string }>>([])
   const [vehicleCostCenters, setVehicleCostCenters] = useState<Array<{ id: string; label: string }>>([])
   const [costCenterInput, setCostCenterInput] = useState('')
   const [costCenterId, setCostCenterId] = useState<string | undefined>()
   const [driverName, setDriverName] = useState('')
+  const [success, setSuccess] = useState<string | null>(null)
 
   const checklistInitialState = useMemo(
     () =>
@@ -196,6 +198,7 @@ export default function VehicleCheckinPage() {
     async function checkVehicle(plate: string) {
       setVehicleExists(null)
       setLastKm(null)
+      setVehicleStatus(null)
       setVehicleCostCenters([])
 
       try {
@@ -207,6 +210,7 @@ export default function VehicleCheckinPage() {
         const vehicles: Array<{
           plate: string
           kmCurrent?: number
+          status?: string | null
           costCenters?: Array<{
             costCenter?: {
               id: string
@@ -219,6 +223,7 @@ export default function VehicleCheckinPage() {
         const found = vehicles.find((v) => v.plate.toUpperCase() === plate)
         setVehicleExists(Boolean(found))
         setLastKm(found?.kmCurrent ?? null)
+        setVehicleStatus(found?.status ?? null)
 
         const vehicleCenters =
           found?.costCenters
@@ -266,6 +271,7 @@ export default function VehicleCheckinPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const form = event.currentTarget
     const normalizedPlate = plateInput.trim().toUpperCase()
 
     if (!plateRegex.test(normalizedPlate)) {
@@ -286,8 +292,15 @@ export default function VehicleCheckinPage() {
     setSubmitting(true)
     setError(null)
     setResult(null)
+    setSuccess(null)
 
-    const formData = new FormData(event.currentTarget)
+    if (typeof window === 'undefined' || typeof window.FormData === 'undefined') {
+      setSubmitting(false)
+      setError('Não foi possível enviar o formulário neste navegador.')
+      return
+    }
+
+    const formData = new window.FormData(form)
 
     const vehicleChecklist = vehicleChecklistItems.map((item) => ({
       name: item.name,
@@ -302,6 +315,19 @@ export default function VehicleCheckinPage() {
     const hasCriticalIssue = vehicleChecklist.some(
       (item) => item.category === 'CRITICO' && item.status === 'COM_PROBLEMA'
     )
+    const treatmentActions = (formData.get('nonConformityActions') as string) || ''
+    const treatmentDate = (formData.get('nonConformityHandlingDate') as string) || ''
+
+    const vehicleWasRestricted = (vehicleStatus ?? '').toUpperCase() === 'RESTRITO'
+    const willBeReleased = !hasCriticalIssue
+
+    if (vehicleWasRestricted && willBeReleased) {
+      if (!treatmentActions.trim() || !treatmentDate) {
+        setError('Informe as tratativas e a data da tratativa para liberar um veículo restrito.')
+        setSubmitting(false)
+        return
+      }
+    }
 
     const fatigue = fatigueQuestions.map((item) => ({
       name: item.name,
@@ -322,11 +348,11 @@ export default function VehicleCheckinPage() {
       fatigue,
       hasNonConformity: hasCriticalIssue ? 'SIM' : 'NAO',
       nonConformityCriticality: hasCriticalIssue ? 'ALTA' : undefined,
-      nonConformityActions: hasCriticalIssue
-        ? 'Veículo paralisado até manutenção do item crítico.'
-        : undefined,
+      nonConformityActions:
+        treatmentActions.trim() ||
+        (hasCriticalIssue ? 'Veículo paralisado até manutenção do item crítico.' : undefined),
       nonConformityManager: undefined,
-      nonConformityHandlingDate: undefined,
+      nonConformityHandlingDate: treatmentDate || undefined,
     }
 
     try {
@@ -343,12 +369,14 @@ export default function VehicleCheckinPage() {
 
       const data: SubmissionResult = await res.json()
       setResult(data)
-      event.currentTarget.reset()
+      form.reset()
       setPlateInput('')
       setVehicleExists(null)
       setLastKm(null)
       setCostCenterInput('')
       setVehicleCostCenters([])
+      setVehicleStatus(null)
+      setSuccess('Check-in concluído com sucesso!')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado'
       setError(message)
@@ -431,6 +459,17 @@ export default function VehicleCheckinPage() {
                   {vehicleExists
                     ? 'Veículo localizado e pronto para check-in'
                     : 'Placa não cadastrada. Cadastre o veículo antes de usar.'}
+                </span>
+              )}
+              {vehicleStatus && (
+                <span
+                  className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                    vehicleStatus === 'RESTRITO'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}
+                >
+                  Status atual: {vehicleStatus}
                 </span>
               )}
             </label>
@@ -622,6 +661,38 @@ export default function VehicleCheckinPage() {
             ))}
           </div>
         </section>
+        {vehicleStatus === 'RESTRITO' && (
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-orange-200">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase text-orange-500">Liberação de veículo restrito</p>
+              <h2 className="text-lg font-semibold text-orange-900">Informe as tratativas realizadas</h2>
+              <p className="text-xs text-orange-700">
+                Para liberar um veículo que estava restrito, registre a ação corretiva executada e a data da tratativa.
+              </p>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Tratativas realizadas
+                <textarea
+                  name="nonConformityActions"
+                  className="min-h-[80px] rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                  placeholder="Ex.: manutenção realizada, peças trocadas, testes de rodagem"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Data da tratativa
+                <input
+                  type="date"
+                  name="nonConformityHandlingDate"
+                  className="rounded-lg border border-slate-300 px-3 py-2 focus:border-orange-500 focus:outline-none"
+                />
+              </label>
+            </div>
+          </section>
+        )}
+
 
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 shadow-sm">
           Itens críticos com problema geram não conformidade automática e orientam a paralisação do
@@ -637,6 +708,8 @@ export default function VehicleCheckinPage() {
             {submitting ? 'Enviando...' : 'Enviar check-in'}
           </button>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          {success && <p className="text-sm text-green-700">{success}</p>}
+          
         </div>
       </form>
 

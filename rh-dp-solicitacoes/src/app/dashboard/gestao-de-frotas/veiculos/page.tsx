@@ -38,6 +38,17 @@ type VehicleCheckin = {
   driverName?: string | null
   driverStatus: string
   vehicleStatus?: string
+  vehiclePlateSnapshot?: string | null
+  vehicleTypeSnapshot?: string | null
+  fatigueScore?: number | null
+  fatigueRisk?: string | null
+  hasNonConformity?: boolean
+  nonConformityCriticality?: string | null
+  nonConformityActions?: string | null
+  nonConformityManager?: string | null
+  nonConformityDate?: string | null
+  checklistJson?: Array<{ name?: string; label?: string; category?: string; status?: string }>
+  fatigueJson?: Array<{ name?: string; label?: string; answer?: string }>
 }
 
 type VehicleStatusInfo = {
@@ -75,6 +86,12 @@ function formatDate(date?: string | null) {
   const parsed = new Date(date)
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleDateString('pt-BR')
+}
+function formatDateTime(date?: string | null) {
+  if (!date) return '—'
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return parsed.toLocaleString('pt-BR')
 }
 
 export default function VehiclesPage() {
@@ -169,6 +186,8 @@ export default function VehiclesPage() {
         data.map((item) => ({
           ...item,
           vehicleStatus: (item as any).vehicle?.status || item.vehicleStatus,
+          vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
+          vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
         }))
       )
     } catch (err) {
@@ -340,6 +359,9 @@ export default function VehiclesPage() {
                 Modelo
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
                 Centros de custo
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
@@ -353,7 +375,7 @@ export default function VehiclesPage() {
           <tbody className="divide-y divide-slate-200">
             {loading && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-600">
+                <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-600">
                   <div className="inline-flex items-center gap-2">
                     <Loader2 size={18} className="animate-spin" /> Carregando veículos...
                   </div>
@@ -363,7 +385,7 @@ export default function VehiclesPage() {
 
             {!loading && vehicles.length === 0 && !error && (
               <tr>
-                <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-600">
+                <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-600">
                   Nenhum veículo cadastrado até o momento.
                 </td>
               </tr>
@@ -388,6 +410,18 @@ export default function VehiclesPage() {
                     <td className="px-6 py-4 text-sm font-semibold text-slate-900">{vehicle.plate}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.type || '—'}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicle.model || '—'}</td>
+                     <td className="px-6 py-4 text-sm">
+                      {(() => {
+                        const info = getStatusInfo(vehicle.status)
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${info.colorClass}`}
+                          >
+                            {info.label || '—'}
+                          </span>
+                        )
+                      })()}
+                    </td>
                     <td className="px-6 py-4 text-sm text-slate-700">{vehicleCostCentersText}</td>
                     <td className="px-6 py-4 text-sm text-slate-700">{formatKm(vehicle.kmCurrent)}</td>
                     <td className="px-6 py-4 text-right text-sm text-slate-700">
@@ -443,52 +477,125 @@ export default function VehiclesPage() {
             </div>
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Data</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Motorista</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">KM</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Centro de custo</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Setor</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Status veículo</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-600">Status motorista</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {loadingCheckins && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-4 text-center text-slate-600">
-                      <div className="inline-flex items-center gap-2">
-                        <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+           <div className="mt-4 space-y-3">
+            {loadingCheckins && (
+              <div className="flex justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600">
+                <div className="inline-flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+                </div>
+              </div>
+            )}
+
+            {!loadingCheckins && checkins.length === 0 && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
+                Nenhum check-in encontrado para este veículo.
+              </div>
+            )}
+
+            {!loadingCheckins &&
+              checkins.map((checkin) => {
+                const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
+                const checklist = checkin.checklistJson || []
+                const fatigue = checkin.fatigueJson || []
+
+                return (
+                  <details
+                    key={checkin.id}
+                    className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    open
+                  >
+                    <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-900">
+                      <span>
+                        {formatDateTime(checkin.inspectionDate)} • KM {formatKm(checkin.kmAtInspection)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}
+                      >
+                        {statusInfo.label || '—'}
+                      </span>
+                    </summary>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="space-y-1 text-sm text-slate-700">
+                        <p className="font-semibold text-slate-900">Informações principais</p>
+                        <p>Motorista: {checkin.driverName || '—'}</p>
+                        <p>Centro de custo: {checkin.costCenter || '—'}</p>
+                        <p>Setor: {checkin.sectorActivity || '—'}</p>
+                        <p>Tipo de veículo: {checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</p>
+                        <p>Placa registrada: {checkin.vehiclePlateSnapshot || selectedVehicle.plate}</p>
+                        <p>Status do motorista: {checkin.driverStatus}</p>
+                        <p>Fadiga: {checkin.fatigueScore ?? '—'} pontos ({checkin.fatigueRisk || '—'})</p>
                       </div>
-                    </td>
-                  </tr>
-                )}
 
-                {!loadingCheckins && checkins.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-4 text-center text-slate-600">
-                      Nenhum check-in encontrado para este veículo.
-                    </td>
-                  </tr>
-                )}
+                       <div className="space-y-1 text-sm text-slate-700">
+                        <p className="font-semibold text-slate-900">Não conformidades</p>
+                        <p>
+                          Possui não conformidade: {checkin.hasNonConformity ? 'Sim' : 'Não'}
+                        </p>
+                        <p>Criticidade: {checkin.nonConformityCriticality || '—'}</p>
+                        <p>Tratativas: {checkin.nonConformityActions || '—'}</p>
+                        <p>Responsável: {checkin.nonConformityManager || '—'}</p>
+                        <p>Data da tratativa: {formatDate(checkin.nonConformityDate)}</p>
+                      </div>
+                    </div>
 
-                {!loadingCheckins &&
-                  checkins.map((checkin) => (
-                    <tr key={checkin.id}>
-                      <td className="px-4 py-2 text-slate-800">{formatDate(checkin.inspectionDate)}</td>
-                      <td className="px-4 py-2 text-slate-800">{checkin.driverName || '—'}</td>
-                      <td className="px-4 py-2 text-slate-800">{formatKm(checkin.kmAtInspection)}</td>
-                      <td className="px-4 py-2 text-slate-800">{checkin.costCenter || '—'}</td>
-                      <td className="px-4 py-2 text-slate-800">{checkin.sectorActivity || '—'}</td>
-                      <td className="px-4 py-2 text-slate-800">{checkin.vehicleStatus || '—'}</td>
-                      <td className="px-4 py-2 text-slate-800">{checkin.driverStatus}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                        <p className="text-sm font-semibold text-slate-900">Checklist informado</p>
+                        {checklist.length === 0 && (
+                          <p className="text-xs text-slate-500">Nenhum item registrado.</p>
+                        )}
+                        {checklist.map((item, index) => (
+                          <div
+                            key={`${item.name}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded bg-slate-50 px-3 py-2"
+                          >
+                            <div className="text-xs text-slate-700">
+                              <p className="font-semibold">{item.label || item.name}</p>
+                              <p className="text-slate-500">Categoria: {item.category || '—'}</p>
+                            </div>
+                            <span
+                              className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                item.status === 'COM_PROBLEMA'
+                                  ? 'bg-red-100 text-red-800'
+                                  : item.status === 'NAO_SE_APLICA'
+                                    ? 'bg-slate-100 text-slate-700'
+                                    : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {item.status || 'OK'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                        <p className="text-sm font-semibold text-slate-900">Controle de fadiga</p>
+                        {fatigue.length === 0 && (
+                          <p className="text-xs text-slate-500">Sem respostas registradas.</p>
+                        )}
+                        {fatigue.map((item, index) => (
+                          <div
+                            key={`${item.name}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded bg-slate-50 px-3 py-2"
+                          >
+                            <p className="text-xs font-semibold text-slate-800">{item.label || item.name}</p>
+                            <span
+                              className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                item.answer === 'SIM'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
+                            >
+                              {item.answer || '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </details>
+                )
+              })}
           </div>
         </div>
       )}
