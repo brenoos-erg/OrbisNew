@@ -194,7 +194,7 @@ export async function DELETE(req: Request) {
 
     await prisma.vehicleCheckin.deleteMany({ where: { vehicleId: id } })
     await prisma.vehicle.delete({ where: { id } })
-
+await prisma.vehicle.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao excluir veículo', error)
