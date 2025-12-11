@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from 'docx'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-// ------------- HELPERS DE DATA -------------
 
 function formatDateLabel(date?: Date | null) {
   if (!date) return '—'
@@ -49,23 +60,11 @@ function dateRange(monthParam: string | null, startParam: string | null, endPara
   return { start, end }
 }
 
-function dayKey(date: Date) {
-  // chave YYYY-MM-DD
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString().slice(0, 10)
-}
-
-// ------------- TIPOS AUXILIARES -------------
-
 type ChecklistItem = { name?: string; label?: string; status?: string; category?: string }
 type FatigueItem = { name?: string; label?: string; answer?: string }
-
 type CheckinWithDriver = Prisma.VehicleCheckinGetPayload<{
   include: { driver: { select: { fullName: true; email: true } } }
 }>
-
-// ------------- HELPERS GERAIS -------------
 
 function safeArrayFromJson<T>(value: unknown): T[] {
   if (Array.isArray(value)) {
@@ -86,188 +85,134 @@ function safeArrayFromJson<T>(value: unknown): T[] {
   return []
 }
 
-function checkbox(checked: boolean) {
-  return checked ? '☑' : '☐'
+function paragraph(text: string, options?: { bold?: boolean; size?: number; alignment?: AlignmentType }) {
+  return new Paragraph({
+    alignment: options?.alignment ?? AlignmentType.LEFT,
+    children: [new TextRun({ text, bold: options?.bold, size: options?.size ?? 22 })],
+  })
 }
 
-function escapeHtml(value: unknown) {
-  const safeValue = value ?? ''
-  return String(safeValue)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+function cell(children: Paragraph[], widthPercent?: number, alignment: AlignmentType = AlignmentType.LEFT) {
+  return new TableCell({
+    children,
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+      left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+      right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+    },
+    width: widthPercent
+      ? { size: widthPercent * 50, type: WidthType.PERCENTAGE }
+      : { size: 0, type: WidthType.AUTO },
+    verticalAlign: alignment === AlignmentType.CENTER ? VerticalAlign.CENTER : VerticalAlign.TOP,
+  })
 }
 
-// ------------- TABELAS HTML -------------
+function buildChecklistTable(items: ChecklistItem[]) {
+  if (items.length === 0) return null
 
-// tabela dos itens de checklist, com colunas NC / R / NI
-function renderChecklistTable(items: ChecklistItem[]) {
-  if (items.length === 0) return ''
+  const header = new TableRow({
+    children: [
+      cell([paragraph('Nº', { bold: true })], 8, AlignmentType.CENTER),
+      cell([paragraph('Categoria', { bold: true })], 20),
+      cell([paragraph('Verificação', { bold: true })], 48),
+      cell([paragraph('NC', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+      cell([paragraph('R', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+      cell([paragraph('NI', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+    ],
+  })
 
-  const rows = items
-    .map((item, index) => {
-      const label = escapeHtml(item.label || item.name || 'Item')
-      const category = escapeHtml(item.category || '—')
-      const statusRaw = (item.status || 'OK').toUpperCase()
+  const rows = items.map((item, index) => {
+    const status = (item.status || 'OK').toUpperCase()
 
-      // Regras de status:
-      // - crítico: "OK" / "COM_PROBLEMA"
-      // - não crítico: "OK" / "COM_PROBLEMA" / "NAO_SE_APLICA"
-      // Mapeando para as colunas:
-      const isNc = statusRaw === 'COM_PROBLEMA'
-      const isNi = statusRaw === 'NAO_SE_APLICA'
-      const isR = false // se futuramente tiver outro estado "R", ajustar aqui
-
-      return `
-        <tr>
-          <td class="cell narrow">${index + 1}</td>
-          <td class="cell">${category}</td>
-          <td class="cell">${label}</td>
-          <td class="cell center">${checkbox(isNc)}</td>
-          <td class="cell center">${checkbox(isR)}</td>
-          <td class="cell center">${checkbox(isNi)}</td>
-        </tr>
-      `
+    return new TableRow({
+      children: [
+        cell([paragraph(String(index + 1), { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+        cell([paragraph(item.category || '—')], 20),
+        cell([paragraph(item.label || item.name || 'Item')], 48),
+        cell([paragraph(status === 'NC' ? '☑' : '☐', { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+        cell([paragraph(status === 'R' ? '☑' : '☐', { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+        cell([
+          paragraph(
+            status !== 'NC' && status !== 'R' ? '☑' : '☐',
+            { alignment: AlignmentType.CENTER },
+          ),
+        ], 8, AlignmentType.CENTER),
+      ],
     })
-    .join('')
+  })
 
-  return `
-    <table class="full">
-      <thead>
-        <tr>
-          <th class="cell narrow">Nº</th>
-          <th class="cell">Categoria</th>
-          <th class="cell">Verificação</th>
-          <th class="cell center">NC</th>
-          <th class="cell center">R</th>
-          <th class="cell center">NI</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `
+  return new Table({
+    rows: [header, ...rows],
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    margins: { top: 100, bottom: 100 },
+  })
 }
 
-// tabela de controle de fadiga (respostas Sim/Não)
-function renderFatigueTable(items: FatigueItem[], score?: number | null, risk?: string | null) {
+function buildFatigueTable(items: FatigueItem[], score?: number | null, risk?: string | null) {
   const hasScore = score !== null && score !== undefined
   const hasRisk = Boolean(risk)
 
-  if (items.length === 0 && !hasScore && !hasRisk) return ''
+  if (items.length === 0 && !hasScore && !hasRisk) return null
 
-  const rows = items
-    .map((item, index) => {
-      const label = escapeHtml(item.label || item.name || 'Pergunta')
-      const answer = escapeHtml(item.answer || '—') // normalmente "Sim" / "Não"
-
-      return `
-        <tr>
-          <td class="cell narrow">${index + 1}</td>
-          <td class="cell">${label}</td>
-          <td class="cell center">${answer}</td>
-        </tr>
-      `
-    })
-    .join('')
-
-  const summaryRow =
-    hasScore || hasRisk
-      ? `
-        <tr>
-          <td class="cell" colspan="3">
-            <strong>Pontuação de fadiga:</strong>
-            ${escapeHtml(`${hasScore ? score : '—'}${risk ? ` (${risk})` : ''}`)}
-          </td>
-        </tr>
-      `
-      : ''
-
-  return `
-    <table class="full">
-      <thead>
-        <tr>
-          <th class="cell narrow">Nº</th>
-          <th class="cell">Pergunta</th>
-          <th class="cell center">Resposta</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-        ${summaryRow}
-      </tbody>
-    </table>
-  `
-}
-
-// tabela-resumo diária: mostra TODOS os dias do período
-function renderDailySummary(start: Date | undefined, end: Date | undefined, checkins: CheckinWithDriver[]) {
-  if (!start && !end) return ''
-
-  if (checkins.length === 0) return ''
-
-  const effectiveStart = new Date(start ?? checkins[0].inspectionDate)
-  const effectiveEnd = new Date(end ?? checkins[checkins.length - 1].inspectionDate)
-  effectiveStart.setHours(0, 0, 0, 0)
-  effectiveEnd.setHours(0, 0, 0, 0)
-
-  const counts = new Map<string, number>()
-  checkins.forEach((c) => {
-    const key = dayKey(c.inspectionDate)
-    counts.set(key, (counts.get(key) ?? 0) + 1)
+  const header = new TableRow({
+    children: [
+      cell([paragraph('Nº', { bold: true })], 10, AlignmentType.CENTER),
+      cell([paragraph('Pergunta', { bold: true })], 60),
+      cell([paragraph('Resposta', { bold: true, alignment: AlignmentType.CENTER })], 30, AlignmentType.CENTER),
+    ],
   })
 
-  let rows = ''
+  const rows = items.map((item, index) =>
+    new TableRow({
+      children: [
+        cell([paragraph(String(index + 1), { alignment: AlignmentType.CENTER })], 10, AlignmentType.CENTER),
+        cell([paragraph(item.label || item.name || 'Pergunta')], 60),
+        cell([paragraph(item.answer || '—', { alignment: AlignmentType.CENTER })], 30, AlignmentType.CENTER),
+      ],
+    }),
+  )
 
-  for (let d = new Date(effectiveStart); d <= effectiveEnd; d.setDate(d.getDate() + 1)) {
-    const key = dayKey(d)
-    const count = counts.get(key) ?? 0
-    const dateLabel = formatDateLabel(new Date(d))
-
-    rows += `
-      <tr>
-        <td class="cell narrow center">${d.getDate()}</td>
-        <td class="cell center">${escapeHtml(dateLabel)}</td>
-        <td class="cell center">${count > 0 ? count : ''}</td>
-      </tr>
-    `
+  if (hasScore || hasRisk) {
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [
+              paragraph(
+                `Pontuação de fadiga: ${hasScore ? score : '—'}${risk ? ` (${risk})` : ''}`,
+                { bold: true },
+              ),
+            ],
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+            },
+            columnSpan: 3,
+          }),
+        ],
+      }),
+    )
   }
 
-  return `
-    <div class="block">
-      <h2>Resumo diário do período</h2>
-      <table class="full daily">
-        <thead>
-          <tr>
-            <th class="cell narrow center">Dia</th>
-            <th class="cell center">Data</th>
-            <th class="cell center">Qtde de check-ins</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
-    </div>
-  `
+  return new Table({
+    rows: [header, ...rows],
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    margins: { top: 200 },
+  })
 }
 
-// ------------- MONTAGEM DO "DOC" -------------
-
-type BuildDocParams = {
+function buildWordDocument({
+  vehicle,
+  checkins,
+  rangeText,
+}: {
   vehicle: { plate: string | null; type: string | null; sector: string | null }
   checkins: CheckinWithDriver[]
   rangeText: string
-  start?: Date
-  end?: Date
-}
-
-function buildWordDocument({ vehicle, checkins, rangeText, start, end }: BuildDocParams) {
-  const dailySummary = renderDailySummary(start, end, checkins)
-
+}) {
   const sections = checkins.map((checkin, index) => {
     const checklistItems = safeArrayFromJson<ChecklistItem>(checkin.checklistJson)
     const fatigueItems = safeArrayFromJson<FatigueItem>(checkin.fatigueJson)
@@ -278,185 +223,153 @@ function buildWordDocument({ vehicle, checkins, rangeText, start, end }: BuildDo
       checkin.nonConformityCriticality ||
       checkin.nonConformityManager
 
-    return `
-      <section class="section">
-        <table class="full meta">
-          <tr>
-            <td class="cell"><strong>Placa:</strong> ${escapeHtml(vehicle.plate || '—')}</td>
-            <td class="cell"><strong>Tipo:</strong> ${escapeHtml(vehicle.type || '—')}</td>
-            <td class="cell"><strong>Setor:</strong> ${escapeHtml(vehicle.sector || '—')}</td>
-            <td class="cell"><strong>Período:</strong> ${escapeHtml(rangeText)}</td>
-          </tr>
-          <tr>
-            <td class="cell"><strong>Data/Hora:</strong> ${escapeHtml(formatDateTimeLabel(checkin.inspectionDate))}</td>
-            <td class="cell"><strong>KM na inspeção:</strong> ${escapeHtml(
-              checkin.kmAtInspection?.toLocaleString('pt-BR') || '—',
-            )}</td>
-            <td class="cell"><strong>Check-in nº:</strong> ${index + 1}</td>
-            <td class="cell"><strong>Status veículo:</strong> ${escapeHtml(checkin.vehicleStatus || '—')}</td>
-          </tr>
-          <tr>
-            <td class="cell"><strong>Motorista:</strong> ${escapeHtml(
-              checkin.driverName || checkin.driver?.fullName || '—',
-            )}</td>
-            <td class="cell"><strong>E-mail:</strong> ${escapeHtml(checkin.driver?.email || '—')}</td>
-            <td class="cell"><strong>Centro de custo:</strong> ${escapeHtml(checkin.costCenter || '—')}</td>
-            <td class="cell"><strong>Status motorista:</strong> ${escapeHtml(checkin.driverStatus || '—')}</td>
-          </tr>
-        </table>
+    const metaTable = new Table({
+      rows: [
+        new TableRow({
+          children: [
+            cell([paragraph(`Placa: ${checkin.vehiclePlate || vehicle.plate || '—'}`)], 33),
+            cell([paragraph(`Tipo: ${vehicle.type || '—'}`)], 33),
+            cell([paragraph(`Setor: ${vehicle.sector || '—'}`)], 34),
+          ],
+        }),
+        new TableRow({
+          children: [
+            cell([
+              paragraph(`Data/Hora: ${formatDateTimeLabel(checkin.inspectionDate)}`),
+            ], 33),
+            cell([
+              paragraph(
+                `KM na inspeção: ${checkin.kmAtInspection?.toLocaleString('pt-BR') || '—'}`,
+              ),
+            ], 33),
+            cell([paragraph(`Check-in nº: ${index + 1}`)], 34),
+          ],
+        }),
+        new TableRow({
+          children: [
+            cell([
+              paragraph(`Motorista: ${checkin.driverName || checkin.driver?.fullName || '—'}`),
+            ], 33),
+            cell([paragraph(`E-mail: ${checkin.driver?.email || '—'}`)], 33),
+            cell([paragraph(`Status motorista: ${checkin.driverStatus || '—'}`)], 34),
+          ],
+        }),
+        new TableRow({
+          children: [
+            cell([paragraph(`Centro de custo: ${checkin.costCenter || '—'}`)], 33),
+            cell([paragraph(`Setor de atividade: ${checkin.sectorActivity || '—'}`)], 33),
+            cell([paragraph(`Status veículo: ${checkin.vehicleStatus || '—'}`)], 34),
+          ],
+        }),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    })
 
-        <div class="block">
-          <h2>Checklist</h2>
-          ${renderChecklistTable(checklistItems)}
-        </div>
+    const checklistTable = buildChecklistTable(checklistItems)
+    const fatigueTable = buildFatigueTable(fatigueItems, checkin.fatigueScore, checkin.fatigueRisk)
 
-        ${
-          nonConformity
-            ? `
-              <div class="block">
-                <h2>Não conformidade</h2>
-                <table class="full">
-                  <tr>
-                    <td class="cell"><strong>Criticidade:</strong> ${escapeHtml(
-                      checkin.nonConformityCriticality || '—',
-                    )}</td>
-                    <td class="cell"><strong>Data da tratativa:</strong> ${escapeHtml(
-                      formatDateLabel(checkin.nonConformityDate),
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td class="cell" colspan="2"><strong>Tratativas:</strong> ${escapeHtml(
-                      checkin.nonConformityActions || '—',
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td class="cell" colspan="2"><strong>Responsável:</strong> ${escapeHtml(
-                      checkin.nonConformityManager || '—',
-                    )}</td>
-                  </tr>
-                </table>
-              </div>
-            `
-            : ''
-        }
+    const nonConformityTable = nonConformity
+      ? new Table({
+          rows: [
+            new TableRow({
+              children: [
+                cell(
+                  [
+                    paragraph(
+                      `Criticidade: ${checkin.nonConformityCriticality || '—'}`,
+                    ),
+                  ],
+                  50,
+                ),
+                cell(
+                  [paragraph(`Data da tratativa: ${formatDateLabel(checkin.nonConformityDate)}`)],
+                  50,
+                ),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [paragraph(`Tratativas: ${checkin.nonConformityActions || '—'}`)],
+                  columnSpan: 2,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                  },
+                }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({
+                  children: [paragraph(`Responsável: ${checkin.nonConformityManager || '—'}`)],
+                  columnSpan: 2,
+                  borders: {
+                    top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+                  },
+                }),
+              ],
+            }),
+          ],
+          width: { size: 100, type: WidthType.PERCENTAGE },
+        })
+      : null
 
-        <div class="block">
-          <h2>Controle de fadiga</h2>
-          ${renderFatigueTable(fatigueItems, checkin.fatigueScore, checkin.fatigueRisk)}
-        </div>
-      </section>
-    `
+    const children: Paragraph[] = [
+      paragraph('CHECK LIST PRÉ-OPERACIONAL · VEÍCULOS LEVES', {
+        bold: true,
+        size: 28,
+        alignment: AlignmentType.CENTER,
+      }),
+      paragraph(`Resumo consolidado · ${rangeText}`, {
+        alignment: AlignmentType.CENTER,
+        size: 20,
+      }),
+      new Paragraph({ children: [], spacing: { after: 200 } }),
+    ]
+
+    children.push(paragraph('Dados do veículo', { bold: true, size: 24 }))
+    children.push(new Paragraph({ children: [], spacing: { after: 100 } }))
+    children.push(metaTable)
+
+    if (checklistTable) {
+      children.push(new Paragraph({ children: [], spacing: { before: 200, after: 100 } }))
+      children.push(paragraph('Checklist', { bold: true, size: 24 }))
+      children.push(checklistTable)
+    }
+
+    if (nonConformityTable) {
+      children.push(new Paragraph({ children: [], spacing: { before: 200, after: 100 } }))
+      children.push(paragraph('Não conformidade', { bold: true, size: 24 }))
+      children.push(nonConformityTable)
+    }
+
+    if (fatigueTable) {
+      children.push(new Paragraph({ children: [], spacing: { before: 200, after: 100 } }))
+      children.push(paragraph('Controle de fadiga', { bold: true, size: 24 }))
+      children.push(fatigueTable)
+    }
+
+    children.push(new Paragraph({ children: [], spacing: { before: 200, after: 200 } }))
+    children.push(paragraph('Assinatura do motorista: ____________________________', { size: 20 }))
+
+    return {
+      properties: {
+        page: {
+          margin: { top: 720, right: 720, bottom: 720, left: 720 },
+        },
+      },
+      children,
+    }
   })
 
-  const combinedSections = sections.join('')
-
-  return `
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          @page {
-            size: A4 landscape;
-            margin: 10mm;
-          }
-
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            font-size: 9pt;
-            color: #111;
-          }
-
-          .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-          }
-
-          .logo {
-            height: 26px;
-          }
-
-          .header-text {
-            flex: 1;
-            text-align: center;
-          }
-
-          h1 {
-            font-size: 12pt;
-            margin: 0 0 2px 0;
-          }
-
-          h2 {
-            font-size: 9pt;
-            margin: 4px 0;
-          }
-
-          .muted {
-            color: #555;
-            font-size: 8pt;
-          }
-
-          table.full {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 4px;
-            font-size: 8pt;
-          }
-
-          table.meta {
-            margin-bottom: 6px;
-          }
-
-          table.daily {
-            margin-top: 2px;
-          }
-
-          .cell {
-            border: 1px solid #333;
-            padding: 2px 4px;
-            vertical-align: middle;
-          }
-
-          .narrow {
-            width: 18px;
-            text-align: center;
-          }
-
-          .center {
-            text-align: center;
-          }
-
-          .block {
-            margin-top: 4px;
-          }
-
-          .section {
-            margin-top: 8px;
-            margin-bottom: 8px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="/erg-logo.png" alt="ERG" class="logo" />
-          <div class="header-text">
-            <h1>CHECK LIST PRÉ-OPERACIONAL · VEÍCULOS LEVES E CONDUTORES</h1>
-            <p class="muted">Registro consolidado de check-ins · ${escapeHtml(rangeText)}</p>
-          </div>
-          <div style="width: 60px;"></div>
-        </div>
-
-        ${dailySummary}
-
-        ${combinedSections}
-      </body>
-    </html>
-  `
+  return new Document({ sections })
 }
-
-// ------------- ROTA GET -------------
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -501,14 +414,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Nenhum check-in encontrado para o período selecionado.' }, { status: 404 })
   }
 
-  const html = buildWordDocument({ vehicle, checkins, rangeText, start: start ?? undefined, end: end ?? undefined })
-  const buffer = Buffer.from(html, 'utf-8')
-  const filename = `checkins-${vehicle.plate || 'veiculo'}.doc`
+  const doc = buildWordDocument({ vehicle, checkins, rangeText })
+  const buffer = await Packer.toBuffer(doc)
+  const filename = `checkins-${vehicle.plate || 'veiculo'}.docx`
 
   return new NextResponse(buffer, {
     status: 200,
     headers: {
-      'Content-Type': 'application/msword; charset=utf-8',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
