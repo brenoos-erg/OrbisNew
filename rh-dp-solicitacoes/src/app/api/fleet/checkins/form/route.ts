@@ -56,6 +56,81 @@ type PositionedLine = { text: string; size: number; y: number }
 
 type ChecklistItem = { name?: string; label?: string; status?: string; category?: string }
 type FatigueItem = { name?: string; label?: string; answer?: string }
+const DEFAULT_COLUMN_WIDTH = 90
+const STRONG_DIVIDER = ''.padEnd(DEFAULT_COLUMN_WIDTH, '=')
+const LIGHT_DIVIDER = ''.padEnd(DEFAULT_COLUMN_WIDTH, '─')
+
+function truncateWithEllipsis(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text
+  if (maxLength <= 1) return text.slice(0, maxLength)
+  return `${text.slice(0, maxLength - 1)}…`
+}
+
+function padText(text: string, width: number) {
+  if (width <= 0) return text
+  return text.padEnd(width, ' ')
+}
+
+function formatSingleRow(label: string, value: string, labelWidth = 24, valueWidth = 60) {
+  const safeLabel = `${label}:`
+  return `${padText(truncateWithEllipsis(safeLabel, labelWidth), labelWidth)}${truncateWithEllipsis(value, valueWidth)}`
+}
+
+function formatDualRow(
+  leftLabel: string,
+  leftValue: string,
+  rightLabel: string,
+  rightValue: string,
+  labelWidth = 16,
+  valueWidth = 26,
+) {
+  const left = `${padText(truncateWithEllipsis(`${leftLabel}:`, labelWidth), labelWidth)}${padText(
+    truncateWithEllipsis(leftValue, valueWidth),
+    valueWidth,
+  )}`
+
+  const right = `${padText(truncateWithEllipsis(`${rightLabel}:`, labelWidth), labelWidth)}${truncateWithEllipsis(
+    rightValue,
+    valueWidth,
+  )}`
+
+  return `${left}  ${right}`
+}
+
+function formatTableRow(values: string[], widths: number[]) {
+  return values
+    .map((value, index) => padText(truncateWithEllipsis(value, widths[index] ?? value.length), widths[index] ?? value.length))
+    .join(' | ')
+}
+
+function tableDivider(widths: number[]) {
+  const contentWidth = widths.reduce((acc, width) => acc + width, 0)
+  const separators = (widths.length - 1) * 3
+  return ''.padEnd(contentWidth + separators, '─')
+}
+
+function truncateWithEllipsis(text: string, maxLength: number) {
+  if (text.length <= maxLength) return text
+  if (maxLength <= 1) return text.slice(0, maxLength)
+  return `${text.slice(0, maxLength - 1)}…`
+}
+
+function padText(text: string, width: number) {
+  if (width <= 0) return text
+  return text.padEnd(width, ' ')
+}
+
+function formatTableRow(values: string[], widths: number[]) {
+  return values
+    .map((value, index) => padText(truncateWithEllipsis(value, widths[index] ?? value.length), widths[index] ?? value.length))
+    .join(' | ')
+}
+
+function tableDivider(widths: number[]) {
+  const contentWidth = widths.reduce((acc, width) => acc + width, 0)
+  const separators = (widths.length - 1) * 3
+  return ''.padEnd(contentWidth + separators, '─')
+}
 
 function safeArrayFromJson<T>(value: unknown): T[] {
   if (Array.isArray(value)) {
@@ -189,65 +264,110 @@ export async function GET(req: Request) {
   })
 
   const lines: LineSpec[] = []
+   lines.push({ text: 'CHECK LIST PRÉ-OPERACIONAL • VEÍCULO LEVE', size: 18, gap: 18 })
+  lines.push({ text: 'Registro consolidado de check-ins', size: 14, gap: 16 })
+  lines.push({ text: STRONG_DIVIDER })
 
-  lines.push({ text: 'CHECK LIST PRÉ-OPERACIONAL • VEÍCULO LEVE', size: 18 })
-  lines.push({ text: 'Registro de check-ins', size: 14 })
-  lines.push({ text: '' })
+  lines.push({ text: 'CHECK LIST PRÉ-OPERACIONAL • VEÍCULO LEVE', size: 18, gap: 20 })
+  lines.push({ text: 'Registro consolidado de check-ins', size: 14, gap: 18 })
   lines.push({ text: `Placa: ${vehicle.plate || '—'}` })
   lines.push({ text: `Tipo: ${vehicle.type || '—'}` })
   lines.push({ text: `Setor: ${vehicle.sector || '—'}` })
 
   const rangeText = start || end ? `${formatDateLabel(start)} até ${formatDateLabel(end)}` : 'Todos os registros'
-  lines.push({ text: `Período: ${rangeText}` })
-  lines.push({ text: '' })
+ lines.push({ text: formatDualRow('Placa', vehicle.plate || '—', 'Tipo', vehicle.type || '—') })
+  lines.push({ text: formatDualRow('Setor', vehicle.sector || '—', 'Período', rangeText) })
+  lines.push({ text: LIGHT_DIVIDER, gap: 18 })
 
   if (checkins.length === 0) {
     lines.push({ text: 'Nenhum check-in encontrado para o período selecionado.' })
   }
 
   checkins.forEach((checkin, index) => {
-    lines.push({ text: `Check-in ${index + 1}`, size: 14 })
-    lines.push({ text: `Data/Hora: ${formatDateTimeLabel(checkin.inspectionDate)}` })
-    lines.push({ text: `KM na inspeção: ${checkin.kmAtInspection?.toLocaleString('pt-BR') ?? '—'}` })
-    lines.push({ text: `Motorista: ${checkin.driverName || checkin.driver?.fullName || '—'}` })
-    lines.push({ text: `E-mail: ${checkin.driver?.email || '—'}` })
-    lines.push({ text: `Centro de custo: ${checkin.costCenter || '—'}` })
-    lines.push({ text: `Setor de atividade: ${checkin.sectorActivity || '—'}` })
-    lines.push({ text: `Status motorista: ${checkin.driverStatus || '—'}` })
-    lines.push({ text: `Status veículo: ${checkin.vehicleStatus || '—'}` })
-    lines.push({ text: `Possui não conformidade: ${checkin.hasNonConformity ? 'Sim' : 'Não'}` })
+   lines.push({ text: `CHECK-IN ${index + 1}`, size: 16, gap: 14 })
+    lines.push({ text: STRONG_DIVIDER, gap: 12 })
+
+    lines.push({
+      text: formatDualRow(
+        'Data/Hora',
+        formatDateTimeLabel(checkin.inspectionDate),
+        'KM na inspeção',
+        checkin.kmAtInspection?.toLocaleString('pt-BR') ?? '—',
+      ),
+      size: 12,
+    })
+    lines.push({
+      text: formatDualRow('Motorista', checkin.driverName || checkin.driver?.fullName || '—', 'E-mail', checkin.driver?.email || '—'),
+      size: 12,
+    })
+    lines.push({
+      text: formatDualRow('Centro de custo', checkin.costCenter || '—', 'Setor de atividade', checkin.sectorActivity || '—'),
+      size: 12,
+    })
+    lines.push({
+      text: formatDualRow('Status motorista', checkin.driverStatus || '—', 'Status veículo', checkin.vehicleStatus || '—'),
+      size: 12,
+    })
+    lines.push({
+      text: formatSingleRow('Não conformidade', checkin.hasNonConformity ? 'Sim' : 'Não'),
+      size: 12,
+      gap: 14,
+    })
 
     if (checkin.nonConformityActions || checkin.nonConformityCriticality || checkin.nonConformityManager) {
-      lines.push({ text: 'Dados da não conformidade:', size: 12 })
-      lines.push({ text: `- Criticidade: ${checkin.nonConformityCriticality || '—'}` })
-      lines.push({ text: `- Tratativas: ${checkin.nonConformityActions || '—'}` })
-      lines.push({ text: `- Responsável: ${checkin.nonConformityManager || '—'}` })
-      lines.push({ text: `- Data da tratativa: ${formatDateLabel(checkin.nonConformityDate)}` })
-    }
+        lines.push({ text: 'Detalhes da não conformidade', size: 12, gap: 10 })
+      lines.push({ text: LIGHT_DIVIDER })
+      lines.push({
+        text: formatDualRow(
+          'Criticidade',
+          checkin.nonConformityCriticality || '—',
+          'Data da tratativa',
+          formatDateLabel(checkin.nonConformityDate),
+        ),
+        size: 11,
+      })
+      lines.push({ text: formatSingleRow('Tratativas', checkin.nonConformityActions || '—', 18, 70), size: 11 })
+      lines.push({ text: formatSingleRow('Responsável', checkin.nonConformityManager || '—', 18, 70), size: 11, gap: 14 })
 
     const checklistItems = safeArrayFromJson<ChecklistItem>(checkin.checklistJson)
     if (checklistItems.length > 0) {
-      lines.push({ text: 'Checklist informado:' })
-      checklistItems.forEach((item) => {
+  const checklistWidths = [18, 56, 12]
+      lines.push({ text: 'Checklist informado', size: 12, gap: 12 })
+      lines.push({ text: LIGHT_DIVIDER })
+      lines.push({ text: formatTableRow(['Categoria', 'Item', 'Status'], checklistWidths), size: 11 })
+      lines.push({ text: tableDivider(checklistWidths) })
+       checklistItems.forEach((item) => {
         const status = item.status || 'OK'
         const label = item.label || item.name || 'Item'
-        const category = item.category ? ` • Categoria: ${item.category}` : ''
-        lines.push({ text: `- ${label} • Status: ${status}${category}` })
+        const category = item.category || '—'
+        lines.push({ text: formatTableRow([category, label, status], checklistWidths), size: 11 })
       })
+      lines.push({ text: LIGHT_DIVIDER, gap: 12 })
     }
 
     const fatigueItems = safeArrayFromJson<FatigueItem>(checkin.fatigueJson)
     if (fatigueItems.length > 0) {
-      lines.push({ text: 'Controle de fadiga:' })
+       const fatigueWidths = [70, 16]
+      lines.push({ text: 'Controle de fadiga', size: 12, gap: 12 })
+      lines.push({ text: LIGHT_DIVIDER })
+      lines.push({ text: formatTableRow(['Pergunta', 'Resposta'], fatigueWidths), size: 11 })
+      lines.push({ text: tableDivider(fatigueWidths) })
       fatigueItems.forEach((item) => {
         const answer = item.answer || '—'
         const label = item.label || item.name || 'Pergunta'
-        lines.push({ text: `- ${label}: ${answer}` })
+          lines.push({ text: formatTableRow([label, answer], fatigueWidths), size: 11 })
       })
-      lines.push({ text: `Pontuação de fadiga: ${checkin.fatigueScore ?? '—'} (${checkin.fatigueRisk || '—'})` })
+      lines.push({
+        text: formatTableRow(
+          ['Pontuação de fadiga', `${checkin.fatigueScore ?? '—'} (${checkin.fatigueRisk || '—'})`],
+          fatigueWidths,
+        ),
+        size: 11,
+      })
+      lines.push({ text: LIGHT_DIVIDER, gap: 12 })
     }
 
-    lines.push({ text: '' })
+    lines.push({ text: STRONG_DIVIDER, gap: 22 })
   })
 
   const pages = paginateLines(lines)
