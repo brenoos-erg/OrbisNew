@@ -1,41 +1,38 @@
 import { NextResponse } from 'next/server'
-import {
-  AlignmentType,
-  Document,
-  PageOrientation,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  WidthType,
-} from 'docx'
+import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType } from 'docx'
 
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type ChecklistItem = { name?: string; label?: string; status?: string }
+type ChecklistItem = {
+  name?: string
+  label?: string
+  status?: string
+  critical?: boolean
+  category?: string
+}
 
-const checklistItems = [
-  { code: '01', key: '01', label: 'Freios' },
-  { code: '02', key: '02', label: 'Buzina / sinal sonoro de ré / sinal luminoso de ré' },
-  { code: '05', key: '05', label: 'Limpadores e sistema de injeção de água no para-brisa' },
-  { code: '06', key: '06', label: 'Calibragem de pneus' },
-  { code: '07', key: '07', label: 'Farol alto/baxo direito e esquerdo' },
-  { code: '08', key: '08', label: 'Faroletes / pisca alerta / setas' },
-  { code: '09', key: '09', label: 'Macaco / triângulo de segurança / chave de roda' },
-  { code: '10', key: '10', label: 'Calço de segurança' },
-  { code: '11', key: '11', label: 'Retrovisores externos e interno' },
-  { code: '13', key: '13', label: 'Cinto de segurança' },
-  { code: '15', key: '15', label: 'Ar-condicionado em perfeito funcionamento' },
-  { code: '16', key: '16', label: 'Condições gerais de limpeza (interna e externa)' },
-  { code: '18', key: '18', label: 'Nível de óleo do motor, água do radiador e fluído de freio' },
-  { code: '19', key: '19', label: 'Sistema de telemetria / sensor de fadiga' },
-  { code: '20', key: '20', label: 'Documentos do veículo (Renavan, DUT, IPVA, Licenciamento, Seguro obrigatório, CNH, etc)' },
-]
+type FatigueInfo = {
+  isFatigued?: boolean
+  score?: number
+  answer?: string
+  name?: string
+}
+
+const fatiguePoints: Record<string, number> = {
+  '31': 5,
+  '32': 30,
+  '33': 5,
+  '34': 5,
+  '35': 5,
+  '36': 5,
+  '37': 5,
+  '38': 30,
+  '39': 5,
+  '40': 5,
+}
 
 function parseMonthParam(month: string | null) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return null
@@ -49,34 +46,94 @@ function parseMonthParam(month: string | null) {
   return { start, end, year, monthIndex }
 }
 
-function safeArrayFromJson<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
+function parseChecklist(value: unknown): ChecklistItem[] {
+  if (Array.isArray(value)) return value as ChecklistItem[]
 
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) return parsed as T[]
+      if (Array.isArray(parsed)) return parsed as ChecklistItem[]
     } catch (error) {
-      console.error('Erro ao converter JSON para array', error)
+      console.error('Erro ao converter checklistJson', error)
     }
   }
 
   return []
 }
 
-function statusSymbol(status?: string | null) {
-  const normalized = status?.toUpperCase()
-  if (normalized === 'OK') return '✓'
-  if (normalized === 'COM_PROBLEMA') return 'X'
-  if (normalized === 'NAO_SE_APLICA') return '•'
-  return ''
+function parseFatigue(
+  value: unknown,
+  fallbackScore?: number,
+): { isFatigued: boolean; score: number } {
+  let data: FatigueInfo | FatigueInfo[] | null = null
+
+  if (typeof value === 'string') {
+    try {
+      data = JSON.parse(value)
+    } catch (error) {
+      console.error('Erro ao converter fatigueJson', error)
+    }
+  } else if (value && typeof value === 'object') {
+    data = value as FatigueInfo | FatigueInfo[]
+  }
+
+  let isFatigued: boolean | null = null
+  let score: number | null = typeof fallbackScore === 'number' ? fallbackScore : null
+
+  if (Array.isArray(data)) {
+    const fatigueObj = data.find(
+      (item) => typeof item === 'object' && item !== null && 'isFatigued' in item,
+    )
+    if (fatigueObj && typeof fatigueObj === 'object') {
+      if ('isFatigued' in fatigueObj) {
+        isFatigued = Boolean((fatigueObj as FatigueInfo).isFatigued)
+      }
+      if (typeof (fatigueObj as FatigueInfo).score === 'number') {
+        score = (fatigueObj as FatigueInfo).score ?? score
+      }
+    } else {
+      const answersScore = data.reduce((total, item) => {
+        if (typeof item !== 'object' || !item) return total
+        if (item.answer?.toUpperCase() === 'SIM') {
+          return total + (fatiguePoints[item.name ?? ''] ?? 0)
+        }
+        return total
+      }, 0)
+      if (answersScore > 0) {
+        score = answersScore
+      }
+    }
+  } else if (data && typeof data === 'object') {
+    if ('isFatigued' in data) {
+      isFatigued = Boolean((data as FatigueInfo).isFatigued)
+    }
+    if (typeof (data as FatigueInfo).score === 'number') {
+      score = (data as FatigueInfo).score ?? score
+    }
+  }
+
+  if (isFatigued === null) {
+    isFatigued = (score ?? 0) > 0
+  }
+
+  return { isFatigued, score: score ?? 0 }
 }
 
-function paragraph(text: string, align?: AlignmentType, bold = false) {
-  return new Paragraph({
-    alignment: align,
-    children: [new TextRun({ text, bold })],
-  })
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat('pt-BR').format(date)
+}
+
+function buildHeader(plate: string | null, type: string | null, sector: string | null, month: string) {
+  const [year, monthStr] = month.split('-')
+  const referenceLabel = `${monthStr}/${year}`
+
+  return [
+    new Paragraph({ text: 'RELATÓRIO DE CHECKLIST DIÁRIO', bold: true }),
+    new Paragraph({
+      text: `Veículo: ${plate ?? '—'} | Tipo: ${type ?? '—'} | Setor: ${sector ?? '—'}`,
+    }),
+    new Paragraph({ text: `Mês: ${referenceLabel}` }),
+  ]
 }
 
 export async function GET(req: Request) {
@@ -87,7 +144,7 @@ export async function GET(req: Request) {
   if (!vehicleId || !monthParam) {
     return NextResponse.json(
       { error: 'Parâmetros obrigatórios ausentes: vehicleId e month.' },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
@@ -96,8 +153,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Parâmetro month inválido. Use YYYY-MM.' }, { status: 400 })
   }
 
-  const { start, end, monthIndex, year } = monthInfo
-  const daysInMonth = end.getDate()
+  const { start, end } = monthInfo
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
@@ -113,90 +169,95 @@ export async function GET(req: Request) {
     orderBy: { inspectionDate: 'asc' },
   })
 
-  const matrix: Record<number, Record<string, string>> = {}
+  // ---- monta as linhas da tabela (UM row por check-in) ----
+  const rows = checkins.map((checkin) => {
+    const checklist = parseChecklist(checkin.checklistJson)
 
-  checkins.forEach((checkin) => {
-    const day = new Date(checkin.inspectionDate).getDate()
-    const checklist = safeArrayFromJson<ChecklistItem>(checkin.checklistJson)
+    const criticalItems = checklist
+      .filter((item) => {
+        const status = item.status?.toUpperCase()
+        const isCritical =
+          typeof item.critical === 'boolean'
+            ? item.critical
+            : item.category?.toUpperCase() === 'CRITICO'
+        return isCritical && status && status !== 'OK'
+      })
+      .map((item) => item.label || item.name || '—')
 
-    if (!matrix[day]) matrix[day] = {}
+    const nonCriticalItems = checklist
+      .filter((item) => {
+        const status = item.status?.toUpperCase()
+        const isCritical =
+          typeof item.critical === 'boolean'
+            ? item.critical
+            : item.category?.toUpperCase() === 'CRITICO'
+        return !isCritical && status && status !== 'OK'
+      })
+      .map((item) => item.label || item.name || '—')
 
-    checklist.forEach((item) => {
-      const key = item.name || item.label
-      if (!key) return
-      matrix[day][key] = item.status || 'OK'
+    const fatigue = parseFatigue(checkin.fatigueJson, checkin.fatigueScore)
+
+    const dateCell = new TableCell({
+      children: [new Paragraph({ text: formatDate(checkin.inspectionDate) })],
     })
-  })
-
-  const headerRows = new TableRow({
-    children: [
-      new TableCell({
-        children: [paragraph('Item', AlignmentType.CENTER, true)],
-      }),
-      new TableCell({
-        children: [paragraph('Verificação', AlignmentType.CENTER, true)],
-      }),
-      ...Array.from({ length: daysInMonth }, (_, index) =>
-        new TableCell({
-          children: [paragraph(String(index + 1), AlignmentType.CENTER, true)],
-        })
-      ),
-    ],
-  })
-
-  const itemRows = checklistItems.map((item) => {
-    const dayCells = Array.from({ length: daysInMonth }, (_, index) => {
-      const day = index + 1
-      const status = matrix[day]?.[item.key]
-      const symbol = statusSymbol(status)
-
-      return new TableCell({ children: [paragraph(symbol, AlignmentType.CENTER)] })
+    const criticalCell = new TableCell({
+      children: [
+        new Paragraph({
+          text: criticalItems.length > 0 ? criticalItems.join(', ') : '—',
+        }),
+      ],
+    })
+    const nonCriticalCell = new TableCell({
+      children: [
+        new Paragraph({
+          text: nonCriticalItems.length > 0 ? nonCriticalItems.join(', ') : '—',
+        }),
+      ],
+    })
+    const fatigueCell = new TableCell({
+      children: [new Paragraph({ text: fatigue.isFatigued ? 'Sim' : 'Não' })],
+    })
+    const scoreCell = new TableCell({
+      children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
     })
 
     return new TableRow({
-      children: [
-        new TableCell({ children: [paragraph(item.code, AlignmentType.CENTER)] }),
-        new TableCell({ children: [paragraph(item.label)] }),
-        ...dayCells,
-      ],
+      children: [dateCell, criticalCell, nonCriticalCell, fatigueCell, scoreCell],
     })
   })
 
   const table = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [headerRows, ...itemRows],
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: 'DATA' })] }),
+          new TableCell({ children: [new Paragraph({ text: 'ITENS CRÍTICOS' })] }),
+          new TableCell({ children: [new Paragraph({ text: 'ITENS NÃO CRÍTICOS' })] }),
+          new TableCell({ children: [new Paragraph({ text: 'FADIGA' })] }),
+          new TableCell({ children: [new Paragraph({ text: 'PONTOS' })] }),
+        ],
+      }),
+      ...rows,
+    ],
   })
-
-  const referenceLabel = `${String(monthIndex + 1).padStart(2, '0')}/${year}`
 
   const doc = new Document({
     sections: [
       {
-        properties: {
-          page: {
-            size: {
-              orientation: PageOrientation.LANDSCAPE,
-            },
-          },
-        },
-        children: [
-          paragraph('CHECK LIST PRÉ-OPERACIONAL – VEÍCULO LEVE', AlignmentType.CENTER, true),
-          paragraph(`Placa: ${vehicle.plate}   Tipo: ${vehicle.type ?? '—'}   Setor: ${vehicle.sector ?? '—'}`),
-          paragraph(`Mês de referência: ${referenceLabel}`),
-          table,
-        ],
+        children: [...buildHeader(vehicle.plate, vehicle.type, vehicle.sector, monthParam), table],
       },
     ],
   })
 
   const buffer = await Packer.toBuffer(doc)
 
-  const filename = `checklist-${vehicle.plate}-${monthParam}.docx`
   return new NextResponse(buffer as unknown as BodyInit, {
     status: 200,
     headers: {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${monthParam}.docx"`,
     },
   })
 }

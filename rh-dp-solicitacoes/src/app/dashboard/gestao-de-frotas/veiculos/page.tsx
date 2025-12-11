@@ -213,7 +213,7 @@ export default function VehiclesPage() {
 
     return `/api/fleet/checkins/form?${params.toString()}`
   }, [appliedEndDate, appliedStartDate, selectedMonth, selectedVehicle])
-  const monthlySheetUrl = useMemo(() => {
+  const monthlyDocUrl = useMemo(() => {
     if (!selectedVehicle || !selectedMonth) return '#'
 
     const params = new URLSearchParams({
@@ -663,13 +663,12 @@ export default function VehiclesPage() {
                   >
                     <List size={14} /> Excel deste veículo
                   </a>
-                   <a
-                    href={!selectedVehicle || !selectedMonth ? '#' : monthlySheetUrl}
-                    className={`inline-flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 hover:bg-green-100 ${
-                      !selectedVehicle || !selectedMonth ? 'pointer-events-none opacity-60' : ''
-                    }`}
+                    <a
+                    href={monthlyDocUrl}
+                    className="inline-flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
+
                   >
-                    <List size={14} /> Checklist mensal (Word)
+                    <List size={14} /> Relatório diário (Word)
                   </a>
                   <a
                     href={downloadFormUrl}
