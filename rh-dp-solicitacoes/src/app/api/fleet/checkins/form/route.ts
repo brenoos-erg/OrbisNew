@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function escapePdfText(text: string) {
-  return text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
-}
+// ------------- HELPERS DE DATA -------------
 
 function formatDateLabel(date?: Date | null) {
   if (!date) return '—'
@@ -50,181 +49,414 @@ function dateRange(monthParam: string | null, startParam: string | null, endPara
   return { start, end }
 }
 
-type LineSpec = { text: string; size?: number; gap?: number }
+function dayKey(date: Date) {
+  // chave YYYY-MM-DD
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString().slice(0, 10)
+}
 
-type PositionedLine = { text: string; size: number; y: number }
+// ------------- TIPOS AUXILIARES -------------
 
 type ChecklistItem = { name?: string; label?: string; status?: string; category?: string }
 type FatigueItem = { name?: string; label?: string; answer?: string }
-const DEFAULT_COLUMN_WIDTH = 90
-const STRONG_DIVIDER = ''.padEnd(DEFAULT_COLUMN_WIDTH, '=')
-const LIGHT_DIVIDER = ''.padEnd(DEFAULT_COLUMN_WIDTH, '─')
 
-function truncateWithEllipsis(text: string, maxLength: number) {
-  if (text.length <= maxLength) return text
-  if (maxLength <= 1) return text.slice(0, maxLength)
-  return `${text.slice(0, maxLength - 1)}…`
-}
+type CheckinWithDriver = Prisma.VehicleCheckinGetPayload<{
+  include: { driver: { select: { fullName: true; email: true } } }
+}>
 
-function padText(text: string, width: number) {
-  if (width <= 0) return text
-  return text.padEnd(width, ' ')
-}
-
-function formatSingleRow(label: string, value: string, labelWidth = 24, valueWidth = 60) {
-  const safeLabel = `${label}:`
-  return `${padText(truncateWithEllipsis(safeLabel, labelWidth), labelWidth)}${truncateWithEllipsis(value, valueWidth)}`
-}
-
-function formatDualRow(
-  leftLabel: string,
-  leftValue: string,
-  rightLabel: string,
-  rightValue: string,
-  labelWidth = 16,
-  valueWidth = 26,
-) {
-  const left = `${padText(truncateWithEllipsis(`${leftLabel}:`, labelWidth), labelWidth)}${padText(
-    truncateWithEllipsis(leftValue, valueWidth),
-    valueWidth,
-  )}`
-
-  const right = `${padText(truncateWithEllipsis(`${rightLabel}:`, labelWidth), labelWidth)}${truncateWithEllipsis(
-    rightValue,
-    valueWidth,
-  )}`
-
-  return `${left}  ${right}`
-}
-
-function formatTableRow(values: string[], widths: number[]) {
-  return values
-    .map((value, index) => padText(truncateWithEllipsis(value, widths[index] ?? value.length), widths[index] ?? value.length))
-    .join(' | ')
-}
-
-function tableDivider(widths: number[]) {
-  const contentWidth = widths.reduce((acc, width) => acc + width, 0)
-  const separators = (widths.length - 1) * 3
-  return ''.padEnd(contentWidth + separators, '─')
-}
-
-function truncateWithEllipsis(text: string, maxLength: number) {
-  if (text.length <= maxLength) return text
-  if (maxLength <= 1) return text.slice(0, maxLength)
-  return `${text.slice(0, maxLength - 1)}…`
-}
-
-function padText(text: string, width: number) {
-  if (width <= 0) return text
-  return text.padEnd(width, ' ')
-}
-
-function formatTableRow(values: string[], widths: number[]) {
-  return values
-    .map((value, index) => padText(truncateWithEllipsis(value, widths[index] ?? value.length), widths[index] ?? value.length))
-    .join(' | ')
-}
-
-function tableDivider(widths: number[]) {
-  const contentWidth = widths.reduce((acc, width) => acc + width, 0)
-  const separators = (widths.length - 1) * 3
-  return ''.padEnd(contentWidth + separators, '─')
-}
+// ------------- HELPERS GERAIS -------------
 
 function safeArrayFromJson<T>(value: unknown): T[] {
   if (Array.isArray(value)) {
     return value as T[]
   }
 
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed as T[]
+      }
+    } catch (error) {
+      console.error('Erro ao converter JSON para array', error)
+    }
+  }
+
   return []
 }
 
-function paginateLines(lines: LineSpec[]) {
-  const pages: PositionedLine[][] = []
-  let current: PositionedLine[] = []
-  let y = 760
-
-  lines.forEach((line) => {
-    const gap = line.gap ?? 16
-    const size = line.size ?? 12
-
-    if (y < 60) {
-      pages.push(current)
-      current = []
-      y = 760
-    }
-
-    current.push({ text: line.text, size, y })
-    y -= gap
-  })
-
-  if (current.length === 0) {
-    current.push({ text: 'Nenhum check-in encontrado para o período selecionado.', size: 12, y })
-  }
-
-  pages.push(current)
-  return pages
+function checkbox(checked: boolean) {
+  return checked ? '☑' : '☐'
 }
 
-function buildContentStream(lines: PositionedLine[]) {
-  return lines
-    .map((line) => {
-      return `BT /F1 ${line.size} Tf 1 0 0 1 50 ${line.y} Tm (${escapePdfText(line.text)}) Tj ET`
+function escapeHtml(value: unknown) {
+  const safeValue = value ?? ''
+  return String(safeValue)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// ------------- TABELAS HTML -------------
+
+// tabela dos itens de checklist, com colunas NC / R / NI
+function renderChecklistTable(items: ChecklistItem[]) {
+  if (items.length === 0) return ''
+
+  const rows = items
+    .map((item, index) => {
+      const label = escapeHtml(item.label || item.name || 'Item')
+      const category = escapeHtml(item.category || '—')
+      const statusRaw = (item.status || 'OK').toUpperCase()
+
+      // Regras de status:
+      // - crítico: "OK" / "COM_PROBLEMA"
+      // - não crítico: "OK" / "COM_PROBLEMA" / "NAO_SE_APLICA"
+      // Mapeando para as colunas:
+      const isNc = statusRaw === 'COM_PROBLEMA'
+      const isNi = statusRaw === 'NAO_SE_APLICA'
+      const isR = false // se futuramente tiver outro estado "R", ajustar aqui
+
+      return `
+        <tr>
+          <td class="cell narrow">${index + 1}</td>
+          <td class="cell">${category}</td>
+          <td class="cell">${label}</td>
+          <td class="cell center">${checkbox(isNc)}</td>
+          <td class="cell center">${checkbox(isR)}</td>
+          <td class="cell center">${checkbox(isNi)}</td>
+        </tr>
+      `
     })
-    .join('\n')
+    .join('')
+
+  return `
+    <table class="full">
+      <thead>
+        <tr>
+          <th class="cell narrow">Nº</th>
+          <th class="cell">Categoria</th>
+          <th class="cell">Verificação</th>
+          <th class="cell center">NC</th>
+          <th class="cell center">R</th>
+          <th class="cell center">NI</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `
 }
 
-function buildPdf(pages: PositionedLine[][]) {
-  const contentStreams = pages.map((page) => buildContentStream(page))
-  const objects: string[] = []
+// tabela de controle de fadiga (respostas Sim/Não)
+function renderFatigueTable(items: FatigueItem[], score?: number | null, risk?: string | null) {
+  const hasScore = score !== null && score !== undefined
+  const hasRisk = Boolean(risk)
 
-  // 1: Font
-  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+  if (items.length === 0 && !hasScore && !hasRisk) return ''
 
-  // 2..N: Content streams
-  contentStreams.forEach((content) => {
-    const length = Buffer.byteLength(content, 'utf-8')
-    const stream = `<< /Length ${length} >>\nstream\n${content}\nendstream`
-    objects.push(stream)
+  const rows = items
+    .map((item, index) => {
+      const label = escapeHtml(item.label || item.name || 'Pergunta')
+      const answer = escapeHtml(item.answer || '—') // normalmente "Sim" / "Não"
+
+      return `
+        <tr>
+          <td class="cell narrow">${index + 1}</td>
+          <td class="cell">${label}</td>
+          <td class="cell center">${answer}</td>
+        </tr>
+      `
+    })
+    .join('')
+
+  const summaryRow =
+    hasScore || hasRisk
+      ? `
+        <tr>
+          <td class="cell" colspan="3">
+            <strong>Pontuação de fadiga:</strong>
+            ${escapeHtml(`${hasScore ? score : '—'}${risk ? ` (${risk})` : ''}`)}
+          </td>
+        </tr>
+      `
+      : ''
+
+  return `
+    <table class="full">
+      <thead>
+        <tr>
+          <th class="cell narrow">Nº</th>
+          <th class="cell">Pergunta</th>
+          <th class="cell center">Resposta</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        ${summaryRow}
+      </tbody>
+    </table>
+  `
+}
+
+// tabela-resumo diária: mostra TODOS os dias do período
+function renderDailySummary(start: Date | undefined, end: Date | undefined, checkins: CheckinWithDriver[]) {
+  if (!start && !end) return ''
+
+  if (checkins.length === 0) return ''
+
+  const effectiveStart = new Date(start ?? checkins[0].inspectionDate)
+  const effectiveEnd = new Date(end ?? checkins[checkins.length - 1].inspectionDate)
+  effectiveStart.setHours(0, 0, 0, 0)
+  effectiveEnd.setHours(0, 0, 0, 0)
+
+  const counts = new Map<string, number>()
+  checkins.forEach((c) => {
+    const key = dayKey(c.inspectionDate)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   })
 
-  const totalPages = contentStreams.length || 1
-  const pagesRefIndex = 1 + contentStreams.length + totalPages + 1
+  let rows = ''
 
-  // Page objects
-  for (let i = 0; i < totalPages; i += 1) {
-    const contentId = 2 + i
-    const page = `<< /Type /Page /Parent ${pagesRefIndex} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents ${contentId} 0 R >>`
-    objects.push(page)
+  for (let d = new Date(effectiveStart); d <= effectiveEnd; d.setDate(d.getDate() + 1)) {
+    const key = dayKey(d)
+    const count = counts.get(key) ?? 0
+    const dateLabel = formatDateLabel(new Date(d))
+
+    rows += `
+      <tr>
+        <td class="cell narrow center">${d.getDate()}</td>
+        <td class="cell center">${escapeHtml(dateLabel)}</td>
+        <td class="cell center">${count > 0 ? count : ''}</td>
+      </tr>
+    `
   }
 
-  // Pages object
-  const kids = Array.from({ length: totalPages }, (_, index) => `${2 + contentStreams.length + index} 0 R`).join(' ')
-  objects.push(`<< /Type /Pages /Count ${totalPages} /Kids [${kids}] >>`)
-
-  // Catalog object
-  objects.push(`<< /Type /Catalog /Pages ${objects.length} 0 R >>`)
-
-  let pdf = '%PDF-1.4\n'
-  const offsets: number[] = []
-
-  objects.forEach((object, index) => {
-    offsets[index + 1] = Buffer.byteLength(pdf, 'utf-8')
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`
-  })
-
-  const xrefPosition = Buffer.byteLength(pdf, 'utf-8')
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
-  objects.forEach((_, index) => {
-    pdf += `${String(offsets[index + 1]).padStart(10, '0')} 00000 n \n`
-  })
-
-  const catalogIndex = objects.length
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogIndex} 0 R >>\nstartxref\n${xrefPosition}\n%%EOF`
-
-  return Buffer.from(pdf, 'utf-8')
+  return `
+    <div class="block">
+      <h2>Resumo diário do período</h2>
+      <table class="full daily">
+        <thead>
+          <tr>
+            <th class="cell narrow center">Dia</th>
+            <th class="cell center">Data</th>
+            <th class="cell center">Qtde de check-ins</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `
 }
+
+// ------------- MONTAGEM DO "DOC" -------------
+
+type BuildDocParams = {
+  vehicle: { plate: string | null; type: string | null; sector: string | null }
+  checkins: CheckinWithDriver[]
+  rangeText: string
+  start?: Date
+  end?: Date
+}
+
+function buildWordDocument({ vehicle, checkins, rangeText, start, end }: BuildDocParams) {
+  const dailySummary = renderDailySummary(start, end, checkins)
+
+  const sections = checkins.map((checkin, index) => {
+    const checklistItems = safeArrayFromJson<ChecklistItem>(checkin.checklistJson)
+    const fatigueItems = safeArrayFromJson<FatigueItem>(checkin.fatigueJson)
+
+    const nonConformity =
+      checkin.hasNonConformity ||
+      checkin.nonConformityActions ||
+      checkin.nonConformityCriticality ||
+      checkin.nonConformityManager
+
+    return `
+      <section class="section">
+        <table class="full meta">
+          <tr>
+            <td class="cell"><strong>Placa:</strong> ${escapeHtml(vehicle.plate || '—')}</td>
+            <td class="cell"><strong>Tipo:</strong> ${escapeHtml(vehicle.type || '—')}</td>
+            <td class="cell"><strong>Setor:</strong> ${escapeHtml(vehicle.sector || '—')}</td>
+            <td class="cell"><strong>Período:</strong> ${escapeHtml(rangeText)}</td>
+          </tr>
+          <tr>
+            <td class="cell"><strong>Data/Hora:</strong> ${escapeHtml(formatDateTimeLabel(checkin.inspectionDate))}</td>
+            <td class="cell"><strong>KM na inspeção:</strong> ${escapeHtml(
+              checkin.kmAtInspection?.toLocaleString('pt-BR') || '—',
+            )}</td>
+            <td class="cell"><strong>Check-in nº:</strong> ${index + 1}</td>
+            <td class="cell"><strong>Status veículo:</strong> ${escapeHtml(checkin.vehicleStatus || '—')}</td>
+          </tr>
+          <tr>
+            <td class="cell"><strong>Motorista:</strong> ${escapeHtml(
+              checkin.driverName || checkin.driver?.fullName || '—',
+            )}</td>
+            <td class="cell"><strong>E-mail:</strong> ${escapeHtml(checkin.driver?.email || '—')}</td>
+            <td class="cell"><strong>Centro de custo:</strong> ${escapeHtml(checkin.costCenter || '—')}</td>
+            <td class="cell"><strong>Status motorista:</strong> ${escapeHtml(checkin.driverStatus || '—')}</td>
+          </tr>
+        </table>
+
+        <div class="block">
+          <h2>Checklist</h2>
+          ${renderChecklistTable(checklistItems)}
+        </div>
+
+        ${
+          nonConformity
+            ? `
+              <div class="block">
+                <h2>Não conformidade</h2>
+                <table class="full">
+                  <tr>
+                    <td class="cell"><strong>Criticidade:</strong> ${escapeHtml(
+                      checkin.nonConformityCriticality || '—',
+                    )}</td>
+                    <td class="cell"><strong>Data da tratativa:</strong> ${escapeHtml(
+                      formatDateLabel(checkin.nonConformityDate),
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td class="cell" colspan="2"><strong>Tratativas:</strong> ${escapeHtml(
+                      checkin.nonConformityActions || '—',
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td class="cell" colspan="2"><strong>Responsável:</strong> ${escapeHtml(
+                      checkin.nonConformityManager || '—',
+                    )}</td>
+                  </tr>
+                </table>
+              </div>
+            `
+            : ''
+        }
+
+        <div class="block">
+          <h2>Controle de fadiga</h2>
+          ${renderFatigueTable(fatigueItems, checkin.fatigueScore, checkin.fatigueRisk)}
+        </div>
+      </section>
+    `
+  })
+
+  const combinedSections = sections.join('')
+
+  return `
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            font-size: 9pt;
+            color: #111;
+          }
+
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+          }
+
+          .logo {
+            height: 26px;
+          }
+
+          .header-text {
+            flex: 1;
+            text-align: center;
+          }
+
+          h1 {
+            font-size: 12pt;
+            margin: 0 0 2px 0;
+          }
+
+          h2 {
+            font-size: 9pt;
+            margin: 4px 0;
+          }
+
+          .muted {
+            color: #555;
+            font-size: 8pt;
+          }
+
+          table.full {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 4px;
+            font-size: 8pt;
+          }
+
+          table.meta {
+            margin-bottom: 6px;
+          }
+
+          table.daily {
+            margin-top: 2px;
+          }
+
+          .cell {
+            border: 1px solid #333;
+            padding: 2px 4px;
+            vertical-align: middle;
+          }
+
+          .narrow {
+            width: 18px;
+            text-align: center;
+          }
+
+          .center {
+            text-align: center;
+          }
+
+          .block {
+            margin-top: 4px;
+          }
+
+          .section {
+            margin-top: 8px;
+            margin-bottom: 8px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="/erg-logo.png" alt="ERG" class="logo" />
+          <div class="header-text">
+            <h1>CHECK LIST PRÉ-OPERACIONAL · VEÍCULOS LEVES E CONDUTORES</h1>
+            <p class="muted">Registro consolidado de check-ins · ${escapeHtml(rangeText)}</p>
+          </div>
+          <div style="width: 60px;"></div>
+        </div>
+
+        ${dailySummary}
+
+        ${combinedSections}
+      </body>
+    </html>
+  `
+}
+
+// ------------- ROTA GET -------------
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -263,122 +495,20 @@ export async function GET(req: Request) {
     orderBy: { inspectionDate: 'asc' },
   })
 
-  const lines: LineSpec[] = []
-   lines.push({ text: 'CHECK LIST PRÉ-OPERACIONAL • VEÍCULO LEVE', size: 18, gap: 18 })
-  lines.push({ text: 'Registro consolidado de check-ins', size: 14, gap: 16 })
-  lines.push({ text: STRONG_DIVIDER })
-
-  lines.push({ text: 'CHECK LIST PRÉ-OPERACIONAL • VEÍCULO LEVE', size: 18, gap: 20 })
-  lines.push({ text: 'Registro consolidado de check-ins', size: 14, gap: 18 })
-  lines.push({ text: `Placa: ${vehicle.plate || '—'}` })
-  lines.push({ text: `Tipo: ${vehicle.type || '—'}` })
-  lines.push({ text: `Setor: ${vehicle.sector || '—'}` })
-
   const rangeText = start || end ? `${formatDateLabel(start)} até ${formatDateLabel(end)}` : 'Todos os registros'
- lines.push({ text: formatDualRow('Placa', vehicle.plate || '—', 'Tipo', vehicle.type || '—') })
-  lines.push({ text: formatDualRow('Setor', vehicle.sector || '—', 'Período', rangeText) })
-  lines.push({ text: LIGHT_DIVIDER, gap: 18 })
 
   if (checkins.length === 0) {
-    lines.push({ text: 'Nenhum check-in encontrado para o período selecionado.' })
+    return NextResponse.json({ error: 'Nenhum check-in encontrado para o período selecionado.' }, { status: 404 })
   }
 
-  checkins.forEach((checkin, index) => {
-   lines.push({ text: `CHECK-IN ${index + 1}`, size: 16, gap: 14 })
-    lines.push({ text: STRONG_DIVIDER, gap: 12 })
+  const html = buildWordDocument({ vehicle, checkins, rangeText, start: start ?? undefined, end: end ?? undefined })
+  const buffer = Buffer.from(html, 'utf-8')
+  const filename = `checkins-${vehicle.plate || 'veiculo'}.doc`
 
-    lines.push({
-      text: formatDualRow(
-        'Data/Hora',
-        formatDateTimeLabel(checkin.inspectionDate),
-        'KM na inspeção',
-        checkin.kmAtInspection?.toLocaleString('pt-BR') ?? '—',
-      ),
-      size: 12,
-    })
-    lines.push({
-      text: formatDualRow('Motorista', checkin.driverName || checkin.driver?.fullName || '—', 'E-mail', checkin.driver?.email || '—'),
-      size: 12,
-    })
-    lines.push({
-      text: formatDualRow('Centro de custo', checkin.costCenter || '—', 'Setor de atividade', checkin.sectorActivity || '—'),
-      size: 12,
-    })
-    lines.push({
-      text: formatDualRow('Status motorista', checkin.driverStatus || '—', 'Status veículo', checkin.vehicleStatus || '—'),
-      size: 12,
-    })
-    lines.push({
-      text: formatSingleRow('Não conformidade', checkin.hasNonConformity ? 'Sim' : 'Não'),
-      size: 12,
-      gap: 14,
-    })
-
-    if (checkin.nonConformityActions || checkin.nonConformityCriticality || checkin.nonConformityManager) {
-        lines.push({ text: 'Detalhes da não conformidade', size: 12, gap: 10 })
-      lines.push({ text: LIGHT_DIVIDER })
-      lines.push({
-        text: formatDualRow(
-          'Criticidade',
-          checkin.nonConformityCriticality || '—',
-          'Data da tratativa',
-          formatDateLabel(checkin.nonConformityDate),
-        ),
-        size: 11,
-      })
-      lines.push({ text: formatSingleRow('Tratativas', checkin.nonConformityActions || '—', 18, 70), size: 11 })
-      lines.push({ text: formatSingleRow('Responsável', checkin.nonConformityManager || '—', 18, 70), size: 11, gap: 14 })
-
-    const checklistItems = safeArrayFromJson<ChecklistItem>(checkin.checklistJson)
-    if (checklistItems.length > 0) {
-  const checklistWidths = [18, 56, 12]
-      lines.push({ text: 'Checklist informado', size: 12, gap: 12 })
-      lines.push({ text: LIGHT_DIVIDER })
-      lines.push({ text: formatTableRow(['Categoria', 'Item', 'Status'], checklistWidths), size: 11 })
-      lines.push({ text: tableDivider(checklistWidths) })
-       checklistItems.forEach((item) => {
-        const status = item.status || 'OK'
-        const label = item.label || item.name || 'Item'
-        const category = item.category || '—'
-        lines.push({ text: formatTableRow([category, label, status], checklistWidths), size: 11 })
-      })
-      lines.push({ text: LIGHT_DIVIDER, gap: 12 })
-    }
-
-    const fatigueItems = safeArrayFromJson<FatigueItem>(checkin.fatigueJson)
-    if (fatigueItems.length > 0) {
-       const fatigueWidths = [70, 16]
-      lines.push({ text: 'Controle de fadiga', size: 12, gap: 12 })
-      lines.push({ text: LIGHT_DIVIDER })
-      lines.push({ text: formatTableRow(['Pergunta', 'Resposta'], fatigueWidths), size: 11 })
-      lines.push({ text: tableDivider(fatigueWidths) })
-      fatigueItems.forEach((item) => {
-        const answer = item.answer || '—'
-        const label = item.label || item.name || 'Pergunta'
-          lines.push({ text: formatTableRow([label, answer], fatigueWidths), size: 11 })
-      })
-      lines.push({
-        text: formatTableRow(
-          ['Pontuação de fadiga', `${checkin.fatigueScore ?? '—'} (${checkin.fatigueRisk || '—'})`],
-          fatigueWidths,
-        ),
-        size: 11,
-      })
-      lines.push({ text: LIGHT_DIVIDER, gap: 12 })
-    }
-
-    lines.push({ text: STRONG_DIVIDER, gap: 22 })
-  })
-
-  const pages = paginateLines(lines)
-  const pdfBuffer = buildPdf(pages)
-
-  const filename = `checkins-${vehicle.plate || 'veiculo'}.pdf`
-
-  return new NextResponse(pdfBuffer, {
+  return new NextResponse(buffer, {
     status: 200,
     headers: {
-      'Content-Type': 'application/pdf',
+      'Content-Type': 'application/msword; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
