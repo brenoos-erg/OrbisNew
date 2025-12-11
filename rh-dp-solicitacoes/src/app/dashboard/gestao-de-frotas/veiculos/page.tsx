@@ -109,6 +109,18 @@ function formatDateTime(date?: string | null) {
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleString('pt-BR')
 }
+function getMonthBoundaries(month?: string | null) {
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return { start: '', end: '' }
+
+  const [year, monthIndex] = month.split('-').map(Number)
+  const startDate = new Date(year, monthIndex - 1, 1)
+  const endDate = new Date(year, monthIndex, 0)
+
+  return {
+    start: startDate.toISOString().slice(0, 10),
+    end: endDate.toISOString().slice(0, 10),
+  }
+}
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
@@ -133,8 +145,12 @@ export default function VehiclesPage() {
   const [loadingStatusLogs, setLoadingStatusLogs] = useState(false)
   const [statusSubmitting, setStatusSubmitting] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
-const [viewingLogId, setViewingLogId] = useState<string | null>(null)
+  const [viewingLogId, setViewingLogId] = useState<string | null>(null)
   const [typedReasonBackup, setTypedReasonBackup] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+
 
   const [formValues, setFormValues] = useState({
     plate: '',
@@ -153,6 +169,10 @@ const [viewingLogId, setViewingLogId] = useState<string | null>(null)
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
     [vehicles]
   )
+  const monthBoundaries = useMemo(() => getMonthBoundaries(selectedMonth), [selectedMonth])
+
+  const appliedStartDate = customStartDate || monthBoundaries.start
+  const appliedEndDate = customEndDate || monthBoundaries.end
 
   useEffect(() => {
     loadVehicles()
@@ -164,6 +184,46 @@ const [viewingLogId, setViewingLogId] = useState<string | null>(null)
       loadCheckins(selectedVehicle.id)
     }
   }, [selectedVehicle])
+  
+  const filteredCheckins = useMemo(() => {
+    const start = appliedStartDate ? new Date(`${appliedStartDate}T00:00:00`) : null
+    const end = appliedEndDate ? new Date(`${appliedEndDate}T23:59:59`) : null
+
+    return checkins.filter((checkin) => {
+      if (!start && !end) return true
+
+      const date = new Date(checkin.inspectionDate)
+      if (Number.isNaN(date.getTime())) return false
+
+      if (start && date < start) return false
+      if (end && date > end) return false
+
+      return true
+    })
+  }, [appliedEndDate, appliedStartDate, checkins])
+
+  const downloadFormUrl = useMemo(() => {
+    if (!selectedVehicle) return '#'
+
+    const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
+
+    if (selectedMonth) params.set('month', selectedMonth)
+    if (appliedStartDate) params.set('startDate', appliedStartDate)
+    if (appliedEndDate) params.set('endDate', appliedEndDate)
+
+    return `/api/fleet/checkins/form?${params.toString()}`
+  }, [appliedEndDate, appliedStartDate, selectedMonth, selectedVehicle])
+
+  const appliedPeriodLabel = useMemo(() => {
+    if (appliedStartDate || appliedEndDate) {
+      return `${appliedStartDate || '...'} até ${appliedEndDate || '...'}`
+    }
+    if (selectedMonth) {
+      return `Mês ${selectedMonth}`
+    }
+    return 'Todos os check-ins'
+  }, [appliedEndDate, appliedStartDate, selectedMonth])
+
 
   async function loadCostCenters() {
     setLoadingCostCenters(true)
@@ -210,7 +270,7 @@ const [viewingLogId, setViewingLogId] = useState<string | null>(null)
       setCheckins(
         data.map((item) => ({
           ...item,
-          vehicleStatus: (item as any).vehicle?.status || item.vehicleStatus,
+           vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
           vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
           vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
         }))
@@ -572,46 +632,104 @@ const [viewingLogId, setViewingLogId] = useState<string | null>(null)
       </div>
 
       {/* painel de check-ins do veículo selecionado (se quiser tirar, pode remover tudo isso) */}
-      {selectedVehicle && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase text-slate-500">Check-ins do veículo</p>
-              <h2 className="text-2xl font-bold text-slate-900">{selectedVehicle.plate}</h2>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => loadCheckins(selectedVehicle.id)}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
-              >
-                <RefreshCw size={14} /> Atualizar
-              </button>
-              <a
-                href={`/api/fleet/checkins/excel?vehicleId=${selectedVehicle.id}`}
-                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-              >
-                <List size={14} /> Excel deste veículo
-              </a>
-            </div>
-          </div>
-
-           <div className="mt-4 space-y-3">
-            {loadingCheckins && (
-              <div className="flex justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600">
-                <div className="inline-flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+        {selectedVehicle && (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase text-slate-500">Check-ins do veículo</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{selectedVehicle.plate}</h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => loadCheckins(selectedVehicle.id)}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+                  >
+                    <RefreshCw size={14} /> Atualizar
+                  </button>
+                  <a
+                    href={`/api/fleet/checkins/excel?vehicleId=${selectedVehicle.id}`}
+                    className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  >
+                    <List size={14} /> Excel deste veículo
+                  </a>
+                  <a
+                    href={downloadFormUrl}
+                    className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
+                  >
+                    <List size={14} /> Formulário (PDF)
+                  </a>
                 </div>
               </div>
-            )}
 
-            {!loadingCheckins && checkins.length === 0 && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
-                Nenhum check-in encontrado para este veículo.
+
+            <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">Filtrar por mês</span>
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  />
+                </label>
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">Data inicial</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  />
+                </label>
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">Data final</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2"
+                  />
+                </label>
+                <div className="flex items-end gap-2">
+                  <button
+                    onClick={() => {
+                      setCustomStartDate('')
+                      setCustomEndDate('')
+                      setSelectedMonth('')
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                  >
+                    <X size={14} /> Limpar filtros
+                  </button>
+                </div>
               </div>
-            )}
 
-            {!loadingCheckins &&
-              checkins.map((checkin) => {
+
+             <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
+
+              <div className="mt-4 space-y-3">
+                {loadingCheckins && (
+                  <div className="flex justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600">
+                    <div className="inline-flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+                    </div>
+                  </div>
+                )}
+
+                {!loadingCheckins && checkins.length === 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
+                    Nenhum check-in encontrado para este veículo.
+                  </div>
+                )}
+
+                {!loadingCheckins && checkins.length > 0 && filteredCheckins.length === 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-center text-amber-800">
+                    Não há check-ins dentro do período selecionado.
+                  </div>
+                )}
+
+                {!loadingCheckins &&
+              filteredCheckins.map((checkin) => {
                 const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
                 const checklist = checkin.checklistJson || []
                 const fatigue = checkin.fatigueJson || []

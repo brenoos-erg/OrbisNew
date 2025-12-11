@@ -170,6 +170,7 @@ export async function POST(req: Request) {
         vehiclePlateSnapshot: normalizedPlate,
         vehicleTypeSnapshot: normalizedType,
         kmAtInspection: vehicleKm,
+        vehicleStatus,
         checklistJson: vehicleChecklist,
         fatigueJson: fatigue,
         fatigueScore,

@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     checkin.costCenter ?? '',
     checkin.sectorActivity ?? '',
     checkin.kmAtInspection,
-    checkin.vehicle?.status ?? '',
+    (checkin as { vehicleStatus?: string }).vehicleStatus ?? checkin.vehicle?.status ?? '',
     checkin.driverStatus,
     checkin.hasNonConformity ? 'Sim' : 'Não',
   ])

@@ -565,6 +565,7 @@ model VehicleCheckin {
   vehiclePlateSnapshot     String
   vehicleTypeSnapshot      String
   kmAtInspection           Int
+  vehicleStatus            String    @default("DISPONIVEL")
   checklistJson            Json
   fatigueJson              Json
   fatigueScore             Int
