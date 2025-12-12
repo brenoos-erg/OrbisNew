@@ -155,13 +155,34 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR').format(date)
 }
 
-async function buildHeader(
-  plate: string | null,
-  type: string | null,
-  sector: string | null,
-  periodLabel: string,
-) {
-    const logoPath = path.join(process.cwd(), 'public', 'erg-logo.png')
+function formatKm(km?: number | null) {
+  if (typeof km !== 'number') return '—'
+  return `${km.toLocaleString('pt-BR')} km`
+}
+
+function buildLabelCell(text: string) {
+  return new TableCell({
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, color: 'FFFFFF' })],
+        alignment: AlignmentType.LEFT,
+      }),
+    ],
+    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+    margins: { top: 120, bottom: 120, left: 160, right: 160 },
+  })
+}
+
+function buildValueCell(text: string) {
+  return new TableCell({
+    children: [new Paragraph({ text })],
+    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'EEF2F7' },
+    margins: { top: 120, bottom: 120, left: 160, right: 160 },
+  })
+}
+
+async function buildHeader(title: string) {
+  const logoPath = path.join(process.cwd(), 'public', 'erg-logo.png')
   let logoParagraph: Paragraph | undefined
 
   try {
@@ -183,34 +204,198 @@ async function buildHeader(
   return [
      ...(logoParagraph ? [logoParagraph] : []),
     new Paragraph({
-      children: [
-        new TextRun({ text: 'RELATÓRIO DE CHECKLIST DIÁRIO', bold: true }),
-      ],
+      children: [new TextRun({ text: title, bold: true })],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
-      spacing: { after: 160 },
+      spacing: { after: 120 },
     }),
+    ]
+}
+
+function buildVehicleInfoSection(
+  vehicle: {
+    plate: string | null
+    type: string | null
+    model: string | null
+    sector: string | null
+    status: string | null
+    costCenter: string | null
+    kmCurrent: number | null
+    costCenters?: Array<{ costCenter: { description: string | null; code: string | null } | null }>
+  },
+  periodLabel: string,
+) {
+  const costCenterOptions = vehicle.costCenters?.
+    map((item) => item.costCenter?.description || item.costCenter?.code)
+    .filter(Boolean)
+
+  const costCenterLabel =
+    costCenterOptions?.join(' • ') || vehicle.costCenter || '—'
+
+  const infoRows = [
     new Paragraph({
-      children: [
-        new TextRun({ text: 'Veículo: ', bold: true }),
-        new TextRun({ text: 'Veículo: ', bold: true }),
-        new TextRun({ text: plate ?? '—' }),
-        new TextRun({ text: '   Tipo: ', bold: true }),
-        new TextRun({ text: type ?? '—' }),
-        new TextRun({ text: '   Setor: ', bold: true }),
-        new TextRun({ text: sector ?? '—' }),
+      children: [new TextRun({ text: 'Dados do veículo', bold: true })],
+      heading: HeadingLevel.HEADING_2,
+      spacing: { after: 80 },
+    }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            buildLabelCell('Período do relatório'),
+            buildValueCell(periodLabel),
+            buildLabelCell('Situação do veículo'),
+            buildValueCell(vehicle.status ?? '—'),
+          ],
+        }),
+        new TableRow({
+          children: [
+            buildLabelCell('Placa'),
+            buildValueCell(vehicle.plate ?? '—'),
+            buildLabelCell('Tipo'),
+            buildValueCell(vehicle.type ?? '—'),
+          ],
+        }),
+        new TableRow({
+          children: [
+            buildLabelCell('Modelo'),
+            buildValueCell(vehicle.model ?? '—'),
+            buildLabelCell('Setor'),
+            buildValueCell(vehicle.sector ?? '—'),
+          ],
+        }),
+        new TableRow({
+          children: [
+            buildLabelCell('Centro de custo'),
+            buildValueCell(costCenterLabel),
+            buildLabelCell('KM atual'),
+            buildValueCell(formatKm(vehicle.kmCurrent)),
+          ],
+        }),
       ],
     }),
-    new Paragraph({
+    ]
+
+  return infoRows
+}
+
+type DriverSummary = {
+  name: string
+  email?: string | null
+  phone?: string | null
+  status?: string | null
+}
+
+function buildDriversSection(drivers: DriverSummary[]) {
+  const headerRow = new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph({ text: 'CONDUTOR', bold: true })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+        margins: { top: 120, bottom: 120, left: 120, right: 120 },
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'CONTATO', bold: true })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+        margins: { top: 120, bottom: 120, left: 120, right: 120 },
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'APTIDÃO', bold: true })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+        margins: { top: 120, bottom: 120, left: 120, right: 120 },
+      }),
+    ],
+  })
+
+  const rows = (drivers.length > 0
+    ? drivers
+    : [{ name: 'Nenhum condutor informado', email: null, phone: null, status: '—' }]
+  ).map((driver, index) => {
+    const contacts = [driver.email, driver.phone].filter(Boolean).join(' • ')
+    const aptitude = driver.status?.toUpperCase() || '—'
+
+    return new TableRow({
       children: [
-        new TextRun({ text: 'Período: ', bold: true }),
-        new TextRun({ text: periodLabel }),
+        new TableCell({
+          children: [new Paragraph({ text: driver.name || '—' })],
+          shading:
+            index % 2 === 0
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              : undefined,
+          margins: { top: 120, bottom: 120, left: 120, right: 120 },
+        }),
+        new TableCell({
+          children: [new Paragraph({ text: contacts || '—' })],
+          shading:
+            index % 2 === 0
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              : undefined,
+          margins: { top: 120, bottom: 120, left: 120, right: 120 },
+        }),
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: aptitude, bold: true })],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+          shading:
+            index % 2 === 0
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              : undefined,
+          margins: { top: 120, bottom: 120, left: 120, right: 120 },
+        }),
       ],
-      spacing: { after: 200 },
+        })
+  })
+
+  return [
+    new Paragraph({
+      children: [new TextRun({ text: 'Condutor(es)', bold: true })],
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 200, after: 80 },
     }),
-    
+    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }),
   ]
 }
+function extractDriverNames(primary?: string | null, fallback?: string | null) {
+  const merged = primary || fallback || ''
+
+  return merged
+    .split(/[;,/]/)
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0)
+}
+
+function summarizeDrivers(
+  checkins: Array<{
+    driverName: string
+    driver?: { fullName: string | null; email: string | null; phone: string | null } | null
+    driverStatus?: string | null
+  }>,
+): DriverSummary[] {
+  const summaries = new Map<string, DriverSummary>()
+
+  checkins.forEach((checkin) => {
+    const names = extractDriverNames(checkin.driverName, checkin.driver?.fullName)
+
+    names.forEach((name) => {
+      const key = name.toLowerCase()
+      if (!summaries.has(key)) {
+        summaries.set(key, {
+          name,
+          email: checkin.driver?.email,
+          phone: checkin.driver?.phone,
+          status: checkin.driverStatus,
+        })
+      }
+    })
+  })
+
+  return Array.from(summaries.values())
+}
+
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -247,7 +432,16 @@ export async function GET(req: Request) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { plate: true, type: true, sector: true },
+    select: {
+      plate: true,
+      type: true,
+      model: true,
+      sector: true,
+      status: true,
+      costCenter: true,
+      kmCurrent: true,
+      costCenters: { include: { costCenter: { select: { description: true, code: true } } } },
+    },
   })
 
   if (!vehicle) {
@@ -256,8 +450,10 @@ export async function GET(req: Request) {
 
   const checkins = await prisma.vehicleCheckin.findMany({
     where: { vehicleId, inspectionDate: { gte: start, lte: end } },
+    include: { driver: { select: { fullName: true, email: true, phone: true } } },
     orderBy: { inspectionDate: 'asc' },
   })
+  const driverSummaries = summarizeDrivers(checkins)
 
   // ---- monta as linhas da tabela (UM row por check-in) ----
   const rows = checkins.map((checkin, index) => {
@@ -295,6 +491,7 @@ export async function GET(req: Request) {
       ...baseCellConfig,
       children: [new Paragraph({ text: formatDate(checkin.inspectionDate) })],
     })
+    const driverNames = extractDriverNames(checkin.driverName, checkin.driver?.fullName)
     const criticalCell = new TableCell({
       ...baseCellConfig,
       children: [
@@ -321,13 +518,36 @@ export async function GET(req: Request) {
         ...baseCellConfig,
       children: [new Paragraph({ text: fatigueText })],
     })
+    const driverCell = new TableCell({
+      ...baseCellConfig,
+      children: [
+        new Paragraph({ text: driverNames.length > 0 ? driverNames.join(' • ') : '—' }),
+      ],
+    })
+    const aptitudeCell = new TableCell({
+      ...baseCellConfig,
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: checkin.driverStatus?.toUpperCase() || '—', bold: true })],
+          alignment: AlignmentType.CENTER,
+        }),
+      ],
+    })
     const scoreCell = new TableCell({
         ...baseCellConfig,
       children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
     })
 
     return new TableRow({
-      children: [dateCell, criticalCell, nonCriticalCell, fatigueCell, scoreCell],
+       children: [
+        dateCell,
+        criticalCell,
+        nonCriticalCell,
+        fatigueCell,
+        driverCell,
+        aptitudeCell,
+        scoreCell,
+      ],
       shading: index % 2 === 0
         ? { type: ShadingType.CLEAR, color: 'auto', fill: 'F2F6FC' }
         : undefined,
@@ -359,6 +579,16 @@ export async function GET(req: Request) {
             shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
+           new TableCell({
+            children: [new Paragraph({ text: 'CONDUTOR(ES)', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'APTIDÃO', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
           new TableCell({
             children: [new Paragraph({ text: 'PONTOS', bold: true })],
             shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
@@ -369,6 +599,15 @@ export async function GET(req: Request) {
       ...rows,
     ],
   })
+  const headerSection = await buildHeader('RELATÓRIO DE CHECKLIST DIÁRIO')
+  const vehicleInfoSection = buildVehicleInfoSection(vehicle, periodLabel)
+  const driversSection = buildDriversSection(driverSummaries)
+  const checklistTitle = new Paragraph({
+    children: [new TextRun({ text: 'Checklists e não conformidades', bold: true })],
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 200, after: 120 },
+  })
+
 
   const doc = new Document({
     styles: {
@@ -391,14 +630,17 @@ export async function GET(req: Request) {
           },
         },
         children: [
-          ...(await buildHeader(vehicle.plate, vehicle.type, vehicle.sector, periodLabel)),
+          ...headerSection,
+          ...vehicleInfoSection,
+          ...driversSection,
+          checklistTitle,
           table,
         ],
       },
     ],
   })
-    const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
-
+    
+const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
 
   const buffer = await Packer.toBuffer(doc)
 
