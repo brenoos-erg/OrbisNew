@@ -207,15 +207,36 @@ async function buildHeader(title: string) {
     console.warn('Logo não encontrada em', logoPath, error)
   }
 
-  return [
-     ...(logoParagraph ? [logoParagraph] : []),
-    new Paragraph({
-      children: [new TextRun({ text: title, bold: true, color: COLORS.primary, size: 32 })],
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-    }),
-  ]
+  const logoCell = new TableCell({
+    children: logoParagraph ? [logoParagraph] : [new Paragraph({ text: '' })],
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+  })
+
+  const titleCell = new TableCell({
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text: title, bold: true, color: COLORS.primary, size: 32 })],
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+      }),
+    ],
+    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
+    columnSpan: 2,
+    margins: { top: 160, bottom: 160, left: 160, right: 160 },
+    verticalAlign: VerticalAlign.CENTER,
+  })
+
+  const table = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: [logoCell, titleCell],
+      }),
+    ],
+  })
+
+  return [table, new Paragraph({ children: [], spacing: { after: 160 } })]
 }
 
 function buildVehicleInfoSection(
@@ -249,39 +270,39 @@ function buildVehicleInfoSection(
       rows: [
         new TableRow({
           children: [
-            buildLabelCell('Período do relatório'),
-            buildValueCell(periodLabel),
-            buildLabelCell('Situação do veículo'),
-            buildValueCell(vehicle.status ?? '—'),
-          ],
-        }),
-        new TableRow({
-          children: [
-            buildLabelCell('Placa'),
-            buildValueCell(vehicle.plate ?? '—'),
-            buildLabelCell('Tipo'),
-            buildValueCell(vehicle.type ?? '—'),
-          ],
-        }),
-        new TableRow({
-          children: [
-            buildLabelCell('Modelo'),
-            buildValueCell(vehicle.model ?? '—'),
-            buildLabelCell('Setor'),
+            buildLabelCell('RAZÃO SOCIAL'),
+            buildValueCell(costCenterLabel),
+            buildLabelCell('PROJETO'),
             buildValueCell(vehicle.sector ?? '—'),
           ],
         }),
         new TableRow({
           children: [
-            buildLabelCell('Centro de custo'),
-            buildValueCell(costCenterLabel),
-            buildLabelCell('KM atual'),
+            buildLabelCell('PLACA'),
+            buildValueCell(vehicle.plate ?? '—'),
+            buildLabelCell('MODELO'),
+            buildValueCell(vehicle.model ?? '—'),
+          ],
+        }),
+        new TableRow({
+          children: [
+            buildLabelCell('TIPO'),
+            buildValueCell(vehicle.type ?? '—'),
+            buildLabelCell('KM'),
             buildValueCell(formatKm(vehicle.kmCurrent)),
+          ],
+        }),
+        new TableRow({
+          children: [
+            buildLabelCell('PERÍODO DO RELATÓRIO'),
+            buildValueCell(periodLabel),
+            buildLabelCell('SITUAÇÃO DO VEÍCULO'),
+            buildValueCell(vehicle.status ?? '—'),
           ],
         }),
       ],
     }),
-    ]
+  ]
 
   return infoRows
 }
@@ -570,16 +591,24 @@ export async function GET(req: Request) {
             shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
-          new TableCell({
+           new TableCell({
             children: [
-              new Paragraph({ text: 'ITENS CRÍTICOS', bold: true, color: COLORS.primary }),
+              new Paragraph({
+                text: 'CHECKLIST ITENS CRÍTICOS (CONFORMIDADES)',
+                bold: true,
+                color: COLORS.primary,
+              }),
             ],
             shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
              children: [
-              new Paragraph({ text: 'ITENS NÃO CRÍTICOS', bold: true, color: COLORS.primary }),
+              new Paragraph({
+                text: 'CHECKLIST ITENS NÃO CRÍTICOS (CONFORMIDADES)',
+                bold: true,
+                color: COLORS.primary,
+              }),
             ],
             shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
@@ -609,11 +638,11 @@ export async function GET(req: Request) {
       ...rows,
     ],
   })
-  const headerSection = await buildHeader('RELATÓRIO DE CHECKLIST DIÁRIO')
+  const headerSection = await buildHeader('RELATÓRIO DE CHECKLIST MENSAL')
   const vehicleInfoSection = buildVehicleInfoSection(vehicle, periodLabel)
   const driversSection = buildDriversSection(driverSummaries)
   const checklistTitle = new Paragraph({
-    children: [new TextRun({ text: 'Checklists e não conformidades', bold: true })],
+    children: [new TextRun({ text: 'Checklist e não conformidades', bold: true })],
     heading: HeadingLevel.HEADING_2,
     spacing: { before: 200, after: 120 },
   })
@@ -650,7 +679,7 @@ export async function GET(req: Request) {
     ],
   })
     
-const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
+  const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
 
   const buffer = await Packer.toBuffer(doc)
 
@@ -659,7 +688,7 @@ const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 1
     headers: {
       'Content-Type':
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${fileLabel}.docx"`,
+      'Content-Disposition': `attachment; filename="checklist-mensal-${vehicle.plate}-${fileLabel}.docx"`,
     },
   })
 }
