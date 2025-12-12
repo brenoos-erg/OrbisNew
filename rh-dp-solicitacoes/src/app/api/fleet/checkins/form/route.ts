@@ -118,23 +118,39 @@ function buildChecklistTable(items: ChecklistItem[]) {
       cell([paragraph('Verificação', { bold: true })], 48),
       cell([paragraph('NC', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
       cell([paragraph('R', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
-      cell([paragraph('NI', { bold: true, alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+      cell(
+        [paragraph('Conforme', { bold: true, alignment: AlignmentType.CENTER })],
+        8,
+        AlignmentType.CENTER,
+      ),
     ],
   })
 
   const rows = items.map((item, index) => {
     const status = (item.status || 'OK').toUpperCase()
+      const hasNonConformity = status === 'COM_PROBLEMA' || status === 'NC'
+    const requiresRepair = status === 'R'
+    const isOk = status === 'OK' || status === 'CONFORME'
+    const isNotApplicable = status === 'NAO_SE_APLICA'
 
     return new TableRow({
       children: [
         cell([paragraph(String(index + 1), { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
         cell([paragraph(item.category || '—')], 20),
         cell([paragraph(item.label || item.name || 'Item')], 48),
-        cell([paragraph(status === 'NC' ? '☑' : '☐', { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
-        cell([paragraph(status === 'R' ? '☑' : '☐', { alignment: AlignmentType.CENTER })], 8, AlignmentType.CENTER),
+         cell(
+          [paragraph(hasNonConformity ? '☑' : '☐', { alignment: AlignmentType.CENTER })],
+          8,
+          AlignmentType.CENTER,
+        ),
+        cell(
+          [paragraph(requiresRepair ? '☑' : '☐', { alignment: AlignmentType.CENTER })],
+          8,
+          AlignmentType.CENTER,
+        ),
         cell([
           paragraph(
-            status !== 'NC' && status !== 'R' ? '☑' : '☐',
+            isOk ? '☑' : isNotApplicable ? 'N/A' : '☐',
             { alignment: AlignmentType.CENTER },
           ),
         ], 8, AlignmentType.CENTER),

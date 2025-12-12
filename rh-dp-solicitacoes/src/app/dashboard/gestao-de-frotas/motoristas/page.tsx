@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarDays, ClipboardList, FileDown, SlidersHorizontal } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ClipboardList, FileDown, SlidersHorizontal, UserRound } from 'lucide-react'
 
 type CostCenter = {
   id: string
@@ -15,11 +15,22 @@ type MonthlyAnswers = Record<string, Record<number, Record<string, 'SIM' | 'NAO'
 
 type Driver = {
   id: string
+  userId?: string
   name: string
   costCenterId: string
   lastScore: number
   monthlyAnswers: MonthlyAnswers
 }
+type UserDirectoryEntry = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  position: string
+  costCenterId: string
+  avatarUrl?: string
+}
+
 
 type Question = {
   id: string
@@ -48,6 +59,7 @@ const questions: Question[] = [
 const initialDrivers: Driver[] = [
   {
     id: '1',
+    userId: 'u1',
     name: 'Marcos Silva',
     costCenterId: 'cc1',
     lastScore: 18,
@@ -63,6 +75,7 @@ const initialDrivers: Driver[] = [
   },
   {
     id: '2',
+    userId: 'u2',
     name: 'Patrícia Gomes',
     costCenterId: 'cc1',
     lastScore: 12,
@@ -77,6 +90,7 @@ const initialDrivers: Driver[] = [
   },
   {
     id: '3',
+    userId: 'u3',
     name: 'Renato Costa',
     costCenterId: 'cc2',
     lastScore: 32,
@@ -86,6 +100,53 @@ const initialDrivers: Driver[] = [
         2: { q1: 'SIM', q4: 'SIM', q6: 'SIM' },
       },
     },
+  },
+]
+const userDirectory: UserDirectoryEntry[] = [
+  {
+    id: 'u1',
+    name: 'Marcos Silva',
+    email: 'marcos.silva@empresa.com',
+    phone: '(11) 99999-1234',
+    position: 'Motorista Sênior',
+    costCenterId: 'cc1',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Marcos+Silva&background=0EA5E9&color=fff',
+  },
+  {
+    id: 'u2',
+    name: 'Patrícia Gomes',
+    email: 'patricia.gomes@empresa.com',
+    phone: '(11) 98888-4321',
+    position: 'Motorista',
+    costCenterId: 'cc1',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Patricia+Gomes&background=fb923c&color=fff',
+  },
+  {
+    id: 'u3',
+    name: 'Renato Costa',
+    email: 'renato.costa@empresa.com',
+    phone: '(11) 97777-9876',
+    position: 'Motorista',
+    costCenterId: 'cc2',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Renato+Costa&background=22c55e&color=fff',
+  },
+  {
+    id: 'u4',
+    name: 'Bianca Pereira',
+    email: 'bianca.pereira@empresa.com',
+    phone: '(31) 91234-5678',
+    position: 'Motorista Reserva',
+    costCenterId: 'cc1',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Bianca+Pereira&background=8b5cf6&color=fff',
+  },
+  {
+    id: 'u5',
+    name: 'Daniel Souza',
+    email: 'daniel.souza@empresa.com',
+    phone: '(21) 93456-7890',
+    position: 'Motorista',
+    costCenterId: 'cc2',
+    avatarUrl: 'https://ui-avatars.com/api/?name=Daniel+Souza&background=ef4444&color=fff',
   },
 ]
 
@@ -117,13 +178,16 @@ export default function DriversPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [startDay, setStartDay] = useState(1)
   const [endDay, setEndDay] = useState(31)
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
+  const [driverSearchTerm, setDriverSearchTerm] = useState('')
+  const [profileDriverId, setProfileDriverId] = useState<string | null>(null)
   const [driverAnswers, setDriverAnswers] = useState<
     Record<string, MonthlyAnswers>
   >(() => Object.fromEntries(initialDrivers.map((driver) => [driver.id, driver.monthlyAnswers])))
 
   const filteredDrivers = useMemo(
-    () => initialDrivers.filter((driver) => driver.costCenterId === selectedCostCenter),
-    [selectedCostCenter]
+    () => drivers.filter((driver) => driver.costCenterId === selectedCostCenter),
+    [drivers, selectedCostCenter]
   )
 
   useEffect(() => {
@@ -139,7 +203,7 @@ export default function DriversPage() {
   }, [endDay, startDay])
 
   const currentDriver = filteredDrivers.find((driver) => driver.id === selectedDriver) || filteredDrivers[0]
- const selectedMonthLabel = availableMonths.find((month) => month.value === selectedMonth)?.label || selectedMonth
+  const selectedMonthLabel = availableMonths.find((month) => month.value === selectedMonth)?.label || selectedMonth
   const currentAnswers = currentDriver
     ? driverAnswers[currentDriver.id]?.[selectedMonth] || {}
     : {}
@@ -254,25 +318,96 @@ export default function DriversPage() {
     link.click()
     URL.revokeObjectURL(url)
   }
+  function getDriverStatusSnapshot(driver: Driver) {
+    const monthAnswers = driverAnswers[driver.id]?.[selectedMonth] || {}
+    const availableDays = Object.keys(monthAnswers)
+      .map((day) => Number(day))
+      .filter((day) => day >= startDay && day <= endDay)
+      .sort((a, b) => b - a)
+    const latestDay = availableDays[0] || endDay
+    const score = getDayScore(monthAnswers[latestDay])
+    return { latestDay, score, risk: getRisk(score) }
+  }
+
+  function handleAddDriver(user: UserDirectoryEntry) {
+    const alreadyInList = drivers.some((driver) => driver.userId === user.id)
+    if (alreadyInList) {
+      setSelectedCostCenter(user.costCenterId)
+      const existingDriver = drivers.find((driver) => driver.userId === user.id)
+      if (existingDriver) {
+        setSelectedDriver(existingDriver.id)
+        setProfileDriverId(existingDriver.id)
+      }
+      setDriverSearchTerm('')
+      return
+    }
+
+    const newDriver: Driver = {
+      id: `driver-${user.id}`,
+      userId: user.id,
+      name: user.name,
+      costCenterId: user.costCenterId,
+      lastScore: 0,
+      monthlyAnswers: {},
+    }
+
+    setDrivers((prev) => [...prev, newDriver])
+    setDriverAnswers((prev) => ({
+      ...prev,
+      [newDriver.id]: newDriver.monthlyAnswers,
+    }))
+    setSelectedCostCenter(user.costCenterId)
+    setSelectedDriver(newDriver.id)
+    setProfileDriverId(newDriver.id)
+    setDriverSearchTerm('')
+  }
+
+  const searchResults = useMemo(() => {
+    if (!driverSearchTerm.trim()) return []
+    const term = driverSearchTerm.toLowerCase()
+    return userDirectory.filter((user) => {
+      const matchesTerm =
+        user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)
+      const matchesCostCenter = user.costCenterId === selectedCostCenter
+      const alreadyAdded = drivers.some((driver) => driver.userId === user.id)
+      return matchesTerm && matchesCostCenter && !alreadyAdded
+    })
+  }, [driverSearchTerm, drivers, selectedCostCenter])
+
 
   const costCenterInfo = costCenters.find((center) => center.id === selectedCostCenter)
+
+  const currentDirectoryEntry = currentDriver?.userId
+    ? userDirectory.find((user) => user.id === currentDriver.userId)
+    : undefined
+
+  const profileDriver = profileDriverId ? drivers.find((driver) => driver.id === profileDriverId) : null
+  const profileDirectoryEntry = profileDriver?.userId
+    ? userDirectory.find((user) => user.id === profileDriver.userId)
+    : undefined
+  const profileSnapshot = profileDriver ? getDriverStatusSnapshot(profileDriver) : null
 
   const summary = useMemo(() => {
     const totals = { aptos: 0, inaptos: 0 }
     filteredDrivers.forEach((driver) => {
-      const monthAnswers = driverAnswers[driver.id]?.[selectedMonth] || {}
-      const availableDays = Object.keys(monthAnswers)
-        .map((day) => Number(day))
-        .filter((day) => day >= startDay && day <= endDay)
-        .sort((a, b) => b - a)
-      const latestDay = availableDays[0] || endDay
-      const score = getDayScore(monthAnswers[latestDay])
-      const status = getRisk(score).status
+      const status = getDriverStatusSnapshot(driver).risk.status
       if (status === 'APTO') totals.aptos += 1
       else totals.inaptos += 1
     })
     return totals
   }, [driverAnswers, filteredDrivers, endDay, selectedMonth, startDay])
+  const statusPanelDrivers = useMemo(
+    () =>
+      filteredDrivers.map((driver) => ({
+        driver,
+        snapshot: getDriverStatusSnapshot(driver),
+        directoryEntry: driver.userId
+          ? userDirectory.find((user) => user.id === driver.userId)
+          : undefined,
+      })),
+    [filteredDrivers, driverAnswers, endDay, selectedMonth, startDay]
+  )
+
 
   return (
     <div className="space-y-6">
@@ -307,6 +442,65 @@ export default function DriversPage() {
               </option>
             ))}
           </select>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase text-slate-500">
+              Buscar usuário cadastrado
+            </label>
+            <div className="relative">
+              <input
+                type="search"
+                value={driverSearchTerm}
+                onChange={(event) => setDriverSearchTerm(event.target.value)}
+                placeholder="Digite nome ou e-mail e adicione como motorista"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+              />
+
+              {driverSearchTerm && (
+                <div className="absolute z-20 mt-2 w-full rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {searchResults.length ? (
+                    <ul className="divide-y divide-slate-100 text-sm text-slate-800">
+                      {searchResults.map((user) => {
+                        const userCostCenter = costCenters.find((center) => center.id === user.costCenterId)
+                        return (
+                          <li key={user.id}>
+                            <button
+                              type="button"
+                              onClick={() => handleAddDriver(user)}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-100">
+                                  {user.avatarUrl ? (
+                                    <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <UserRound className="h-full w-full p-2 text-slate-500" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{user.name}</p>
+                                  <p className="text-xs text-slate-500">{user.email}</p>
+                                  <p className="text-2xs text-slate-500">
+                                    {userCostCenter ? `${userCostCenter.name} • Código ${userCostCenter.code}` : 'Centro não informado'}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-2xs rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-700">Adicionar</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="px-4 py-3 text-xs text-slate-500">Nenhum usuário encontrado nesta visão.</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">
+              Busque usuários já cadastrados e traga-os para a visão de motoristas do centro de custo selecionado.
+            </p>
+          </div>
+
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
             <p className="flex items-center gap-2 text-slate-700">
@@ -392,6 +586,67 @@ export default function DriversPage() {
 
         {/* LADO DIREITO */}
         <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase text-slate-500">Painel de status</p>
+                <h2 className="text-xl font-semibold text-slate-900">Motoristas desta visão</h2>
+                <p className="text-xs text-slate-600">
+                  Veja o status mais recente e abra a ficha rápida com os dados do colaborador.
+                </p>
+              </div>
+              <span className="text-2xs rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                Período {startDay}–{endDay}
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {statusPanelDrivers.length ? (
+                statusPanelDrivers.map(({ driver, snapshot, directoryEntry }) => (
+                  <button
+                    key={driver.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDriver(driver.id)
+                      setProfileDriverId(driver.id)
+                    }}
+                    className="flex w-full flex-col gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-orange-500 hover:bg-orange-50"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-100">
+                          {directoryEntry?.avatarUrl ? (
+                            <img
+                              src={directoryEntry.avatarUrl}
+                              alt={driver.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <UserRound className="h-full w-full p-2 text-slate-500" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{driver.name}</p>
+                          <p className="text-2xs text-slate-500">{directoryEntry?.position || 'Motorista'}</p>
+                        </div>
+                      </div>
+                      <span className={`text-2xs rounded-full px-3 py-1 font-semibold ${snapshot.risk.color}`}>
+                        {snapshot.risk.status}
+                      </span>
+                    </div>
+                    <div className="text-2xs text-slate-600">
+                      <p>Última referência: dia {snapshot.latestDay}</p>
+                      <p>Pontuação: {snapshot.score} pts</p>
+                      <p>Contato: {directoryEntry?.phone || 'Não informado'}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-slate-600">Nenhum motorista disponível para o centro de custo.</p>
+              )}
+            </div>
+          </div>
+
           {/* Lista de motoristas */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -414,21 +669,18 @@ export default function DriversPage() {
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {filteredDrivers.map((driver) => {
-                const monthAnswers = driverAnswers[driver.id]?.[selectedMonth] || {}
-                const availableDays = Object.keys(monthAnswers)
-                  .map((day) => Number(day))
-                  .filter((day) => day >= startDay && day <= endDay)
-                  .sort((a, b) => b - a)
-                const latestDay = availableDays[0] || endDay
-                const score = getDayScore(monthAnswers[latestDay])
-                const risk = getRisk(score)
+                const statusSnapshot = getDriverStatusSnapshot(driver)
+                const { latestDay, risk } = statusSnapshot
                 const isSelected = driver.id === currentDriver?.id
 
                 return (
                   <button
                     key={driver.id}
                     type="button"
-                    onClick={() => setSelectedDriver(driver.id)}
+                    onClick={() => {
+                      setSelectedDriver(driver.id)
+                      setProfileDriverId(driver.id)
+                    }}
                     className={`flex items-center justify-between rounded-lg border px-4 py-3 text-left shadow-sm transition ${
                       isSelected
                         ? 'border-orange-500 bg-orange-50 text-orange-800'
@@ -473,6 +725,95 @@ export default function DriversPage() {
 
            </div>
       </div>
+      {profileDriver && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal
+          onClick={() => setProfileDriverId(null)}
+        >
+          <div className="flex min-h-full items-start justify-center overflow-y-auto p-4">
+            <div
+              className="w-full max-w-3xl rounded-2xl bg-white shadow-xl ring-1 ring-slate-200"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Ficha do motorista</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{profileDriver.name}</h2>
+                  <p className="text-sm text-slate-600">{profileDirectoryEntry?.position || 'Motorista'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xs rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                    Centro: {costCenters.find((center) => center.id === profileDriver.costCenterId)?.name || '—'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setProfileDriverId(null)}
+                    className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+                <div className="flex items-center gap-3 md:col-span-2">
+                  <div className="h-16 w-16 overflow-hidden rounded-full bg-slate-100">
+                    {profileDirectoryEntry?.avatarUrl ? (
+                      <img
+                        src={profileDirectoryEntry.avatarUrl}
+                        alt={profileDriver.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <UserRound className="h-full w-full p-3 text-slate-500" />
+                    )}
+                  </div>
+                  <div className="space-y-1 text-sm text-slate-700">
+                    <p className="font-semibold text-slate-900">{profileDriver.name}</p>
+                    <p>{profileDirectoryEntry?.email || 'E-mail não informado'}</p>
+                    <p>{profileDirectoryEntry?.phone || 'Contato não informado'}</p>
+                  </div>
+                </div>
+
+                {profileSnapshot && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Status atual</p>
+                    <div className="mt-2 space-y-1">
+                      <div
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${profileSnapshot.risk.color}`}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-current" />
+                        {profileSnapshot.risk.status} • {profileSnapshot.risk.risk}
+                      </div>
+                      <p className="text-2xs text-slate-500">
+                        Última referência: dia {profileSnapshot.latestDay} • Pontos {profileSnapshot.score}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 p-4 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Cargo e equipe</p>
+                  <p className="font-semibold text-slate-900">{profileDirectoryEntry?.position || 'Motorista'}</p>
+                  <p className="text-xs text-slate-500">
+                    Centro de custo: {costCenters.find((center) => center.id === profileDriver.costCenterId)?.name || 'Não informado'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-4 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Contato rápido</p>
+                  <p>E-mail: {profileDirectoryEntry?.email || '—'}</p>
+                  <p>Telefone: {profileDirectoryEntry?.phone || '—'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {isFormOpen && costCenterInfo && currentDriver && (
         <div

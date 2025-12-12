@@ -121,6 +121,7 @@ export default function VehicleCheckinPage() {
   const [vehicleCostCenters, setVehicleCostCenters] = useState<Array<{ id: string; label: string }>>([])
   const [costCenterInput, setCostCenterInput] = useState('')
   const [costCenterId, setCostCenterId] = useState<string | undefined>()
+  const [vehicleType, setVehicleType] = useState('VEICULO_LEVE')
   const [driverName, setDriverName] = useState('')
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -200,6 +201,7 @@ export default function VehicleCheckinPage() {
       setLastKm(null)
       setVehicleStatus(null)
       setVehicleCostCenters([])
+      setVehicleType('VEICULO_LEVE')
 
       try {
         const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, {
@@ -211,6 +213,7 @@ export default function VehicleCheckinPage() {
           plate: string
           kmCurrent?: number
           status?: string | null
+          type?: string | null
           costCenters?: Array<{
             costCenter?: {
               id: string
@@ -224,6 +227,7 @@ export default function VehicleCheckinPage() {
         setVehicleExists(Boolean(found))
         setLastKm(found?.kmCurrent ?? null)
         setVehicleStatus(found?.status ?? null)
+        setVehicleType(found?.type ?? 'VEICULO_LEVE')
 
         const vehicleCenters =
           found?.costCenters
@@ -251,6 +255,7 @@ export default function VehicleCheckinPage() {
     } else {
       setVehicleExists(null)
       setLastKm(null)
+      setVehicleType('VEICULO_LEVE')
     }
   }, [plateInput])
 
@@ -376,6 +381,7 @@ export default function VehicleCheckinPage() {
       setCostCenterInput('')
       setVehicleCostCenters([])
       setVehicleStatus(null)
+      setVehicleType('VEICULO_LEVE')
       setSuccess('Check-in concluído com sucesso!')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado'
@@ -528,7 +534,8 @@ export default function VehicleCheckinPage() {
               Tipo de veículo
               <select
                 name="vehicleType"
-                defaultValue="VEICULO_LEVE"
+                value={vehicleType}
+                onChange={(event) => setVehicleType(event.target.value)}
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               >
                 <option value="VEICULO_LEVE">Veículo leve</option>
