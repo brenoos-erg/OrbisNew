@@ -193,17 +193,18 @@ async function buildHeader(
     new Paragraph({
       children: [
         new TextRun({ text: 'Veículo: ', bold: true }),
-        new TextRun(plate ?? '—'),
+        new TextRun({ text: 'Veículo: ', bold: true }),
+        new TextRun({ text: plate ?? '—' }),
         new TextRun({ text: '   Tipo: ', bold: true }),
-        new TextRun(type ?? '—'),
+        new TextRun({ text: type ?? '—' }),
         new TextRun({ text: '   Setor: ', bold: true }),
-        new TextRun(sector ?? '—'),
+        new TextRun({ text: sector ?? '—' }),
       ],
     }),
     new Paragraph({
       children: [
         new TextRun({ text: 'Período: ', bold: true }),
-        new TextRun(periodLabel),
+        new TextRun({ text: periodLabel }),
       ],
       spacing: { after: 200 },
     }),
