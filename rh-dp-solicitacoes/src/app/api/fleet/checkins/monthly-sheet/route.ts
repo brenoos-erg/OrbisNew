@@ -19,6 +19,7 @@ type FatigueInfo = {
   score?: number
   answer?: string
   name?: string
+  label?: string
 }
 
 const fatiguePoints: Record<string, number> = {
@@ -45,6 +46,13 @@ function parseMonthParam(month: string | null) {
   const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999)
   return { start, end, year, monthIndex }
 }
+function parseDateParam(value: string | null, endOfDay = false) {
+  if (!value) return null
+
+  const date = new Date(`${value}T${endOfDay ? '23:59:59' : '00:00:00'}`)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
 
 function parseChecklist(value: unknown): ChecklistItem[] {
   if (Array.isArray(value)) return value as ChecklistItem[]
@@ -64,7 +72,7 @@ function parseChecklist(value: unknown): ChecklistItem[] {
 function parseFatigue(
   value: unknown,
   fallbackScore?: number,
-): { isFatigued: boolean; score: number } {
+): { isFatigued: boolean; score: number; yesAnswers: string[] } {
   let data: FatigueInfo | FatigueInfo[] | null = null
 
   if (typeof value === 'string') {
@@ -79,8 +87,16 @@ function parseFatigue(
 
   let isFatigued: boolean | null = null
   let score: number | null = typeof fallbackScore === 'number' ? fallbackScore : null
+   const yesAnswers: string[] = []
 
   if (Array.isArray(data)) {
+    data.forEach((item) => {
+      if (typeof item !== 'object' || !item) return
+      if (item.answer?.toUpperCase() === 'SIM') {
+        yesAnswers.push(item.label || item.name || '—')
+      }
+    })
+
     const fatigueObj = data.find(
       (item) => typeof item === 'object' && item !== null && 'isFatigued' in item,
     )
@@ -116,23 +132,26 @@ function parseFatigue(
     isFatigued = (score ?? 0) > 0
   }
 
-  return { isFatigued, score: score ?? 0 }
+  return { isFatigued, score: score ?? 0, yesAnswers }
 }
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR').format(date)
 }
 
-function buildHeader(plate: string | null, type: string | null, sector: string | null, month: string) {
-  const [year, monthStr] = month.split('-')
-  const referenceLabel = `${monthStr}/${year}`
+function buildHeader(
+  plate: string | null,
+  type: string | null,
+  sector: string | null,
+  periodLabel: string,
+) {
 
   return [
     new Paragraph({ text: 'RELATÓRIO DE CHECKLIST DIÁRIO', bold: true }),
     new Paragraph({
       text: `Veículo: ${plate ?? '—'} | Tipo: ${type ?? '—'} | Setor: ${sector ?? '—'}`,
     }),
-    new Paragraph({ text: `Mês: ${referenceLabel}` }),
+    new Paragraph({ text: `Período: ${periodLabel}` }),
   ]
 }
 
@@ -140,20 +159,34 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const vehicleId = searchParams.get('vehicleId')
   const monthParam = searchParams.get('month')
+  const startDateParam = searchParams.get('startDate')
+  const endDateParam = searchParams.get('endDate')
 
-  if (!vehicleId || !monthParam) {
+  if (!vehicleId) {
     return NextResponse.json(
-      { error: 'Parâmetros obrigatórios ausentes: vehicleId e month.' },
+      { error: 'Parâmetro obrigatório ausente: vehicleId.' },
       { status: 400 },
     )
   }
 
   const monthInfo = parseMonthParam(monthParam)
-  if (!monthInfo) {
+  if (monthParam && !monthInfo) {
     return NextResponse.json({ error: 'Parâmetro month inválido. Use YYYY-MM.' }, { status: 400 })
   }
 
-  const { start, end } = monthInfo
+ const start = parseDateParam(startDateParam) || monthInfo?.start
+  const end = parseDateParam(endDateParam, true) || monthInfo?.end
+
+  if (!start || !end) {
+    return NextResponse.json(
+      {
+        error: 'Informe o mês (YYYY-MM) ou um intervalo válido com startDate e endDate (YYYY-MM-DD).',
+      },
+      { status: 400 },
+    )
+  }
+
+  const periodLabel = `${formatDate(start)} a ${formatDate(end)}`
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
@@ -214,8 +247,14 @@ export async function GET(req: Request) {
         }),
       ],
     })
+    const fatigueText = fatigue.isFatigued
+      ? fatigue.yesAnswers.length > 0
+        ? `Sim (${fatigue.yesAnswers.join(', ')})`
+        : 'Sim'
+      : 'Não'
+
     const fatigueCell = new TableCell({
-      children: [new Paragraph({ text: fatigue.isFatigued ? 'Sim' : 'Não' })],
+      children: [new Paragraph({ text: fatigueText })],
     })
     const scoreCell = new TableCell({
       children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
@@ -245,10 +284,12 @@ export async function GET(req: Request) {
   const doc = new Document({
     sections: [
       {
-        children: [...buildHeader(vehicle.plate, vehicle.type, vehicle.sector, monthParam), table],
+        children: [...buildHeader(vehicle.plate, vehicle.type, vehicle.sector, periodLabel), table],
       },
     ],
   })
+    const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
+
 
   const buffer = await Packer.toBuffer(doc)
 
@@ -257,7 +298,7 @@ export async function GET(req: Request) {
     headers: {
       'Content-Type':
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${monthParam}.docx"`,
+       'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${fileLabel}.docx"`,
     },
   })
 }

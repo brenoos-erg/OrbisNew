@@ -147,7 +147,8 @@ export default function VehiclesPage() {
   const [statusError, setStatusError] = useState<string | null>(null)
   const [viewingLogId, setViewingLogId] = useState<string | null>(null)
   const [typedReasonBackup, setTypedReasonBackup] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), [])
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
 
@@ -202,27 +203,21 @@ export default function VehiclesPage() {
     })
   }, [appliedEndDate, appliedStartDate, checkins])
 
-  const downloadFormUrl = useMemo(() => {
+ const monthlyDocUrl = useMemo(() => {
     if (!selectedVehicle) return '#'
 
-    const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
+    const params = new URLSearchParams({
+      vehicleId: selectedVehicle.id,
+    })
 
     if (selectedMonth) params.set('month', selectedMonth)
     if (appliedStartDate) params.set('startDate', appliedStartDate)
     if (appliedEndDate) params.set('endDate', appliedEndDate)
 
-    return `/api/fleet/checkins/form?${params.toString()}`
-  }, [appliedEndDate, appliedStartDate, selectedMonth, selectedVehicle])
-  const monthlyDocUrl = useMemo(() => {
-    if (!selectedVehicle || !selectedMonth) return '#'
-
-    const params = new URLSearchParams({
-      vehicleId: selectedVehicle.id,
-      month: selectedMonth,
-    })
+    
 
     return `/api/fleet/checkins/monthly-sheet?${params.toString()}`
-  }, [selectedMonth, selectedVehicle])
+}, [appliedEndDate, appliedStartDate, selectedMonth, selectedVehicle])
 
 
   const appliedPeriodLabel = useMemo(() => {
@@ -668,13 +663,7 @@ export default function VehiclesPage() {
                     className="inline-flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
 
                   >
-                    <List size={14} /> Relatório diário (Word)
-                  </a>
-                  <a
-                    href={downloadFormUrl}
-                    className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
-                  >
-                    <List size={14} /> Formulário (PDF)
+                    <List size={14} /> Checklist mensal (Word)
                   </a>
                 </div>
               </div>
@@ -686,7 +675,7 @@ export default function VehiclesPage() {
                   <input
                     type="month"
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
+                     onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
                     className="w-full rounded-md border border-slate-300 px-3 py-2"
                   />
                 </label>
@@ -709,12 +698,12 @@ export default function VehiclesPage() {
                   />
                 </label>
                 <div className="flex items-end gap-2">
-                  <button
-                    onClick={() => {
-                      setCustomStartDate('')
-                      setCustomEndDate('')
-                      setSelectedMonth('')
-                    }}
+                    <button
+                      onClick={() => {
+                        setCustomStartDate('')
+                        setCustomEndDate('')
+                        setSelectedMonth(currentMonth)
+                      }}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
                   >
                     <X size={14} /> Limpar filtros
@@ -753,11 +742,10 @@ export default function VehiclesPage() {
                 const fatigue = checkin.fatigueJson || []
 
                 return (
-                  <details
-                    key={checkin.id}
-                    className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                    open
-                  >
+                   <details
+                      key={checkin.id}
+                      className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    >
                     <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-900">
                       <span>
                         {formatDateTime(checkin.inspectionDate)} • KM {formatKm(checkin.kmAtInspection)}
