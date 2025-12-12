@@ -1,21 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  AlignmentType,
-  Document,
-  HeadingLevel,
-  ImageRun,
-  Packer,
-  Paragraph,
-  ShadingType,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  VerticalAlign,
-  WidthType,
-} from 'docx'
-import path from 'path'
-import { promises as fs } from 'fs'
+import JSZip from 'jszip'
 
 import { prisma } from '@/lib/prisma'
 
@@ -38,18 +22,13 @@ type FatigueInfo = {
   label?: string
 }
 
-const fatiguePoints: Record<string, number> = {
-  '31': 5,
-  '32': 30,
-  '33': 5,
-  '34': 5,
-  '35': 5,
-  '36': 5,
-  '37': 5,
-  '38': 30,
-  '39': 5,
-  '40': 5,
+type DriverSummary = {
+  name: string
+  email?: string | null
+  phone?: string | null
+  status?: string | null
 }
+const KM_LIMIT_PER_DAY = 2000
 
 function parseMonthParam(month: string | null) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return null
@@ -155,237 +134,20 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR').format(date)
 }
 
-function formatKm(km?: number | null) {
-  if (typeof km !== 'number') return '—'
-  return `${km.toLocaleString('pt-BR')} km`
-}
-const COLORS = {
-  primary: '1D4F91',
-  labelBackground: 'D9D9D9',
-  valueBackground: 'F3F4F6',
-  rowBackground: 'F2F6FC',
-}
-
-function buildLabelCell(text: string) {
-  return new TableCell({
-    children: [
-      new Paragraph({
-        children: [new TextRun({ text, bold: true, color: COLORS.primary })],
-        alignment: AlignmentType.LEFT,
-      }),
-    ],
-    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-    margins: { top: 120, bottom: 120, left: 160, right: 160 },
-  })
+const fatiguePoints: Record<string, number> = {
+  '31': 5,
+  '32': 30,
+  '33': 5,
+  '34': 5,
+  '35': 5,
+  '36': 5,
+  '37': 5,
+  '38': 30,
+  '39': 5,
+  '40': 5,
 }
 
-function buildValueCell(text: string) {
-  return new TableCell({
-    children: [new Paragraph({ text })],
-    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground },
-    margins: { top: 120, bottom: 120, left: 160, right: 160 },
-  })
-}
 
-async function buildHeader(title: string) {
-  const logoPath = path.join(process.cwd(), 'public', 'erg-logotipo.png')
-  let logoParagraph: Paragraph | undefined
-
-  try {
-    const logoBuffer = await fs.readFile(logoPath)
-    logoParagraph = new Paragraph({
-      children: [
-        new ImageRun({
-          data: logoBuffer,
-          transformation: { width: 170, height: 68 },
-        }),
-      ],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 160 },
-    })
-  } catch (error) {
-    console.warn('Logo não encontrada em', logoPath, error)
-  }
-
-  const logoCell = new TableCell({
-    children: logoParagraph ? [logoParagraph] : [new Paragraph({ text: '' })],
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 120, bottom: 120, left: 120, right: 120 },
-  })
-
-  const titleCell = new TableCell({
-    children: [
-      new Paragraph({
-        children: [new TextRun({ text: title, bold: true, color: COLORS.primary, size: 32 })],
-        heading: HeadingLevel.HEADING_1,
-        alignment: AlignmentType.CENTER,
-      }),
-    ],
-    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-    columnSpan: 2,
-    margins: { top: 160, bottom: 160, left: 160, right: 160 },
-    verticalAlign: VerticalAlign.CENTER,
-  })
-
-  const table = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      new TableRow({
-        children: [logoCell, titleCell],
-      }),
-    ],
-  })
-
-  return [table, new Paragraph({ children: [], spacing: { after: 160 } })]
-}
-
-function buildVehicleInfoSection(
-  vehicle: {
-    plate: string | null
-    type: string | null
-    model: string | null
-    sector: string | null
-    status: string | null
-    costCenter: string | null
-    kmCurrent: number | null
-    costCenters?: Array<{ costCenter: { description: string | null; code: string | null } | null }>
-  },
-  periodLabel: string,
-) {
-  const costCenterOptions = vehicle.costCenters?.
-    map((item) => item.costCenter?.description || item.costCenter?.code)
-    .filter(Boolean)
-
-  const costCenterLabel =
-    costCenterOptions?.join(' • ') || vehicle.costCenter || '—'
-
-  const infoRows = [
-    new Paragraph({
-      children: [new TextRun({ text: 'Dados do veículo', bold: true })],
-      heading: HeadingLevel.HEADING_2,
-      spacing: { after: 80 },
-    }),
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [
-        new TableRow({
-          children: [
-            buildLabelCell('RAZÃO SOCIAL'),
-            buildValueCell(costCenterLabel),
-            buildLabelCell('PROJETO'),
-            buildValueCell(vehicle.sector ?? '—'),
-          ],
-        }),
-        new TableRow({
-          children: [
-            buildLabelCell('PLACA'),
-            buildValueCell(vehicle.plate ?? '—'),
-            buildLabelCell('MODELO'),
-            buildValueCell(vehicle.model ?? '—'),
-          ],
-        }),
-        new TableRow({
-          children: [
-            buildLabelCell('TIPO'),
-            buildValueCell(vehicle.type ?? '—'),
-            buildLabelCell('KM'),
-            buildValueCell(formatKm(vehicle.kmCurrent)),
-          ],
-        }),
-        new TableRow({
-          children: [
-            buildLabelCell('PERÍODO DO RELATÓRIO'),
-            buildValueCell(periodLabel),
-            buildLabelCell('SITUAÇÃO DO VEÍCULO'),
-            buildValueCell(vehicle.status ?? '—'),
-          ],
-        }),
-      ],
-    }),
-  ]
-
-  return infoRows
-}
-
-type DriverSummary = {
-  name: string
-  email?: string | null
-  phone?: string | null
-  status?: string | null
-}
-
-function buildDriversSection(drivers: DriverSummary[]) {
-  const headerRow = new TableRow({
-    children: [
-      new TableCell({
-        children: [new Paragraph({ text: 'CONDUTOR', bold: true, color: COLORS.primary })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-        margins: { top: 120, bottom: 120, left: 120, right: 120 },
-      }),
-      new TableCell({
-         children: [new Paragraph({ text: 'CONTATO', bold: true, color: COLORS.primary })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-        margins: { top: 120, bottom: 120, left: 120, right: 120 },
-      }),
-      new TableCell({
-        children: [new Paragraph({ text: 'APTIDÃO', bold: true, color: COLORS.primary })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-        margins: { top: 120, bottom: 120, left: 120, right: 120 },
-      }),
-    ],
-  })
-
-  const rows = (drivers.length > 0
-    ? drivers
-    : [{ name: 'Nenhum condutor informado', email: null, phone: null, status: '—' }]
-  ).map((driver, index) => {
-    const contacts = [driver.email, driver.phone].filter(Boolean).join(' • ')
-    const aptitude = driver.status?.toUpperCase() || '—'
-
-    return new TableRow({
-      children: [
-        new TableCell({
-          children: [new Paragraph({ text: driver.name || '—' })],
-          shading:
-            index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
-              : undefined,
-          margins: { top: 120, bottom: 120, left: 120, right: 120 },
-        }),
-        new TableCell({
-          children: [new Paragraph({ text: contacts || '—' })],
-          shading:
-            index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
-              : undefined,
-          margins: { top: 120, bottom: 120, left: 120, right: 120 },
-        }),
-        new TableCell({
-          children: [
-            new Paragraph({
-              children: [new TextRun({ text: aptitude, bold: true })],
-              alignment: AlignmentType.CENTER,
-            }),
-          ],
-          shading:
-            index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
-              : undefined,
-          margins: { top: 120, bottom: 120, left: 120, right: 120 },
-        }),
-      ],
-        })
-  })
-
-  return [
-    new Paragraph({
-      children: [new TextRun({ text: 'Condutor(es)', bold: true })],
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 200, after: 80 },
-    }),
-    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...rows] }),
-  ]
-}
 function extractDriverNames(primary?: string | null, fallback?: string | null) {
   const merged = primary || fallback || ''
 
@@ -421,6 +183,244 @@ function summarizeDrivers(
   })
 
   return Array.from(summaries.values())
+}
+function columnLetter(column: number) {
+  let temp = column
+  let letter = ''
+  while (temp > 0) {
+    const mod = (temp - 1) % 26
+    letter = String.fromCharCode(65 + mod) + letter
+    temp = Math.floor((temp - mod) / 26)
+  }
+  return letter
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+type SheetCell = {
+  row: number
+  col: number
+  value: string | number
+  style: number
+  type?: 'inlineStr' | 'n'
+}
+
+type WorksheetOptions = {
+  dataValidationStart?: number
+  dataValidationEnd?: number
+  merges?: string[]
+}
+
+function buildCellXml(cell: SheetCell) {
+  const ref = `${columnLetter(cell.col)}${cell.row}`
+  const styleAttr = ` s="${cell.style}"`
+
+  if (typeof cell.value === 'number' && cell.type !== 'inlineStr') {
+    return `<c r="${ref}"${styleAttr}><v>${cell.value}</v></c>`
+  }
+
+  return `<c r="${ref}" t="inlineStr"${styleAttr}><is><t>${escapeXml(
+    String(cell.value),
+  )}</t></is></c>`
+}
+
+function buildWorksheetXml(cells: SheetCell[], options: WorksheetOptions) {
+  const rowsMap = new Map<number, SheetCell[]>()
+  cells.forEach((cell) => {
+    const list = rowsMap.get(cell.row) || []
+    list.push(cell)
+    rowsMap.set(cell.row, list)
+  })
+
+  const maxRow = cells.reduce((max, cell) => Math.max(max, cell.row), 1)
+
+  const rowsXml = Array.from(rowsMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([rowNumber, rowCells]) => {
+      const cellsXml = rowCells
+        .sort((a, b) => a.col - b.col)
+        .map((cell) => buildCellXml(cell))
+        .join('')
+      const customHeightRows: Record<number, number> = {
+        1: 21,
+        2: 16.5,
+        3: 16.5,
+        4: 16.5,
+        6: 18,
+      }
+      const heightAttr = customHeightRows[rowNumber]
+        ? ` ht="${customHeightRows[rowNumber]}" customHeight="1"`
+        : ''
+      return `<row r="${rowNumber}"${heightAttr}>${cellsXml}</row>`
+    })
+    .join('')
+
+  const mergesXml = (options.merges || []).map((m) => `<mergeCell ref="${m}"/>`).join('')
+
+  const validationsXml =
+    options.dataValidationStart && options.dataValidationEnd
+      ? `<dataValidations count="1"><dataValidation type="custom" allowBlank="0" showErrorMessage="1" errorStyle="stop" errorTitle="Valor inválido" error="Quilometragem fora do padrão. Verifique se não digitou um zero a mais." sqref="H${options.dataValidationStart}:H${options.dataValidationEnd}"><formula1>AND(INDIRECT(\"H\"&ROW())&gt;=INDIRECT(\"I\"&ROW()),INDIRECT(\"H\"&ROW())-INDIRECT(\"I\"&ROW())&lt;=INDIRECT(\"K\"&ROW()))</formula1></dataValidation></dataValidations>`
+      : ''
+
+  const conditionalFormatting =
+    options.dataValidationStart && options.dataValidationEnd
+      ? `<conditionalFormatting sqref="H${options.dataValidationStart}:H${options.dataValidationEnd}"><cfRule type="expression" dxfId="0" priority="1"><formula>NOT(AND(INDIRECT(\"H\"&ROW())&gt;=INDIRECT(\"I\"&ROW()),INDIRECT(\"H\"&ROW())-INDIRECT(\"I\"&ROW())&lt;=INDIRECT(\"K\"&ROW())))</formula></cfRule></conditionalFormatting>`
+      : ''
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheetPr/>
+  <dimension ref="A1:K${Math.max(options.dataValidationEnd || maxRow, maxRow)}"/>
+  <sheetViews>
+    <sheetView tabSelected="1" workbookViewId="0"/>
+  </sheetViews>
+  <sheetFormatPr defaultRowHeight="15"/>
+  <cols>
+    <col min="1" max="1" width="12" customWidth="1"/>
+    <col min="2" max="2" width="35" customWidth="1"/>
+    <col min="3" max="3" width="35" customWidth="1"/>
+    <col min="4" max="4" width="12" customWidth="1"/>
+    <col min="5" max="5" width="22" customWidth="1"/>
+    <col min="6" max="6" width="12" customWidth="1"/>
+    <col min="7" max="7" width="10" customWidth="1"/>
+    <col min="8" max="8" width="14" customWidth="1"/>
+    <col min="9" max="9" width="14" customWidth="1" hidden="1"/>
+    <col min="10" max="10" width="14" customWidth="1" hidden="1"/>
+    <col min="11" max="11" width="14" customWidth="1" hidden="1"/>
+  </cols>
+  <sheetData>${rowsXml}</sheetData>
+  ${options.merges?.length ? `<mergeCells count="${options.merges.length}">${mergesXml}</mergeCells>` : ''}
+  <sheetProtection sheet="1" objects="1" scenarios="1"/>
+  ${conditionalFormatting}
+  ${validationsXml}
+  <printOptions horizontalCentered="1" verticalCentered="1"/>
+  <pageMargins left="0.3937" right="0.3937" top="0.5906" bottom="0.5906" header="0.3149" footer="0.3149"/>
+  <pageSetup paperSize="9" orientation="landscape" horizontalDpi="300" verticalDpi="300" scale="100"/>
+</worksheet>`
+}
+
+function buildStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <numFmts count="1"><numFmt numFmtId="165" formatCode="#\,##0 \"km\""/></numFmts>
+  <fonts count="6">
+    <font><name val="Arial"/><sz val="10"/><color rgb="FF000000"/></font>
+    <font><name val="Arial"/><sz val="12"/><color rgb="FF000000"/><b/></font>
+    <font><name val="Arial"/><sz val="10"/><color rgb="FF000000"/><b/></font>
+    <font><name val="Arial"/><sz val="9"/><color rgb="FF000000"/><b/></font>
+    <font><name val="Arial"/><sz val="9"/><color rgb="FF000000"/></font>
+    <font><name val="Arial"/><sz val="8"/><color rgb="FF000000"/><i/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFE6E6E6"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="20">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="center" vertical="center"/><protection locked="0"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="left" vertical="center" wrapText="1"/><protection locked="0"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="left" vertical="center"/><protection locked="0"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="center" vertical="center"/><protection locked="0"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="center" vertical="center" wrapText="1"/><protection locked="0"/></xf>
+    <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyNumberFormat="1" applyAlignment="1" applyProtection="1"><alignment horizontal="right" vertical="center"/><protection locked="0"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="right" vertical="center"/><protection locked="0"/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+  <dxfs count="1"><dxf><fill><patternFill patternType="solid"><fgColor rgb="FFF4CCCC"/></patternFill></fill><border><left style="thin"><color rgb="FFCC0000"/></left><right style="thin"><color rgb="FFCC0000"/></right><top style="thin"><color rgb="FFCC0000"/></top><bottom style="thin"><color rgb="FFCC0000"/></bottom></border></dxf></dxfs>
+</styleSheet>`
+}
+
+function buildContentTypesXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`
+}
+
+function buildRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`
+}
+
+function buildWorkbookXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Checklist" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+}
+
+function buildWorkbookRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+}
+
+function buildCorePropsXml() {
+  const now = new Date().toISOString()
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified>
+</cp:coreProperties>`
+}
+
+function buildAppPropsXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Checklist</Application>
+</Properties>`
+}
+
+function addInfoCells(
+  cells: SheetCell[],
+  row: number,
+  labelsAndValues: Array<{ label: string; value: string; isNumber?: boolean }>,
+) {
+  let col = 1
+  labelsAndValues.forEach((item) => {
+    cells.push({ row, col, value: item.label, style: 2 })
+    cells.push({ row, col: col + 1, value: item.value, style: item.isNumber ? 4 : 3 })
+    col += 2
+  })
 }
 
 
@@ -482,8 +482,86 @@ export async function GET(req: Request) {
   })
   const driverSummaries = summarizeDrivers(checkins)
 
-  // ---- monta as linhas da tabela (UM row por check-in) ----
-  const rows = checkins.map((checkin, index) => {
+  const cells: SheetCell[] = []
+  const merges: string[] = []
+
+  // Title
+  cells.push({ row: 1, col: 1, value: 'RELATÓRIO DE CHECKLIST DIÁRIO', style: 1 })
+  merges.push('A1:H1')
+  
+const costCenterOptions = vehicle.costCenters?.
+    map((item) => item.costCenter?.description || item.costCenter?.code)
+    .filter(Boolean)
+  const costCenterLabel = costCenterOptions?.join(' • ') || vehicle.costCenter || '—'
+
+  addInfoCells(
+    cells,
+    2,
+    [
+      { label: 'RAZÃO SOCIAL', value: costCenterLabel },
+      { label: 'PROJETO', value: vehicle.sector ?? '—' },
+      { label: 'PLACA', value: vehicle.plate ?? '—' },
+      { label: 'MODELO', value: vehicle.model ?? '—' },
+    ],
+  )
+
+  addInfoCells(
+    cells,
+    3,
+    [
+      { label: 'TIPO', value: vehicle.type ?? '—' },
+      { label: 'KM', value: vehicle.kmCurrent ?? 0, isNumber: true },
+      { label: 'PERÍODO DO RELATÓRIO', value: periodLabel },
+      { label: 'SITUAÇÃO DO VEÍCULO', value: vehicle.status ?? '—' },
+    ],
+  )
+
+  addInfoCells(
+    cells,
+    4,
+    [
+      {
+        label: 'CONDUTOR(ES)',
+        value:
+          driverSummaries.length > 0
+            ? driverSummaries.map((d) => d.name).join(' • ')
+            : 'Nenhum condutor informado',
+      },
+      { label: 'CONTATOS', value: driverSummaries.map((d) => d.email || d.phone || '').filter(Boolean).join(' • ') || '—' },
+      { label: 'APTIDÃO', value: driverSummaries.map((d) => d.status?.toUpperCase()).filter(Boolean).join(' • ') || '—' },
+      { label: ' ', value: ' ' },
+    ],
+  )
+
+  // Table header (row 6)
+  const headerRow = 6
+  const headers = [
+    'DATA',
+    'ITENS CRÍTICOS',
+    'ITENS NÃO CRÍTICOS',
+    'FADIGA',
+    'CONDUTOR(ES)',
+    'APTIDÃO',
+    'PONTOS',
+    'KM INFORMADO',
+    'KM ANTERIOR',
+    'KM RODADO',
+    'LIMITE KM DIA',
+  ]
+  headers.forEach((title, index) => {
+    cells.push({ row: headerRow, col: index + 1, value: title, style: index < 8 ? 5 : 6 })
+  })
+
+  // Body rows
+  const startBodyRow = headerRow + 1
+  const dataRows = checkins.length > 0 ? checkins : []
+  if (dataRows.length === 0) {
+    cells.push({ row: startBodyRow, col: 1, value: '—', style: 6 })
+    cells.push({ row: startBodyRow, col: 2, value: 'Nenhum registro encontrado', style: 7 })
+  }
+
+  dataRows.forEach((checkin, idx) => {
+    const row = startBodyRow + idx
     const checklist = parseChecklist(checkin.checklistJson)
 
     const criticalItems = checklist
@@ -509,186 +587,67 @@ export async function GET(req: Request) {
       .map((item) => item.label || item.name || '—')
 
     const fatigue = parseFatigue(checkin.fatigueJson, checkin.fatigueScore)
-     const baseCellConfig = {
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 100, bottom: 100, left: 120, right: 120 },
-    }
-
-    const dateCell = new TableCell({
-      ...baseCellConfig,
-      children: [new Paragraph({ text: formatDate(checkin.inspectionDate) })],
-    })
-    const driverNames = extractDriverNames(checkin.driverName, checkin.driver?.fullName)
-    const criticalCell = new TableCell({
-      ...baseCellConfig,
-      children: [
-        new Paragraph({
-          text: criticalItems.length > 0 ? criticalItems.join(', ') : '—',
-        }),
-      ],
-    })
-    const nonCriticalCell = new TableCell({
-      ...baseCellConfig,
-      children: [
-        new Paragraph({
-          text: nonCriticalItems.length > 0 ? nonCriticalItems.join(', ') : '—',
-        }),
-      ],
-    })
     const fatigueText = fatigue.isFatigued
       ? fatigue.yesAnswers.length > 0
         ? `Sim (${fatigue.yesAnswers.join(', ')})`
         : 'Sim'
       : 'Não'
 
-    const fatigueCell = new TableCell({
-      ...baseCellConfig,
-      children: [new Paragraph({ text: fatigueText })],
-    })
-    const driverCell = new TableCell({
-      ...baseCellConfig,
-      children: [
-        new Paragraph({ text: driverNames.length > 0 ? driverNames.join(' • ') : '—' }),
-      ],
-    })
-    const aptitudeCell = new TableCell({
-      ...baseCellConfig,
-      children: [
-        new Paragraph({
-          children: [new TextRun({ text: checkin.driverStatus?.toUpperCase() || '—', bold: true })],
-          alignment: AlignmentType.CENTER,
-        }),
-      ],
-    })
-    const scoreCell = new TableCell({
-      ...baseCellConfig,
-      children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
-    })
+     const driverNames = extractDriverNames(checkin.driverName, checkin.driver?.fullName)
+    const previousKm = idx > 0 ? dataRows[idx - 1].kmAtInspection : checkin.kmAtInspection
 
-    return new TableRow({
-      children: [
-        dateCell,
-        criticalCell,
-        nonCriticalCell,
-        fatigueCell,
-        driverCell,
-        aptitudeCell,
-        scoreCell,
-      ],
-      shading: index % 2 === 0
-        ? { type: ShadingType.CLEAR, color: 'auto', fill: COLORS.rowBackground }
-        : undefined,
-    })
+    cells.push({ row, col: 1, value: formatDate(checkin.inspectionDate), style: 13 })
+    cells.push({ row, col: 2, value: criticalItems.join('\n') || '—', style: 14 })
+    cells.push({ row, col: 3, value: nonCriticalItems.join('\n') || '—', style: 14 })
+    cells.push({ row, col: 4, value: fatigueText, style: 17 })
+    cells.push({ row, col: 5, value: driverNames.join(' • ') || '—', style: 15 })
+    cells.push({ row, col: 6, value: checkin.driverStatus?.toUpperCase() || '—', style: 16 })
+    cells.push({ row, col: 7, value: fatigue.score ?? 0, style: 13 })
+    cells.push({ row, col: 8, value: checkin.kmAtInspection, style: 18 })
+    cells.push({ row, col: 9, value: previousKm, style: 4 })
+    cells.push({ row, col: 10, value: checkin.kmAtInspection - previousKm, style: 4 })
+    cells.push({ row, col: 11, value: KM_LIMIT_PER_DAY, style: 4 })
   })
 
-  const table = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            children: [new Paragraph({ text: 'DATA', bold: true, color: COLORS.primary })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-           new TableCell({
-            children: [
-              new Paragraph({
-                text: 'CHECKLIST ITENS CRÍTICOS (CONFORMIDADES)',
-                bold: true,
-                color: COLORS.primary,
-              }),
-            ],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-          new TableCell({
-             children: [
-              new Paragraph({
-                text: 'CHECKLIST ITENS NÃO CRÍTICOS (CONFORMIDADES)',
-                bold: true,
-                color: COLORS.primary,
-              }),
-            ],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-          new TableCell({
-             children: [new Paragraph({ text: 'FADIGA', bold: true, color: COLORS.primary })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: 'CONDUTOR(ES)', bold: true, color: COLORS.primary })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: 'APTIDÃO', bold: true, color: COLORS.primary })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-          new TableCell({
-            children: [new Paragraph({ text: 'PONTOS', bold: true, color: COLORS.primary })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-        ],
-      }),
-      ...rows,
-    ],
-  })
-  const headerSection = await buildHeader('RELATÓRIO DE CHECKLIST MENSAL')
-  const vehicleInfoSection = buildVehicleInfoSection(vehicle, periodLabel)
-  const driversSection = buildDriversSection(driverSummaries)
-  const checklistTitle = new Paragraph({
-    children: [new TextRun({ text: 'Checklist e não conformidades', bold: true })],
-    heading: HeadingLevel.HEADING_2,
-    spacing: { before: 200, after: 120 },
-  })
+  const lastRow = startBodyRow + Math.max(dataRows.length, 1) - 1
+   const footerRow = lastRow + 2
+  cells.push({ row: footerRow, col: 1, value: 'Documento gerado automaticamente pelo sistema', style: 12 })
+  merges.push(`A${footerRow}:H${footerRow}`)
 
 
-  const doc = new Document({
-    styles: {
-      default: {
-        document: {
-          run: {
-            font: 'Arial',
-          },
-          paragraph: {
-            spacing: { line: 276 },
-          },
-        },
-      },
-    },
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: { top: 720, bottom: 720, left: 720, right: 720 },
-          },
-        },
-        children: [
-          ...headerSection,
-          ...vehicleInfoSection,
-          ...driversSection,
-          checklistTitle,
-          table,
-        ],
-      },
-    ],
+const worksheetXml = buildWorksheetXml(cells, {
+    dataValidationStart: dataRows.length > 0 ? startBodyRow : undefined,
+    dataValidationEnd: dataRows.length > 0 ? lastRow : undefined,
+    merges,
   })
     
-  const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
 
-  const buffer = await Packer.toBuffer(doc)
+  const zip = new JSZip()
+  zip.file('[Content_Types].xml', buildContentTypesXml())
+  const relsFolder = zip.folder('_rels')
+  relsFolder?.file('.rels', buildRelsXml())
+
+  const docProps = zip.folder('docProps')
+  docProps?.file('core.xml', buildCorePropsXml())
+  docProps?.file('app.xml', buildAppPropsXml())
+
+  const xl = zip.folder('xl')
+  xl?.file('workbook.xml', buildWorkbookXml())
+  xl?.file('styles.xml', buildStylesXml())
+  const xlRels = xl?.folder('_rels')
+  xlRels?.file('workbook.xml.rels', buildWorkbookRelsXml())
+  const worksheets = xl?.folder('worksheets')
+  worksheets?.file('sheet1.xml', worksheetXml)
+
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' })
+
+  const fileLabel = startDateParam || monthParam || start.toISOString().slice(0, 10)
 
   return new NextResponse(buffer as unknown as BodyInit, {
     status: 200,
     headers: {
-      'Content-Type':
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="checklist-mensal-${vehicle.plate}-${fileLabel}.docx"`,
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="checklist-mensal-${vehicle.plate}-${fileLabel}.xlsx"`,
     },
   })
 }
