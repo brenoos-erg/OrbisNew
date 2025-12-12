@@ -159,16 +159,22 @@ function formatKm(km?: number | null) {
   if (typeof km !== 'number') return '—'
   return `${km.toLocaleString('pt-BR')} km`
 }
+const COLORS = {
+  primary: '1D4F91',
+  labelBackground: 'D9D9D9',
+  valueBackground: 'F3F4F6',
+  rowBackground: 'F2F6FC',
+}
 
 function buildLabelCell(text: string) {
   return new TableCell({
     children: [
       new Paragraph({
-        children: [new TextRun({ text, bold: true, color: 'FFFFFF' })],
+        children: [new TextRun({ text, bold: true, color: COLORS.primary })],
         alignment: AlignmentType.LEFT,
       }),
     ],
-    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
     margins: { top: 120, bottom: 120, left: 160, right: 160 },
   })
 }
@@ -176,13 +182,13 @@ function buildLabelCell(text: string) {
 function buildValueCell(text: string) {
   return new TableCell({
     children: [new Paragraph({ text })],
-    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'EEF2F7' },
+    shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground },
     margins: { top: 120, bottom: 120, left: 160, right: 160 },
   })
 }
 
 async function buildHeader(title: string) {
-  const logoPath = path.join(process.cwd(), 'public', 'erg-logo.png')
+  const logoPath = path.join(process.cwd(), 'public', 'erg-logotipo.png')
   let logoParagraph: Paragraph | undefined
 
   try {
@@ -191,11 +197,11 @@ async function buildHeader(title: string) {
       children: [
         new ImageRun({
           data: logoBuffer,
-          transformation: { width: 140, height: 56 },
+          transformation: { width: 170, height: 68 },
         }),
       ],
       alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
+      spacing: { after: 160 },
     })
   } catch (error) {
     console.warn('Logo não encontrada em', logoPath, error)
@@ -204,12 +210,12 @@ async function buildHeader(title: string) {
   return [
      ...(logoParagraph ? [logoParagraph] : []),
     new Paragraph({
-      children: [new TextRun({ text: title, bold: true })],
+      children: [new TextRun({ text: title, bold: true, color: COLORS.primary, size: 32 })],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
-      spacing: { after: 120 },
+      spacing: { after: 200 },
     }),
-    ]
+  ]
 }
 
 function buildVehicleInfoSection(
@@ -291,18 +297,18 @@ function buildDriversSection(drivers: DriverSummary[]) {
   const headerRow = new TableRow({
     children: [
       new TableCell({
-        children: [new Paragraph({ text: 'CONDUTOR', bold: true })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+        children: [new Paragraph({ text: 'CONDUTOR', bold: true, color: COLORS.primary })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
         margins: { top: 120, bottom: 120, left: 120, right: 120 },
       }),
       new TableCell({
-        children: [new Paragraph({ text: 'CONTATO', bold: true })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+         children: [new Paragraph({ text: 'CONTATO', bold: true, color: COLORS.primary })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
         margins: { top: 120, bottom: 120, left: 120, right: 120 },
       }),
       new TableCell({
-        children: [new Paragraph({ text: 'APTIDÃO', bold: true })],
-        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+        children: [new Paragraph({ text: 'APTIDÃO', bold: true, color: COLORS.primary })],
+        shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
         margins: { top: 120, bottom: 120, left: 120, right: 120 },
       }),
     ],
@@ -321,7 +327,7 @@ function buildDriversSection(drivers: DriverSummary[]) {
           children: [new Paragraph({ text: driver.name || '—' })],
           shading:
             index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
               : undefined,
           margins: { top: 120, bottom: 120, left: 120, right: 120 },
         }),
@@ -329,7 +335,7 @@ function buildDriversSection(drivers: DriverSummary[]) {
           children: [new Paragraph({ text: contacts || '—' })],
           shading:
             index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
               : undefined,
           margins: { top: 120, bottom: 120, left: 120, right: 120 },
         }),
@@ -342,7 +348,7 @@ function buildDriversSection(drivers: DriverSummary[]) {
           ],
           shading:
             index % 2 === 0
-              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: 'F8FAFC' }
+              ? { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.valueBackground }
               : undefined,
           margins: { top: 120, bottom: 120, left: 120, right: 120 },
         }),
@@ -501,7 +507,7 @@ export async function GET(req: Request) {
       ],
     })
     const nonCriticalCell = new TableCell({
-        ...baseCellConfig,
+      ...baseCellConfig,
       children: [
         new Paragraph({
           text: nonCriticalItems.length > 0 ? nonCriticalItems.join(', ') : '—',
@@ -515,7 +521,7 @@ export async function GET(req: Request) {
       : 'Não'
 
     const fatigueCell = new TableCell({
-        ...baseCellConfig,
+      ...baseCellConfig,
       children: [new Paragraph({ text: fatigueText })],
     })
     const driverCell = new TableCell({
@@ -534,12 +540,12 @@ export async function GET(req: Request) {
       ],
     })
     const scoreCell = new TableCell({
-        ...baseCellConfig,
+      ...baseCellConfig,
       children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
     })
 
     return new TableRow({
-       children: [
+      children: [
         dateCell,
         criticalCell,
         nonCriticalCell,
@@ -549,7 +555,7 @@ export async function GET(req: Request) {
         scoreCell,
       ],
       shading: index % 2 === 0
-        ? { type: ShadingType.CLEAR, color: 'auto', fill: 'F2F6FC' }
+        ? { type: ShadingType.CLEAR, color: 'auto', fill: COLORS.rowBackground }
         : undefined,
     })
   })
@@ -559,39 +565,43 @@ export async function GET(req: Request) {
     rows: [
       new TableRow({
         children: [
-           new TableCell({
-            children: [new Paragraph({ text: 'DATA', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+          new TableCell({
+            children: [new Paragraph({ text: 'DATA', bold: true, color: COLORS.primary })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
-            children: [new Paragraph({ text: 'ITENS CRÍTICOS', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            children: [
+              new Paragraph({ text: 'ITENS CRÍTICOS', bold: true, color: COLORS.primary }),
+            ],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
-            children: [new Paragraph({ text: 'ITENS NÃO CRÍTICOS', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+             children: [
+              new Paragraph({ text: 'ITENS NÃO CRÍTICOS', bold: true, color: COLORS.primary }),
+            ],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
-            children: [new Paragraph({ text: 'FADIGA', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
-            margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          }),
-           new TableCell({
-            children: [new Paragraph({ text: 'CONDUTOR(ES)', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+             children: [new Paragraph({ text: 'FADIGA', bold: true, color: COLORS.primary })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
-            children: [new Paragraph({ text: 'APTIDÃO', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            children: [new Paragraph({ text: 'CONDUTOR(ES)', bold: true, color: COLORS.primary })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
           new TableCell({
-            children: [new Paragraph({ text: 'PONTOS', bold: true })],
-            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            children: [new Paragraph({ text: 'APTIDÃO', bold: true, color: COLORS.primary })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'PONTOS', bold: true, color: COLORS.primary })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: COLORS.labelBackground },
             margins: { top: 120, bottom: 120, left: 120, right: 120 },
           }),
         ],
