@@ -18,6 +18,7 @@ type Driver = {
   userId?: string
   name: string
   costCenterId: string
+  assignment: 'motorista' | 'outro'
   lastScore: number
   monthlyAnswers: MonthlyAnswers
 }
@@ -28,6 +29,7 @@ type UserDirectoryEntry = {
   phone: string
   position: string
   costCenterId: string
+  assignments: string[]
   avatarUrl?: string
 }
 
@@ -62,6 +64,7 @@ const initialDrivers: Driver[] = [
     userId: 'u1',
     name: 'Marcos Silva',
     costCenterId: 'cc1',
+    assignment: 'motorista',
     lastScore: 18,
     monthlyAnswers: {
       '2024-09': {
@@ -78,6 +81,7 @@ const initialDrivers: Driver[] = [
     userId: 'u2',
     name: 'Patrícia Gomes',
     costCenterId: 'cc1',
+    assignment: 'motorista',
     lastScore: 12,
     monthlyAnswers: {
       '2024-09': {
@@ -93,6 +97,7 @@ const initialDrivers: Driver[] = [
     userId: 'u3',
     name: 'Renato Costa',
     costCenterId: 'cc2',
+    assignment: 'motorista',
     lastScore: 32,
     monthlyAnswers: {
       '2024-09': {
@@ -110,6 +115,7 @@ const userDirectory: UserDirectoryEntry[] = [
     phone: '(11) 99999-1234',
     position: 'Motorista Sênior',
     costCenterId: 'cc1',
+    assignments: ['motorista'],
     avatarUrl: 'https://ui-avatars.com/api/?name=Marcos+Silva&background=0EA5E9&color=fff',
   },
   {
@@ -119,6 +125,8 @@ const userDirectory: UserDirectoryEntry[] = [
     phone: '(11) 98888-4321',
     position: 'Motorista',
     costCenterId: 'cc1',
+    assignments: ['motorista'],
+    
     avatarUrl: 'https://ui-avatars.com/api/?name=Patricia+Gomes&background=fb923c&color=fff',
   },
   {
@@ -128,6 +136,7 @@ const userDirectory: UserDirectoryEntry[] = [
     phone: '(11) 97777-9876',
     position: 'Motorista',
     costCenterId: 'cc2',
+    assignments: ['motorista'],
     avatarUrl: 'https://ui-avatars.com/api/?name=Renato+Costa&background=22c55e&color=fff',
   },
   {
@@ -137,6 +146,7 @@ const userDirectory: UserDirectoryEntry[] = [
     phone: '(31) 91234-5678',
     position: 'Motorista Reserva',
     costCenterId: 'cc1',
+    assignments: ['motorista'],
     avatarUrl: 'https://ui-avatars.com/api/?name=Bianca+Pereira&background=8b5cf6&color=fff',
   },
   {
@@ -146,6 +156,7 @@ const userDirectory: UserDirectoryEntry[] = [
     phone: '(21) 93456-7890',
     position: 'Motorista',
     costCenterId: 'cc2',
+    assignments: ['motorista'],
     avatarUrl: 'https://ui-avatars.com/api/?name=Daniel+Souza&background=ef4444&color=fff',
   },
 ]
@@ -180,13 +191,23 @@ export default function DriversPage() {
   const [endDay, setEndDay] = useState(31)
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers)
   const [driverSearchTerm, setDriverSearchTerm] = useState('')
+  const [selectedAssignment, setSelectedAssignment] = useState<'motorista' | 'outro'>('motorista')
   const [profileDriverId, setProfileDriverId] = useState<string | null>(null)
   const [driverAnswers, setDriverAnswers] = useState<
     Record<string, MonthlyAnswers>
   >(() => Object.fromEntries(initialDrivers.map((driver) => [driver.id, driver.monthlyAnswers])))
 
   const filteredDrivers = useMemo(
-    () => drivers.filter((driver) => driver.costCenterId === selectedCostCenter),
+    () =>
+      drivers.filter((driver) => {
+        const directoryEntry = driver.userId
+          ? userDirectory.find((user) => user.id === driver.userId)
+          : null
+        const hasMotoristaAssignment =
+          driver.assignment === 'motorista' || directoryEntry?.assignments.includes('motorista')
+
+        return driver.costCenterId === selectedCostCenter && hasMotoristaAssignment
+      }),
     [drivers, selectedCostCenter]
   )
 
@@ -347,6 +368,7 @@ export default function DriversPage() {
       userId: user.id,
       name: user.name,
       costCenterId: user.costCenterId,
+      assignment: selectedAssignment,
       lastScore: 0,
       monthlyAnswers: {},
     }
@@ -365,14 +387,15 @@ export default function DriversPage() {
   const searchResults = useMemo(() => {
     if (!driverSearchTerm.trim()) return []
     const term = driverSearchTerm.toLowerCase()
-    return userDirectory.filter((user) => {
-      const matchesTerm =
-        user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)
-      const matchesCostCenter = user.costCenterId === selectedCostCenter
-      const alreadyAdded = drivers.some((driver) => driver.userId === user.id)
-      return matchesTerm && matchesCostCenter && !alreadyAdded
-    })
-  }, [driverSearchTerm, drivers, selectedCostCenter])
+      return userDirectory.filter((user) => {
+        const matchesTerm =
+          user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)
+        const matchesCostCenter = user.costCenterId === selectedCostCenter
+        const alreadyAdded = drivers.some((driver) => driver.userId === user.id)
+        const matchesAssignment = user.assignments.includes(selectedAssignment)
+        return matchesTerm && matchesCostCenter && matchesAssignment && !alreadyAdded
+      })
+    }, [driverSearchTerm, drivers, selectedAssignment, selectedCostCenter])
 
 
   const costCenterInfo = costCenters.find((center) => center.id === selectedCostCenter)
@@ -442,6 +465,23 @@ export default function DriversPage() {
               </option>
             ))}
           </select>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase text-slate-500" htmlFor="assignment">
+              Função do usuário
+            </label>
+            <select
+              id="assignment"
+              value={selectedAssignment}
+              onChange={(event) => setSelectedAssignment(event.target.value as 'motorista' | 'outro')}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none"
+            >
+              <option value="motorista">Motorista</option>
+              <option value="outro">Outro</option>
+            </select>
+            <p className="text-2xs text-slate-500">
+              Somente usuários com a função Motorista serão exibidos no painel de status.
+            </p>
+          </div>
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase text-slate-500">
               Buscar usuário cadastrado
