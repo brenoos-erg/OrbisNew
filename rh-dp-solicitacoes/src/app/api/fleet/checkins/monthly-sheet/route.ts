@@ -1,5 +1,21 @@
 import { NextResponse } from 'next/server'
-import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType } from 'docx'
+import {
+  AlignmentType,
+  Document,
+  HeadingLevel,
+  ImageRun,
+  Packer,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from 'docx'
+import path from 'path'
+import { promises as fs } from 'fs'
 
 import { prisma } from '@/lib/prisma'
 
@@ -139,19 +155,59 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR').format(date)
 }
 
-function buildHeader(
+async function buildHeader(
   plate: string | null,
   type: string | null,
   sector: string | null,
   periodLabel: string,
 ) {
+    const logoPath = path.join(process.cwd(), 'public', 'erg-logo.png')
+  let logoParagraph: Paragraph | undefined
+
+  try {
+    const logoBuffer = await fs.readFile(logoPath)
+    logoParagraph = new Paragraph({
+      children: [
+        new ImageRun({
+          data: logoBuffer,
+          transformation: { width: 140, height: 56 },
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 },
+    })
+  } catch (error) {
+    console.warn('Logo não encontrada em', logoPath, error)
+  }
 
   return [
-    new Paragraph({ text: 'RELATÓRIO DE CHECKLIST DIÁRIO', bold: true }),
+     ...(logoParagraph ? [logoParagraph] : []),
     new Paragraph({
-      text: `Veículo: ${plate ?? '—'} | Tipo: ${type ?? '—'} | Setor: ${sector ?? '—'}`,
+      children: [
+        new TextRun({ text: 'RELATÓRIO DE CHECKLIST DIÁRIO', bold: true }),
+      ],
+      heading: HeadingLevel.HEADING_1,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 160 },
     }),
-    new Paragraph({ text: `Período: ${periodLabel}` }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Veículo: ', bold: true }),
+        new TextRun(plate ?? '—'),
+        new TextRun({ text: '   Tipo: ', bold: true }),
+        new TextRun(type ?? '—'),
+        new TextRun({ text: '   Setor: ', bold: true }),
+        new TextRun(sector ?? '—'),
+      ],
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: 'Período: ', bold: true }),
+        new TextRun(periodLabel),
+      ],
+      spacing: { after: 200 },
+    }),
+    
   ]
 }
 
@@ -174,7 +230,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Parâmetro month inválido. Use YYYY-MM.' }, { status: 400 })
   }
 
- const start = parseDateParam(startDateParam) || monthInfo?.start
+  const start = parseDateParam(startDateParam) || monthInfo?.start
   const end = parseDateParam(endDateParam, true) || monthInfo?.end
 
   if (!start || !end) {
@@ -203,7 +259,7 @@ export async function GET(req: Request) {
   })
 
   // ---- monta as linhas da tabela (UM row por check-in) ----
-  const rows = checkins.map((checkin) => {
+  const rows = checkins.map((checkin, index) => {
     const checklist = parseChecklist(checkin.checklistJson)
 
     const criticalItems = checklist
@@ -229,11 +285,17 @@ export async function GET(req: Request) {
       .map((item) => item.label || item.name || '—')
 
     const fatigue = parseFatigue(checkin.fatigueJson, checkin.fatigueScore)
+     const baseCellConfig = {
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 100, bottom: 100, left: 120, right: 120 },
+    }
 
     const dateCell = new TableCell({
+      ...baseCellConfig,
       children: [new Paragraph({ text: formatDate(checkin.inspectionDate) })],
     })
     const criticalCell = new TableCell({
+      ...baseCellConfig,
       children: [
         new Paragraph({
           text: criticalItems.length > 0 ? criticalItems.join(', ') : '—',
@@ -241,6 +303,7 @@ export async function GET(req: Request) {
       ],
     })
     const nonCriticalCell = new TableCell({
+        ...baseCellConfig,
       children: [
         new Paragraph({
           text: nonCriticalItems.length > 0 ? nonCriticalItems.join(', ') : '—',
@@ -254,14 +317,19 @@ export async function GET(req: Request) {
       : 'Não'
 
     const fatigueCell = new TableCell({
+        ...baseCellConfig,
       children: [new Paragraph({ text: fatigueText })],
     })
     const scoreCell = new TableCell({
+        ...baseCellConfig,
       children: [new Paragraph({ text: String(fatigue.score ?? '—') })],
     })
 
     return new TableRow({
       children: [dateCell, criticalCell, nonCriticalCell, fatigueCell, scoreCell],
+      shading: index % 2 === 0
+        ? { type: ShadingType.CLEAR, color: 'auto', fill: 'F2F6FC' }
+        : undefined,
     })
   })
 
@@ -270,11 +338,31 @@ export async function GET(req: Request) {
     rows: [
       new TableRow({
         children: [
-          new TableCell({ children: [new Paragraph({ text: 'DATA' })] }),
-          new TableCell({ children: [new Paragraph({ text: 'ITENS CRÍTICOS' })] }),
-          new TableCell({ children: [new Paragraph({ text: 'ITENS NÃO CRÍTICOS' })] }),
-          new TableCell({ children: [new Paragraph({ text: 'FADIGA' })] }),
-          new TableCell({ children: [new Paragraph({ text: 'PONTOS' })] }),
+           new TableCell({
+            children: [new Paragraph({ text: 'DATA', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'ITENS CRÍTICOS', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'ITENS NÃO CRÍTICOS', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'FADIGA', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'PONTOS', bold: true })],
+            shading: { type: ShadingType.CLEAR, color: 'FFFFFF', fill: '1D4F91' },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+          }),
         ],
       }),
       ...rows,
@@ -282,9 +370,29 @@ export async function GET(req: Request) {
   })
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: 'Arial',
+          },
+          paragraph: {
+            spacing: { line: 276 },
+          },
+        },
+      },
+    },
     sections: [
       {
-        children: [...buildHeader(vehicle.plate, vehicle.type, vehicle.sector, periodLabel), table],
+        properties: {
+          page: {
+            margin: { top: 720, bottom: 720, left: 720, right: 720 },
+          },
+        },
+        children: [
+          ...(await buildHeader(vehicle.plate, vehicle.type, vehicle.sector, periodLabel)),
+          table,
+        ],
       },
     ],
   })
@@ -298,7 +406,7 @@ export async function GET(req: Request) {
     headers: {
       'Content-Type':
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-       'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${fileLabel}.docx"`,
+      'Content-Disposition': `attachment; filename="checklist-${vehicle.plate}-${fileLabel}.docx"`,
     },
   })
 }
