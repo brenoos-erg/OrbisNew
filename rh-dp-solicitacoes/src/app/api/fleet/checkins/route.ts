@@ -20,7 +20,6 @@ const fatiguePoints: Record<string, number> = {
   '40': 5,
 }
 
-// Tipo para os itens do checklist
 type ChecklistItem = {
   name?: string
   label?: string
@@ -87,7 +86,7 @@ function buildEmailContent({
   vehiclePlate: string
   vehicleType?: string | null
   vehicleKm: number
-  itemsWithProblem: ChecklistItem[] // Alterado para usar ChecklistItem[]
+  itemsWithProblem: ChecklistItem[]
   driverStatus: 'APTO' | 'INAPTO'
   fatigueRisk: 'LEVE' | 'TOLERAVEL' | 'GRAVE'
   nonConformityCriticality?: string | null
@@ -98,11 +97,12 @@ function buildEmailContent({
   const formattedDate = inspectionDate || '—'
   const formattedTime = inspectionTime && inspectionTime !== '' ? inspectionTime : '—'
   const formattedKm = Number.isFinite(vehicleKm) ? vehicleKm.toLocaleString('pt-BR') : '—'
-  const issues = itemsWithProblem
-    .map((item) => item.label || item.name)
-    .filter(Boolean)
-    .map((label) => `- ${label}`)
-    .join('\n') || '- Item crítico não informado'
+  const issues =
+    itemsWithProblem
+      .map((item) => item.label || item.name)
+      .filter(Boolean)
+      .map((label) => `- ${label}`)
+      .join('\n') || '- Item crítico não informado'
 
   const baseIntro =
     driverStatus === 'INAPTO'
@@ -113,7 +113,10 @@ function buildEmailContent({
     driverStatus === 'INAPTO'
       ? `Descrição: Checklist de fadiga indicou motorista INAPTO (risco ${fatigueRisk}).`
       : `Descrição: ${issues}`,
-    `Criticidade: ${nonConformityCriticality || (driverStatus === 'INAPTO' ? 'Motorista inapto' : 'Item crítico')}`,
+    `Criticidade: ${
+      nonConformityCriticality ||
+      (driverStatus === 'INAPTO' ? 'Motorista inapto' : 'Item crítico')
+    }`,
     `Medidas Tomadas: ${
       nonConformityActions ||
       (driverStatus === 'INAPTO'
@@ -144,7 +147,8 @@ function buildEmailContent({
     '',
     driverStatus === 'INAPTO' ? '⚠️ Motorista Inapto' : '⚠️ Não Conformidade',
     nonConformityBlock,
-  ].filter((line): line is string => line !== undefined)
+  ]
+    .filter((line): line is string => line !== undefined)
     .join('\n')
 
   return {
@@ -202,7 +206,7 @@ export async function POST(req: Request) {
     if (!inspectionDate || !vehiclePlate || typeof vehicleKm !== 'number') {
       return NextResponse.json(
         { error: 'Dados obrigatórios ausentes (data, placa ou quilometragem).' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -212,7 +216,6 @@ export async function POST(req: Request) {
 
     const { fatigueScore, fatigueRisk, driverStatus } = calculateFatigue(fatigue)
 
-    // Mudança: usando a tipagem correta para itemsWithProblem
     const itemsWithProblem = (vehicleChecklist as ChecklistItem[]).filter(
       (item) =>
         item.category?.toUpperCase() === 'CRITICO' &&
@@ -222,7 +225,6 @@ export async function POST(req: Request) {
     const hasVehicleProblem = itemsWithProblem.length > 0
     const hasNonConformityBool = String(hasNonConformity).toUpperCase() === 'SIM'
 
-    // O status do veículo depende apenas de problemas mecânicos/itens do checklist ou não conformidade.
     const vehicleStatus =
       hasVehicleProblem || hasNonConformityBool ? 'RESTRITO' : 'DISPONIVEL'
 
@@ -233,15 +235,17 @@ export async function POST(req: Request) {
     if (!vehicle) {
       return NextResponse.json(
         { error: 'Placa não cadastrada. Cadastre o veículo antes do check-in.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
+
     if (typeof vehicleKm === 'number' && vehicleKm < vehicle.kmCurrent) {
       return NextResponse.json(
         { error: 'A quilometragem informada é inferior ao último registro do veículo.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
+
     if (driverName && driverName !== appUser.fullName) {
       await prisma.user.update({
         where: { id: appUser.id },
@@ -256,7 +260,7 @@ export async function POST(req: Request) {
             error:
               'Veículo restrito requer tratativa: informe ações e data de tratativa para liberar o veículo.',
           },
-          { status: 400 }
+          { status: 400 },
         )
       }
     }
@@ -297,7 +301,8 @@ export async function POST(req: Request) {
       },
     })
 
-    const shouldNotify = hasVehicleProblem || driverStatus === 'INAPTO'
+    const shouldNotify =
+      hasVehicleProblem || hasNonConformityBool || driverStatus === 'INAPTO'
 
     if (shouldNotify) {
       const recipients = await findFleetLevel3Emails()
@@ -337,7 +342,7 @@ export async function POST(req: Request) {
     console.error('Erro ao registrar check-in de veículo', error)
     return NextResponse.json(
       { error: 'Erro ao registrar check-in' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
