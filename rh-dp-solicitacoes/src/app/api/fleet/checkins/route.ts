@@ -134,6 +134,8 @@ function buildEmailContent({
     '',
     '👤 Dados do Motorista',
     `Nome: ${driverName || '—'}`,
+    `Status: ${driverStatus}`,
+    driverStatus === 'INAPTO' ? `Risco de fadiga: ${fatigueRisk}` : undefined,
     '',
     '🚚 Dados do Veículo',
     `${vehicleType || 'Veículo'} / Tipo: ${vehicleType || '—'}`,
@@ -142,7 +144,8 @@ function buildEmailContent({
     '',
     driverStatus === 'INAPTO' ? '⚠️ Motorista Inapto' : '⚠️ Não Conformidade',
     nonConformityBlock,
-  ].join('\n')
+  ].filter((line): line is string => line !== undefined)
+    .join('\n')
 
   return {
     subject: driverStatus === 'INAPTO' ? 'Alerta: motorista inapto' : 'Alerta de check-in de veículo',
@@ -294,7 +297,7 @@ export async function POST(req: Request) {
       },
     })
 
-    const shouldNotify = vehicleStatus === 'RESTRITO' || driverStatus === 'INAPTO' || hasNonConformityBool
+    const shouldNotify = hasVehicleProblem || driverStatus === 'INAPTO'
 
     if (shouldNotify) {
       const recipients = await findFleetLevel3Emails()
