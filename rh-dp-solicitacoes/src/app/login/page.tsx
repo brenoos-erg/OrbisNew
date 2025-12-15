@@ -47,7 +47,7 @@ function LoginPageContent() {
     e.preventDefault()
     setLoading(true)
 
-    // 1️⃣ Tenta autenticar com Supabase
+  // 1️⃣ Tenta autenticar com Supabase
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setLoading(false)
@@ -56,49 +56,45 @@ function LoginPageContent() {
     }
 
     // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
+    let syncDbUnavailable = false
     try {
-     const syncRes = await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
+      const syncRes = await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
       if (!syncRes.ok) {
         const body = await syncRes.json().catch(() => null)
-        if (body?.dbUnavailable) {
-          setLoading(false)
-          router.replace('/login?db-unavailable=1')
-          router.refresh()
-          return
-        }
-
-        setLoading(false)
-        alert(body?.error || 'Erro ao sincronizar usuário. Tente novamente.')
-        return
+        if (body?.dbUnavailable) syncDbUnavailable = true
+        // Erros de sincronização não devem impedir login quando Supabase já autenticou
       }
     } catch {
       // erro silencioso, mas não deixa travar
     }
 
     // 3️⃣ Verifica status no backend
-    try {
-      const res = await fetch('/api/session/me', { cache: 'no-store' })
-      if (res.ok) {
-        const me = await res.json()
-        if (me?.dbUnavailable) {
-          setLoading(false)
-          router.replace('/login?db-unavailable=1')
-          router.refresh()
-          return
+    if (!syncDbUnavailable) {
+      try {
+        const res = await fetch('/api/session/me', { cache: 'no-store' })
+        if (res.ok) {
+          const me = await res.json()
+          if (me?.dbUnavailable) {
+            syncDbUnavailable = true
+          }
+          if (me?.appUser?.status === 'INATIVO') {
+            await supabase.auth.signOut({ scope: 'global' })
+            setLoading(false)
+            alert('Seu usuário está INATIVO. Fale com o administrador.')
+            router.replace('/login?inactive=1')
+            router.refresh()
+            return
+          }
         }
-        if (me?.appUser?.status === 'INATIVO') {
-          await supabase.auth.signOut({ scope: 'global' })
-          setLoading(false)
-          alert('Seu usuário está INATIVO. Fale com o administrador.')
-          router.replace('/login?inactive=1')
-          router.refresh()
-          return
-        }
+      } catch {
+        // erro silencioso, mas não deixa travar
       }
-    } catch {
-      // erro silencioso, mas não deixa travar
     }
 
+    if (syncDbUnavailable) {
+      // mostra aviso mas mantém sessão já autenticada
+      alert('Não foi possível verificar seus dados agora. Vamos continuar assim mesmo.')
+    }
     // 4️⃣ Se for primeiro acesso (mustChangePassword)
     const { data: { user } } = await supabase.auth.getUser()
     const must = (user?.user_metadata as any)?.mustChangePassword === true

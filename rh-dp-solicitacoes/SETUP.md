@@ -58,8 +58,11 @@ Banco de dados hospedado no **Supabase**, que usa PostgreSQL.
 
 #### `.env` Final (funcional)
 ```env
-# Banco de dados Supabase (conexão direta via IPv6)
-DATABASE_URL=postgresql://postgres:Xmfobk5332%21@db.wgwgdghkecnekqhseavy.supabase.co:5432/postgres?sslmode=require
+# Banco de dados Supabase (use URL DO POOL para Vercel/serverless)
+DATABASE_URL=postgresql://postgres:Xmfobk5332%21@aws-0-sa-east-1.pooler.supabase.net:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1
+
+# URL direta (para migrações locais ou ambientes com IPv6 liberado)
+DIRECT_DATABASE_URL=postgresql://postgres:Xmfobk5332%21@db.wgwgdghkecnekqhseavy.supabase.co:5432/postgres?sslmode=require
 
 # Supabase API
 NEXT_PUBLIC_SUPABASE_URL=https://wgwgdghkecnekqhseavy.supabase.co
@@ -67,6 +70,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 ```
 
 > 💡 Observação: a senha contém `!`, que foi escapado para `%21`.
+> Em produção (Vercel) use a URL de *pooling* (`aws-0-...pooler.supabase.net`) para evitar falhas de conexão em ambientes sem IPv6.
 
 ---
 
@@ -79,6 +83,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 | Erro | Causa | Solução |
 |------|--------|----------|
 | `P1001: Can't reach database server` | DNS não resolvia IPv6 | Instalado **Cloudflare WARP** |
+| `P1001` no Vercel / serverless | Conexão direta exige IPv6 e esgota conexões | Usar string de pooling do Supabase (`aws-0-...pooler.supabase.net:6543`) em `DATABASE_URL` e manter `DIRECT_DATABASE_URL` apenas para migrações locais |
 | `P1001` durante `npm run dev` em ambientes sem acesso à internet | Falha ao aplicar migrações antes de subir o Next.js | Rode `SKIP_PRISMA_MIGRATE=true npm run dev` para iniciar o servidor sem aplicar migrações (as operações de banco continuarão indisponíveis). Também é possível colocar `SKIP_PRISMA_MIGRATE=true` no `.env`, já que o script de dev agora carrega esse arquivo automaticamente. Para evitar erros de sincronização de sessão quando o banco estiver inacessível, defina também `SKIP_PRISMA_DB=true`. |
 | `Validation Error Count` no schema | Comentários com `#` | Trocado para `//` |
 | `Enum value definition` inválido | Prisma não aceita `#` | Corrigido comentários |
