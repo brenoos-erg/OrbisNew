@@ -27,8 +27,8 @@ export async function getCurrentAppUser() {
   const authId = sessionUser.id
   const email = sessionUser.email ?? undefined
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const session = sessionData.session ?? null
+ // usa apenas getUser() para garantir que os dados estejam autenticados via Supabase
+  const session = sessionUser ? { user: sessionUser } : null
 
   let appUser = null
   let dbUnavailable = false

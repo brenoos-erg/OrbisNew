@@ -36,15 +36,52 @@ function LoginPageContent() {
 const shouldForceSignOut = search.get('logout') === '1'
 
   useEffect(() => {
-    // derruba a sessão apenas quando solicitado explicitamente
+    let active = true
+    // derruba a sessão apenas quando solicitado explicitamente e tenta reaproveitar sessões já válidas
     ;(async () => {
       if (shouldForceSignOut) {
         try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
         try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
       }
-      setLoadingSession(false)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!active) return
+
+      if (user) {
+        try {
+          const meRes = await fetch('/api/session/me', { cache: 'no-store' })
+          if (!active) return
+          if (meRes.ok) {
+            const me = await meRes.json()
+            if (me?.appUser?.status === 'INATIVO') {
+              await supabase.auth.signOut({ scope: 'global' })
+              router.replace('/login?inactive=1')
+              router.refresh()
+              return
+            }
+            if (me?.appUser) {
+              router.replace(nextUrl)
+              router.refresh()
+              return
+            }
+            if (me?.dbUnavailable) {
+              router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+              router.refresh()
+              return
+            }
+          }
+        } catch {
+          // falha silenciosa para não travar a tela de login
+        }
+      }
+
+      if (active) setLoadingSession(false)
     })()
-  }, [shouldForceSignOut, supabase])
+
+    return () => {
+      active = false
+    }
+  }, [shouldForceSignOut, supabase, router, nextUrl])
 
   async function handleLogin() {
     if (loading) return
@@ -83,7 +120,7 @@ const shouldForceSignOut = search.get('logout') === '1'
           if (me?.dbUnavailable) {
             syncDbUnavailable = true
           }
-           if (!syncDbUnavailable && !me?.appUser) {
+            if (!syncDbUnavailable && !me?.appUser) {
             setLoading(false)
             alert('Não foi possível carregar seus dados agora. Tente novamente.')
             return

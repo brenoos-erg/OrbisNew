@@ -6,6 +6,6 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const supabase = createRouteHandlerClient({ cookies })
-  const { data } = await supabase.auth.getSession()
-  return NextResponse.json({ hasSession: !!data.session, session: data.session })
+  const { data } = await supabase.auth.getUser()
+  return NextResponse.json({ hasSession: !!data.user, user: data.user })
 }
