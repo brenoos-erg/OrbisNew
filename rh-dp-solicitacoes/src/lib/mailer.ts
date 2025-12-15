@@ -1,8 +1,7 @@
 // src/lib/mailer.ts
-import nodemailer from 'nodemailer'
 
 export type MailPayload = {
-  to: string[]        // sempre array, mesmo que só 1 email
+  to: string[]
   subject: string
   text?: string
   html?: string
@@ -13,94 +12,100 @@ export type MailResult = {
   error?: string
 }
 
-// Transporter global (reutilizado entre chamadas)
-const transporterPromise = (async () => {
-  const {
-    SMTP_HOST,
-    SMTP_PORT,
-    SMTP_USER,
-    SMTP_PASS,
-    SMTP_FROM,
-    NODE_ENV,
-  } = process.env
+export type MailChannel = 'ALERTS' | 'NOTIFICATIONS' | 'SYSTEM'
 
-  // Modo DEV sem SMTP configurado: só loga
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_FROM) {
-    console.warn(
-      '[mailer] SMTP não configurado. E-mails serão apenas LOGADOS no console.',
-    )
-    return null
+type ResendEmailPayload = {
+  from: string
+  to: string[]
+  subject: string
+  text?: string
+  html?: string
+}
+
+/**
+ * Retorna o "from" por canal.
+ * Configure no .env:
+ *  MAIL_FROM_ALERTS="ERG Engenharia <alertas@updates.ergengenharia.com.br>"
+ *  MAIL_FROM_NOTIFICATIONS="ERG Engenharia <notificacoes@updates.ergengenharia.com.br>"
+ *  MAIL_FROM_SYSTEM="ERG Engenharia <sistema@updates.ergengenharia.com.br>"
+ */
+function getFromByChannel(channel: MailChannel): string {
+  const fallback = process.env.MAIL_FROM ?? 'onboarding@resend.dev'
+
+  const map: Record<MailChannel, string | undefined> = {
+    ALERTS: process.env.MAIL_FROM_ALERTS,
+    NOTIFICATIONS: process.env.MAIL_FROM_NOTIFICATIONS,
+    SYSTEM: process.env.MAIL_FROM_SYSTEM,
   }
 
-  const port = Number(SMTP_PORT)
+  return map[channel] ?? fallback
+}
 
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port,
-    secure: port === 465, // 465 = SSL, 587 = TLS/STARTTLS
-    auth:
-      SMTP_USER && SMTP_PASS
-        ? {
-            user: SMTP_USER,
-            pass: SMTP_PASS,
-          }
-        : undefined,
+function normalizeRecipients(to: string[]): string[] {
+  return (to ?? [])
+    .map((x) => String(x).trim())
+    .filter((x) => x.length > 0)
+}
+
+function assertValidPayload(payload: MailPayload) {
+  const to = normalizeRecipients(payload.to)
+  if (to.length === 0) throw new Error('Lista de destinatários (to) vazia.')
+  if (!payload.subject?.trim()) throw new Error('Assunto (subject) é obrigatório.')
+  if (!payload.text?.trim() && !payload.html?.trim()) {
+    throw new Error('Informe pelo menos "text" ou "html" no e-mail.')
+  }
+}
+
+async function sendViaResend(apiKey: string, payload: ResendEmailPayload) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
   })
 
-  // Opcional: verificar conexão no startup (só em dev)
-  if (NODE_ENV !== 'production') {
-    try {
-      await transporter.verify()
-      console.log('[mailer] Conectado ao servidor SMTP com sucesso.')
-    } catch (err) {
-      console.error('[mailer] Erro ao verificar SMTP:', err)
-    }
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    throw new Error(errorText || `Resend request failed with status ${response.status}`)
   }
 
-  return transporter
-})()
+  return response.json()
+}
 
-export async function sendMail({
-  to,
-  subject,
-  text,
-  html,
-}: MailPayload): Promise<MailResult> {
+/**
+ * Envia e-mail via Resend.
+ * - Em DEV (sem RESEND_API_KEY), apenas loga e retorna { sent: true }.
+ * - channel define o FROM (ALERTS/NOTIFICATIONS/SYSTEM).
+ */
+export async function sendMail(
+  payload: MailPayload,
+  channel: MailChannel = 'SYSTEM',
+): Promise<MailResult> {
   try {
-    const transporter = await transporterPromise
+    assertValidPayload(payload)
 
-    // Se não tiver transporter (SMTP não configurado), apenas loga
-    if (!transporter) {
-      console.log('-----------------------------')
-      console.log('📨 [DEV] Simulando envio de e-mail')
-      console.log('Para:', to.join(', '))
-      console.log('Assunto:', subject)
-      if (text) {
-        console.log('\nTexto:\n', text)
-      }
-      if (html) {
-        console.log('\nHTML:\n', html)
-      }
-      console.log('-----------------------------')
+    const apiKey = process.env.RESEND_API_KEY
+    const to = normalizeRecipients(payload.to)
+    const subject = payload.subject.trim()
+    const text = payload.text?.trim()
+    const html = payload.html?.trim()
+    const from = getFromByChannel(channel)
+
+    // Fallback DEV / ambiente sem integração
+    if (!apiKey) {
+      console.info('[DEV] RESEND_API_KEY não encontrada; e-mail não foi enviado.')
+      console.info({ channel, from, to, subject, text, html })
       return { sent: true }
     }
 
-    const from = process.env.SMTP_FROM!
-
-    await transporter.sendMail({
-      from,
-      to,
-      subject,
-      text,
-      html,
-    })
+    await sendViaResend(apiKey, { from, to, subject, text, html })
 
     return { sent: true }
   } catch (error) {
-    console.error('[mailer] Erro ao enviar e-mail:', error)
-    return {
-      sent: false,
-      error: error instanceof Error ? error.message : String(error),
-    }
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('Erro ao enviar e-mail:', message)
+    return { sent: false, error: message }
   }
 }
