@@ -126,9 +126,9 @@ function buildChecklistTable(items: ChecklistItem[]) {
     ],
   })
 
-  const rows = items.map((item, index) => {
+    const rows = items.map((item, index) => {
     const status = (item.status || 'OK').toUpperCase()
-      const hasNonConformity = status === 'COM_PROBLEMA' || status === 'NC'
+    const hasNonConformity = status === 'COM_PROBLEMA' || status === 'NC'
     const requiresRepair = status === 'R'
     const isOk = status === 'OK' || status === 'CONFORME'
     const isNotApplicable = status === 'NAO_SE_APLICA'

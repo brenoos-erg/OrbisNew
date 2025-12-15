@@ -1,11 +1,30 @@
 import { NextResponse } from 'next/server'
+import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { getCurrentAppUser } from '@/lib/auth'
+import { normalizePlate, isValidPlate } from '@/lib/plate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/
+const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+
+function hasMinLevel(current: ModuleLevel | undefined, min: ModuleLevel) {
+  if (!current) return false
+  return LEVEL_ORDER.indexOf(current) >= LEVEL_ORDER.indexOf(min)
+}
 
 export async function GET(req: Request) {
+  const { appUser } = await getCurrentAppUser()
+
+  if (!appUser) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  }
+
+  const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
+  if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)) {
+    return NextResponse.json({ error: 'Acesso negado ao módulo de frotas.' }, { status: 403 })
+  }
+
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') ?? undefined
   const plate = searchParams.get('plate') ?? undefined
@@ -31,6 +50,17 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+     const { appUser } = await getCurrentAppUser()
+
+    if (!appUser) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
+    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+    }
+
     const body = await req.json()
     const {
       plate,
@@ -50,10 +80,10 @@ export async function POST(req: Request) {
       )
     }
 
-    const normalizedPlate = String(plate).trim().toUpperCase()
-     if (!plateRegex.test(normalizedPlate)) {
+    const normalizedPlate = normalizePlate(String(plate))
+    if (!isValidPlate(normalizedPlate)) {
       return NextResponse.json(
-        { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul).' },
+         { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul) ou ABC1234 (antiga).' },
         { status: 400 }
       )
     }
@@ -115,6 +145,17 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const { appUser } = await getCurrentAppUser()
+
+    if (!appUser) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
+    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
@@ -182,6 +223,16 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const { appUser } = await getCurrentAppUser()
+
+    if (!appUser) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
+    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+    }
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
@@ -194,7 +245,6 @@ export async function DELETE(req: Request) {
 
     await prisma.vehicleCheckin.deleteMany({ where: { vehicleId: id } })
     await prisma.vehicle.delete({ where: { id } })
-await prisma.vehicle.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao excluir veículo', error)

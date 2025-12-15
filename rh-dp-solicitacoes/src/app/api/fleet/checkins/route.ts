@@ -45,16 +45,99 @@ function calculateFatigue(fatigue: Array<{ name: string; answer?: string }>) {
 
   return { fatigueScore, fatigueRisk, driverStatus }
 }
-async function findFleetLevel2Emails() {
+async function findFleetLevel3Emails() {
   const fleetModule = await prisma.module.findFirst({ where: { key: 'gestao-de-frotas' } })
   if (!fleetModule) return [] as string[]
 
   const accesses = await prisma.userModuleAccess.findMany({
-    where: { moduleId: fleetModule.id, level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] } },
+    where: { moduleId: fleetModule.id, level: ModuleLevel.NIVEL_3 },
     include: { user: { select: { email: true } } },
   })
 
   return accesses.map((access) => access.user.email).filter(Boolean) as string[]
+}
+function buildEmailContent({
+  inspectionDate,
+  inspectionTime,
+  driverName,
+  vehiclePlate,
+  vehicleType,
+  vehicleKm,
+  itemsWithProblem,
+  driverStatus,
+  fatigueRisk,
+  nonConformityCriticality,
+  nonConformityActions,
+  nonConformityManager,
+  nonConformityHandlingDate,
+}: {
+  inspectionDate: string
+  inspectionTime?: string
+  driverName?: string | null
+  vehiclePlate: string
+  vehicleType?: string | null
+  vehicleKm: number
+  itemsWithProblem: Array<{ name?: string; label?: string }>
+  driverStatus: 'APTO' | 'INAPTO'
+  fatigueRisk: 'LEVE' | 'TOLERAVEL' | 'GRAVE'
+  nonConformityCriticality?: string | null
+  nonConformityActions?: string | null
+  nonConformityManager?: string | null
+  nonConformityHandlingDate?: string | null
+}) {
+  const formattedDate = inspectionDate || '—'
+  const formattedTime = inspectionTime && inspectionTime !== '' ? inspectionTime : '—'
+  const formattedKm = Number.isFinite(vehicleKm) ? vehicleKm.toLocaleString('pt-BR') : '—'
+  const issues = itemsWithProblem
+    .map((item) => item.label || item.name)
+    .filter(Boolean)
+    .map((label) => `- ${label}`)
+    .join('\n') || '- Item crítico não informado'
+
+  const baseIntro =
+    driverStatus === 'INAPTO'
+      ? 'Foi identificado um motorista inapto durante o preenchimento do Checklist de Veículos – ERG.'
+      : 'Foi identificada uma não conformidade durante o preenchimento do Checklist de Veículos – ERG.'
+
+  const nonConformityBlock = [
+    driverStatus === 'INAPTO'
+      ? `Descrição: Checklist de fadiga indicou motorista INAPTO (risco ${fatigueRisk}).`
+      : `Descrição: ${issues}`,
+    `Criticidade: ${nonConformityCriticality || (driverStatus === 'INAPTO' ? 'Motorista inapto' : 'Item crítico')}`,
+    `Medidas Tomadas: ${
+      nonConformityActions ||
+      (driverStatus === 'INAPTO'
+        ? 'Substituir o condutor ou aguardar liberação do gestor.'
+        : 'Item sinalizado e será informado ao gestor')
+    }`,
+    `Gestor Responsável: ${nonConformityManager || 'Gestor responsável não informado'}`,
+    `Data da Tratativa: ${nonConformityHandlingDate || formattedDate}`,
+  ].join('\n')
+
+  const text = [
+    baseIntro,
+    'Segue o resumo das informações registradas:',
+    '',
+    '📌 Dados do Checklist',
+    `Data da inspeção: ${formattedDate}`,
+    `Horário: ${formattedTime}`,
+    '',
+    '👤 Dados do Motorista',
+    `Nome: ${driverName || '—'}`,
+    '',
+    '🚚 Dados do Veículo',
+    `${vehicleType || 'Veículo'} / Tipo: ${vehicleType || '—'}`,
+    `Placa: ${vehiclePlate}`,
+    `KM / Horímetro: ${formattedKm}`,
+    '',
+    driverStatus === 'INAPTO' ? '⚠️ Motorista Inapto' : '⚠️ Não Conformidade',
+    nonConformityBlock,
+  ].join('\n')
+
+  return {
+    subject: driverStatus === 'INAPTO' ? 'Alerta: motorista inapto' : 'Alerta de check-in de veículo',
+    text,
+  }
 }
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -198,21 +281,24 @@ export async function POST(req: Request) {
     const shouldNotify = vehicleStatus === 'RESTRITO' || driverStatus === 'INAPTO' || hasNonConformityBool
 
     if (shouldNotify) {
-      const recipients = await findFleetLevel2Emails()
+      const recipients = await findFleetLevel3Emails()
 
       if (recipients.length > 0) {
-        const subject = 'Alerta de check-in de veículo'
-        const text = [
-          `Veículo: ${normalizedPlate} (${normalizedType})`,
-          `Status do veículo: ${vehicleStatus}`,
-          `Motorista: ${driverName || appUser.fullName || '—'}`,
-          `Status do motorista: ${driverStatus}`,
-          `Não conformidade: ${hasNonConformityBool ? 'Sim' : 'Não'}`,
-          `Data/hora: ${inspectionDateTime.toLocaleString('pt-BR')}`,
-          hasVehicleProblem ? 'Itens com problema informados no checklist.' : undefined,
-        ]
-          .filter(Boolean)
-          .join('\n')
+        const { subject, text } = buildEmailContent({
+          inspectionDate,
+          inspectionTime,
+          driverName: driverName || appUser.fullName,
+          vehiclePlate: normalizedPlate,
+          vehicleType: normalizedType,
+          vehicleKm,
+          itemsWithProblem,
+          driverStatus,
+          fatigueRisk,
+          nonConformityCriticality,
+          nonConformityActions,
+          nonConformityManager: nonConformityManager || appUser.fullName,
+          nonConformityHandlingDate,
+        })
 
         const mailResult = await sendMail({ to: recipients, subject, text })
 

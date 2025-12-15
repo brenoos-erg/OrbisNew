@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { isValidPlate } from '@/lib/plate'
 
 type ChecklistItem = {
   name: string
@@ -150,7 +151,6 @@ export default function VehicleCheckinPage() {
     }, {})
   )
 
-  const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/
 
   useEffect(() => {
     async function loadCostCenters() {
@@ -250,7 +250,7 @@ export default function VehicleCheckinPage() {
     }
 
     const normalizedPlate = plateInput.trim().toUpperCase()
-    if (plateRegex.test(normalizedPlate)) {
+    if (isValidPlate(normalizedPlate)) {
       checkVehicle(normalizedPlate)
     } else {
       setVehicleExists(null)
@@ -279,8 +279,8 @@ export default function VehicleCheckinPage() {
     const form = event.currentTarget
     const normalizedPlate = plateInput.trim().toUpperCase()
 
-    if (!plateRegex.test(normalizedPlate)) {
-      setError('Informe uma placa no formato ABC1A34 (padrão Mercosul)')
+   if (!isValidPlate(normalizedPlate)) {
+      setError('Informe uma placa no formato ABC1A34 (Mercosul) ou ABC1234 (antiga)')
       return
     }
 
@@ -446,8 +446,8 @@ export default function VehicleCheckinPage() {
                 required
                 name="vehiclePlate"
                 type="text"
-                placeholder="ABC1A34"
-                pattern="[A-Z]{3}[0-9][A-Z][0-9]{2}"
+                placeholder="ABC1A34 ou ABC1234"
+                pattern="[A-Z]{3}[0-9][A-Z0-9][0-9]{2}"
                 value={plateInput}
                 onChange={(event) => {
                   const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X } from 'lucide-react'
+import { isValidPlate } from '@/lib/plate'
 
 type CostCenterOption = {
   id: string
@@ -57,6 +58,7 @@ type VehicleStatusInfo = {
   colorClass: string
   normalized: string
 }
+
 type VehicleStatusLog = {
   id: string
   vehicleId: string
@@ -65,6 +67,8 @@ type VehicleStatusLog = {
   createdAt: string
   createdBy?: { fullName?: string | null; email?: string | null } | null
 }
+
+type FleetLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
 
 const statusOptions = [
   { value: 'DISPONIVEL', label: 'Disponível' },
@@ -92,6 +96,7 @@ function getStatusInfo(status?: string | null): VehicleStatusInfo {
       return { label: status ?? '—', colorClass: 'bg-slate-100 text-slate-800', normalized }
   }
 }
+
 function getDriverStatusInfo(status?: string | null) {
   const normalized = status?.toUpperCase()
 
@@ -114,7 +119,6 @@ function extractDriverNames(checkin: VehicleCheckin) {
     .filter((name) => name.length > 0)
 }
 
-
 function formatKm(km?: number | null) {
   if (typeof km !== 'number') return '—'
   return `${km.toLocaleString('pt-BR')} km`
@@ -126,12 +130,14 @@ function formatDate(date?: string | null) {
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleDateString('pt-BR')
 }
+
 function formatDateTime(date?: string | null) {
   if (!date) return '—'
   const parsed = new Date(date)
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleString('pt-BR')
 }
+
 function getMonthBoundaries(month?: string | null) {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return { start: '', end: '' }
 
@@ -161,6 +167,7 @@ export default function VehiclesPage() {
 
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
   const [loadingCostCenters, setLoadingCostCenters] = useState(false)
+
   const [statusModalVehicle, setStatusModalVehicle] = useState<ApiVehicle | null>(null)
   const [statusSelection, setStatusSelection] = useState('DISPONIVEL')
   const [statusReason, setStatusReason] = useState('')
@@ -170,11 +177,14 @@ export default function VehiclesPage() {
   const [statusError, setStatusError] = useState<string | null>(null)
   const [viewingLogId, setViewingLogId] = useState<string | null>(null)
   const [typedReasonBackup, setTypedReasonBackup] = useState('')
+
   const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), [])
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
 
+  const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
+  const [permissionsLoading, setPermissionsLoading] = useState(true)
 
   const [formValues, setFormValues] = useState({
     plate: '',
@@ -185,30 +195,68 @@ export default function VehiclesPage() {
     costCenterIds: [] as string[],
   })
 
-  const plateRegex = /^[A-Z]{3}\d[A-Z]\d{2}$/ // Mercosul
   const normalizedPlate = formValues.plate.trim().toUpperCase()
-  const isPlateValid = plateRegex.test(normalizedPlate)
+  const isPlateValid = isValidPlate(normalizedPlate)
+  const canManageVehicles = fleetLevel === 'NIVEL_3'
+  const canViewVehicles = fleetLevel === 'NIVEL_2' || canManageVehicles
 
   const restrictedVehicles = useMemo(
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
-    [vehicles]
+    [vehicles],
   )
+
   const monthBoundaries = useMemo(() => getMonthBoundaries(selectedMonth), [selectedMonth])
 
   const appliedStartDate = customStartDate || monthBoundaries.start
   const appliedEndDate = customEndDate || monthBoundaries.end
 
   useEffect(() => {
+    async function loadPermissions() {
+      try {
+        const res = await fetch('/api/session/me', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Falha ao carregar permissões do módulo')
+
+        const data = await res.json()
+        const level: FleetLevel | null = (() => {
+          const raw =
+            data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
+            data?.appUser?.moduleLevels?.['gestao_frotas']
+          return raw === 'NIVEL_1' || raw === 'NIVEL_2' || raw === 'NIVEL_3' ? raw : null
+        })()
+
+        setFleetLevel(level)
+      } catch (err) {
+        console.error(err)
+        setFleetLevel(null)
+      } finally {
+        setPermissionsLoading(false)
+      }
+    }
+
+    loadPermissions()
+  }, [])
+
+  useEffect(() => {
+    if (permissionsLoading) return
+
+    if (!canViewVehicles) {
+      setLoading(false)
+      setLoadingCostCenters(false)
+      return
+    }
+
     loadVehicles()
     loadCostCenters()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissionsLoading, canViewVehicles])
 
   useEffect(() => {
     if (selectedVehicle) {
       loadCheckins(selectedVehicle.id)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicle])
-  
+
   const filteredCheckins = useMemo(() => {
     const start = appliedStartDate ? new Date(`${appliedStartDate}T00:00:00`) : null
     const end = appliedEndDate ? new Date(`${appliedEndDate}T23:59:59`) : null
@@ -226,22 +274,29 @@ export default function VehiclesPage() {
     })
   }, [appliedEndDate, appliedStartDate, checkins])
 
- const monthlyDocUrl = useMemo(() => {
+  /**
+   * ✅ Correção importante:
+   * - Se o usuário digitou datas customizadas -> manda startDate/endDate
+   * - Senão -> manda só month
+   */
+  const monthlyDocUrl = useMemo(() => {
     if (!selectedVehicle) return '#'
 
     const params = new URLSearchParams({
       vehicleId: selectedVehicle.id,
     })
 
-    if (selectedMonth) params.set('month', selectedMonth)
-    if (appliedStartDate) params.set('startDate', appliedStartDate)
-    if (appliedEndDate) params.set('endDate', appliedEndDate)
+    const usingCustomDates = Boolean(customStartDate || customEndDate)
 
-    
+    if (usingCustomDates) {
+      if (customStartDate) params.set('startDate', customStartDate)
+      if (customEndDate) params.set('endDate', customEndDate)
+    } else {
+      if (selectedMonth) params.set('month', selectedMonth)
+    }
 
     return `/api/fleet/checkins/monthly-sheet?${params.toString()}`
-}, [appliedEndDate, appliedStartDate, selectedMonth, selectedVehicle])
-
+  }, [customEndDate, customStartDate, selectedMonth, selectedVehicle])
 
   const appliedPeriodLabel = useMemo(() => {
     if (appliedStartDate || appliedEndDate) {
@@ -252,7 +307,6 @@ export default function VehiclesPage() {
     }
     return 'Todos os check-ins'
   }, [appliedEndDate, appliedStartDate, selectedMonth])
-
 
   async function loadCostCenters() {
     setLoadingCostCenters(true)
@@ -289,6 +343,7 @@ export default function VehiclesPage() {
   }
 
   async function loadCheckins(vehicleId: string) {
+    if (!canViewVehicles) return
     setLoadingCheckins(true)
 
     try {
@@ -299,10 +354,10 @@ export default function VehiclesPage() {
       setCheckins(
         data.map((item) => ({
           ...item,
-           vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
+          vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
           vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
           vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
-        }))
+        })),
       )
     } catch (err) {
       console.error(err)
@@ -311,7 +366,9 @@ export default function VehiclesPage() {
       setLoadingCheckins(false)
     }
   }
+
   async function loadStatusLogs(vehicleId: string) {
+    if (!canManageVehicles) return
     setLoadingStatusLogs(true)
     setStatusError(null)
 
@@ -331,6 +388,7 @@ export default function VehiclesPage() {
   }
 
   function openStatusModal(vehicle: ApiVehicle) {
+    if (!canManageVehicles) return
     const normalized = getStatusInfo(vehicle.status).normalized
     const initialStatus = statusOptions.some((option) => option.value === normalized)
       ? normalized
@@ -345,14 +403,18 @@ export default function VehiclesPage() {
     setViewingLogId(null)
     loadStatusLogs(vehicle.id)
   }
+
   async function submitStatusChange() {
     if (!statusModalVehicle) return
+    if (!canManageVehicles) {
+      setStatusError('Você não tem permissão para alterar o status dos veículos.')
+      return
+    }
 
     if (viewingLogId) {
       setStatusError('Clique em "Escrever novo motivo" para registrar uma nova alteração.')
       return
     }
-
 
     setStatusSubmitting(true)
     setStatusError(null)
@@ -376,11 +438,11 @@ export default function VehiclesPage() {
       const log: VehicleStatusLog = await res.json()
 
       setVehicles((prev) =>
-        prev.map((item) => (item.id === statusModalVehicle.id ? { ...item, status: statusSelection } : item))
+        prev.map((item) => (item.id === statusModalVehicle.id ? { ...item, status: statusSelection } : item)),
       )
 
       setSelectedVehicle((prev) =>
-        prev && prev.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev
+        prev && prev.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev,
       )
 
       setStatusLogs((prev) => [log, ...prev])
@@ -394,8 +456,8 @@ export default function VehiclesPage() {
     }
   }
 
-
   function openCreateForm() {
+    if (!canManageVehicles) return
     setEditingVehicle(null)
     setFormValues({
       plate: '',
@@ -410,6 +472,7 @@ export default function VehiclesPage() {
   }
 
   function openEditForm(vehicle: ApiVehicle) {
+    if (!canManageVehicles) return
     setEditingVehicle(vehicle)
     setFormValues({
       plate: vehicle.plate,
@@ -418,20 +481,23 @@ export default function VehiclesPage() {
       sector: vehicle.sector || '',
       kmCurrent: vehicle.kmCurrent?.toString() || '',
       costCenterIds:
-        vehicle.costCenters
-          ?.map((link) => link.costCenter?.id || null)
-          .filter((id): id is string => Boolean(id)) || [],
+        vehicle.costCenters?.map((link) => link.costCenter?.id || null).filter((id): id is string => Boolean(id)) ||
+        [],
     })
     setFormError(null)
     setFormOpen(true)
   }
 
   async function handleSubmit() {
+    if (!canManageVehicles) {
+      setFormError('Seu acesso permite apenas consulta aos veículos.')
+      return
+    }
     setSubmitting(true)
     setFormError(null)
 
     if (!isPlateValid) {
-      setFormError('Informe uma placa no formato ABC1A34 (padrão Mercosul)')
+      setFormError('Informe uma placa no formato ABC1A34 (Mercosul) ou ABC1234 (antiga)')
       setSubmitting(false)
       return
     }
@@ -452,7 +518,6 @@ export default function VehiclesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-
         if (!res.ok) throw new Error('Falha ao atualizar veículo')
       } else {
         const res = await fetch('/api/fleet/vehicles', {
@@ -478,6 +543,10 @@ export default function VehiclesPage() {
   }
 
   async function handleDelete(vehicle: ApiVehicle) {
+    if (!canManageVehicles) {
+      alert('Você não tem permissão para excluir veículos.')
+      return
+    }
     const confirmed = window.confirm(`Deseja excluir o veículo ${vehicle.plate}?`)
     if (!confirmed) return
 
@@ -508,160 +577,190 @@ export default function VehiclesPage() {
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={loadVehicles}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
-        </button>
-        <button
-          onClick={openCreateForm}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
-        >
-          <Plus size={16} /> Registrar veículo
-        </button>
-        <a
-          href="/api/fleet/checkins/excel"
-          className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-slate-800 hover:bg-slate-50"
-        >
-          <List size={16} /> Baixar Excel principal
-        </a>
-      </div>
-
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+      {permissionsLoading ? (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-700">
+          <Loader2 size={16} className="animate-spin" /> Carregando permissões de acesso...
         </div>
-      )}
-      
-
-      {restrictedVehicles.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          {restrictedVehicles.length} veículo(s) estão restritos por conta de algum check-in recente.
+      ) : !canViewVehicles ? (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+          Seu perfil permite apenas visualizar o checklist diário. Solicite elevação para acessar o cadastro de veículos.
         </div>
-      )}
+      ) : (
+        <>
+          {fleetLevel === 'NIVEL_2' && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Acesso em modo consulta: visualize veículos, check-ins e baixe formulários. Edição liberada apenas para
+              usuários nível 3.
+            </div>
+          )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Placa
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Tipo
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Modelo
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Centros de custo
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                KM atual
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {loading && (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-600">
-                  <div className="inline-flex items-center gap-2">
-                    <Loader2 size={18} className="animate-spin" /> Carregando veículos...
-                  </div>
-                </td>
-              </tr>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={loadVehicles}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
+            </button>
+
+            {canManageVehicles && (
+              <button
+                onClick={openCreateForm}
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
+              >
+                <Plus size={16} /> Registrar veículo
+              </button>
             )}
 
-            {!loading && vehicles.length === 0 && !error && (
-              <tr>
-                <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-600">
-                  Nenhum veículo cadastrado até o momento.
-                </td>
-              </tr>
-            )}
+            <a
+              href="/api/fleet/checkins/excel"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-slate-800 hover:bg-slate-50"
+            >
+              <List size={16} /> Baixar Excel principal
+            </a>
+          </div>
 
-            {!loading &&
-              vehicles.map((vehicle) => {
-                const vehicleCostCenters =
-                  vehicle.costCenters
-                    ?.map((link) => {
-                      const cc = link.costCenter
-                      if (!cc) return null
-                      return cc.description || cc.code || cc.externalCode || null
-                    })
-                    .filter(Boolean) || []
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+          )}
 
-                const vehicleCostCentersText =
-                  vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
+          {restrictedVehicles.length > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              {restrictedVehicles.length} veículo(s) estão restritos por conta de algum check-in recente.
+            </div>
+          )}
 
-                return (
-                  <tr key={vehicle.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">{vehicle.plate}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{vehicle.type || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{vehicle.model || '—'}</td>
-                    <td className="px-6 py-4 text-sm">
-                      {(() => {
-                        const info = getStatusInfo(vehicle.status)
-                        return (
-                            <div className="flex items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${info.colorClass}`}
-                            >
-                              {info.label || '—'}
-                            </span>
-                            <button
-                              onClick={() => openStatusModal(vehicle)}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
-                              title="Alterar status"
-                            >
-                              <Edit3 size={14} />
-                            </button>
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{vehicleCostCentersText}</td>
-                    <td className="px-6 py-4 text-sm text-slate-700">{formatKm(vehicle.kmCurrent)}</td>
-                    <td className="px-6 py-4 text-right text-sm text-slate-700">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setSelectedVehicle(vehicle)}
-                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
-                        >
-                          <List size={14} /> Check-ins
-                        </button>
-                        <button
-                          onClick={() => openEditForm(vehicle)}
-                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
-                        >
-                          <Edit3 size={14} /> Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(vehicle)}
-                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 size={14} /> Excluir
-                        </button>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Placa
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Tipo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Modelo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Centros de custo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    KM atual
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-600">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader2 size={18} className="animate-spin" /> Carregando veículos...
                       </div>
                     </td>
                   </tr>
-                )
-              })}
-          </tbody>
-        </table>
-      </div>
+                )}
 
-      {/* painel de check-ins do veículo selecionado (se quiser tirar, pode remover tudo isso) */}
-        {selectedVehicle && (
+                {!loading && vehicles.length === 0 && !error && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-600">
+                      Nenhum veículo cadastrado até o momento.
+                    </td>
+                  </tr>
+                )}
+
+                {!loading &&
+                  vehicles.map((vehicle) => {
+                    const vehicleCostCenters =
+                      vehicle.costCenters
+                        ?.map((link) => {
+                          const cc = link.costCenter
+                          if (!cc) return null
+                          return cc.description || cc.code || cc.externalCode || null
+                        })
+                        .filter(Boolean) || []
+
+                    const vehicleCostCentersText =
+                      vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
+
+                    return (
+                      <tr key={vehicle.id} className="hover:bg-slate-50">
+                        <td className="px-6 py-4 text-sm font-semibold text-slate-900">{vehicle.plate}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{vehicle.type || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{vehicle.model || '—'}</td>
+                        <td className="px-6 py-4 text-sm">
+                          {(() => {
+                            const info = getStatusInfo(vehicle.status)
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${info.colorClass}`}
+                                >
+                                  {info.label || '—'}
+                                </span>
+                                {canManageVehicles && (
+                                  <button
+                                    onClick={() => openStatusModal(vehicle)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+                                    title="Alterar status"
+                                  >
+                                    <Edit3 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{vehicleCostCentersText}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">{formatKm(vehicle.kmCurrent)}</td>
+                        <td className="px-6 py-4 text-right text-sm text-slate-700">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setSelectedVehicle(vehicle)}
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
+                            >
+                              <List size={14} /> Check-ins
+                            </button>
+
+                            {canManageVehicles ? (
+                              <>
+                                <button
+                                  onClick={() => openEditForm(vehicle)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
+                                >
+                                  <Edit3 size={14} /> Editar
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(vehicle)}
+                                  className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 size={14} /> Excluir
+                                </button>
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
+                                Consulta
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* painel de check-ins */}
+          {selectedVehicle && (
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -675,33 +774,34 @@ export default function VehiclesPage() {
                   >
                     <RefreshCw size={14} /> Atualizar
                   </button>
+
                   <a
                     href={`/api/fleet/checkins/excel?vehicleId=${selectedVehicle.id}`}
                     className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
                   >
                     <List size={14} /> Excel deste veículo
                   </a>
-                    <a
+
+                  <a
                     href={monthlyDocUrl}
                     className="inline-flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
-
                   >
                     <List size={14} /> Checklist mensal (Word)
                   </a>
                 </div>
               </div>
 
-
-            <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
+              <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="font-semibold text-slate-900">Filtrar por mês</span>
                   <input
                     type="month"
                     value={selectedMonth}
-                     onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
+                    onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
                     className="w-full rounded-md border border-slate-300 px-3 py-2"
                   />
                 </label>
+
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="font-semibold text-slate-900">Data inicial</span>
                   <input
@@ -711,6 +811,7 @@ export default function VehiclesPage() {
                     className="w-full rounded-md border border-slate-300 px-3 py-2"
                   />
                 </label>
+
                 <label className="space-y-1 text-sm text-slate-700">
                   <span className="font-semibold text-slate-900">Data final</span>
                   <input
@@ -720,13 +821,14 @@ export default function VehiclesPage() {
                     className="w-full rounded-md border border-slate-300 px-3 py-2"
                   />
                 </label>
+
                 <div className="flex items-end gap-2">
-                    <button
-                      onClick={() => {
-                        setCustomStartDate('')
-                        setCustomEndDate('')
-                        setSelectedMonth(currentMonth)
-                      }}
+                  <button
+                    onClick={() => {
+                      setCustomStartDate('')
+                      setCustomEndDate('')
+                      setSelectedMonth(currentMonth)
+                    }}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
                   >
                     <X size={14} /> Limpar filtros
@@ -734,8 +836,7 @@ export default function VehiclesPage() {
                 </div>
               </div>
 
-
-             <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
+              <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
 
               <div className="mt-4 space-y-3">
                 {loadingCheckins && (
@@ -759,231 +860,243 @@ export default function VehiclesPage() {
                 )}
 
                 {!loadingCheckins &&
-              filteredCheckins.map((checkin) => {
-                const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
-                const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
-                const checklist = checkin.checklistJson || []
-                const fatigue = checkin.fatigueJson || []
-                const driverNames = extractDriverNames(checkin)
+                  filteredCheckins.map((checkin) => {
+                    const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
+                    const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
+                    const checklist = checkin.checklistJson || []
+                    const fatigue = checkin.fatigueJson || []
+                    const driverNames = extractDriverNames(checkin)
 
-                return (
-                    <details
-                    key={checkin.id}
-                    className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
-                      <div className="space-y-0.5">
-                        <p>
+                    return (
+                      <details
+                        key={checkin.id}
+                        className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                          <div className="space-y-0.5">
+                            <p>
                               {formatDateTime(checkin.inspectionDate)} • KM {formatKm(checkin.kmAtInspection)}
-                        </p>
-                        <p className="text-xs font-normal text-slate-600">
-                          {driverNames.length > 0
-                            ? driverNames.join(' • ')
-                            : checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'}
-                        </p>
-                      </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}
-                        >
-                          {statusInfo.label || '—'}
-                        </span>
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${driverStatusInfo.colorClass}`}
-                        >
-                          Motorista {driverStatusInfo.label}
-                        </span>
-                      </div>
-                    </summary>
-
-                           <div className="mt-4 space-y-3">
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                        <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-slate-900">Dados do veículo</p>
-                            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                              Registro
-                            </span>
+                            </p>
+                            <p className="text-xs font-normal text-slate-600">
+                              {driverNames.length > 0
+                                ? driverNames.join(' • ')
+                                : checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'}
+                            </p>
                           </div>
-                          <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                            <div>
-                              <dt className="text-xs uppercase text-slate-500">Placa</dt>
-                              <dd className="font-semibold text-slate-900">
-                                {checkin.vehiclePlateSnapshot || selectedVehicle.plate}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs uppercase text-slate-500">Tipo</dt>
-                              <dd>{checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</dd>
-                            </div>
-                              <div>
-                              <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
-                              <dd>{formatKm(checkin.kmAtInspection)}</dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs uppercase text-slate-500">Centro de custo</dt>
-                              <dd>{checkin.costCenter || '—'}</dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs uppercase text-slate-500">Setor</dt>
-                              <dd>{checkin.sectorActivity || '—'}</dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs uppercase text-slate-500">Status</dt>
-                              <dd>
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusInfo.colorClass}`}
-                                >
-                                  {statusInfo.label || '—'}
-                                </span>
-                              </dd>
-                            </div>
-                          </dl>
-                        </div>
-
-                        <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-white p-4 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-slate-900">Condutor(es)</p>
+                          <div className="flex flex-wrap items-center gap-2">
                             <span
-                                           className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${driverStatusInfo.colorClass}`}
+                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}
                             >
-                              {driverStatusInfo.label}
+                              {statusInfo.label || '—'}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${driverStatusInfo.colorClass}`}
+                            >
+                              Motorista {driverStatusInfo.label}
                             </span>
                           </div>
-                         <div className="mt-3 space-y-2 text-sm text-slate-700">
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Nome(s)</p>
-                              {driverNames.length > 0 ? (
-                                <div className="mt-1 flex flex-wrap gap-2">
-                                  {driverNames.map((name) => (
-                                    <span
-                                      key={name}
-                                      className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-indigo-100"
-                                    >
-                                      {name}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="mt-1 text-slate-500">—</p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">E-mail</p>
-                              <p className="mt-1">{checkin.driver?.email || '—'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase text-slate-500">Aptidão do motorista</p>
-                              <p className="mt-1 text-base font-semibold text-slate-900">
-                                {driverStatusInfo.label}
-                              </p>
-                              <p className="text-xs text-slate-500">Resultado do checklist de fadiga.</p>
-                            </div>
-                          </div>
-                        </div>
+                        </summary>
 
-                        <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm">
-                          <p className="text-sm font-semibold text-slate-900">Não conformidades</p>
-                          <div className="mt-3 space-y-2 text-sm text-slate-700">
-                            <p>
-                              <span className="text-xs uppercase text-slate-500">Possui não conformidade</span>
-                              <br />
-                              {checkin.hasNonConformity ? 'Sim' : 'Não'}
-                            </p>
-                            <p>
-                              <span className="text-xs uppercase text-slate-500">Criticidade</span>
-                              <br />
-                              {checkin.nonConformityCriticality || '—'}
-                            </p>
-                            <p>
-                              <span className="text-xs uppercase text-slate-500">Tratativas</span>
-                              <br />
-                              {checkin.nonConformityActions || '—'}
-                            </p>
-                            <p>
-                              <span className="text-xs uppercase text-slate-500">Responsável</span>
-                              <br />
-                              {checkin.nonConformityManager || '—'}
-                            </p>
-                            <p>
-                              <span className="text-xs uppercase text-slate-500">Data da tratativa</span>
-                              <br />
-                              {formatDate(checkin.nonConformityDate)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-slate-900">Checklist informado</p>
-                            <span className="text-xs uppercase text-slate-500">Itens</span>
-                          </div>
-                          {checklist.length === 0 && (
-                            <p className="text-xs text-slate-500">Nenhum item registrado.</p>
-                          )}
-                          {checklist.map((item, index) => (
-                            <div
-                              key={`${item.name}-${index}`}
-                              className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
-                            >
-                                <div className="text-xs text-slate-700">
-                                <p className="font-semibold">{item.label || item.name}</p>
-                                <p className="text-slate-500">Categoria: {item.category || '—'}</p>
+                        <div className="mt-4 space-y-3">
+                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-900">Dados do veículo</p>
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                  Registro
+                                </span>
                               </div>
-                              <span
-                                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                  item.status === 'COM_PROBLEMA'
-                                    ? 'bg-red-100 text-red-800'
-                                    : item.status === 'NAO_SE_APLICA'
-                                      ? 'bg-slate-100 text-slate-700'
-                                      : 'bg-green-100 text-green-800'
-                                }`}
-                              >
-                                {item.status || 'OK'}
-                              </span>
+                              <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">Placa</dt>
+                                  <dd className="font-semibold text-slate-900">
+                                    {checkin.vehiclePlateSnapshot || selectedVehicle.plate}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">Tipo</dt>
+                                  <dd>{checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
+                                  <dd>{formatKm(checkin.kmAtInspection)}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">Centro de custo</dt>
+                                  <dd>{checkin.costCenter || '—'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">Setor</dt>
+                                  <dd>{checkin.sectorActivity || '—'}</dd>
+                                </div>
+                                <div>
+                                  <dt className="text-xs uppercase text-slate-500">Status</dt>
+                                  <dd>
+                                    <span
+                                      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusInfo.colorClass}`}
+                                    >
+                                      {statusInfo.label || '—'}
+                                    </span>
+                                  </dd>
+                                </div>
+                              </dl>
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-slate-900">Controle de fadiga</p>
-                            <span className="text-xs uppercase text-slate-500">{checkin.fatigueRisk || '—'}</span>
+                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-white p-4 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-900">Condutor(es)</p>
+                                <span
+                                  className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${driverStatusInfo.colorClass}`}
+                                >
+                                  {driverStatusInfo.label}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                <div>
+                                  <p className="text-xs uppercase text-slate-500">Nome(s)</p>
+                                  {driverNames.length > 0 ? (
+                                    <div className="mt-1 flex flex-wrap gap-2">
+                                      {driverNames.map((name) => (
+                                        <span
+                                          key={name}
+                                          className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-indigo-100"
+                                        >
+                                          {name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="mt-1 text-slate-500">—</p>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <p className="text-xs uppercase text-slate-500">E-mail</p>
+                                  <p className="mt-1">{checkin.driver?.email || '—'}</p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs uppercase text-slate-500">Aptidão do motorista</p>
+                                  <p className="mt-1 text-base font-semibold text-slate-900">
+                                    {driverStatusInfo.label}
+                                  </p>
+                                  <p className="text-xs text-slate-500">Resultado do checklist de fadiga.</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm">
+                              <p className="text-sm font-semibold text-slate-900">Não conformidades</p>
+                              <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                <p>
+                                  <span className="text-xs uppercase text-slate-500">Possui não conformidade</span>
+                                  <br />
+                                  {checkin.hasNonConformity ? 'Sim' : 'Não'}
+                                </p>
+                                <p>
+                                  <span className="text-xs uppercase text-slate-500">Criticidade</span>
+                                  <br />
+                                  {checkin.nonConformityCriticality || '—'}
+                                </p>
+                                <p>
+                                  <span className="text-xs uppercase text-slate-500">Tratativas</span>
+                                  <br />
+                                  {checkin.nonConformityActions || '—'}
+                                </p>
+                                <p>
+                                  <span className="text-xs uppercase text-slate-500">Responsável</span>
+                                  <br />
+                                  {checkin.nonConformityManager || '—'}
+                                </p>
+                                <p>
+                                  <span className="text-xs uppercase text-slate-500">Data da tratativa</span>
+                                  <br />
+                                  {formatDate(checkin.nonConformityDate)}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                         <p className="text-xs text-slate-500">
-                            Pontuação: <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
-                          </p>
-                          {fatigue.length === 0 && (
-                            <p className="text-xs text-slate-500">Sem respostas registradas.</p>
-                          )}
-                          {fatigue.map((item, index) => (
-                            <div
-                              key={`${item.name}-${index}`}
-                              className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
-                            >
-                              <p className="text-xs font-semibold text-slate-800">{item.label || item.name}</p>
-                              <span
-                                className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                  item.answer === 'SIM'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-green-100 text-green-800'
-                                }`}
-                              >
-                                {item.answer || '—'}
-                              </span>
+
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-900">Checklist informado</p>
+                                <span className="text-xs uppercase text-slate-500">Itens</span>
+                              </div>
+
+                              {checklist.length === 0 && (
+                                <p className="text-xs text-slate-500">Nenhum item registrado.</p>
+                              )}
+
+                              {checklist.map((item, idx) => (
+                                <div
+                                  key={`${item.name}-${idx}`}
+                                  className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
+                                >
+                                  <div className="text-xs text-slate-700">
+                                    <p className="font-semibold">{item.label || item.name}</p>
+                                    <p className="text-slate-500">Categoria: {item.category || '—'}</p>
+                                  </div>
+
+                                  <span
+                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                      item.status === 'COM_PROBLEMA'
+                                        ? 'bg-red-100 text-red-800'
+                                        : item.status === 'NAO_SE_APLICA'
+                                          ? 'bg-slate-100 text-slate-700'
+                                          : 'bg-green-100 text-green-800'
+                                    }`}
+                                  >
+                                    {item.status || 'OK'}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+
+                            <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-900">Controle de fadiga</p>
+                                <span className="text-xs uppercase text-slate-500">{checkin.fatigueRisk || '—'}</span>
+                              </div>
+
+                              <p className="text-xs text-slate-500">
+                                Pontuação:{' '}
+                                <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
+                              </p>
+
+                              {fatigue.length === 0 && (
+                                <p className="text-xs text-slate-500">Sem respostas registradas.</p>
+                              )}
+
+                              {fatigue.map((item, idx) => (
+                                <div
+                                  key={`${item.name}-${idx}`}
+                                  className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
+                                >
+                                  <p className="text-xs font-semibold text-slate-800">{item.label || item.name}</p>
+                                  <span
+                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                      item.answer === 'SIM' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                    }`}
+                                  >
+                                    {item.answer || '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </details>
-                )
-              })}
-          </div>
-        </div>
+                      </details>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
+        </>
       )}
+
+      {/* ✅ Modal Status (agora só 1 vez - removido duplicado) */}
       {statusModalVehicle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="relative grid w-full max-w-5xl gap-6 rounded-2xl bg-white p-6 shadow-2xl md:grid-cols-[2fr_1fr]">
@@ -1008,7 +1121,9 @@ export default function VehiclesPage() {
                   <h2 className="text-2xl font-bold text-slate-900">{statusModalVehicle.plate}</h2>
                   <p className="text-sm text-slate-600">Selecione o status desejado e informe o motivo da alteração.</p>
                 </div>
-                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusInfo(statusModalVehicle.status).colorClass}`}>
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusInfo(statusModalVehicle.status).colorClass}`}
+                >
                   {getStatusInfo(statusModalVehicle.status).label}
                 </div>
               </div>
@@ -1045,6 +1160,7 @@ export default function VehiclesPage() {
                     </span>
                   )}
                 </div>
+
                 <textarea
                   value={statusReason}
                   onChange={(e) => {
@@ -1056,6 +1172,7 @@ export default function VehiclesPage() {
                   className="min-h-[140px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                   placeholder="Descreva o motivo da mudança de status"
                 />
+
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                   <span>Obrigatório sempre que um novo status for salvo.</span>
                   {viewingLogId ? (
@@ -1075,7 +1192,9 @@ export default function VehiclesPage() {
               </div>
 
               {statusError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {statusError}
+                </div>
               )}
 
               <div className="flex justify-end gap-3">
@@ -1092,6 +1211,7 @@ export default function VehiclesPage() {
                 >
                   Cancelar
                 </button>
+
                 <button
                   onClick={submitStatusChange}
                   disabled={statusSubmitting || Boolean(viewingLogId)}
@@ -1135,21 +1255,19 @@ export default function VehiclesPage() {
                         setStatusSelection(normalized)
                       }}
                       className={`w-full rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
-                        isActive
-                          ? 'border-blue-200 bg-white'
-                          : 'border-slate-200 bg-white/70 hover:border-slate-300'
+                        isActive ? 'border-blue-200 bg-white' : 'border-slate-200 bg-white/70 hover:border-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}
-                          >
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}>
                             {info.label}
                           </span>
                           <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
                         </div>
-                        {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
+                        {isActive && (
+                          <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>
+                        )}
                       </div>
                       <p className="mt-2 line-clamp-2 text-sm text-slate-800">{log.reason}</p>
                       <p className="mt-1 text-xs text-slate-500">
@@ -1164,186 +1282,7 @@ export default function VehiclesPage() {
         </div>
       )}
 
-      {statusModalVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="relative grid w-full max-w-5xl gap-6 rounded-2xl bg-white p-6 shadow-2xl md:grid-cols-[2fr_1fr]">
-            <button
-              onClick={() => {
-                setStatusModalVehicle(null)
-                setStatusLogs([])
-                setStatusError(null)
-                setViewingLogId(null)
-                setStatusReason('')
-              }}
-              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
-              title="Fechar"
-            >
-              <X size={16} />
-            </button>
-
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Alterar status</p>
-                  <h2 className="text-2xl font-bold text-slate-900">{statusModalVehicle.plate}</h2>
-                  <p className="text-sm text-slate-600">Selecione o status desejado e informe o motivo da alteração.</p>
-                </div>
-                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${getStatusInfo(statusModalVehicle.status).colorClass}`}>
-                  {getStatusInfo(statusModalVehicle.status).label}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-900">Status do veículo</p>
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                  {statusOptions.map((option) => {
-                    const active = statusSelection === option.value
-                    return (
-                      <button
-                        key={option.value}
-                        onClick={() => setStatusSelection(option.value)}
-                        disabled={statusSubmitting || Boolean(viewingLogId)}
-                        className={`flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
-                          active
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
-                        } ${viewingLogId ? 'cursor-not-allowed opacity-60' : ''}`}
-                      >
-                        {option.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">Motivo da alteração*</p>
-                  {viewingLogId && (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                      Visualizando log
-                    </span>
-                  )}
-                </div>
-                <textarea
-                  value={statusReason}
-                  onChange={(e) => {
-                    if (viewingLogId) return
-                    setStatusReason(e.target.value)
-                    setTypedReasonBackup(e.target.value)
-                  }}
-                  readOnly={Boolean(viewingLogId)}
-                  className="min-h-[140px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-inner focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="Descreva o motivo da mudança de status"
-                />
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                  <span>Obrigatório sempre que um novo status for salvo.</span>
-                  {viewingLogId ? (
-                    <button
-                      className="text-blue-700 hover:underline"
-                      onClick={() => {
-                        setViewingLogId(null)
-                        setStatusReason(typedReasonBackup)
-                      }}
-                    >
-                      Escrever novo motivo
-                    </button>
-                  ) : (
-                    <span>Clique em um log ao lado para visualizar o motivo anterior.</span>
-                  )}
-                </div>
-              </div>
-
-              {statusError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setStatusModalVehicle(null)
-                    setStatusLogs([])
-                    setStatusError(null)
-                    setViewingLogId(null)
-                    setStatusReason('')
-                  }}
-                  className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  disabled={statusSubmitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={submitStatusChange}
-                  disabled={statusSubmitting || Boolean(viewingLogId)}
-                  className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {statusSubmitting && <Loader2 size={16} className="animate-spin" />}
-                  Salvar status
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Histórico</p>
-                  <p className="text-sm font-semibold text-slate-900">Logs anteriores</p>
-                  <p className="text-xs text-slate-600">Clique em um log para visualizar o motivo.</p>
-                </div>
-                {loadingStatusLogs && <Loader2 size={16} className="mt-1 animate-spin text-slate-500" />}
-              </div>
-
-              <div className="max-h-[460px] space-y-2 overflow-y-auto pr-1">
-                {statusLogs.length === 0 && !loadingStatusLogs && (
-                  <p className="text-xs text-slate-600">Nenhum log de status registrado para este veículo.</p>
-                )}
-
-                {statusLogs.map((log) => {
-                  const info = getStatusInfo(log.status)
-                  const isActive = viewingLogId === log.id
-                  const normalized = statusOptions.some((option) => option.value === info.normalized)
-                    ? info.normalized
-                    : 'DISPONIVEL'
-
-                  return (
-                    <button
-                      key={log.id}
-                      onClick={() => {
-                        setTypedReasonBackup(statusReason)
-                        setViewingLogId(log.id)
-                        setStatusReason(log.reason)
-                        setStatusSelection(normalized)
-                      }}
-                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm shadow-sm transition hover:-translate-y-[1px] hover:shadow ${
-                        isActive
-                          ? 'border-blue-200 bg-white'
-                          : 'border-slate-200 bg-white/70 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}
-                          >
-                            {info.label}
-                          </span>
-                          <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
-                        </div>
-                        {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-sm text-slate-800">{log.reason}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {log.createdBy?.fullName || log.createdBy?.email || 'Usuário não identificado'}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Modal do form */}
       {formOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
@@ -1356,10 +1295,7 @@ export default function VehiclesPage() {
                   {editingVehicle ? editingVehicle.plate : 'Novo veículo'}
                 </h2>
               </div>
-              <button
-                onClick={() => setFormOpen(false)}
-                className="text-sm text-slate-500 hover:text-slate-800"
-              >
+              <button onClick={() => setFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">
                 Fechar
               </button>
             </div>
@@ -1370,54 +1306,37 @@ export default function VehiclesPage() {
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.plate}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      plate: e.target.value,
-                    }))
-                  }
-                  placeholder="ABC1A34"
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, plate: e.target.value }))}
+                  placeholder="ABC1A34 ou ABC1234"
                 />
               </label>
+
               <label className="space-y-1 text-sm text-slate-700">
                 <span>Tipo*</span>
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.type}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      type: e.target.value,
-                    }))
-                  }
-                  placeholder="Ex.: SUV"
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, type: e.target.value }))}
+                  placeholder="Ex.: 4x4"
                 />
               </label>
+
               <label className="space-y-1 text-sm text-slate-700">
                 <span>Modelo</span>
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.model}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      model: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, model: e.target.value }))}
                   placeholder="Ex.: Toro"
                 />
               </label>
+
               <label className="space-y-1 text-sm text-slate-700">
                 <span>Setor</span>
                 <input
                   className="w-full rounded-md border border-slate-200 px-3 py-2"
                   value={formValues.sector}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({
-                      ...prev,
-                      sector: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, sector: e.target.value }))}
                 />
               </label>
 
@@ -1426,14 +1345,14 @@ export default function VehiclesPage() {
                   <span>Centros de custo</span>
                   {loadingCostCenters && <Loader2 size={14} className="animate-spin text-slate-500" />}
                 </div>
+
                 <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-200 p-3">
                   {costCenters.length === 0 && !loadingCostCenters && (
                     <p className="text-xs text-slate-500">Nenhum centro de custo disponível.</p>
                   )}
-                  {costCenters.map((cc) => {
-                    const label =
-                      cc.description || cc.code || cc.externalCode || 'Centro de custo'
 
+                  {costCenters.map((cc) => {
+                    const label = cc.description || cc.code || cc.externalCode || 'Centro de custo'
                     return (
                       <label key={cc.id} className="flex items-center gap-2 text-slate-700">
                         <input
@@ -1487,6 +1406,7 @@ export default function VehiclesPage() {
               >
                 Cancelar
               </button>
+
               <button
                 onClick={handleSubmit}
                 disabled={submitting}

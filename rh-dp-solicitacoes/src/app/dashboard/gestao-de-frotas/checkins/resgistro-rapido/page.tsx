@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { isValidPlate } from '@/lib/plate'
 type CostCenterOption = {
   id: string
   label: string
@@ -34,8 +35,7 @@ export default function QuickCheckinPage() {
   const [costCenterId, setCostCenterId] = useState<string | undefined>()
 
   const lastEntry = useMemo(() => entries[0], [entries])
-  const plateRegex = /^[A-Z]{3}\d{4}$/
-  const plateIsValid = plateRegex.test(plateInput)
+  const plateIsValid = isValidPlate(plateInput)
 
   useEffect(() => {
     async function loadCostCenters() {
@@ -101,7 +101,7 @@ export default function QuickCheckinPage() {
 async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
      if (!plateIsValid) {
-      setError('Informe uma placa no formato ABC1234')
+      setError('Informe uma placa no formato ABC1A34 (Mercosul) ou ABC1234 (antiga)')
       return
     }
 
@@ -201,9 +201,9 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
             <input
               required
               name="vehiclePlate"
-              placeholder="ABC1234"
+               placeholder="ABC1A34 ou ABC1234"
               value={plateInput}
-              pattern="[A-Z]{3}[0-9]{4}"
+              pattern="[A-Z]{3}[0-9][A-Z0-9][0-9]{2}"
               onChange={(event) => {
                 const value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
                 setPlateInput(value.slice(0, 7))
@@ -211,7 +211,8 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
               className="rounded-lg border border-slate-300 px-3 py-2 uppercase focus:border-orange-500 focus:outline-none"
             />
              <span className="text-xs text-slate-500">
-              Use apenas letras e números no formato <strong>ABC1234</strong>.
+              Use apenas letras e números nos formatos <strong>ABC1A34</strong> (Mercosul) ou <strong>ABC1234</strong>
+              (antiga).
             </span>
             {vehicleExists !== null && (
               <span
