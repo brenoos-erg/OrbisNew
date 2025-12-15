@@ -20,6 +20,14 @@ const fatiguePoints: Record<string, number> = {
   '40': 5,
 }
 
+// Tipo para os itens do checklist
+type ChecklistItem = {
+  name?: string
+  label?: string
+  status?: string
+  category?: string
+}
+
 function buildInspectionDateTime(date: string, time?: string) {
   const normalizedTime = time && time.trim() !== '' ? time : '00:00'
   return new Date(`${date}T${normalizedTime}:00`)
@@ -45,6 +53,7 @@ function calculateFatigue(fatigue: Array<{ name: string; answer?: string }>) {
 
   return { fatigueScore, fatigueRisk, driverStatus }
 }
+
 async function findFleetLevel3Emails() {
   const fleetModule = await prisma.module.findFirst({ where: { key: 'gestao-de-frotas' } })
   if (!fleetModule) return [] as string[]
@@ -56,6 +65,7 @@ async function findFleetLevel3Emails() {
 
   return accesses.map((access) => access.user.email).filter(Boolean) as string[]
 }
+
 function buildEmailContent({
   inspectionDate,
   inspectionTime,
@@ -77,7 +87,7 @@ function buildEmailContent({
   vehiclePlate: string
   vehicleType?: string | null
   vehicleKm: number
-  itemsWithProblem: Array<{ name?: string; label?: string }>
+  itemsWithProblem: ChecklistItem[] // Alterado para usar ChecklistItem[]
   driverStatus: 'APTO' | 'INAPTO'
   fatigueRisk: 'LEVE' | 'TOLERAVEL' | 'GRAVE'
   nonConformityCriticality?: string | null
@@ -139,6 +149,7 @@ function buildEmailContent({
     text,
   }
 }
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const vehicleId = searchParams.get('vehicleId') ?? undefined
@@ -198,9 +209,13 @@ export async function POST(req: Request) {
 
     const { fatigueScore, fatigueRisk, driverStatus } = calculateFatigue(fatigue)
 
-    const itemsWithProblem = (
-      vehicleChecklist as Array<{ status?: string; category?: string }>
-    ).filter((item) => item.category?.toUpperCase() === 'CRITICO' && item.status?.toUpperCase() === 'COM_PROBLEMA')
+    // Mudança: usando a tipagem correta para itemsWithProblem
+    const itemsWithProblem = (vehicleChecklist as ChecklistItem[]).filter(
+      (item) =>
+        item.category?.toUpperCase() === 'CRITICO' &&
+        item.status?.toUpperCase() === 'COM_PROBLEMA',
+    )
+
     const hasVehicleProblem = itemsWithProblem.length > 0
     const hasNonConformityBool = String(hasNonConformity).toUpperCase() === 'SIM'
 
@@ -230,7 +245,8 @@ export async function POST(req: Request) {
         data: { fullName: driverName },
       })
     }
-     if (vehicle.status === 'RESTRITO' && vehicleStatus === 'DISPONIVEL') {
+
+    if (vehicle.status === 'RESTRITO' && vehicleStatus === 'DISPONIVEL') {
       if (!nonConformityActions || !nonConformityHandlingDate) {
         return NextResponse.json(
           {
@@ -307,7 +323,6 @@ export async function POST(req: Request) {
         }
       }
     }
-
 
     return NextResponse.json({
       vehicleStatus,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X, Maximize2, Minimize2 } from 'lucide-react'
 import { isValidPlate } from '@/lib/plate'
 
 type CostCenterOption = {
@@ -164,6 +164,7 @@ export default function VehiclesPage() {
   const [selectedVehicle, setSelectedVehicle] = useState<ApiVehicle | null>(null)
   const [checkins, setCheckins] = useState<VehicleCheckin[]>([])
   const [loadingCheckins, setLoadingCheckins] = useState(false)
+  const [checkinsCollapsed, setCheckinsCollapsed] = useState(false)
 
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
   const [loadingCostCenters, setLoadingCostCenters] = useState(false)
@@ -251,9 +252,7 @@ export default function VehiclesPage() {
   }, [permissionsLoading, canViewVehicles])
 
   useEffect(() => {
-    if (selectedVehicle) {
-      loadCheckins(selectedVehicle.id)
-    }
+    if (selectedVehicle) loadCheckins(selectedVehicle.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicle])
 
@@ -263,29 +262,18 @@ export default function VehiclesPage() {
 
     return checkins.filter((checkin) => {
       if (!start && !end) return true
-
       const date = new Date(checkin.inspectionDate)
       if (Number.isNaN(date.getTime())) return false
-
       if (start && date < start) return false
       if (end && date > end) return false
-
       return true
     })
   }, [appliedEndDate, appliedStartDate, checkins])
 
-  /**
-   * ✅ Correção importante:
-   * - Se o usuário digitou datas customizadas -> manda startDate/endDate
-   * - Senão -> manda só month
-   */
   const monthlyDocUrl = useMemo(() => {
     if (!selectedVehicle) return '#'
 
-    const params = new URLSearchParams({
-      vehicleId: selectedVehicle.id,
-    })
-
+    const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
     const usingCustomDates = Boolean(customStartDate || customEndDate)
 
     if (usingCustomDates) {
@@ -299,12 +287,8 @@ export default function VehiclesPage() {
   }, [customEndDate, customStartDate, selectedMonth, selectedVehicle])
 
   const appliedPeriodLabel = useMemo(() => {
-    if (appliedStartDate || appliedEndDate) {
-      return `${appliedStartDate || '...'} até ${appliedEndDate || '...'}`
-    }
-    if (selectedMonth) {
-      return `Mês ${selectedMonth}`
-    }
+    if (appliedStartDate || appliedEndDate) return `${appliedStartDate || '...'} até ${appliedEndDate || '...'}`
+    if (selectedMonth) return `Mês ${selectedMonth}`
     return 'Todos os check-ins'
   }, [appliedEndDate, appliedStartDate, selectedMonth])
 
@@ -326,11 +310,9 @@ export default function VehiclesPage() {
   async function loadVehicles() {
     setLoading(true)
     setError(null)
-
     try {
       const res = await fetch('/api/fleet/vehicles', { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao buscar veículos')
-
       const data: ApiVehicle[] = await res.json()
       setVehicles(data)
     } catch (err) {
@@ -389,10 +371,9 @@ export default function VehiclesPage() {
 
   function openStatusModal(vehicle: ApiVehicle) {
     if (!canManageVehicles) return
+
     const normalized = getStatusInfo(vehicle.status).normalized
-    const initialStatus = statusOptions.some((option) => option.value === normalized)
-      ? normalized
-      : 'DISPONIVEL'
+    const initialStatus = statusOptions.some((option) => option.value === normalized) ? normalized : 'DISPONIVEL'
 
     setStatusModalVehicle(vehicle)
     setStatusSelection(initialStatus)
@@ -410,7 +391,6 @@ export default function VehiclesPage() {
       setStatusError('Você não tem permissão para alterar o status dos veículos.')
       return
     }
-
     if (viewingLogId) {
       setStatusError('Clique em "Escrever novo motivo" para registrar uma nova alteração.')
       return
@@ -437,15 +417,10 @@ export default function VehiclesPage() {
 
       const log: VehicleStatusLog = await res.json()
 
-      setVehicles((prev) =>
-        prev.map((item) => (item.id === statusModalVehicle.id ? { ...item, status: statusSelection } : item)),
-      )
-
-      setSelectedVehicle((prev) =>
-        prev && prev.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev,
-      )
-
+      setVehicles((prev) => prev.map((v) => (v.id === statusModalVehicle.id ? { ...v, status: statusSelection } : v)))
+      setSelectedVehicle((prev) => (prev?.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev))
       setStatusLogs((prev) => [log, ...prev])
+
       setStatusReason('')
       setTypedReasonBackup('')
     } catch (err: any) {
@@ -459,14 +434,7 @@ export default function VehiclesPage() {
   function openCreateForm() {
     if (!canManageVehicles) return
     setEditingVehicle(null)
-    setFormValues({
-      plate: '',
-      type: '',
-      model: '',
-      sector: '',
-      kmCurrent: '',
-      costCenterIds: [],
-    })
+    setFormValues({ plate: '', type: '', model: '', sector: '', kmCurrent: '', costCenterIds: [] })
     setFormError(null)
     setFormOpen(true)
   }
@@ -480,9 +448,7 @@ export default function VehiclesPage() {
       model: vehicle.model || '',
       sector: vehicle.sector || '',
       kmCurrent: vehicle.kmCurrent?.toString() || '',
-      costCenterIds:
-        vehicle.costCenters?.map((link) => link.costCenter?.id || null).filter((id): id is string => Boolean(id)) ||
-        [],
+      costCenterIds: vehicle.costCenters?.map((l) => l.costCenter?.id || null).filter((id): id is string => !!id) || [],
     })
     setFormError(null)
     setFormOpen(true)
@@ -493,6 +459,7 @@ export default function VehiclesPage() {
       setFormError('Seu acesso permite apenas consulta aos veículos.')
       return
     }
+
     setSubmitting(true)
     setFormError(null)
 
@@ -525,7 +492,6 @@ export default function VehiclesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Falha ao criar veículo')
@@ -611,13 +577,6 @@ export default function VehiclesPage() {
                 <Plus size={16} /> Registrar veículo
               </button>
             )}
-
-            <a
-              href="/api/fleet/checkins/excel"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-slate-800 hover:bg-slate-50"
-            >
-              <List size={16} /> Baixar Excel principal
-            </a>
           </div>
 
           {error && (
@@ -775,12 +734,13 @@ export default function VehiclesPage() {
                     <RefreshCw size={14} /> Atualizar
                   </button>
 
-                  <a
-                    href={`/api/fleet/checkins/excel?vehicleId=${selectedVehicle.id}`}
-                    className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                  <button
+                    onClick={() => setCheckinsCollapsed((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
                   >
-                    <List size={14} /> Excel deste veículo
-                  </a>
+                    {checkinsCollapsed ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
+                    {checkinsCollapsed ? 'Maximizar visão' : 'Minimizar visão'}
+                  </button>
 
                   <a
                     href={monthlyDocUrl}
@@ -791,312 +751,313 @@ export default function VehiclesPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
-                <label className="space-y-1 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Filtrar por mês</span>
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </label>
-
-                <label className="space-y-1 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Data inicial</span>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </label>
-
-                <label className="space-y-1 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Data final</span>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </label>
-
-                <div className="flex items-end gap-2">
-                  <button
-                    onClick={() => {
-                      setCustomStartDate('')
-                      setCustomEndDate('')
-                      setSelectedMonth(currentMonth)
-                    }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
-                  >
-                    <X size={14} /> Limpar filtros
-                  </button>
+              {checkinsCollapsed ? (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                  Visão dos check-ins minimizada. Clique em “Maximizar visão” para reabrir os filtros e os registros.
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-900">Filtrar por mês</span>
+                      <input
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </label>
 
-              <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-900">Data inicial</span>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </label>
 
-              <div className="mt-4 space-y-3">
-                {loadingCheckins && (
-                  <div className="flex justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600">
-                    <div className="inline-flex items-center gap-2">
-                      <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+                    <label className="space-y-1 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-900">Data final</span>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </label>
+
+                    <div className="flex items-end gap-2">
+                      <button
+                        onClick={() => {
+                          setCustomStartDate('')
+                          setCustomEndDate('')
+                          setSelectedMonth(currentMonth)
+                        }}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                      >
+                        <X size={14} /> Limpar filtros
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {!loadingCheckins && checkins.length === 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
-                    Nenhum check-in encontrado para este veículo.
-                  </div>
-                )}
+                  <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
 
-                {!loadingCheckins && checkins.length > 0 && filteredCheckins.length === 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-center text-amber-800">
-                    Não há check-ins dentro do período selecionado.
-                  </div>
-                )}
+                  <div className="mt-4 space-y-3">
+                    {loadingCheckins && (
+                      <div className="flex justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600">
+                        <div className="inline-flex items-center gap-2">
+                          <Loader2 size={16} className="animate-spin" /> Carregando check-ins...
+                        </div>
+                      </div>
+                    )}
 
-                {!loadingCheckins &&
-                  filteredCheckins.map((checkin) => {
-                    const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
-                    const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
-                    const checklist = checkin.checklistJson || []
-                    const fatigue = checkin.fatigueJson || []
-                    const driverNames = extractDriverNames(checkin)
+                    {!loadingCheckins && checkins.length === 0 && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
+                        Nenhum check-in encontrado para este veículo.
+                      </div>
+                    )}
 
-                    return (
-                      <details
-                        key={checkin.id}
-                        className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                      >
-                        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
-                          <div className="space-y-0.5">
-                            <p>
-                              {formatDateTime(checkin.inspectionDate)} • KM {formatKm(checkin.kmAtInspection)}
-                            </p>
-                            <p className="text-xs font-normal text-slate-600">
-                              {driverNames.length > 0
-                                ? driverNames.join(' • ')
-                                : checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}
-                            >
-                              {statusInfo.label || '—'}
-                            </span>
-                            <span
-                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${driverStatusInfo.colorClass}`}
-                            >
-                              Motorista {driverStatusInfo.label}
-                            </span>
-                          </div>
-                        </summary>
+                    {!loadingCheckins && checkins.length > 0 && filteredCheckins.length === 0 && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-center text-amber-800">
+                        Não há check-ins dentro do período selecionado.
+                      </div>
+                    )}
 
-                        <div className="mt-4 space-y-3">
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-900">Dados do veículo</p>
-                                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                  Registro
-                                </span>
+                    {!loadingCheckins &&
+                      filteredCheckins.map((checkin) => {
+                        const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
+                        const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
+                        const checklist = checkin.checklistJson || []
+                        const fatigue = checkin.fatigueJson || []
+                        const driverNames = extractDriverNames(checkin)
+
+                        return (
+                          <details key={checkin.id} className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                              <div className="space-y-0.5">
+                                <p>
+                                  {formatDateTime(checkin.inspectionDate)} • KM {formatKm(checkin.kmAtInspection)}
+                                </p>
+                                <p className="text-xs font-normal text-slate-600">
+                                  {driverNames.length > 0
+                                    ? driverNames.join(' • ')
+                                    : checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'}
+                                </p>
                               </div>
-                              <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">Placa</dt>
-                                  <dd className="font-semibold text-slate-900">
-                                    {checkin.vehiclePlateSnapshot || selectedVehicle.plate}
-                                  </dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">Tipo</dt>
-                                  <dd>{checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
-                                  <dd>{formatKm(checkin.kmAtInspection)}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">Centro de custo</dt>
-                                  <dd>{checkin.costCenter || '—'}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">Setor</dt>
-                                  <dd>{checkin.sectorActivity || '—'}</dd>
-                                </div>
-                                <div>
-                                  <dt className="text-xs uppercase text-slate-500">Status</dt>
-                                  <dd>
-                                    <span
-                                      className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusInfo.colorClass}`}
-                                    >
-                                      {statusInfo.label || '—'}
-                                    </span>
-                                  </dd>
-                                </div>
-                              </dl>
-                            </div>
 
-                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-white p-4 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-900">Condutor(es)</p>
+                              <div className="flex flex-wrap items-center gap-2">
                                 <span
-                                  className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${driverStatusInfo.colorClass}`}
+                                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${statusInfo.colorClass}`}
                                 >
-                                  {driverStatusInfo.label}
+                                  {statusInfo.label || '—'}
+                                </span>
+
+                                <span
+                                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${driverStatusInfo.colorClass}`}
+                                >
+                                  Motorista {driverStatusInfo.label}
                                 </span>
                               </div>
+                            </summary>
 
-                              <div className="mt-3 space-y-2 text-sm text-slate-700">
-                                <div>
-                                  <p className="text-xs uppercase text-slate-500">Nome(s)</p>
-                                  {driverNames.length > 0 ? (
-                                    <div className="mt-1 flex flex-wrap gap-2">
-                                      {driverNames.map((name) => (
-                                        <span
-                                          key={name}
-                                          className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-indigo-100"
-                                        >
-                                          {name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="mt-1 text-slate-500">—</p>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <p className="text-xs uppercase text-slate-500">E-mail</p>
-                                  <p className="mt-1">{checkin.driver?.email || '—'}</p>
-                                </div>
-
-                                <div>
-                                  <p className="text-xs uppercase text-slate-500">Aptidão do motorista</p>
-                                  <p className="mt-1 text-base font-semibold text-slate-900">
-                                    {driverStatusInfo.label}
-                                  </p>
-                                  <p className="text-xs text-slate-500">Resultado do checklist de fadiga.</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm">
-                              <p className="text-sm font-semibold text-slate-900">Não conformidades</p>
-                              <div className="mt-3 space-y-2 text-sm text-slate-700">
-                                <p>
-                                  <span className="text-xs uppercase text-slate-500">Possui não conformidade</span>
-                                  <br />
-                                  {checkin.hasNonConformity ? 'Sim' : 'Não'}
-                                </p>
-                                <p>
-                                  <span className="text-xs uppercase text-slate-500">Criticidade</span>
-                                  <br />
-                                  {checkin.nonConformityCriticality || '—'}
-                                </p>
-                                <p>
-                                  <span className="text-xs uppercase text-slate-500">Tratativas</span>
-                                  <br />
-                                  {checkin.nonConformityActions || '—'}
-                                </p>
-                                <p>
-                                  <span className="text-xs uppercase text-slate-500">Responsável</span>
-                                  <br />
-                                  {checkin.nonConformityManager || '—'}
-                                </p>
-                                <p>
-                                  <span className="text-xs uppercase text-slate-500">Data da tratativa</span>
-                                  <br />
-                                  {formatDate(checkin.nonConformityDate)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-900">Checklist informado</p>
-                                <span className="text-xs uppercase text-slate-500">Itens</span>
-                              </div>
-
-                              {checklist.length === 0 && (
-                                <p className="text-xs text-slate-500">Nenhum item registrado.</p>
-                              )}
-
-                              {checklist.map((item, idx) => (
-                                <div
-                                  key={`${item.name}-${idx}`}
-                                  className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
-                                >
-                                  <div className="text-xs text-slate-700">
-                                    <p className="font-semibold">{item.label || item.name}</p>
-                                    <p className="text-slate-500">Categoria: {item.category || '—'}</p>
+                            <div className="mt-4 space-y-3">
+                              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                                <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-slate-900">Dados do veículo</p>
+                                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                      Registro
+                                    </span>
                                   </div>
 
-                                  <span
-                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                      item.status === 'COM_PROBLEMA'
-                                        ? 'bg-red-100 text-red-800'
-                                        : item.status === 'NAO_SE_APLICA'
-                                          ? 'bg-slate-100 text-slate-700'
-                                          : 'bg-green-100 text-green-800'
-                                    }`}
-                                  >
-                                    {item.status || 'OK'}
-                                  </span>
+                                  <dl className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Placa</dt>
+                                      <dd className="font-semibold text-slate-900">
+                                        {checkin.vehiclePlateSnapshot || selectedVehicle.plate}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Tipo</dt>
+                                      <dd>{checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
+                                      <dd>{formatKm(checkin.kmAtInspection)}</dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Centro de custo</dt>
+                                      <dd>{checkin.costCenter || '—'}</dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Setor</dt>
+                                      <dd>{checkin.sectorActivity || '—'}</dd>
+                                    </div>
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Status</dt>
+                                      <dd>
+                                        <span
+                                          className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${statusInfo.colorClass}`}
+                                        >
+                                          {statusInfo.label || '—'}
+                                        </span>
+                                      </dd>
+                                    </div>
+                                  </dl>
                                 </div>
-                              ))}
-                            </div>
 
-                            <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-slate-900">Controle de fadiga</p>
-                                <span className="text-xs uppercase text-slate-500">{checkin.fatigueRisk || '—'}</span>
+                                <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-white p-4 shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-slate-900">Condutor(es)</p>
+                                    <span
+                                      className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${driverStatusInfo.colorClass}`}
+                                    >
+                                      {driverStatusInfo.label}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                    <div>
+                                      <p className="text-xs uppercase text-slate-500">Nome(s)</p>
+                                      {driverNames.length > 0 ? (
+                                        <div className="mt-1 flex flex-wrap gap-2">
+                                          {driverNames.map((name) => (
+                                            <span
+                                              key={name}
+                                              className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm ring-1 ring-indigo-100"
+                                            >
+                                              {name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="mt-1 text-slate-500">—</p>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <p className="text-xs uppercase text-slate-500">E-mail</p>
+                                      <p className="mt-1">{checkin.driver?.email || '—'}</p>
+                                    </div>
+
+                                    <div>
+                                      <p className="text-xs uppercase text-slate-500">Aptidão do motorista</p>
+                                      <p className="mt-1 text-base font-semibold text-slate-900">{driverStatusInfo.label}</p>
+                                      <p className="text-xs text-slate-500">Resultado do checklist de fadiga.</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm">
+                                  <p className="text-sm font-semibold text-slate-900">Não conformidades</p>
+                                  <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                    <p>
+                                      <span className="text-xs uppercase text-slate-500">Possui não conformidade</span>
+                                      <br />
+                                      {checkin.hasNonConformity ? 'Sim' : 'Não'}
+                                    </p>
+                                    <p>
+                                      <span className="text-xs uppercase text-slate-500">Criticidade</span>
+                                      <br />
+                                      {checkin.nonConformityCriticality || '—'}
+                                    </p>
+                                    <p>
+                                      <span className="text-xs uppercase text-slate-500">Tratativas</span>
+                                      <br />
+                                      {checkin.nonConformityActions || '—'}
+                                    </p>
+                                    <p>
+                                      <span className="text-xs uppercase text-slate-500">Responsável</span>
+                                      <br />
+                                      {checkin.nonConformityManager || '—'}
+                                    </p>
+                                    <p>
+                                      <span className="text-xs uppercase text-slate-500">Data da tratativa</span>
+                                      <br />
+                                      {formatDate(checkin.nonConformityDate)}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
 
-                              <p className="text-xs text-slate-500">
-                                Pontuação:{' '}
-                                <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
-                              </p>
+                              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-slate-900">Checklist informado</p>
+                                    <span className="text-xs uppercase text-slate-500">Itens</span>
+                                  </div>
 
-                              {fatigue.length === 0 && (
-                                <p className="text-xs text-slate-500">Sem respostas registradas.</p>
-                              )}
+                                  {checklist.length === 0 && <p className="text-xs text-slate-500">Nenhum item registrado.</p>}
 
-                              {fatigue.map((item, idx) => (
-                                <div
-                                  key={`${item.name}-${idx}`}
-                                  className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
-                                >
-                                  <p className="text-xs font-semibold text-slate-800">{item.label || item.name}</p>
-                                  <span
-                                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                                      item.answer === 'SIM' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                    }`}
-                                  >
-                                    {item.answer || '—'}
-                                  </span>
+                                  {checklist.map((item, idx) => (
+                                    <div
+                                      key={`${item.name}-${idx}`}
+                                      className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
+                                    >
+                                      <div className="text-xs text-slate-700">
+                                        <p className="font-semibold">{item.label || item.name}</p>
+                                        <p className="text-slate-500">Categoria: {item.category || '—'}</p>
+                                      </div>
+
+                                      <span
+                                        className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                          item.status === 'COM_PROBLEMA'
+                                            ? 'bg-red-100 text-red-800'
+                                            : item.status === 'NAO_SE_APLICA'
+                                              ? 'bg-slate-100 text-slate-700'
+                                              : 'bg-green-100 text-green-800'
+                                        }`}
+                                      >
+                                        {item.status || 'OK'}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+
+                                <div className="space-y-2 rounded-md border border-slate-200 bg-white/60 p-3 shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-slate-900">Controle de fadiga</p>
+                                    <span className="text-xs uppercase text-slate-500">{checkin.fatigueRisk || '—'}</span>
+                                  </div>
+
+                                  <p className="text-xs text-slate-500">
+                                    Pontuação: <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
+                                  </p>
+
+                                  {fatigue.length === 0 && <p className="text-xs text-slate-500">Sem respostas registradas.</p>}
+
+                                  {fatigue.map((item, idx) => (
+                                    <div
+                                      key={`${item.name}-${idx}`}
+                                      className="flex items-center justify-between gap-3 rounded border border-slate-100 bg-slate-50 px-3 py-2"
+                                    >
+                                      <p className="text-xs font-semibold text-slate-800">{item.label || item.name}</p>
+                                      <span
+                                        className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                          item.answer === 'SIM' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                        }`}
+                                      >
+                                        {item.answer || '—'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </details>
-                    )
-                  })}
-              </div>
+                          </details>
+                        )
+                      })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>
       )}
 
-      {/* ✅ Modal Status (agora só 1 vez - removido duplicado) */}
+      {/* ✅ Modal Status (único) */}
       {statusModalVehicle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="relative grid w-full max-w-5xl gap-6 rounded-2xl bg-white p-6 shadow-2xl md:grid-cols-[2fr_1fr]">
@@ -1192,9 +1153,7 @@ export default function VehiclesPage() {
               </div>
 
               {statusError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {statusError}
-                </div>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
               )}
 
               <div className="flex justify-end gap-3">
@@ -1241,9 +1200,7 @@ export default function VehiclesPage() {
                 {statusLogs.map((log) => {
                   const info = getStatusInfo(log.status)
                   const isActive = viewingLogId === log.id
-                  const normalized = statusOptions.some((option) => option.value === info.normalized)
-                    ? info.normalized
-                    : 'DISPONIVEL'
+                  const normalized = statusOptions.some((option) => option.value === info.normalized) ? info.normalized : 'DISPONIVEL'
 
                   return (
                     <button
@@ -1260,14 +1217,10 @@ export default function VehiclesPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}>
-                            {info.label}
-                          </span>
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}>{info.label}</span>
                           <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
                         </div>
-                        {isActive && (
-                          <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>
-                        )}
+                        {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
                       </div>
                       <p className="mt-2 line-clamp-2 text-sm text-slate-800">{log.reason}</p>
                       <p className="mt-1 text-xs text-slate-500">
@@ -1291,9 +1244,7 @@ export default function VehiclesPage() {
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   {editingVehicle ? 'Editar' : 'Cadastrar'} veículo
                 </p>
-                <h2 className="text-2xl font-bold text-slate-900">
-                  {editingVehicle ? editingVehicle.plate : 'Novo veículo'}
-                </h2>
+                <h2 className="text-2xl font-bold text-slate-900">{editingVehicle ? editingVehicle.plate : 'Novo veículo'}</h2>
               </div>
               <button onClick={() => setFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">
                 Fechar
@@ -1393,9 +1344,7 @@ export default function VehiclesPage() {
             </div>
 
             {formError && (
-              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {formError}
-              </div>
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>
             )}
 
             <div className="mt-6 flex justify-end gap-3">
