@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { supabase } from '@/lib/supabase'
+import { getSupabaseServerClient } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -23,6 +23,7 @@ class HttpError extends Error {
 }
 
 async function ensureAttachmentsBucket() {
+  const supabase = getSupabaseServerClient()
   const { data: bucket, error } = await supabase.storage.getBucket(
     ATTACHMENTS_BUCKET,
   )
@@ -61,6 +62,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   const uploadedPaths: string[] = []
+  const supabase = getSupabaseServerClient()
 
   try {
     await requireActiveUser()
