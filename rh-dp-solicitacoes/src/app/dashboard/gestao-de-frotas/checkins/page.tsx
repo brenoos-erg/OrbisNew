@@ -306,6 +306,59 @@ export default function VehicleCheckinPage() {
     }
 
     const formData = new window.FormData(form)
+    const missingChecklistItem = vehicleChecklistItems.find(
+      (item) => (formData.get(`checklist-${item.name}`) as string | null)?.trim() === ''
+    )
+
+    if (missingChecklistItem) {
+      setError(`Selecione uma opção para o item "${missingChecklistItem.label}".`)
+      setSubmitting(false)
+      return
+    }
+
+const vehicleKmRaw = formData.get('vehicleKm')
+    const vehicleKmConfirmationRaw = formData.get('vehicleKmConfirmation')
+
+    const vehicleKm = Number(vehicleKmRaw ?? 0)
+    const vehicleKmConfirmation = Number(vehicleKmConfirmationRaw ?? 0)
+
+    if (!Number.isFinite(vehicleKm) || vehicleKm <= 0) {
+      setError('Informe uma quilometragem válida.')
+      setSubmitting(false)
+      return
+    }
+
+    if (!Number.isFinite(vehicleKmConfirmation) || vehicleKmConfirmation <= 0) {
+      setError('Confirme uma quilometragem válida.')
+      setSubmitting(false)
+      return
+    }
+
+    if (vehicleKm !== vehicleKmConfirmation) {
+      setError('As quilometragens informadas não coincidem.')
+      setSubmitting(false)
+      return
+    }
+
+    // Regra básica: não pode ser menor que a última (backend também deve validar)
+    if (typeof lastKm === 'number' && vehicleKm < lastKm) {
+      setError(`A quilometragem informada (${vehicleKm.toLocaleString('pt-BR')}) é menor que a última registrada (${lastKm.toLocaleString('pt-BR')}).`)
+      setSubmitting(false)
+      return
+    }
+
+    // Regra anti "0 a mais": se for 10x maior, pede confirmação extra (aqui só bloqueando)
+    if (typeof lastKm === 'number' && lastKm > 0 && vehicleKm >= lastKm * 10) {
+      setError('Quilometragem muito acima do último registro (possível zero a mais). Verifique e tente novamente.')
+      setSubmitting(false)
+      return
+    }
+
+    if (vehicleKm !== vehicleKmConfirmation) {
+      setError('As quilometragens informadas não coincidem.')
+      setSubmitting(false)
+      return
+    }
 
     const vehicleChecklist = vehicleChecklistItems.map((item) => ({
       name: item.name,
@@ -348,7 +401,7 @@ export default function VehicleCheckinPage() {
       driverName: formData.get('driverName'),
       vehicleType: formData.get('vehicleType'),
       vehiclePlate: normalizedPlate,
-      vehicleKm: Number(formData.get('vehicleKm') ?? 0),
+      vehicleKm,
       vehicleChecklist,
       fatigue,
       hasNonConformity: hasCriticalIssue ? 'SIM' : 'NAO',
@@ -494,6 +547,17 @@ export default function VehicleCheckinPage() {
                 {lastKm !== null ? lastKm.toLocaleString('pt-BR') : '—'} km
               </span>
             </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Confirme a quilometragem
+              <input
+                required
+                name="vehicleKmConfirmation"
+                type="number"
+                min={lastKm ?? 0}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+              <span className="text-xs text-slate-500">Repita a quilometragem para evitar erros de digitação.</span>
+            </label>
 
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Centro de custo
@@ -574,7 +638,9 @@ export default function VehicleCheckinPage() {
                     defaultValue={checklistInitialState[item.name]}
                     className="rounded-lg border border-red-200 px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
                   >
-                    <option value="">Selecione...</option>
+                    <option value="" disabled>
+                      Selecione...
+                    </option>
                     {criticalOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
@@ -613,7 +679,9 @@ export default function VehicleCheckinPage() {
                     defaultValue={checklistInitialState[item.name]}
                     className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
                   >
-                    <option value="">Selecione...</option>
+                    <option value="" disabled>
+                      Selecione...
+                    </option>
                     {nonCriticalOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
