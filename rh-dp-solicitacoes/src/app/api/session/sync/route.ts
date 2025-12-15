@@ -6,6 +6,17 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function POST() {
+  const skipPrisma =
+    process.env.SKIP_PRISMA_MIGRATE === 'true' ||
+    process.env.SKIP_PRISMA_DB === 'true'
+
+  if (skipPrisma) {
+    console.warn(
+      'SKIP_PRISMA_MIGRATE/DB is true; skipping user sync against the database.',
+    )
+    return NextResponse.json({ ok: true, skipped: true })
+  }
+
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 

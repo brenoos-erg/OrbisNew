@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "prisma migrate deploy && next dev",
+    "dev": "node scripts/dev.js",
     "build": "next build",
     "start": "prisma migrate deploy && next start",
     "lint": "next lint",
@@ -20,6 +20,7 @@
     "@supabase/auth-helpers-shared": "^0.7.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.81.0",
+    "dotenv": "^16.4.5",
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",
     "framer-motion": "^12.23.24",
