@@ -16,11 +16,36 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode
 }) {
-  const { appUser, dbUnavailable } = await getCurrentAppUser()
+  const { appUser, dbUnavailable, session } = await getCurrentAppUser()
 
   // se não tiver usuário logado, manda pro login
   if (!appUser) {
-      if (dbUnavailable) {
+      if (dbUnavailable && session) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
+          <p className="text-xl font-semibold">Serviço temporariamente indisponível</p>
+          <p className="max-w-xl text-sm text-slate-600">
+            Não foi possível acessar o banco de dados para carregar seus dados. Tente novamente em alguns minutos
+            ou contate o suporte se o problema persistir.
+          </p>
+          <div className="flex items-center gap-3">
+            <a
+              href="/login?logout=1"
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-950"
+            >
+              Sair e tentar novamente
+            </a>
+            <a
+              href="/dashboard"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
+            >
+              Recarregar
+            </a>
+          </div>
+        </div>
+      )
+    }
+    if (dbUnavailable) {
       const params = new URLSearchParams({ 'db-unavailable': '1', next: '/dashboard' })
       redirect(`/login?${params.toString()}`)
     }

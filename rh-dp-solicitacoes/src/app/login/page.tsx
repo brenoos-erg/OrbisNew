@@ -33,21 +33,24 @@ function LoginPageContent() {
   const [sendingReset, setSendingReset] = useState(false)
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const [resetErr, setResetErr] = useState<string | null>(null)
+const shouldForceSignOut = search.get('logout') === '1'
 
   useEffect(() => {
-    // derruba a sessão ao abrir /login (forçar login)
+    // derruba a sessão apenas quando solicitado explicitamente
     ;(async () => {
-      try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
-      try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
+      if (shouldForceSignOut) {
+        try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
+        try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
+      }
       setLoadingSession(false)
     })()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shouldForceSignOut, supabase])
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleLogin() {
+    if (loading) return
     setLoading(true)
 
-  // 1️⃣ Tenta autenticar com Supabase
+    // 1️⃣ Tenta autenticar com Supabase
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setLoading(false)
@@ -59,10 +62,13 @@ function LoginPageContent() {
     let syncDbUnavailable = false
     try {
       const syncRes = await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
-      if (!syncRes.ok) {
-        const body = await syncRes.json().catch(() => null)
-        if (body?.dbUnavailable) syncDbUnavailable = true
-        // Erros de sincronização não devem impedir login quando Supabase já autenticou
+      const body = await syncRes.json().catch(() => null)
+      if (body?.dbUnavailable || body?.skipped) syncDbUnavailable = true
+
+      if (!syncRes.ok && !syncDbUnavailable) {
+        setLoading(false)
+        alert('Não foi possível sincronizar seus dados. Tente novamente.')
+        return
       }
     } catch {
       // erro silencioso, mas não deixa travar
@@ -76,6 +82,11 @@ function LoginPageContent() {
           const me = await res.json()
           if (me?.dbUnavailable) {
             syncDbUnavailable = true
+          }
+           if (!syncDbUnavailable && !me?.appUser) {
+            setLoading(false)
+            alert('Não foi possível carregar seus dados agora. Tente novamente.')
+            return
           }
           if (me?.appUser?.status === 'INATIVO') {
             await supabase.auth.signOut({ scope: 'global' })
@@ -158,7 +169,13 @@ function LoginPageContent() {
           <p className="text-xs text-slate-500">RH ↔ DP</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleLogin()
+          }}
+          className="space-y-5"
+        >
           <div>
             <label className="form-label mb-1">Email</label>
             <input
