@@ -24,7 +24,7 @@ function LoginPageContent() {
 
   const [loadingSession, setLoadingSession] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
 
   // --- Reset de senha (esqueci) ---
@@ -82,18 +82,40 @@ const shouldForceSignOut = search.get('logout') === '1'
       active = false
     }
   }, [shouldForceSignOut, supabase, router, nextUrl])
+  async function resolveEmail(target: string) {
+    const trimmed = target.trim()
+
+    if (trimmed.includes('@')) return trimmed
+
+    const res = await fetch(
+      `/api/auth/resolve-identifier?identifier=${encodeURIComponent(trimmed)}`,
+      { cache: 'no-store' },
+    )
+
+    if (!res.ok) throw new Error('Login não encontrado. Verifique e tente novamente.')
+
+    const data = await res.json().catch(() => null)
+    if (!data?.email) throw new Error('Login não encontrado. Verifique e tente novamente.')
+
+    return data.email as string
+  }
+
 
   async function handleLogin() {
     if (loading) return
     setLoading(true)
 
-    // 1️⃣ Tenta autenticar com Supabase
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
+    let emailToUse = identifier
+    try {
+      emailToUse = await resolveEmail(identifier)
+    } catch (err: any) {
       setLoading(false)
-      alert(error.message)
+      alert(err?.message || 'Não foi possível localizar seu acesso. Tente novamente.')
       return
     }
+
+    // 1️⃣ Tenta autenticar com Supabase
+    const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
 
     // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
     let syncDbUnavailable = false
@@ -160,11 +182,21 @@ const shouldForceSignOut = search.get('logout') === '1'
     setResetMsg(null)
     setSendingReset(true)
     try {
-      const target = resetEmail.trim() || email.trim()
+      let target = resetEmail.trim() || identifier.trim()
       if (!target) {
         setResetErr('Informe seu e-mail para enviar o link de recuperação.')
         setSendingReset(false)
         return
+      }
+
+      if (!target.includes('@')) {
+        try {
+          target = await resolveEmail(target)
+        } catch (err: any) {
+          setResetErr(err?.message || 'Login não encontrado. Verifique e tente novamente.')
+          setSendingReset(false)
+          return
+        }
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
@@ -214,13 +246,13 @@ const shouldForceSignOut = search.get('logout') === '1'
           className="space-y-5"
         >
           <div>
-            <label className="form-label mb-1">Email</label>
+            <label className="form-label mb-1">Email ou login</label>
             <input
-              type="email"
+              type="text"
               required
-              placeholder="seuemail@empresa.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seuemail@empresa.com ou joao.silva"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
             />
           </div>
