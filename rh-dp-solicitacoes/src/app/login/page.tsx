@@ -257,17 +257,17 @@ const shouldForceSignOut = search.get('logout') === '1'
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="form-label mb-1">Senha</label>
-              <button
-                type="button"
-                onClick={() => { setShowReset((v) => !v); setResetEmail(email); setResetMsg(null); setResetErr(null) }}
-                className="text-xs text-orange-600 hover:underline"
-              >
-                Esqueci minha senha
-              </button>
-            </div>
+           <div>
+              <div className="flex items-center justify-between">
+                <label className="form-label mb-1">Senha</label>
+                <button
+                  type="button"
+                  onClick={() => { setShowReset((v) => !v); setResetEmail(identifier); setResetMsg(null); setResetErr(null) }}
+                  className="text-xs text-orange-600 hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
             <input
               type="password"
               required
