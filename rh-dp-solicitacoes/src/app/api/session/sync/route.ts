@@ -6,29 +6,11 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function POST() {
-  const skipPrismaFlags =
-    process.env.SKIP_PRISMA_MIGRATE === 'true' ||
-    process.env.SKIP_PRISMA_DB === 'true'
-    const isProd = process.env.NODE_ENV === 'production'
-
-  if (skipPrismaFlags && !isProd) {
-    console.warn(
-      'SKIP_PRISMA_MIGRATE/DB is true; skipping user sync against the database.',
-    )
-   return NextResponse.json({ ok: true, skipped: true, dbUnavailable: true })
-  }
-
-  if (skipPrismaFlags && isProd) {
-    console.warn(
-      'SKIP_PRISMA_MIGRATE/DB is true in production; attempting to sync user anyway.',
-    )
-  }
-
   const cookieStore = cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
   const {
-    data: { user },
+data: { user },
   } = await supabase.auth.getUser()
 
   // Se não tiver sessão, não faz nada
@@ -39,7 +21,8 @@ export async function POST() {
   const authId = user.id
   const email = user.email ?? ''
   const name = (user.user_metadata as any)?.name ?? ''
-  try {
+
+     try {
     const appUser = await prisma.user.upsert({
       where: { authId }, // authId precisa ser @unique no schema
       create: {
