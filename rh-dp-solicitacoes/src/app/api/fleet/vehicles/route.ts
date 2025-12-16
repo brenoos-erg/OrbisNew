@@ -41,10 +41,7 @@ export async function GET(req: Request) {
           }
         : {}),
     },
-    orderBy: [
-      { checkins: { _max: { inspectionDate: 'desc' } } },
-      { createdAt: 'desc' },
-    ],
+    orderBy: [{ createdAt: 'desc' }],
     include: {
       costCenters: { include: { costCenter: true } },
       checkins: {
@@ -55,10 +52,22 @@ export async function GET(req: Request) {
     },
   })
 
-  const withLastCheckin = vehicles.map(({ checkins, ...vehicle }) => ({
-    ...vehicle,
-    lastCheckinAt: checkins?.[0]?.inspectionDate ?? null,
-  }))
+   const withLastCheckin = vehicles
+    .map((vehicle) => {
+      const { checkins, ...rest } = vehicle
+      return {
+        ...rest,
+        lastCheckinAt: checkins?.[0]?.inspectionDate ?? null,
+      }
+    })
+    .sort((a, b) => {
+      const bLastCheck = b.lastCheckinAt?.getTime() ?? 0
+      const aLastCheck = a.lastCheckinAt?.getTime() ?? 0
+
+      if (bLastCheck !== aLastCheck) return bLastCheck - aLastCheck
+
+      return b.createdAt.getTime() - a.createdAt.getTime()
+    })
 
   return NextResponse.json(withLastCheckin)
 }
