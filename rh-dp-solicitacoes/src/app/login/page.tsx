@@ -33,7 +33,7 @@ function LoginPageContent() {
   const [sendingReset, setSendingReset] = useState(false)
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const [resetErr, setResetErr] = useState<string | null>(null)
-const shouldForceSignOut = search.get('logout') === '1'
+ const shouldForceSignOut = search.get('logout') === '1'
 
   useEffect(() => {
     let active = true
@@ -257,12 +257,20 @@ const shouldForceSignOut = search.get('logout') === '1'
             />
           </div>
 
-           <div>
+          <div>
               <div className="flex items-center justify-between">
                 <label className="form-label mb-1">Senha</label>
                 <button
                   type="button"
-                  onClick={() => { setShowReset((v) => !v); setResetEmail(identifier); setResetMsg(null); setResetErr(null) }}
+                  onClick={() => {
+                    const willShow = !showReset
+                    setShowReset(willShow)
+                    if (willShow) {
+                      setResetEmail((value) => value || identifier)
+                    }
+                    setResetMsg(null)
+                    setResetErr(null)
+                  }}
                   className="text-xs text-orange-600 hover:underline"
                 >
                   Esqueci minha senha
