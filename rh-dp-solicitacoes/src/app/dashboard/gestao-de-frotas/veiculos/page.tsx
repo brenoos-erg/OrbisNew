@@ -20,6 +20,7 @@ type ApiVehicle = {
   kmCurrent?: number | null
   status?: string | null
   createdAt?: string | null
+  lastCheckinAt?: string | null
   costCenters?: Array<{
     costCenter: {
       id: string
@@ -123,7 +124,18 @@ function formatKm(km?: number | null) {
   if (typeof km !== 'number') return '—'
   return `${km.toLocaleString('pt-BR')} km`
 }
+function getVehicleCostCentersText(vehicle: ApiVehicle) {
+  const vehicleCostCenters =
+    vehicle.costCenters
+      ?.map((link) => {
+        const cc = link.costCenter
+        if (!cc) return null
+        return cc.description || cc.code || cc.externalCode || null
+      })
+      .filter(Boolean) || []
 
+  return vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
+}
 function formatDate(date?: string | null) {
   if (!date) return '—'
   const parsed = new Date(date)
@@ -195,6 +207,10 @@ export default function VehiclesPage() {
     kmCurrent: '',
     costCenterIds: [] as string[],
   })
+  const [vehicleSearch, setVehicleSearch] = useState('')
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState('')
+  const [vehiclePage, setVehiclePage] = useState(1)
+  const vehiclesPerPage = 3
 
   const normalizedPlate = formValues.plate.trim().toUpperCase()
   const isPlateValid = isValidPlate(normalizedPlate)
@@ -205,11 +221,64 @@ export default function VehiclesPage() {
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
     [vehicles],
   )
+const processedVehicles = useMemo(() => {
+    const term = vehicleSearch.trim().toLowerCase()
+    const normalizedStatus = vehicleStatusFilter.trim().toUpperCase()
+
+    return [...vehicles]
+      .filter((vehicle) =>
+        normalizedStatus ? getStatusInfo(vehicle.status).normalized === normalizedStatus : true,
+      )
+      .filter((vehicle) => {
+        if (!term) return true
+
+        const statusInfo = getStatusInfo(vehicle.status)
+        const haystack = `${vehicle.plate} ${vehicle.type || ''} ${vehicle.model || ''} ${
+          vehicle.sector || ''
+        } ${getVehicleCostCentersText(vehicle)} ${statusInfo.label} ${statusInfo.normalized}`
+          .toLowerCase()
+
+        return haystack.includes(term)
+      })
+      .sort((a, b) => {
+        const parseDate = (value?: string | null) => {
+          const date = value ? new Date(value).getTime() : 0
+          return Number.isNaN(date) ? 0 : date
+        }
+
+        const recentA = parseDate(a.lastCheckinAt) || parseDate(a.createdAt)
+        const recentB = parseDate(b.lastCheckinAt) || parseDate(b.createdAt)
+        return recentB - recentA
+      })
+  }, [vehicleSearch, vehicleStatusFilter, vehicles])
+
+  const totalVehiclePages = Math.max(1, Math.ceil(processedVehicles.length / vehiclesPerPage))
+  const safeVehiclePage = Math.min(vehiclePage, totalVehiclePages)
+  const paginatedVehicles = useMemo(
+    () =>
+      processedVehicles.slice(
+        (safeVehiclePage - 1) * vehiclesPerPage,
+        safeVehiclePage * vehiclesPerPage,
+      ),
+    [processedVehicles, safeVehiclePage, vehiclesPerPage],
+  )
+  const vehiclePageStart = processedVehicles.length === 0 ? 0 : (safeVehiclePage - 1) * vehiclesPerPage + 1
+  const vehiclePageEnd = Math.min(processedVehicles.length, safeVehiclePage * vehiclesPerPage)
 
   const monthBoundaries = useMemo(() => getMonthBoundaries(selectedMonth), [selectedMonth])
 
   const appliedStartDate = customStartDate || monthBoundaries.start
   const appliedEndDate = customEndDate || monthBoundaries.end
+
+  useEffect(() => {
+    setVehiclePage(1)
+  }, [vehicleSearch, vehicleStatusFilter])
+
+  useEffect(() => {
+    if (vehiclePage > totalVehiclePages) {
+      setVehiclePage(totalVehiclePages || 1)
+    }
+  }, [vehiclePage, totalVehiclePages])
 
   useEffect(() => {
     async function loadPermissions() {
@@ -313,8 +382,14 @@ export default function VehiclesPage() {
     try {
       const res = await fetch('/api/fleet/vehicles', { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao buscar veículos')
-      const data: ApiVehicle[] = await res.json()
-      setVehicles(data)
+     const data: Array<ApiVehicle & { checkins?: Array<{ inspectionDate: string }> }> = await res.json()
+      setVehicles(
+        data.map((vehicle) => ({
+          ...vehicle,
+          lastCheckinAt:
+            vehicle.lastCheckinAt || vehicle.checkins?.[0]?.inspectionDate || vehicle.createdAt || null,
+        })),
+      )
     } catch (err) {
       console.error(err)
       setError('Não foi possível carregar os veículos cadastrados.')
@@ -560,7 +635,7 @@ export default function VehiclesPage() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={loadVehicles}
               disabled={loading}
@@ -577,6 +652,28 @@ export default function VehiclesPage() {
                 <Plus size={16} /> Registrar veículo
               </button>
             )}
+             <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                value={vehicleSearch}
+                onChange={(e) => setVehicleSearch(e.target.value)}
+                placeholder="Buscar por placa, modelo, tipo..."
+                className="w-full min-w-[220px] rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+
+              <select
+                value={vehicleStatusFilter}
+                onChange={(e) => setVehicleStatusFilter(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Status (todos)</option>
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {error && (
@@ -628,27 +725,19 @@ export default function VehiclesPage() {
                   </tr>
                 )}
 
-                {!loading && vehicles.length === 0 && !error && (
+                 {!loading && processedVehicles.length === 0 && !error && (
                   <tr>
                     <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-600">
-                      Nenhum veículo cadastrado até o momento.
+                      {vehicleSearch || vehicleStatusFilter
+                        ? 'Nenhum veículo encontrado com os filtros aplicados.'
+                        : 'Nenhum veículo cadastrado até o momento.'}
                     </td>
                   </tr>
                 )}
 
                 {!loading &&
-                  vehicles.map((vehicle) => {
-                    const vehicleCostCenters =
-                      vehicle.costCenters
-                        ?.map((link) => {
-                          const cc = link.costCenter
-                          if (!cc) return null
-                          return cc.description || cc.code || cc.externalCode || null
-                        })
-                        .filter(Boolean) || []
-
-                    const vehicleCostCentersText =
-                      vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
+                   paginatedVehicles.map((vehicle) => {
+                    const vehicleCostCentersText = getVehicleCostCentersText(vehicle)
 
                     return (
                       <tr key={vehicle.id} className="hover:bg-slate-50">
@@ -717,6 +806,32 @@ export default function VehiclesPage() {
               </tbody>
             </table>
           </div>
+          {processedVehicles.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between border border-slate-200 border-t-0 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <p className="font-medium">
+                Exibindo {vehiclePageStart}-{vehiclePageEnd} de {processedVehicles.length} veículo(s)
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setVehiclePage((prev) => Math.max(1, prev - 1))}
+                  disabled={safeVehiclePage === 1}
+                  className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs uppercase text-slate-500">
+                  Página {safeVehiclePage} / {totalVehiclePages}
+                </span>
+                <button
+                  onClick={() => setVehiclePage((prev) => Math.min(totalVehiclePages, prev + 1))}
+                  disabled={safeVehiclePage === totalVehiclePages}
+                  className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* painel de check-ins */}
           {selectedVehicle && (

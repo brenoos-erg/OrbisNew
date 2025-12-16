@@ -41,11 +41,26 @@ export async function GET(req: Request) {
           }
         : {}),
     },
-    orderBy: { createdAt: 'desc' },
-    include: { costCenters: { include: { costCenter: true } } },
+    orderBy: [
+      { checkins: { _max: { inspectionDate: 'desc' } } },
+      { createdAt: 'desc' },
+    ],
+    include: {
+      costCenters: { include: { costCenter: true } },
+      checkins: {
+        select: { inspectionDate: true },
+        orderBy: { inspectionDate: 'desc' },
+        take: 1,
+      },
+    },
   })
 
-  return NextResponse.json(vehicles)
+  const withLastCheckin = vehicles.map(({ checkins, ...vehicle }) => ({
+    ...vehicle,
+    lastCheckinAt: checkins?.[0]?.inspectionDate ?? null,
+  }))
+
+  return NextResponse.json(withLastCheckin)
 }
 
 export async function POST(req: Request) {
