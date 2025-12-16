@@ -13,6 +13,10 @@ export default function LoginPage() {
     </Suspense>
   )
 }
+function getSessionEmail() {
+  if (typeof window === 'undefined') return ''
+  return sessionStorage.getItem('resetEmail') ?? ''
+}
 
 function LoginPageContent() {
   const router = useRouter()
@@ -29,11 +33,16 @@ function LoginPageContent() {
 
   // --- Reset de senha (esqueci) ---
   const [showReset, setShowReset] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
+  const [resetEmail, setResetEmail] = useState<string>(() => getSessionEmail())
   const [sendingReset, setSendingReset] = useState(false)
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const [resetErr, setResetErr] = useState<string | null>(null)
- const shouldForceSignOut = search.get('logout') === '1'
+  const shouldForceSignOut = search.get('logout') === '1'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem('resetEmail', resetEmail)
+  }, [resetEmail])
 
   useEffect(() => {
     let active = true
