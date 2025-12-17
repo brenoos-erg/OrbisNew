@@ -2,8 +2,9 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye, Upload } from 'lucide-react'
+import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
 
 type UserRow = {
   id: string
@@ -150,10 +151,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [processingBulk, setProcessingBulk] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ created: number } | null>(null)
-  const [importErrors, setImportErrors] = useState<string[]>([])
+
 
   // filtro de usuários
   const [search, setSearch] = useState('')
@@ -246,40 +244,7 @@ export default function Page() {
   useEffect(() => {
     load()
   }, [])
-  async function handleImportSubmit() {
-    if (!importFile) {
-      alert('Selecione um arquivo para importar.')
-      return
-    }
-
-    setImporting(true)
-    setImportErrors([])
-    setImportResult(null)
-
-    try {
-      const fd = new FormData()
-      fd.append('file', importFile)
-
-      const r = await fetch('/api/configuracoes/usuarios/import', {
-        method: 'POST',
-        body: fd,
-      })
-
-      const data = await r.json().catch(() => ({} as any))
-      if (!r.ok) {
-        throw new Error(data?.error || 'Falha ao importar usuários.')
-      }
-
-      setImportResult({ created: Number(data.created) || 0 })
-      setImportErrors(Array.isArray(data.errors) ? data.errors : [])
-      setImportFile(null)
-      await load()
-    } catch (e: any) {
-      setImportErrors([e?.message || 'Erro ao importar usuários.'])
-    } finally {
-      setImporting(false)
-    }
-  }
+  
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -657,60 +622,7 @@ export default function Page() {
                 />
               </div>
             </div>
-             {/* Importação em massa */}
-            <div className="mt-4 rounded-xl border border-dashed border-orange-200 bg-orange-50/70 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-1">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Upload className="h-4 w-4 text-orange-600" /> Importar usuários via planilha
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Aceita .xlsx ou .csv com colunas Nome, Email, Login (opcional), Telefone, Centro de Custo, Senha e Primeiro Acesso (Sim/Não).
-                  </p>
-                  {importResult && (
-                    <p className="text-xs font-semibold text-emerald-700">
-                      {importResult.created} usuário(s) importado(s) com sucesso.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    className="text-xs text-slate-700"
-                  />
-                  <button
-                    type="button"
-                    disabled={importing || !importFile}
-                    onClick={handleImportSubmit}
-                    className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-2 text-xs font-semibold text-white hover:bg-orange-700 disabled:opacity-50"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {importing ? 'Importando…' : 'Importar planilha'}
-                  </button>
-                </div>
-              </div>
-
-              {importErrors.length > 0 && (
-                <div className="mt-3 rounded-lg border border-orange-200 bg-white/70 p-3">
-                  <p className="text-xs font-semibold text-orange-700">
-                    {importErrors.length} linha(s) não puderam ser importadas:
-                  </p>
-                  <ul className="mt-1 max-h-32 space-y-1 overflow-auto text-xs text-orange-700 list-disc pl-4">
-                    {importErrors.slice(0, 5).map((err, idx) => (
-                      <li key={idx}>{err}</li>
-                    ))}
-                  </ul>
-                  {importErrors.length > 5 && (
-                    <p className="text-[11px] text-orange-700">
-                      Mostrando 5 de {importErrors.length} linhas com erro.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+            
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-800">

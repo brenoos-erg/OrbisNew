@@ -1,6 +1,8 @@
+// src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createUserWithAuth } from '@/lib/users/createUserWithAuth'
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto' // <-- ADICIONAR
 
 
 export const dynamic = 'force-dynamic'
@@ -68,17 +70,84 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+// 1) Cria no Prisma
+    // 1) Cria no Prisma
+// 1) Cria no Prisma
+const created = await prisma.user.create({
+  data: { fullName, email, login, phone, costCenterId },
+  select: { id: true, fullName: true, email: true, login: true },
+})
 
-   const created = await createUserWithAuth({
-      fullName,
-      email,
-      login,
-      phone,
+// 1.1) Se tiver centro de custo, cria também o vínculo em UserCostCenter
+if (costCenterId) {
+  await prisma.userCostCenter.create({
+    data: {
+      userId: created.id,
       costCenterId,
-      password: rawPassword,
-      firstAccess,
+    },
+  })
+}
+
+// 1.2) TODOS os usuários criados pela tela começam como NÍVEL 1 em TODOS os módulos
+const modules = await prisma.module.findMany({
+  where: { key: 'solicitacoes' },
+  select: { id: true },
+})
+
+if (modules.length > 0) {
+  await prisma.userModuleAccess.createMany({
+    data: modules.map((m) => ({
+      userId: created.id,
+      moduleId: m.id,
+      level: 'NIVEL_1', // enum ModuleLevel
+    })),
+    skipDuplicates: true, // segurança se futuramente for recriar ou rodar mais de uma vez
+  })
+}
+
+
+
+    // 2) Cria no Supabase Auth (Admin)
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+
+    // Senha efetiva: nunca undefined
+    const effectivePassword =
+      firstAccess && !rawPassword
+        ? `${login}@123`
+        : rawPassword || crypto.randomUUID()
+
+    const { data: authData, error } = await sb.auth.admin.createUser({
+      email,
+      password: effectivePassword,
+      email_confirm: true,
+      user_metadata: {
+        fullName,
+        login,
+        phone,
+        costCenterId,
+        mustChangePassword: firstAccess,
+      },
     })
 
+    if (error) {
+      // rollback no Prisma se der erro no Auth
+      await prisma.user.delete({ where: { id: created.id } })
+      return NextResponse.json(
+        { error: 'Falha ao criar no Auth: ' + error.message },
+        { status: 500 },
+      )
+    }
+
+    // 3) Vincula authId no Prisma
+    if (authData?.user?.id) {
+      await prisma.user.update({
+        where: { id: created.id },
+        data: { authId: authData.user.id as any },
+      })
+    }
 
     return NextResponse.json(created, { status: 201 })
   } catch (e: any) {
