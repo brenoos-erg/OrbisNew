@@ -4,12 +4,8 @@ import { getCurrentAppUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
-import {
-  getUserModuleContext,
-  userHasDepartmentOrCostCenter,
-} from '@/lib/moduleAccess'
+import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
 import { ModuleLevel } from '@prisma/client'
-export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({
   children,
@@ -71,14 +67,13 @@ export default async function DashboardLayout({
   let showFleet = false
 
   if (appUser.id) {
-    const [{ levels, departmentCode }, hasStructure] = await Promise.all([
-      getUserModuleContext(appUser.id),
-      userHasDepartmentOrCostCenter(
-        appUser.id,
-        appUser.costCenterId,
-        appUser.departmentId,
-      ),
-    ])
+    const levels = appUser.moduleLevels ?? {}
+    const departmentCode = appUser.department?.code ?? null
+    const hasStructure = await userHasDepartmentOrCostCenter(
+      appUser.id,
+      appUser.costCenterId,
+      appUser.departmentId,
+    )
 
     const solicitLevel = levels['solicitacoes']
     const configLevel = levels['configuracoes']
@@ -109,7 +104,7 @@ export default async function DashboardLayout({
         showConfigPermissions={showConfigPermissions}
         showFleet={showFleet}
         canApprove={canApprove}
-        userMenu={<UserMenu collapsed={false} />}
+        userMenu={<UserMenu collapsed={false} user={appUser} />}
       />
 
       {/* conteúdo */}

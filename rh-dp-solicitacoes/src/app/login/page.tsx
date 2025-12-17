@@ -128,52 +128,35 @@ function LoginPageContent() {
     const { data, error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
     authenticatedUser = data.user
 
-    // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
-    let syncDbUnavailable = false
+    // 2️⃣ Sincroniza e carrega dados do backend em uma única chamada
+    let bootstrapDbUnavailable = false
     try {
-      const syncRes = await fetch('/api/session/sync', { method: 'POST', cache: 'no-store' })
-      const body = await syncRes.json().catch(() => null)
-      if (body?.dbUnavailable || body?.skipped) syncDbUnavailable = true
-
-      if (!syncRes.ok && !syncDbUnavailable) {
+      const me = await fetchSessionMe({ force: true })
+      if (me?.dbUnavailable) {
+        bootstrapDbUnavailable = true
+      }
+      if (!bootstrapDbUnavailable && !me?.appUser) {
         setLoading(false)
-        alert('Não foi possível sincronizar seus dados. Tente novamente.')
+        alert('Não foi possível carregar seus dados agora. Tente novamente.')
+        return
+      }
+      if (me?.appUser?.status === 'INATIVO') {
+        await supabase.auth.signOut({ scope: 'global' })
+        setLoading(false)
+        alert('Seu usuário está INATIVO. Fale com o administrador.')
+        router.replace('/login?inactive=1')
+        router.refresh()
         return
       }
     } catch {
       // erro silencioso, mas não deixa travar
     }
 
-    // 3️⃣ Verifica status no backend
-    if (!syncDbUnavailable) {
-      try {
-         const me = await fetchSessionMe({ force: true })
-        if (me?.dbUnavailable) {
-          syncDbUnavailable = true
-        }
-        if (!syncDbUnavailable && !me?.appUser) {
-          setLoading(false)
-          alert('Não foi possível carregar seus dados agora. Tente novamente.')
-          return
-        }
-        if (me?.appUser?.status === 'INATIVO') {
-          await supabase.auth.signOut({ scope: 'global' })
-          setLoading(false)
-          alert('Seu usuário está INATIVO. Fale com o administrador.')
-          router.replace('/login?inactive=1')
-          router.refresh()
-          return
-        }
-      } catch {
-        // erro silencioso, mas não deixa travar
-      }
-    }
-
-    if (syncDbUnavailable) {
+    if (bootstrapDbUnavailable) {
       // mostra aviso mas mantém sessão já autenticada
       alert('Não foi possível verificar seus dados agora. Vamos continuar assim mesmo.')
     }
-    // 4️⃣ Se for primeiro acesso (mustChangePassword)
+    // 3️⃣ Se for primeiro acesso (mustChangePasswor
     if (!authenticatedUser) {
       const {
         data: { user },

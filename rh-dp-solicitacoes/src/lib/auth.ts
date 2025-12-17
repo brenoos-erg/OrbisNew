@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers'
 import { performance } from 'node:perf_hooks'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { User } from '@supabase/supabase-js'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
@@ -16,79 +17,64 @@ const getSupabaseServerClient = () =>
     cookies,
   })
 
-async function loadCurrentUser() {
-  const authStartedAt = performance.now()
-  const supabase = getSupabaseServerClient()
+export const appUserSelect = {
+  id: true,
+  email: true,
+  fullName: true,
+  login: true,
+  phone: true,
+  status: true,
+  role: true,
+  costCenterId: true,
+  departmentId: true,
+  department: { select: { id: true, code: true, name: true } },
+}
 
-  const { data: userResult, error: userError } = await supabase.auth.getUser()
-  logTiming('supabase.auth.getUser', authStartedAt)
+  export type SelectedAppUser = Prisma.UserGetPayload<{ select: typeof appUserSelect }>
 
-  if (userError) {
-    console.error('Erro ao buscar usuário autenticado', userError)
-    return { appUser: null, session: null }
-  }
-
-  const sessionUser = userResult.user
+async function resolveAppUserFromSessionUser(
+  sessionUser: User | null,
+  seedUser?: SelectedAppUser | null,
+) {
+  const session = sessionUser ? { user: sessionUser } : null
 
   if (!sessionUser) {
-    return { appUser: null, session: null }
+    return { appUser: null, session, dbUnavailable: false }
   }
 
   const authId = sessionUser.id
   const email = sessionUser.email ?? undefined
 
-const session = sessionUser ? { user: sessionUser } : null
-
-  let appUser = null
+  let appUser = seedUser ?? null
   let dbUnavailable = false
 
   try {
-    const lookupStartedAt = performance.now()
-    appUser = await prisma.user.findUnique({
-      where: { authId },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        login: true,
-        phone: true,
-        status: true,
-        role: true,
-        costCenterId: true,
-        departmentId: true,
-        department: { select: { id: true, code: true, name: true } },
-      },
-    })
-    logTiming('prisma.user.findUnique', lookupStartedAt)
+    if (!appUser) {
+      const lookupStartedAt = performance.now()
+      appUser = await prisma.user.findUnique({
+        where: { authId },
+        select: appUserSelect,
+      })
+      logTiming('prisma.user.findUnique', lookupStartedAt)
+    }
 
-
-   if (!appUser && email) {
+    if (!appUser && email) {
       const emailLookupStartedAt = performance.now()
       const userByEmail = await prisma.user.findUnique({
         where: { email },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          login: true,
-          phone: true,
-          status: true,
-          role: true,
-          costCenterId: true,
-          departmentId: true,
-          department: { select: { id: true, code: true, name: true } },
-        },
+        select: appUserSelect,
+
       })
       logTiming('prisma.user.findUnique(email)', emailLookupStartedAt)
 
-if (userByEmail) {
+      if (userByEmail) {
         const updateStartedAt = performance.now()
-        await prisma.user.update({
+        appUser = await prisma.user.update({
           where: { id: userByEmail.id },
           data: { authId },
+          select: appUserSelect,
         })
         logTiming('prisma.user.update.authId', updateStartedAt)
-        appUser = userByEmail
       }
     }
   } catch (error) {
@@ -111,10 +97,33 @@ if (userByEmail) {
 
   return { appUser, session, dbUnavailable }
 }
+async function loadCurrentUser() {
+  const authStartedAt = performance.now()
+  const supabase = getSupabaseServerClient()
+
+  const { data: userResult, error: userError } = await supabase.auth.getUser()
+  logTiming('supabase.auth.getUser', authStartedAt)
+
+  if (userError) {
+    console.error('Erro ao buscar usuário autenticado', userError)
+    return { appUser: null, session: null }
+  }
+
+  return resolveAppUserFromSessionUser(userResult.user)
+}
 
 export async function getCurrentAppUser() {
   return ensureRequestContext('auth/getCurrentAppUser', () =>
     memoizeRequest('auth/getCurrentAppUser', () => loadCurrentUser()),
+  )
+}
+export async function getCurrentAppUserFromSessionUser(
+  sessionUser: User | null,
+  seedUser?: SelectedAppUser | null,
+) {
+  const key = `auth/getCurrentAppUser/${sessionUser?.id ?? 'anon'}`
+  return ensureRequestContext('auth/getCurrentAppUser', () =>
+    memoizeRequest(key, () => resolveAppUserFromSessionUser(sessionUser, seedUser)),
   )
 }
 

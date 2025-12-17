@@ -1,13 +1,19 @@
 // src/components/layout/userMenu.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
-import { clearSessionMeCache, fetchSessionMe } from '@/lib/session-cache'
+import { useState } from 'react'
+import { clearSessionMeCache } from '@/lib/session-cache'
 import { supabaseBrowser } from '@/lib/supabase/client'
-import { ChevronDown, LogOut, Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
-import { useTheme } from '@/components/theme/ThemeProvider'
+import { ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react'
 
-type Props = { collapsed?: boolean }
+type Props = {
+  collapsed?: boolean
+  user?: {
+    fullName?: string | null
+    login?: string | null
+    email?: string | null
+  } | null
+}
 
 function initialsFrom(name: string) {
   const parts = name.trim().split(/\s+/)
@@ -16,77 +22,19 @@ function initialsFrom(name: string) {
   return (a + b).toUpperCase() || '…'
 }
 
-export default function UserMenu({ collapsed }: Props) {
+export default function UserMenu({ collapsed, user }: Props) {
   const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [fullName, setFullName] = useState('')
-  const [login, setLogin] = useState('')
-  const [email, setEmail] = useState('')
 
-  const { theme, toggleTheme } = useTheme()
+
   const supabase = supabaseBrowser()
 
-  useEffect(() => {
-    let mounted = true
+  const fullName =
+    user?.fullName?.toString()?.trim() ||
+    user?.email?.toString()?.trim() ||
+    'Usuário'
 
-    async function load() {
-      setLoading(true)
-
-      // 1) Usuário autenticado no Supabase
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (!mounted || !user) {
-        setFullName('')
-        setLogin('')
-        setEmail('')
-        setLoading(false)
-        return
-      }
-
-      // 2) Tenta pegar o “espelho” oficial no Prisma via /api/session/me
-      const payload = await fetchSessionMe().catch(() => null)
-      const prismaUser: any = payload?.appUser ?? null
-      const meta = (user.user_metadata || {}) as Record<string, any>
-
-      const name =
-        prismaUser?.fullName?.toString()?.trim() ||
-        meta.fullName?.toString()?.trim() ||
-        meta.name?.toString()?.trim() ||
-        user.email?.toString()?.trim() ||
-        'Usuário'
-
-      const loginValue =
-        prismaUser?.login?.toString()?.trim() ||
-        meta.login?.toString()?.trim() ||
-        user.email?.split('@')[0] ||
-        ''
-
-      const emailValue =
-        prismaUser?.email?.toString()?.trim() || user.email?.toString()?.trim() || ''
-
-      if (!mounted) return
-
-      setFullName(name)
-      setLogin(loginValue)
-      setEmail(emailValue)
-      setLoading(false)
-    }
-
-    load()
-
-    // Recarrega se a sessão mudar
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      load()
-    })
-
-    return () => {
-      mounted = false
-      sub?.subscription?.unsubscribe()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+       const login = user?.login?.toString()?.trim() || user?.email?.toString()?.trim() || ''
+  const email = user?.email?.toString()?.trim() || ''
 
   async function handleSignOut() {
     try {
@@ -106,13 +54,13 @@ export default function UserMenu({ collapsed }: Props) {
         className="w-full rounded-xl bg-white/5 hover:bg-white/10 text-left flex items-center gap-3 px-3 py-2 transition"
       >
         <div className="h-9 w-9 rounded-lg bg-white/15 grid place-items-center text-xs font-bold text-white">
-          {loading ? '…' : initialsFrom(fullName)}
+          {initialsFrom(fullName)}
         </div>
 
         {!collapsed && (
           <div className="min-w-0">
             <div className="truncate text-sm text-white">
-              {loading ? 'Carregando…' : fullName || 'Usuário'}
+              {fullName || 'Usuário'}
             </div>
             <div className="truncate text-[11px] text-slate-400">{login || email}</div>
           </div>

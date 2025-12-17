@@ -14,7 +14,7 @@ let inflightRequest: Promise<SessionMePayload | null> | null = null
 
 async function requestSessionMe(): Promise<SessionMePayload | null> {
   try {
-    const res = await fetch('/api/session/me', { cache: 'no-store' })
+    const res = await fetch('/api/session/bootstrap', { cache: 'no-store' })
     if (!res.ok) return null
 
     const data = await res.json().catch(() => null)
