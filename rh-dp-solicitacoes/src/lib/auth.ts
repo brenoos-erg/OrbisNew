@@ -1,17 +1,25 @@
 // src/lib/auth.ts
 import { cookies } from 'next/headers'
+import { cache } from 'react'
+import { performance } from 'node:perf_hooks'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
+import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
-export async function getCurrentAppUser() {
-  // cria client do Supabase usando cookies do Next
-  const supabase = createServerComponentClient({
+const getSupabaseServerClient = cache(() =>
+  createServerComponentClient({
     cookies,
-  })
+  }),
+)
+
+const loadCurrentUser = cache(async () => {
+  const authStartedAt = performance.now()
+  const supabase = getSupabaseServerClient()
 
   const { data: userResult, error: userError } = await supabase.auth.getUser()
+  logTiming('supabase.auth.getUser', authStartedAt)
 
   if (userError) {
     console.error('Erro ao buscar usuário autenticado', userError)
@@ -27,15 +35,14 @@ export async function getCurrentAppUser() {
   const authId = sessionUser.id
   const email = sessionUser.email ?? undefined
 
- // usa apenas getUser() para garantir que os dados estejam autenticados via Supabase
-  const session = sessionUser ? { user: sessionUser } : null
+const session = sessionUser ? { user: sessionUser } : null
 
   let appUser = null
   let dbUnavailable = false
 
   try {
-    // 1) tenta achar pelo authId
-    appUser = await prisma.user.findFirst({
+    const lookupStartedAt = performance.now()
+    appUser = await prisma.user.findUnique({
       where: { authId },
       select: {
         id: true,
@@ -50,9 +57,12 @@ export async function getCurrentAppUser() {
         department: { select: { id: true, code: true, name: true } },
       },
     })
+    logTiming('prisma.user.findUnique', lookupStartedAt)
 
-    // 2) se não achar, tenta pelo e-mail e “cola” o authId nele
+    logTiming('prisma.user.findUnique', lookupStartedAt)
+
     if (!appUser && email) {
+      const emailLookupStartedAt = performance.now()
       const userByEmail = await prisma.user.findUnique({
         where: { email },
         select: {
@@ -69,12 +79,15 @@ export async function getCurrentAppUser() {
         },
       })
 
-       if (userByEmail) {
+        logTiming('prisma.user.findUnique(email)', emailLookupStartedAt)
+
+      if (userByEmail) {
+        const updateStartedAt = performance.now()
         await prisma.user.update({
           where: { id: userByEmail.id },
           data: { authId },
         })
-
+logTiming('prisma.user.update.authId', updateStartedAt)
         appUser = userByEmail
       }
     }
@@ -88,12 +101,19 @@ export async function getCurrentAppUser() {
 
      return { appUser: null, session, dbUnavailable }
   }
+
   if (appUser) {
+    const levelsStartedAt = performance.now()
     const moduleLevels = await getUserModuleLevels(appUser.id)
+    logTiming('prisma.moduleLevels.load', levelsStartedAt)
     return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable }
   }
 
   return { appUser, session, dbUnavailable }
+})
+
+export async function getCurrentAppUser() {
+  return withRequestMetrics('auth/getCurrentAppUser', () => loadCurrentUser())
 }
 
 export async function requireActiveUser() {

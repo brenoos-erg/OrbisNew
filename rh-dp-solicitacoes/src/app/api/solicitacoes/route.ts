@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
+import { withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,8 +94,9 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
  * GET /api/solicitacoes
  */
 export async function GET(req: NextRequest) {
-  try {
-    const me = await requireActiveUser()
+  return withRequestMetrics('GET /api/solicitacoes', async () => {
+    try {
+      const me = await requireActiveUser()
     const { searchParams } = new URL(req.url)
 
     const page = Math.max(
@@ -192,13 +194,14 @@ export async function GET(req: NextRequest) {
     }))
 
     return NextResponse.json({ rows, total })
-  } catch (e) {
-    console.error('GET /api/solicitacoes error', e)
-    return NextResponse.json(
-      { error: 'Erro ao listar solicitações.' },
-      { status: 500 },
-    )
-  }
+    } catch (e) {
+      console.error('GET /api/solicitacoes error', e)
+      return NextResponse.json(
+        { error: 'Erro ao listar solicitações.' },
+        { status: 500 },
+      )
+    }
+  })
 }
 
 /**
