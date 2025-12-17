@@ -1,7 +1,7 @@
 // src/app/dashboard/configuracoes/usuarios/page.tsx
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -151,6 +151,21 @@ export default function Page() {
 
   const autoLogin = useMemo(() => toLoginFromName(fullName), [fullName])
   useEffect(() => setLogin(autoLogin), [autoLogin])
+
+  const autoEmail = useMemo(() => toEmailFromName(fullName), [fullName])
+  const lastAutoEmailRef = useRef('')
+  useEffect(() => {
+    setEmail((prev) => {
+      const suggested = autoEmail
+      const lastAuto = lastAutoEmailRef.current
+      lastAutoEmailRef.current = suggested
+
+      // Se o campo está vazio ou igual ao último sugerido, atualiza automaticamente
+      if (!prev || prev === lastAuto) return suggested
+      return prev
+    })
+  }, [autoEmail])
+
 
   // ------- listagem -------
   const [rows, setRows] = useState<UserRow[]>([])
