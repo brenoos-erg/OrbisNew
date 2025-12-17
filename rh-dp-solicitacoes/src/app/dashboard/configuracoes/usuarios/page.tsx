@@ -149,11 +149,16 @@ export default function Page() {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [processingBulk, setProcessingBulk] = useState(false)
 
   // filtro de usuários
   const [search, setSearch] = useState('')
   const [userPage, setUserPage] = useState(1)
   const usersPerPage = 5
+
+  // seleção em massa
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkPassword, setBulkPassword] = useState('')
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -183,9 +188,18 @@ export default function Page() {
   const userPageStart = filteredRows.length === 0 ? 0 : (safeUserPage - 1) * usersPerPage + 1
   const userPageEnd = Math.min(filteredRows.length, safeUserPage * usersPerPage)
 
+  const selectedCount = selectedIds.length
+  const pageIds = paginatedRows.filter((u) => u.id).map((u) => u.id) as string[]
+  const pageFullySelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
+
   useEffect(() => {
     setUserPage(1)
   }, [search])
+
+  useEffect(() => {
+    // se a lista mudou, limpa seleções inexistentes
+    setSelectedIds((prev) => prev.filter((id) => rows.some((r) => r.id === id)))
+  }, [rows])
 
   useEffect(() => {
     if (userPage > totalUserPages) {
@@ -319,6 +333,77 @@ export default function Page() {
     closeEdit()
     await load()
   }
+  function toggleSelection(id?: string) {
+    if (!id) return
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
+    )
+  }
+
+  function toggleSelectAllPage() {
+    if (pageIds.length === 0) return
+    if (pageFullySelected) {
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])))
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return
+    if (!confirm(`Excluir ${selectedIds.length} usuário(s)?`)) return
+
+    setProcessingBulk(true)
+    try {
+      for (const id of selectedIds) {
+        const r = await fetch(`/api/configuracoes/usuarios/${id}`, {
+          method: 'DELETE',
+        })
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}))
+          throw new Error(err?.error || 'Falha ao excluir um dos usuários.')
+        }
+      }
+      setSelectedIds([])
+      await load()
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao excluir selecionados.')
+    } finally {
+      setProcessingBulk(false)
+    }
+  }
+
+  async function handleBulkPassword() {
+    if (selectedIds.length === 0) return
+    const trimmed = bulkPassword.trim()
+    if (!trimmed) {
+      alert('Informe a nova senha para os usuários selecionados.')
+      return
+    }
+
+    setProcessingBulk(true)
+    try {
+      for (const id of selectedIds) {
+        const r = await fetch(`/api/configuracoes/usuarios/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: trimmed }),
+        })
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}))
+          throw new Error(err?.error || 'Falha ao atualizar senha de um usuário.')
+        }
+      }
+      setBulkPassword('')
+      setSelectedIds([])
+      await load()
+    } catch (e: any) {
+      alert(e?.message || 'Erro ao atualizar senhas.')
+    } finally {
+      setProcessingBulk(false)
+    }
+  }
+
 
   // ------- excluir -------
   async function handleDelete(u: UserRow) {
@@ -534,13 +619,66 @@ export default function Page() {
                 />
               </div>
             </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-800">
+                  Selecionados: {selectedCount}
+                </span>
+                {selectedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-xs text-orange-600 underline hover:text-orange-700"
+                  >
+                    Limpar seleção
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    className="w-48 rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    placeholder="Nova senha em massa"
+                    value={bulkPassword}
+                    onChange={(e) => setBulkPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={processingBulk || selectedCount === 0}
+                    onClick={handleBulkPassword}
+                    className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Aplicar senha
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={processingBulk || selectedCount === 0}
+                  onClick={handleBulkDelete}
+                  className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  Excluir selecionados
+                </button>
+              </div>
+            </div>
 
             {/* Tabela */}
 <div className="mt-3 rounded-xl border border-slate-100 overflow-x-auto">
   <table className="w-full min-w-[1200px] text-sm table-fixed">
     <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
       <tr>
-        <th className="px-4 py-2 w-[20%] text-left">Nome</th>
+         <th className="px-4 py-2 w-10 text-left">
+          <input
+            type="checkbox"
+            checked={pageFullySelected}
+            onChange={toggleSelectAllPage}
+            className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+          />
+        </th>
+        <th className="px-4 py-2 w-[19%] text-left">Nome</th>
         <th className="px-4 py-2 w-[14%] text-left">Login</th>
         <th className="px-4 py-2 w-[25%] text-left">E-mail</th>
         <th className="px-4 py-2 w-[18%] text-left">Centro de Custo</th>
@@ -562,14 +700,28 @@ export default function Page() {
           </td>
         </tr>
       ) : (
-        paginatedRows.map((u) => (
+        paginatedRows.map((u) => {
+          const isSelected = !!u.id && selectedIds.includes(u.id)
+          return (
           <tr
             key={u.id || u.email}
-            className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+            className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${
+              isSelected ? 'bg-orange-50/70' : ''
+            }`}
             onClick={() => {
               if (u.id) router.push(`/dashboard/configuracoes/usuarios/${u.id}`)
             }}
           >
+            <td className="px-4 py-2 align-top">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+                checked={isSelected}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleSelection(u.id)}
+                disabled={!u.id}
+              />
+            </td>
             <td className="px-4 py-2 align-top">
               <div className="font-medium text-slate-900 truncate" title={u.fullName}>
                 {u.fullName}
@@ -600,6 +752,7 @@ export default function Page() {
               <div className="flex items-center justify-end gap-1">
                 {/* Visualizar */}
                 <button
+                type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     if (u.id) router.push(`/dashboard/configuracoes/usuarios/${u.id}`)
@@ -612,6 +765,7 @@ export default function Page() {
 
                 {/* Editar */}
                 <button
+                 type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     openEdit(u)
@@ -625,6 +779,7 @@ export default function Page() {
 
                 {/* Excluir */}
                 <button
+                 type="button"
                   onClick={(e) => {
                     e.stopPropagation()
                     handleDelete(u)
@@ -638,7 +793,8 @@ export default function Page() {
               </div>
             </td>
           </tr>
-        ))
+          )
+        })
       )}
     </tbody>
   </table>
@@ -652,6 +808,7 @@ export default function Page() {
 
     <div className="flex items-center gap-2">
       <button
+      type="button"
         onClick={() => setUserPage((prev) => Math.max(1, prev - 1))}
         disabled={safeUserPage === 1}
         className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
@@ -664,6 +821,7 @@ export default function Page() {
       </span>
 
       <button
+      type="button"
         onClick={() => setUserPage((prev) => Math.min(totalUserPages, prev + 1))}
         disabled={safeUserPage === totalUserPages}
         className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
@@ -694,6 +852,7 @@ export default function Page() {
               </h3>
               <button
                 onClick={closeEdit}
+                type="button"
                 className="rounded-md p-1 hover:bg-slate-100"
               >
                 <X size={18} />
@@ -768,12 +927,14 @@ export default function Page() {
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={closeEdit}
+                type="button"
                 className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm"
               >
                 <X size={16} /> Cancelar
               </button>
               <button
                 onClick={submitEdit}
+                type="button"
                 className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 <Check size={16} /> Salvar alterações
