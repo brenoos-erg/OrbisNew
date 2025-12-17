@@ -1,4 +1,3 @@
-// src/app/api/configuracoes/usuarios/[id]/route.ts
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
@@ -9,10 +8,10 @@ export const dynamic = 'force-dynamic'
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  return createClient(url, key)
+  return createClient(url, key, { auth: { persistSession: false } })
 }
 
-/** GET: retorna dados do usuário (para a página de perfil) */
+/** GET: retorna dados do usuário */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
@@ -46,12 +45,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json()
     const id = params.id
 
-    const fullName   = (body.fullName ?? '').trim()
-    const email      = (body.email ?? '').trim().toLowerCase()
-    const login      = (body.login ?? '').trim().toLowerCase()
-    const phone      = (body.phone ?? '').trim() || null
+    const fullName = (body.fullName ?? '').trim()
+    const email = (body.email ?? '').trim().toLowerCase()
+    const login = (body.login ?? '').trim().toLowerCase()
+    const phone = (body.phone ?? '').trim() || null
     const costCenterId = (body.costCenterId ?? '').trim() || null
-    const password   = (body.password ?? '').trim()
+    const password = (body.password ?? '').trim()
 
     // Atualiza no Prisma
     const updated = await prisma.user.update({
@@ -65,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       },
       select: {
         id: true, fullName: true, email: true, login: true,
-        phone: true, costCenterId: true, authId: true
+        phone: true, costCenterId: true, authId: true,
       },
     })
 
@@ -79,9 +78,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const meta: Record<string, any> = {}
       if (fullName) meta.fullName = fullName
       if (login) meta.login = login
-      if (phone !== undefined) meta.phone = phone
-      if (costCenterId !== undefined) meta.costCenterId = costCenterId
-      if (Object.keys(meta).length > 0) updates.user_metadata = meta
+      meta.phone = phone
+      meta.costCenterId = costCenterId
+
+      updates.user_metadata = meta
 
       const { error: upErr } = await admin.auth.admin.updateUserById(updated.authId, updates)
       if (upErr) console.error('supabase admin update error', upErr)
@@ -98,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       email: updated.email,
       login: updated.login ?? '',
       phone: updated.phone ?? '',
-      costCenterId: updated.costCenterId ?? '',
+      costCenterId: updated.costCenterId ?? null,
     })
   } catch (e: any) {
     if (e?.code === 'P2002') {
@@ -109,55 +109,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-/** DELETE: remove no Prisma e depois tenta remover no Auth (best-effort) */
+/**
+ * DELETE: NÃO APAGA (evita FK). Só INATIVA.
+ * (Se quiser esconder na tela, filtre status ATIVO no GET)
+ */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
 
-    // 1) pega authId antes
-    const existing = await prisma.user.findUnique({
+    await prisma.user.update({
       where: { id },
-      select: { id: true, authId: true },
+      data: { status: 'INATIVO' },
     })
-    if (!existing) {
-      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
-    }
-
-        // 2) remove vínculos que bloqueiam a exclusão
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id },
-        data: {
-          costCenterId: null,
-          departmentId: null,
-        },
-      }),
-      prisma.event.deleteMany({ where: { actorId: id } }),
-      prisma.userModuleAccess.deleteMany({ where: { userId: id } }),
-      prisma.userCostCenter.deleteMany({ where: { userId: id } }),
-      prisma.groupMember.deleteMany({ where: { userId: id } }),
-    ])
-
-    // 3) exclui no Prisma depois de limpar vínculos
-    await prisma.user.delete({ where: { id } })
-
-    // 4) tenta excluir no Auth (não falha se der erro)
-    if (existing.authId) {
-      const admin = getSupabaseAdmin()
-      await admin.auth.admin.deleteUser(existing.authId).catch((err) => {
-        console.error('Falha ao excluir no Auth (seguindo mesmo assim):', err)
-      })
-    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
-    if (e?.code === 'P2003' || e?.code === '23503') {
-      return NextResponse.json(
-        { error: 'Não é possível excluir: existem registros vinculados a este usuário.' },
-        { status: 409 }
-      )
-    }
     console.error('DELETE /configuracoes/usuarios/[id] error', e)
-    return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao inativar usuário.' }, { status: 500 })
   }
 }

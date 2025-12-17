@@ -1,11 +1,38 @@
-// src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto' // <-- ADICIONAR
-
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+
+// Admin client (Service Role) – só no servidor
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createClient(url, key, { auth: { persistSession: false } })
+}
+
+// Busca usuário no Auth por email (compatível com versões antigas)
+async function findAuthUserIdByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string) {
+  const target = email.trim().toLowerCase()
+
+  let page = 1
+  const perPage = 1000 // pode ajustar
+
+  for (let i = 0; i < 20; i++) { // limite de segurança
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw new Error(error.message)
+
+    const found = (data?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === target)
+    if (found?.id) return found.id
+
+    // se veio menos que perPage, acabou
+    if (!data?.users || data.users.length < perPage) break
+    page++
+  }
+
+  return null
+}
 
 // === GET: listar usuários ===
 export async function GET() {
@@ -52,15 +79,16 @@ export async function GET() {
   return NextResponse.json(list)
 }
 
-// === POST: criar usuário (Prisma + Supabase Auth) ===
+// === POST: criar usuário (Auth primeiro + Prisma upsert) ===
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+
     const fullName = (body.fullName ?? '').trim()
     const email = (body.email ?? '').trim().toLowerCase()
     const login = (body.login ?? '').trim().toLowerCase()
-    const phone = (body.phone ?? '') || null
-    const costCenterId = (body.costCenterId ?? '') || null
+    const phone = (body.phone ?? '').trim() || null
+    const costCenterId = body.costCenterId || null
     const rawPassword = (body.password ?? '').trim()
     const firstAccess = !!body.firstAccess
 
@@ -70,86 +98,106 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-// 1) Cria no Prisma
-    // 1) Cria no Prisma
-// 1) Cria no Prisma
-const created = await prisma.user.create({
-  data: { fullName, email, login, phone, costCenterId },
-  select: { id: true, fullName: true, email: true, login: true },
-})
 
-// 1.1) Se tiver centro de custo, cria também o vínculo em UserCostCenter
-if (costCenterId) {
-  await prisma.userCostCenter.create({
-    data: {
-      userId: created.id,
-      costCenterId,
-    },
-  })
-}
+    const admin = getSupabaseAdmin()
 
-// 1.2) TODOS os usuários criados pela tela começam como NÍVEL 1 em TODOS os módulos
-const modules = await prisma.module.findMany({
-  where: { key: 'solicitacoes' },
-  select: { id: true },
-})
+    // 1) AUTH: acha por email; se não existir, cria
+    let authId: string | null = null
 
-if (modules.length > 0) {
-  await prisma.userModuleAccess.createMany({
-    data: modules.map((m) => ({
-      userId: created.id,
-      moduleId: m.id,
-      level: 'NIVEL_1', // enum ModuleLevel
-    })),
-    skipDuplicates: true, // segurança se futuramente for recriar ou rodar mais de uma vez
-  })
-}
+    authId = await findAuthUserIdByEmail(admin, email)
 
+    if (!authId) {
+      // Se "primeiro acesso" está marcado, NÃO pode criar sem senha.
+      // Então geramos uma senha aleatória e marcamos mustChangePassword no metadata.
+      const effectivePassword =
+        firstAccess
+          ? crypto.randomBytes(24).toString('base64url')
+          : (rawPassword || `${login}@123`)
 
+      const { data: authData, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: effectivePassword,
+        email_confirm: true,
+        user_metadata: {
+          fullName,
+          login,
+          phone,
+          costCenterId,
+          mustChangePassword: firstAccess,
+        },
+      })
 
-    // 2) Cria no Supabase Auth (Admin)
-    const sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    )
+      if (createErr) {
+        return NextResponse.json(
+          { error: 'Falha ao criar no Auth: ' + createErr.message },
+          { status: 500 },
+        )
+      }
 
-    // Senha efetiva: nunca undefined
-    const effectivePassword =
-      firstAccess && !rawPassword
-        ? `${login}@123`
-        : rawPassword || crypto.randomUUID()
+      authId = authData?.user?.id ?? null
+    }
 
-    const { data: authData, error } = await sb.auth.admin.createUser({
-      email,
-      password: effectivePassword,
-      email_confirm: true,
-      user_metadata: {
-        fullName,
-        login,
-        phone,
-        costCenterId,
-        mustChangePassword: firstAccess,
-      },
-    })
-
-    if (error) {
-      // rollback no Prisma se der erro no Auth
-      await prisma.user.delete({ where: { id: created.id } })
+    if (!authId) {
       return NextResponse.json(
-        { error: 'Falha ao criar no Auth: ' + error.message },
+        { error: 'Não foi possível obter o authId do usuário.' },
         { status: 500 },
       )
     }
 
-    // 3) Vincula authId no Prisma
-    if (authData?.user?.id) {
-      await prisma.user.update({
-        where: { id: created.id },
-        data: { authId: authData.user.id as any },
+    // 2) PRISMA: upsert por email (não delete nunca)
+    const appUser = await prisma.user.upsert({
+      where: { email },
+      create: {
+        fullName,
+        email,
+        login,
+        phone,
+        costCenterId,
+        authId: authId as any,
+        status: 'ATIVO',
+        role: 'COLABORADOR',
+      },
+      update: {
+        fullName,
+        login,
+        phone,
+        costCenterId,
+        authId: authId as any,
+        status: 'ATIVO',
+      },
+      select: { id: true, fullName: true, email: true, login: true },
+    })
+
+    // 3) Vincula UserCostCenter (N:N) com upsert
+    if (costCenterId) {
+      await prisma.userCostCenter.upsert({
+        where: {
+          userId_costCenterId: { userId: appUser.id, costCenterId },
+        },
+        create: { userId: appUser.id, costCenterId },
+        update: {},
       })
     }
 
-    return NextResponse.json(created, { status: 201 })
+    // 4) NIVEL_1 nos módulos
+    // Ajuste o key para bater com o que está no banco (no seu schema parece maiúsculo)
+    const modules = await prisma.module.findMany({
+      where: { key: 'SOLICITACOES' },
+      select: { id: true },
+    })
+
+    if (modules.length > 0) {
+      await prisma.userModuleAccess.createMany({
+        data: modules.map((m) => ({
+          userId: appUser.id,
+          moduleId: m.id,
+          level: 'NIVEL_1',
+        })),
+        skipDuplicates: true,
+      })
+    }
+
+    return NextResponse.json(appUser, { status: 201 })
   } catch (e: any) {
     if (e?.code === 'P2002') {
       return NextResponse.json(

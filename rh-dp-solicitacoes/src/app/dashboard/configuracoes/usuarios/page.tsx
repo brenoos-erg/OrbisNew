@@ -5,7 +5,6 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-
 type UserRow = {
   id: string
   fullName: string
@@ -64,8 +63,9 @@ function CostCenterCombo({
   const options = useMemo(
     () =>
       centers.filter((cc) => {
-        const text = `${cc.externalCode ?? ''} ${cc.code ?? ''} ${cc.description ?? ''
-          }`.toLowerCase()
+        const text = `${cc.externalCode ?? ''} ${cc.code ?? ''} ${
+          cc.description ?? ''
+        }`.toLowerCase()
         return text.includes(query.toLowerCase())
       }),
     [centers, query],
@@ -130,6 +130,13 @@ function toLoginFromName(fullName: string) {
   return [first, last].filter(Boolean).join('.').replace(/[^a-z.]/g, '')
 }
 
+// ✅ AJUSTE 1: gera e-mail automaticamente (login@ergengenharia.com.br)
+function toEmailFromName(fullName: string) {
+  const login = toLoginFromName(fullName)
+  if (!login) return ''
+  return `${login}@ergengenharia.com.br`
+}
+
 export default function Page() {
   const router = useRouter()
 
@@ -150,7 +157,7 @@ export default function Page() {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
- const [bulkCreating, setBulkCreating] = useState(false)
+  const [bulkCreating, setBulkCreating] = useState(false)
   const [processingBulk, setProcessingBulk] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkCreateFirstAccess, setBulkCreateFirstAccess] = useState(true)
@@ -158,7 +165,6 @@ export default function Page() {
   const [bulkResults, setBulkResults] = useState<
     { line: number; name: string; status: 'ok' | 'error'; message: string }[]
   >([])
-
 
   // filtro de usuários
   const [search, setSearch] = useState('')
@@ -194,12 +200,14 @@ export default function Page() {
       ),
     [filteredRows, safeUserPage, usersPerPage],
   )
-  const userPageStart = filteredRows.length === 0 ? 0 : (safeUserPage - 1) * usersPerPage + 1
+  const userPageStart =
+    filteredRows.length === 0 ? 0 : (safeUserPage - 1) * usersPerPage + 1
   const userPageEnd = Math.min(filteredRows.length, safeUserPage * usersPerPage)
 
   const selectedCount = selectedIds.length
   const pageIds = paginatedRows.filter((u) => u.id).map((u) => u.id) as string[]
-  const pageFullySelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
+  const pageFullySelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
 
   useEffect(() => {
     setUserPage(1)
@@ -215,13 +223,12 @@ export default function Page() {
       setUserPage(totalUserPages || 1)
     }
   }, [userPage, totalUserPages])
+
   async function load() {
     setLoading(true)
     try {
       // usuários (Auth + Prisma)
-      const r = await fetch('/api/configuracoes/usuarios', {
-        cache: 'no-store',
-      })
+      const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
       if (!r.ok) {
         const err: any = await r.json().catch(() => ({}))
         throw new Error(err?.error || `GET falhou: ${r.status}`)
@@ -230,13 +237,8 @@ export default function Page() {
       setRows(list)
 
       // centros de custo (para selects / combos)
-      const cr = await fetch('/api/cost-centers/select', {
-        cache: 'no-store',
-      })
-      if (!cr.ok)
-        throw new Error(
-          `GET /api/cost-centers/select -> ${cr.status}`,
-        )
+      const cr = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
       const arr: CostCenter[] = await cr.json()
       setCostCenters(arr)
     } catch (e) {
@@ -251,7 +253,6 @@ export default function Page() {
   useEffect(() => {
     load()
   }, [])
-  
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -320,21 +321,18 @@ export default function Page() {
 
   async function submitEdit() {
     if (!editing) return
-    const r = await fetch(
-      `/api/configuracoes/usuarios/${editing.id}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: editFullName,
-          email: editEmail,
-          login: editLogin,
-          phone: editPhone,
-          costCenterId: editCostCenterId || null,
-          password: editPassword || undefined,
-        }),
-      },
-    )
+    const r = await fetch(`/api/configuracoes/usuarios/${editing.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: editFullName,
+        email: editEmail,
+        login: editLogin,
+        phone: editPhone,
+        costCenterId: editCostCenterId || null,
+        password: editPassword || undefined,
+      }),
+    })
     if (!r.ok) {
       const err = await r.json().catch(() => ({}))
       alert(err?.error || 'Falha ao atualizar.')
@@ -343,6 +341,7 @@ export default function Page() {
     closeEdit()
     await load()
   }
+
   function toggleSelection(id?: string) {
     if (!id) return
     setSelectedIds((prev) =>
@@ -413,6 +412,8 @@ export default function Page() {
       setProcessingBulk(false)
     }
   }
+
+  // ✅ AJUSTE 2: bulk não exige email; se vier vazio, gera automaticamente
   async function handleBulkCreate() {
     const lines = bulkText
       .split('\n')
@@ -427,33 +428,41 @@ export default function Page() {
     setBulkResults([])
     setBulkCreating(true)
 
-    const results: { line: number; name: string; status: 'ok' | 'error'; message: string }[] = []
+    const results: {
+      line: number
+      name: string
+      status: 'ok' | 'error'
+      message: string
+    }[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const raw = lines[i]
       const parts = raw.split(';').map((p) => p.trim())
-      const [name, email, phoneInput, passwordInput, loginInput] = parts
+      const [name, emailInput, phoneInput, passwordInput, loginInput] = parts
 
-      if (!name || !email) {
+      if (!name) {
         results.push({
           line: i + 1,
           name: name || '—',
           status: 'error',
-          message: 'Informe nome e e-mail separados por ponto e vírgula.',
+          message: 'Nome é obrigatório.',
         })
         continue
       }
 
       const loginValue = (loginInput || toLoginFromName(name)).toLowerCase()
+      const emailValue =
+        (emailInput && emailInput.toLowerCase()) || toEmailFromName(name)
+
       const passwordValue = (passwordInput || '').trim()
 
-        try {
+      try {
         const r = await fetch('/api/configuracoes/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             fullName: name,
-            email: email.toLowerCase(),
+            email: emailValue,
             login: loginValue,
             phone: phoneInput || '',
             costCenterId: bulkCostCenterId || null,
@@ -492,8 +501,6 @@ export default function Page() {
     }
   }
 
-
-
   // ------- excluir -------
   async function handleDelete(u: UserRow) {
     if (!u.id) {
@@ -501,12 +508,9 @@ export default function Page() {
       return
     }
     if (!confirm(`Excluir o usuário "${u.fullName}"?`)) return
-    const r = await fetch(
-      `/api/configuracoes/usuarios/${u.id}`,
-      {
-        method: 'DELETE',
-      },
-    )
+    const r = await fetch(`/api/configuracoes/usuarios/${u.id}`, {
+      method: 'DELETE',
+    })
     if (!r.ok) {
       const err = await r.json().catch(() => ({}))
       alert(err?.error || 'Falha ao excluir.')
