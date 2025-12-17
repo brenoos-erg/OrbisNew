@@ -154,6 +154,7 @@ export default function Page() {
   const [processingBulk, setProcessingBulk] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkCreateFirstAccess, setBulkCreateFirstAccess] = useState(true)
+  const [bulkCostCenterId, setBulkCostCenterId] = useState('')
   const [bulkResults, setBulkResults] = useState<
     { line: number; name: string; status: 'ok' | 'error'; message: string }[]
   >([])
@@ -431,7 +432,7 @@ export default function Page() {
     for (let i = 0; i < lines.length; i++) {
       const raw = lines[i]
       const parts = raw.split(';').map((p) => p.trim())
-      const [name, email, loginInput, phoneInput, passwordInput] = parts
+      const [name, email, phoneInput, passwordInput, loginInput] = parts
 
       if (!name || !email) {
         results.push({
@@ -446,7 +447,7 @@ export default function Page() {
       const loginValue = (loginInput || toLoginFromName(name)).toLowerCase()
       const passwordValue = (passwordInput || '').trim()
 
-      try {
+        try {
         const r = await fetch('/api/configuracoes/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -455,7 +456,7 @@ export default function Page() {
             email: email.toLowerCase(),
             login: loginValue,
             phone: phoneInput || '',
-            costCenterId: null,
+            costCenterId: bulkCostCenterId || null,
             password: bulkCreateFirstAccess ? '' : passwordValue,
             firstAccess: bulkCreateFirstAccess,
           }),
@@ -936,12 +937,22 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                   Cole várias linhas usando ponto e vírgula como separador e cadastre tudo de uma só vez.
                 </p>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Formato: Nome completo; email; login (opcional); telefone (opcional); senha (opcional).
-                  Se o login estiver vazio, usamos o padrão gerado pelo nome.
+                  Formato: Nome completo; email; telefone (opcional); senha (opcional); login (opcional).
+                  Se o login estiver vazio, usamos o padrão gerado pelo nome (primeiro e último).
                 </p>
               </div>
 
-              <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex flex-col items-start gap-3 sm:items-end sm:w-80 w-full">
+                <CostCenterCombo
+                  label="Centro de Custo (opcional)"
+                  valueId={bulkCostCenterId}
+                  onChangeId={setBulkCostCenterId}
+                  centers={costCenters}
+                />
+                <p className="-mt-1 text-[11px] text-slate-500">
+                  Aplicado a todos os usuários criados nesta lista.
+                </p>
+
                 <label className="flex items-center gap-2 text-xs text-slate-700">
                   <input
                     type="checkbox"
@@ -955,15 +966,15 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                   <button
                     type="button"
                     className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                    onClick={() =>
-                      setBulkText(
-                        'Maria Silva; maria.silva@empresa.com; maria.silva; (31) 99999-0000;\n' +
-                          'João Souza; joao.souza@empresa.com; joao.souza;;SenhaSegura123',
-                      )
-                    }
-                  >
-                    Preencher exemplo
-                  </button>
+                  onClick={() =>
+                    setBulkText(
+                        'Maria Silva; maria.silva@empresa.com; (31) 99999-0000; ; maria.silva\n' +
+                          'João Souza; joao.souza@empresa.com; ; SenhaSegura123; joao.souza',
+                    )
+                  }
+                >
+                  Preencher exemplo
+                </button>
                   <button
                     type="button"
                     disabled={bulkCreating}
@@ -980,7 +991,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
               className="w-full rounded-lg border border-slate-200 bg-white/80 p-3 text-sm text-slate-800 shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
               rows={4}
               placeholder={
-                'Exemplo:\nMaria Silva; maria.silva@empresa.com; maria.silva; (31) 99999-0000;\nJoão Souza; joao.souza@empresa.com; joao.souza; ; SenhaSegura123'
+                'Exemplo:\nMaria Silva; maria.silva@empresa.com; (31) 99999-0000; ; maria.silva\nJoão Souza; joao.souza@empresa.com; ; SenhaSegura123; joao.souza'
               }
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
