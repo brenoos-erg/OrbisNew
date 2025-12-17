@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { performance } from 'node:perf_hooks'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { User } from '@supabase/supabase-js'
-import { Prisma } from '@prisma/client'
+import { ModuleLevel, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
 import {
@@ -30,12 +30,18 @@ export const appUserSelect = {
   department: { select: { id: true, code: true, name: true } },
 }
 
-  export type SelectedAppUser = Prisma.UserGetPayload<{ select: typeof appUserSelect }>
+export type SelectedAppUser = Prisma.UserGetPayload<{ select: typeof appUserSelect }>
+
+export type CurrentAppUserResult = {
+  appUser: (SelectedAppUser & { moduleLevels?: Record<string, ModuleLevel> }) | null
+  session: { user: User } | null
+  dbUnavailable: boolean
+}
 
 async function resolveAppUserFromSessionUser(
   sessionUser: User | null,
   seedUser?: SelectedAppUser | null,
-) {
+): Promise<CurrentAppUserResult> {
   const session = sessionUser ? { user: sessionUser } : null
 
   if (!sessionUser) {
@@ -97,7 +103,7 @@ async function resolveAppUserFromSessionUser(
 
   return { appUser, session, dbUnavailable }
 }
-async function loadCurrentUser() {
+async function loadCurrentUser(): Promise<CurrentAppUserResult> {
   const authStartedAt = performance.now()
   const supabase = getSupabaseServerClient()
 
@@ -106,7 +112,7 @@ async function loadCurrentUser() {
 
   if (userError) {
     console.error('Erro ao buscar usuário autenticado', userError)
-    return { appUser: null, session: null }
+    return { appUser: null, session: null, dbUnavailable: false }
   }
 
   return resolveAppUserFromSessionUser(userResult.user)
@@ -120,7 +126,7 @@ export async function getCurrentAppUser() {
 export async function getCurrentAppUserFromSessionUser(
   sessionUser: User | null,
   seedUser?: SelectedAppUser | null,
-) {
+): Promise<CurrentAppUserResult> {
   const key = `auth/getCurrentAppUser/${sessionUser?.id ?? 'anon'}`
   return ensureRequestContext('auth/getCurrentAppUser', () =>
     memoizeRequest(key, () => resolveAppUserFromSessionUser(sessionUser, seedUser)),
