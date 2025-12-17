@@ -4,10 +4,15 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
-// Admin client (Service Role) – só no servidor
+// Admin client (Service Role) – só no servidor. Retorna null se não houver credenciais.
 function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    console.warn('Supabase admin credentials missing; skipping Auth sync.')
+    return null
+  }
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
@@ -72,23 +77,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (updated.authId) {
       const admin = getSupabaseAdmin()
 
-      const updates: Record<string, any> = {}
-      if (email) updates.email = email
+      if (admin) {
+        const updates: Record<string, any> = {}
+        if (email) updates.email = email
 
-      const meta: Record<string, any> = {}
-      if (fullName) meta.fullName = fullName
-      if (login) meta.login = login
-      meta.phone = phone
-      meta.costCenterId = costCenterId
+        const meta: Record<string, any> = {}
+        if (fullName) meta.fullName = fullName
+        if (login) meta.login = login
+        meta.phone = phone
+        meta.costCenterId = costCenterId
 
-      updates.user_metadata = meta
+        updates.user_metadata = meta
 
-      const { error: upErr } = await admin.auth.admin.updateUserById(updated.authId, updates)
-      if (upErr) console.error('supabase admin update error', upErr)
+        const { error: upErr } = await admin.auth.admin.updateUserById(updated.authId, updates)
+        if (upErr) console.error('supabase admin update error', upErr)
 
-      if (password) {
-        const { error: passErr } = await admin.auth.admin.updateUserById(updated.authId, { password })
-        if (passErr) console.error('supabase admin set password error', passErr)
+        if (password) {
+          const { error: passErr } = await admin.auth.admin.updateUserById(updated.authId, { password })
+          if (passErr) console.error('supabase admin set password error', passErr)
+        }
+      } else {
+        console.warn('Supabase admin credentials missing; skipping Auth sync for update.')
       }
     }
 

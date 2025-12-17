@@ -5,15 +5,23 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-// Admin client (Service Role) – só no servidor
+// Admin client (Service Role) – só no servidor. Retorna null se não houver credenciais.
 function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    console.warn('Supabase admin credentials missing; skipping Auth sync.')
+    return null
+  }
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
 // Busca usuário no Auth por email (compatível com versões antigas)
-async function findAuthUserIdByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string) {
+async function findAuthUserIdByEmail(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  email: string,
+) {
   const target = email.trim().toLowerCase()
 
   let page = 1
@@ -104,17 +112,17 @@ export async function POST(req: NextRequest) {
     // 1) AUTH: acha por email; se não existir, cria
     let authId: string | null = null
 
-    authId = await findAuthUserIdByEmail(admin, email)
+    if (admin) {
+  authId = await findAuthUserIdByEmail(admin, email)
 
-    if (!authId) {
-      // Se "primeiro acesso" está marcado, NÃO pode criar sem senha.
-      // Então geramos uma senha aleatória e marcamos mustChangePassword no metadata.
-      const effectivePassword =
-        firstAccess
-          ? crypto.randomBytes(24).toString('base64url')
-          : (rawPassword || `${login}@123`)
+  if (!authId) {
+    const effectivePassword =
+      firstAccess
+        ? crypto.randomBytes(24).toString('base64url')
+        : (rawPassword || `${login}@123`)
 
-      const { data: authData, error: createErr } = await admin.auth.admin.createUser({
+    const { data: authData, error: createErr } =
+      await admin.auth.admin.createUser({
         email,
         password: effectivePassword,
         email_confirm: true,
@@ -127,22 +135,26 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      if (createErr) {
-        return NextResponse.json(
-          { error: 'Falha ao criar no Auth: ' + createErr.message },
-          { status: 500 },
-        )
-      }
-
-      authId = authData?.user?.id ?? null
-    }
-
-    if (!authId) {
+    if (createErr) {
       return NextResponse.json(
-        { error: 'Não foi possível obter o authId do usuário.' },
+        { error: 'Falha ao criar no Auth: ' + createErr.message },
         { status: 500 },
       )
     }
+
+    authId = authData?.user?.id ?? null
+  }
+
+  if (!authId) {
+    return NextResponse.json(
+      { error: 'Não foi possível obter o authId do usuário.' },
+      { status: 500 },
+    )
+  }
+} // ✅ FECHA o if (admin)
+
+// 2) PRISMA: upsert por email...
+
 
     // 2) PRISMA: upsert por email (não delete nunca)
     const appUser = await prisma.user.upsert({
