@@ -1,6 +1,7 @@
 'use client'
 import type { User } from '@supabase/supabase-js'
 import { Suspense, useEffect, useState } from 'react'
+import { clearSessionMeCache, fetchSessionMe } from '@/lib/session-cache'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, Loader2 } from 'lucide-react'
@@ -51,6 +52,7 @@ function LoginPageContent() {
       if (shouldForceSignOut) {
         try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
         try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
+        clearSessionMeCache()
       }
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -58,26 +60,23 @@ function LoginPageContent() {
 
       if (user) {
         try {
-          const meRes = await fetch('/api/session/me', { cache: 'no-store' })
+           const me = await fetchSessionMe()
           if (!active) return
-          if (meRes.ok) {
-            const me = await meRes.json()
-            if (me?.appUser?.status === 'INATIVO') {
-              await supabase.auth.signOut({ scope: 'global' })
-              router.replace('/login?inactive=1')
-              router.refresh()
-              return
-            }
-            if (me?.appUser) {
-              router.replace(nextUrl)
-              router.refresh()
-              return
-            }
-            if (me?.dbUnavailable) {
-              router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
-              router.refresh()
-              return
-            }
+          if (me?.appUser?.status === 'INATIVO') {
+            await supabase.auth.signOut({ scope: 'global' })
+            router.replace('/login?inactive=1')
+            router.refresh()
+            return
+          }
+          if (me?.appUser) {
+            router.replace(nextUrl)
+            router.refresh()
+            return
+          }
+          if (me?.dbUnavailable) {
+            router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+            router.refresh()
+            return
           }
         } catch {
           // falha silenciosa para não travar a tela de login
@@ -148,25 +147,22 @@ function LoginPageContent() {
     // 3️⃣ Verifica status no backend
     if (!syncDbUnavailable) {
       try {
-        const res = await fetch('/api/session/me', { cache: 'no-store' })
-        if (res.ok) {
-          const me = await res.json()
-          if (me?.dbUnavailable) {
-            syncDbUnavailable = true
-          }
-            if (!syncDbUnavailable && !me?.appUser) {
-            setLoading(false)
-            alert('Não foi possível carregar seus dados agora. Tente novamente.')
-            return
-          }
-          if (me?.appUser?.status === 'INATIVO') {
-            await supabase.auth.signOut({ scope: 'global' })
-            setLoading(false)
-            alert('Seu usuário está INATIVO. Fale com o administrador.')
-            router.replace('/login?inactive=1')
-            router.refresh()
-            return
-          }
+         const me = await fetchSessionMe({ force: true })
+        if (me?.dbUnavailable) {
+          syncDbUnavailable = true
+        }
+        if (!syncDbUnavailable && !me?.appUser) {
+          setLoading(false)
+          alert('Não foi possível carregar seus dados agora. Tente novamente.')
+          return
+        }
+        if (me?.appUser?.status === 'INATIVO') {
+          await supabase.auth.signOut({ scope: 'global' })
+          setLoading(false)
+          alert('Seu usuário está INATIVO. Fale com o administrador.')
+          router.replace('/login?inactive=1')
+          router.refresh()
+          return
         }
       } catch {
         // erro silencioso, mas não deixa travar

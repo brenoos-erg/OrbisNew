@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { fetchSessionMe } from '@/lib/session-cache'
 import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X, Maximize2, Minimize2 } from 'lucide-react'
 import { isValidPlate } from '@/lib/plate'
 
@@ -283,10 +284,8 @@ const processedVehicles = useMemo(() => {
   useEffect(() => {
     async function loadPermissions() {
       try {
-        const res = await fetch('/api/session/me', { cache: 'no-store' })
-        if (!res.ok) throw new Error('Falha ao carregar permissões do módulo')
-
-        const data = await res.json()
+        const data = await fetchSessionMe()
+        if (!data) throw new Error('Falha ao carregar permissões do módulo')
         const level: FleetLevel | null = (() => {
           const raw =
             data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||

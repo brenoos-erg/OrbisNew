@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { clearSessionMeCache, fetchSessionMe } from '@/lib/session-cache'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { ChevronDown, LogOut, Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
 import { useTheme } from '@/components/theme/ThemeProvider'
@@ -45,17 +46,8 @@ export default function UserMenu({ collapsed }: Props) {
       }
 
       // 2) Tenta pegar o “espelho” oficial no Prisma via /api/session/me
-      let prismaUser: any = null
-      try {
-        const r = await fetch('/api/session/me', { cache: 'no-store' })
-        if (r.ok) {
-          const payload = await r.json()
-          prismaUser = payload?.appUser ?? null
-        }
-      } catch {
-        // se der erro, só usa o fallback do Supabase
-      }
-
+      const payload = await fetchSessionMe().catch(() => null)
+      const prismaUser: any = payload?.appUser ?? null
       const meta = (user.user_metadata || {}) as Record<string, any>
 
       const name =
@@ -103,6 +95,7 @@ export default function UserMenu({ collapsed }: Props) {
     try {
       await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' })
     } catch {}
+    clearSessionMeCache()
     window.location.href = '/login'
   }
 

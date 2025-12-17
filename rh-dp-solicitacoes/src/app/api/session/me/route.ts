@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentAppUser } from '@/lib/auth'
 import { withRequestMetrics } from '@/lib/request-metrics'
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   return withRequestMetrics('GET /api/session/me', async () => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { fetchSessionMe } from '@/lib/session-cache'
 import { isValidPlate } from '@/lib/plate'
 
 type ChecklistItem = {
@@ -262,9 +263,8 @@ export default function VehicleCheckinPage() {
   useEffect(() => {
     async function loadDriver() {
       try {
-        const res = await fetch('/api/session/me', { cache: 'no-store' })
-        if (!res.ok) return
-        const data = await res.json()
+         const data = await fetchSessionMe()
+        if (!data) return
         setDriverName(data?.appUser?.fullName ?? '')
       } catch (err) {
         console.error(err)

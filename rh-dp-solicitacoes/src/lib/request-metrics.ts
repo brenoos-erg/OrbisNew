@@ -103,3 +103,15 @@ export async function memoizeRequest<T>(key: string, fn: () => Promise<T> | T): 
   ctx.cache.set(key, pending)
   return pending
 }
+export async function ensureRequestContext<T>(
+  label: string,
+  fn: () => Promise<T> | T,
+): Promise<T> {
+  const ctx = storage.getStore()
+
+  if (ctx) {
+    return fn()
+  }
+
+  return withRequestMetrics(label, fn)
+}

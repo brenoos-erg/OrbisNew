@@ -5,7 +5,11 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
-import { logTiming, memoizeRequest, withRequestMetrics } from '@/lib/request-metrics'
+import {
+  ensureRequestContext,
+  logTiming,
+  memoizeRequest,
+} from '@/lib/request-metrics'
 
 const getSupabaseServerClient = () =>
   createServerComponentClient({
@@ -109,8 +113,8 @@ if (userByEmail) {
 }
 
 export async function getCurrentAppUser() {
-  return memoizeRequest('auth/getCurrentAppUser', () =>
-    withRequestMetrics('auth/getCurrentAppUser', () => loadCurrentUser()),
+  return ensureRequestContext('auth/getCurrentAppUser', () =>
+    memoizeRequest('auth/getCurrentAppUser', () => loadCurrentUser()),
   )
 }
 

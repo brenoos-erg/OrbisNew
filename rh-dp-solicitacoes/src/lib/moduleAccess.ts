@@ -1,7 +1,8 @@
+
 // src/lib/moduleAccess.ts
 import { prisma } from '@/lib/prisma'
 import { ModuleLevel } from '@prisma/client'
-import { memoizeRequest } from '@/lib/request-metrics'
+import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
 
 export type AccessMap = Record<string, ModuleLevel>
 
@@ -62,7 +63,9 @@ async function loadUserModuleContext(
 export async function getUserModuleContext(
   userId: string,
 ): Promise<{ levels: AccessMap; departmentCode: string | null }> {
-  return memoizeRequest(`moduleAccess/context/${userId}`, () => loadUserModuleContext(userId))
+  return ensureRequestContext('moduleAccess/context', () =>
+    memoizeRequest(`moduleAccess/context/${userId}`, () => loadUserModuleContext(userId)),
+  )
 }
 
 export async function getUserModuleLevels(userId: string): Promise<AccessMap> {
