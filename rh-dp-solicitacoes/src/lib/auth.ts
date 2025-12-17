@@ -1,20 +1,18 @@
 // src/lib/auth.ts
 import { cookies } from 'next/headers'
-import { cache } from 'react'
 import { performance } from 'node:perf_hooks'
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
-import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
+import { logTiming, memoizeRequest, withRequestMetrics } from '@/lib/request-metrics'
 
-const getSupabaseServerClient = cache(() =>
+const getSupabaseServerClient = () =>
   createServerComponentClient({
     cookies,
-  }),
-)
+  })
 
-const loadCurrentUser = cache(async () => {
+async function loadCurrentUser() {
   const authStartedAt = performance.now()
   const supabase = getSupabaseServerClient()
 
@@ -59,9 +57,8 @@ const session = sessionUser ? { user: sessionUser } : null
     })
     logTiming('prisma.user.findUnique', lookupStartedAt)
 
-    logTiming('prisma.user.findUnique', lookupStartedAt)
 
-    if (!appUser && email) {
+   if (!appUser && email) {
       const emailLookupStartedAt = performance.now()
       const userByEmail = await prisma.user.findUnique({
         where: { email },
@@ -78,16 +75,15 @@ const session = sessionUser ? { user: sessionUser } : null
           department: { select: { id: true, code: true, name: true } },
         },
       })
+      logTiming('prisma.user.findUnique(email)', emailLookupStartedAt)
 
-        logTiming('prisma.user.findUnique(email)', emailLookupStartedAt)
-
-      if (userByEmail) {
+if (userByEmail) {
         const updateStartedAt = performance.now()
         await prisma.user.update({
           where: { id: userByEmail.id },
           data: { authId },
         })
-logTiming('prisma.user.update.authId', updateStartedAt)
+        logTiming('prisma.user.update.authId', updateStartedAt)
         appUser = userByEmail
       }
     }
@@ -99,7 +95,7 @@ logTiming('prisma.user.update.authId', updateStartedAt)
       console.error('Erro ao buscar usuário no banco de dados', error)
     }
 
-     return { appUser: null, session, dbUnavailable }
+    return { appUser: null, session, dbUnavailable }
   }
 
   if (appUser) {
@@ -110,10 +106,12 @@ logTiming('prisma.user.update.authId', updateStartedAt)
   }
 
   return { appUser, session, dbUnavailable }
-})
+}
 
 export async function getCurrentAppUser() {
-  return withRequestMetrics('auth/getCurrentAppUser', () => loadCurrentUser())
+  return memoizeRequest('auth/getCurrentAppUser', () =>
+    withRequestMetrics('auth/getCurrentAppUser', () => loadCurrentUser()),
+  )
 }
 
 export async function requireActiveUser() {

@@ -1,7 +1,7 @@
 // src/lib/moduleAccess.ts
-import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { ModuleLevel } from '@prisma/client'
+import { memoizeRequest } from '@/lib/request-metrics'
 
 export type AccessMap = Record<string, ModuleLevel>
 
@@ -23,50 +23,50 @@ function pickHigherLevel(current: ModuleLevel | undefined, incoming: ModuleLevel
  *
  * Se um módulo existir tanto no departamento quanto no UserModuleAccess, mantém o maior nível.
  */
-const loadUserModuleContext = cache(
-  async (userId: string): Promise<{ levels: AccessMap; departmentCode: string | null }> => {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        department: {
-          select: {
-            code: true,
-            modules: {
-              include: { module: { select: { key: true } } },
-            },
-            },
-        },
-        moduleAccesses: {
-          include: { module: { select: { key: true } } },
-        },
-      },
-    })
-    const levels: AccessMap = {}
-
-    // Base: todos os módulos vinculados ao departamento ficam visíveis com NIVEL_1
-    for (const deptModule of user?.department?.modules ?? []) {
-      const key = deptModule.module.key.toLowerCase()
-      levels[key] = ModuleLevel.NIVEL_1
-    }
-
-    // Sobrescritas individuais (UserModuleAccess) podem elevar o nível (ex.: aprovador NIVEL_3)
-    for (const access of user?.moduleAccesses ?? []) {
-      const key = access.module.key.toLowerCase()
-      levels[key] = pickHigherLevel(levels[key], access.level)
-    }
-
-    return { levels, departmentCode: user?.department?.code ?? null }
-  },
-)
-
-  export async function getUserModuleContext(
+async function loadUserModuleContext(
   userId: string,
 ): Promise<{ levels: AccessMap; departmentCode: string | null }> {
-  return loadUserModuleContext(userId)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      department: {
+        select: {
+          code: true,
+          modules: {
+            include: { module: { select: { key: true } } },
+          },
+        },
+      },
+      moduleAccesses: {
+        include: { module: { select: { key: true } } },
+      },
+    },
+  })
+  const levels: AccessMap = {}
+
+  // Base: todos os módulos vinculados ao departamento ficam visíveis com NIVEL_1
+  for (const deptModule of user?.department?.modules ?? []) {
+    const key = deptModule.module.key.toLowerCase()
+    levels[key] = ModuleLevel.NIVEL_1
+  }
+
+  // Sobrescritas individuais (UserModuleAccess) podem elevar o nível (ex.: aprovador NIVEL_3)
+  for (const access of user?.moduleAccesses ?? []) {
+    const key = access.module.key.toLowerCase()
+    levels[key] = pickHigherLevel(levels[key], access.level)
+  }
+
+  return { levels, departmentCode: user?.department?.code ?? null }
+}
+
+export async function getUserModuleContext(
+  userId: string,
+): Promise<{ levels: AccessMap; departmentCode: string | null }> {
+  return memoizeRequest(`moduleAccess/context/${userId}`, () => loadUserModuleContext(userId))
 }
 
 export async function getUserModuleLevels(userId: string): Promise<AccessMap> {
-  const { levels } = await loadUserModuleContext(userId)
+  const { levels } = await getUserModuleContext(userId)
   return levels
 }
 

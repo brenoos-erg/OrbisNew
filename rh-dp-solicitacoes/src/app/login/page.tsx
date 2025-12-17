@@ -1,10 +1,10 @@
 'use client'
+import type { User } from '@supabase/supabase-js'
 import { Suspense, useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, Loader2 } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
   return (
@@ -114,6 +114,8 @@ function LoginPageContent() {
     if (loading) return
     setLoading(true)
 
+     let authenticatedUser: User | null = null
+
     let emailToUse = identifier
     try {
       emailToUse = await resolveEmail(identifier)
@@ -124,7 +126,8 @@ function LoginPageContent() {
     }
 
     // 1️⃣ Tenta autenticar com Supabase
-    const { error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
+    authenticatedUser = data.user
 
     // 2️⃣ Sincroniza usuário no backend (cria/atualiza no Prisma)
     let syncDbUnavailable = false
@@ -175,8 +178,14 @@ function LoginPageContent() {
       alert('Não foi possível verificar seus dados agora. Vamos continuar assim mesmo.')
     }
     // 4️⃣ Se for primeiro acesso (mustChangePassword)
-    const { data: { user } } = await supabase.auth.getUser()
-    const must = (user?.user_metadata as any)?.mustChangePassword === true
+    if (!authenticatedUser) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      authenticatedUser = user
+    }
+
+    const must = (authenticatedUser?.user_metadata as any)?.mustChangePassword === true
 
     if (must) {
       router.replace(`/primeiro-acesso?next=${encodeURIComponent(nextUrl)}`)

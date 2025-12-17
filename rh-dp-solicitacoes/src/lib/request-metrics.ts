@@ -7,6 +7,7 @@ export type MetricsContext = {
   startedAt: number
   prismaQueryCount: number
   prismaQueryTime: number
+  cache: Map<string, Promise<unknown>>
 }
 
 const storage = new AsyncLocalStorage<MetricsContext>()
@@ -62,6 +63,7 @@ export async function withRequestMetrics<T>(
     startedAt: performance.now(),
     prismaQueryCount: 0,
     prismaQueryTime: 0,
+    cache: new Map(),
   }
 
   return storage.run(context, async () => {
@@ -83,4 +85,21 @@ export async function withRequestMetrics<T>(
 export function logTiming(label: string, startedAt: number) {
   const elapsed = performance.now() - startedAt
   console.info('[timing]', label, `${elapsed.toFixed(1)}ms`)
+}
+
+export async function memoizeRequest<T>(key: string, fn: () => Promise<T> | T): Promise<T> {
+  const ctx = storage.getStore()
+
+  if (!ctx) {
+    return fn()
+  }
+
+  const existing = ctx.cache.get(key)
+  if (existing) {
+    return (await existing) as T
+  }
+
+  const pending = Promise.resolve(fn())
+  ctx.cache.set(key, pending)
+  return pending
 }

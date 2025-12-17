@@ -6,6 +6,8 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 
+export const revalidate = 300
+
 const CORE_MODULES = [
   { key: 'solicitacoes', name: 'Solicitações' },
   { key: 'configuracoes', name: 'Configurações' },
@@ -24,7 +26,6 @@ async function ensureCoreModules() {
   )
 }
 
-export const dynamic = 'force-dynamic'
 
 // GET: todos departamentos + módulos + links
 export async function GET() {
