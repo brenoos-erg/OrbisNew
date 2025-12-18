@@ -1,3 +1,4 @@
+// src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
@@ -14,6 +15,7 @@ function getSupabaseAdmin() {
     console.warn('Supabase admin credentials missing; skipping Auth sync.')
     return null
   }
+
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
@@ -25,16 +27,17 @@ async function findAuthUserIdByEmail(
   const target = email.trim().toLowerCase()
 
   let page = 1
-  const perPage = 1000 // pode ajustar
+  const perPage = 1000
 
-  for (let i = 0; i < 20; i++) { // limite de segurança
+  for (let i = 0; i < 20; i++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
     if (error) throw new Error(error.message)
 
-    const found = (data?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === target)
+    const found = (data?.users ?? []).find(
+      (u) => (u.email ?? '').toLowerCase() === target,
+    )
     if (found?.id) return found.id
 
-    // se veio menos que perPage, acabou
     if (!data?.users || data.users.length < perPage) break
     page++
   }
@@ -113,48 +116,52 @@ export async function POST(req: NextRequest) {
     let authId: string | null = null
 
     if (admin) {
-  authId = await findAuthUserIdByEmail(admin, email)
+      authId = await findAuthUserIdByEmail(admin, email)
 
-  if (!authId) {
-    const effectivePassword =
-      firstAccess
-        ? crypto.randomBytes(24).toString('base64url')
-        : (rawPassword || `${login}@123`)
+      if (!authId) {
+        const effectivePassword = firstAccess
+          ? crypto.randomBytes(24).toString('base64url')
+          : rawPassword || `${login}@123`
 
-    const { data: authData, error: createErr } =
-      await admin.auth.admin.createUser({
-        email,
-        password: effectivePassword,
-        email_confirm: true,
-        user_metadata: {
-          fullName,
-          login,
-          phone,
-          costCenterId,
-          mustChangePassword: firstAccess,
-        },
-      })
+        const { data: authData, error: createErr } =
+          await admin.auth.admin.createUser({
+            email,
+            password: effectivePassword,
+            email_confirm: true,
+            user_metadata: {
+              fullName,
+              login,
+              phone,
+              costCenterId,
+              mustChangePassword: firstAccess,
+            },
+          })
 
-    if (createErr) {
+        if (createErr) {
+          return NextResponse.json(
+            { error: 'Falha ao criar no Auth: ' + createErr.message },
+            { status: 500 },
+          )
+        }
+
+        authId = authData?.user?.id ?? null
+      }
+    }
+
+    // Se não tem admin, não dá pra criar/atualizar Auth -> retorna erro claro
+    if (!admin) {
       return NextResponse.json(
-        { error: 'Falha ao criar no Auth: ' + createErr.message },
+        { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível criar usuário no Auth.' },
         { status: 500 },
       )
     }
 
-    authId = authData?.user?.id ?? null
-  }
-
-  if (!authId) {
-    return NextResponse.json(
-      { error: 'Não foi possível obter o authId do usuário.' },
-      { status: 500 },
-    )
-  }
-} // ✅ FECHA o if (admin)
-
-// 2) PRISMA: upsert por email...
-
+    if (!authId) {
+      return NextResponse.json(
+        { error: 'Não foi possível obter o authId do usuário.' },
+        { status: 500 },
+      )
+    }
 
     // 2) PRISMA: upsert por email (não delete nunca)
     const appUser = await prisma.user.upsert({
@@ -191,8 +198,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4) NIVEL_1 nos módulos
-    // Ajuste o key para bater com o que está no banco (no seu schema parece maiúsculo)
+    // 4) NIVEL_1 nos módulos (ajuste o key se necessário)
+    // Se no seu banco for 'solicitacoes' (minúsculo), troque aqui.
     const modules = await prisma.module.findMany({
       where: { key: 'SOLICITACOES' },
       select: { id: true },
@@ -217,6 +224,7 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       )
     }
+
     console.error('POST /api/configuracoes/usuarios error', e)
     return NextResponse.json(
       { error: e?.message || 'Erro ao criar usuário.' },
