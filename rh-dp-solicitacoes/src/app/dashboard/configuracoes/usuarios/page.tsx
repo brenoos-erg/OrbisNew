@@ -280,16 +280,16 @@ export default function Page() {
       const r = await fetch('/api/configuracoes/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          login: login.trim().toLowerCase(),
-          phone: phone.trim(),
-          costCenterId: costCenterId || null,
-          password: firstAccess ? '' : password,
-          firstAccess,
-        }),
-      })
+         body: JSON.stringify({
+            fullName: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            login: login.trim().toLowerCase(),
+            phone: phone.trim(),
+            costCenterId: costCenterId || null,
+          password,
+            firstAccess,
+          }),
+        })
       if (!r.ok) {
         const err = await r.json().catch(() => ({} as any))
         throw new Error(err?.error || `POST falhou: ${r.status}`)
@@ -475,16 +475,16 @@ export default function Page() {
         const r = await fetch('/api/configuracoes/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName: name,
-            email: emailValue,
-            login: loginValue,
-            phone: phoneInput || '',
-            costCenterId: bulkCostCenterId || null,
-            password: bulkCreateFirstAccess ? '' : passwordValue,
-            firstAccess: bulkCreateFirstAccess,
-          }),
-        })
+            body: JSON.stringify({
+              fullName: name,
+              email: emailValue,
+              login: loginValue,
+              phone: phoneInput || '',
+              costCenterId: bulkCostCenterId || null,
+            password: passwordValue,
+              firstAccess: bulkCreateFirstAccess,
+            }),
+          })
 
         if (!r.ok) {
           const err = await r.json().catch(() => ({}))
@@ -649,16 +649,11 @@ export default function Page() {
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
-                className={
-                  'w-full rounded-lg border px-4 py-3 text-sm outline-none bg-[var(--card)] text-[var(--foreground)] ' +
-                  (firstAccess
-                    ? 'border-slate-500/50 text-slate-500 cursor-not-allowed'
-                    : 'border-[var(--border-subtle)] focus:border-orange-400 focus:ring-2 focus:ring-orange-300')
-                }
+                 className="w-full rounded-lg border px-4 py-3 text-sm outline-none bg-[var(--card)] text-[var(--foreground)] border-[var(--border-subtle)] focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={firstAccess}
+                
               />
             </div>
             <div className="flex items-center mt-6">

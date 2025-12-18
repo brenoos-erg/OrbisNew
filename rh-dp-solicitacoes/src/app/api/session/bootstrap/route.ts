@@ -72,32 +72,68 @@ export async function GET() {
 
     const { data, error } = await supabase.auth.getUser()
 
-    if (error) {
-      console.error('Erro ao buscar usuário autenticado', error)
+    if (error || !data?.user) {
+      if (error) {
+        console.error('Erro ao buscar usuário autenticado', error)
+      }
+
+      return NextResponse.json(
+        { error: 'Não autenticado' },
+        { status: 401 },
+      )
     }
 
-    const sessionUser = data?.user ?? null
+    const sessionUser = data.user
 
     let syncedUser: SelectedAppUser | null = null
-    let dbUnavailable = false
 
-    if (sessionUser) {
-      try {
-        syncedUser = await syncUser(sessionUser)
-      } catch (err) {
-        if (err instanceof Prisma.PrismaClientInitializationError) {
-          dbUnavailable = true
-        }
-      }
+    try {
+      syncedUser = await syncUser(sessionUser)
+    } catch (err) {
+      const isDbUnavailable = err instanceof Prisma.PrismaClientInitializationError
+      console.error('Erro ao sincronizar usuário no bootstrap', err)
+
+      return NextResponse.json(
+        {
+          error: 'Falha ao sincronizar usuário',
+          dbUnavailable: isDbUnavailable,
+        },
+        { status: isDbUnavailable ? 503 : 500 },
+      )
     }
 
-    const { appUser, session, dbUnavailable: authDbUnavailable } =
-      await getCurrentAppUserFromSessionUser(sessionUser, syncedUser)
+    try {
+      const { appUser, session, dbUnavailable } = await getCurrentAppUserFromSessionUser(
+        sessionUser,
+        syncedUser,
+      )
 
-    return NextResponse.json({
-      appUser,
-      session,
-      dbUnavailable: dbUnavailable || authDbUnavailable,
-    })
+     if (!appUser) {
+        return NextResponse.json(
+          {
+            error: 'Usuário não encontrado no banco',
+            dbUnavailable,
+          },
+          { status: dbUnavailable ? 503 : 404 },
+        )
+      }
+
+      return NextResponse.json({
+        appUser,
+        session,
+        dbUnavailable,
+      })
+    } catch (err) {
+      const isDbUnavailable = err instanceof Prisma.PrismaClientInitializationError
+      console.error('Erro ao carregar appUser a partir da sessão', err)
+
+      return NextResponse.json(
+        {
+          error: 'Erro ao carregar usuário autenticado',
+          dbUnavailable: isDbUnavailable,
+        },
+        { status: isDbUnavailable ? 503 : 500 },
+      )
+    }
   })
 }

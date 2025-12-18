@@ -4,6 +4,7 @@ export type SessionMePayload = {
   appUser?: any
   session?: any
   dbUnavailable?: boolean
+    error?: string
 }
 
 const SESSION_CACHE_TTL_MS = 15_000
@@ -13,15 +14,20 @@ let cacheExpiresAt = 0
 let inflightRequest: Promise<SessionMePayload | null> | null = null
 
 async function requestSessionMe(): Promise<SessionMePayload | null> {
-  try {
-    const res = await fetch('/api/session/bootstrap', { cache: 'no-store' })
-    if (!res.ok) return null
+  const res = await fetch('/api/session/bootstrap', { cache: 'no-store' })
+  const data = await res.json().catch(() => null)
 
-    const data = await res.json().catch(() => null)
-    return data as SessionMePayload | null
-  } catch {
-    return null
+  if (!res.ok) {
+    const err = new Error(
+      (data as any)?.error || `Falha no bootstrap (status ${res.status})`,
+    ) as Error & { status?: number; payload?: any }
+
+    err.status = res.status
+    err.payload = data
+    throw err
   }
+  
+  return data as SessionMePayload | null
 }
 
 export async function fetchSessionMe(options?: { force?: boolean }) {

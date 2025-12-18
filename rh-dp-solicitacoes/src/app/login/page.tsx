@@ -31,6 +31,8 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+
 
   // --- Reset de senha (esqueci) ---
   const [showReset, setShowReset] = useState(false)
@@ -60,7 +62,7 @@ function LoginPageContent() {
 
       if (user) {
         try {
-           const me = await fetchSessionMe()
+          const me = await fetchSessionMe()
           if (!active) return
           if (me?.appUser?.status === 'INATIVO') {
             await supabase.auth.signOut({ scope: 'global' })
@@ -78,8 +80,19 @@ function LoginPageContent() {
             router.refresh()
             return
           }
-        } catch {
-          // falha silenciosa para não travar a tela de login
+        } catch (err: any) {
+          if (!active) return
+
+          const status = (err as any)?.status as number | undefined
+          const payload = (err as any)?.payload as any
+          if (payload?.dbUnavailable) {
+            router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+            router.refresh()
+            return
+          }
+          if (status && status !== 401) {
+            setBootstrapError(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
+          }
         }
       }
 
@@ -113,7 +126,7 @@ function LoginPageContent() {
     if (loading) return
     setLoading(true)
 
-     let authenticatedUser: User | null = null
+    let authenticatedUser: User | null = null
 
     let emailToUse = identifier
     try {
@@ -126,6 +139,11 @@ function LoginPageContent() {
 
     // 1️⃣ Tenta autenticar com Supabase
     const { data, error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
+     if (error) {
+      setLoading(false)
+      alert(error.message || 'Não foi possível autenticar. Tente novamente.')
+      return
+    }
     authenticatedUser = data.user
 
     // 2️⃣ Sincroniza e carrega dados do backend em uma única chamada
@@ -137,7 +155,7 @@ function LoginPageContent() {
       }
       if (!bootstrapDbUnavailable && !me?.appUser) {
         setLoading(false)
-        alert('Não foi possível carregar seus dados agora. Tente novamente.')
+        alert(me?.error || 'Não foi possível carregar seus dados agora. Tente novamente.')
         return
       }
       if (me?.appUser?.status === 'INATIVO') {
@@ -148,8 +166,22 @@ function LoginPageContent() {
         router.refresh()
         return
       }
-    } catch {
-      // erro silencioso, mas não deixa travar
+    } catch (err: any) {
+      const payload = (err as any)?.payload as any
+      const status = (err as any)?.status as number | undefined
+
+      if (payload?.dbUnavailable) {
+        bootstrapDbUnavailable = true
+      } else {
+        setLoading(false)
+
+        if (status === 401) {
+          alert('Sessão expirada. Faça login novamente.')
+        } else {
+          alert(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
+        }
+        return
+      }
     }
 
     if (bootstrapDbUnavailable) {
@@ -224,6 +256,11 @@ function LoginPageContent() {
         {isDbUnavailable && (
           <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
             Não foi possível conectar ao banco de dados. Tente novamente em alguns minutos ou contate o suporte.
+          </div>
+        )}
+        {bootstrapError && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {bootstrapError}
           </div>
         )}
 

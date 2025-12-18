@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,9 +118,7 @@ export async function POST(req: NextRequest) {
       authId = await findAuthUserIdByEmail(admin, email)
 
       if (!authId) {
-        const effectivePassword = firstAccess
-          ? crypto.randomBytes(24).toString('base64url')
-          : rawPassword || `${login}@123`
+        const effectivePassword = rawPassword || `${login}@123`
 
         const { data: authData, error: createErr } =
           await admin.auth.admin.createUser({

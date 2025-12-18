@@ -85,7 +85,6 @@ export default function UserMenu({ collapsed, user }: Props) {
             <div className="text-[11px] text-slate-400 truncate">{email || login}</div>
           </div>
 
-          <div className="my-2 h-px bg-white/10" />
 
         
 
