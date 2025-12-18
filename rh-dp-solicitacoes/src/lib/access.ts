@@ -3,6 +3,8 @@ import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 
+export type AuthenticatedUser = Awaited<ReturnType<typeof requireActiveUser>>
+
 /**
  * Carrega o nível do usuário para um módulo.
  * Ex.: moduleKey = 'solicitacoes' | 'configuracoes'
@@ -26,7 +28,7 @@ export async function assertUserMinLevel(
   moduleKey: string,
   minLevel: ModuleLevel,
 ) {
-const { levels } = await getUserModuleContext(userId)
+  const { levels } = await getUserModuleContext(userId)
   const normalizedKey = moduleKey.toLowerCase()
   const level = levels[normalizedKey]
 
@@ -54,15 +56,16 @@ const { levels } = await getUserModuleContext(userId)
  */
 export function withModuleLevel<
   TContext extends { params?: any } = { params?: any },
+  TRequest extends Request = Request,
 >(
   moduleKey: string,
   minLevel: ModuleLevel,
   handler: (
-    req: Request,
-    ctx: TContext & { me: { id: string } },
+    req: TRequest,
+    ctx: TContext & { me: AuthenticatedUser },
   ) => Promise<Response>,
 ) {
-  return async (req: Request, ctx: TContext): Promise<Response> => {
+  return async (req: TRequest, ctx: TContext): Promise<Response> => {
     try {
       // 1) usuário logado
       const me = await requireActiveUser()

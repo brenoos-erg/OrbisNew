@@ -1,15 +1,12 @@
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
-import { requireActiveUser } from '@/lib/auth'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
-
-type AuthenticatedUser = Awaited<ReturnType<typeof requireActiveUser>>
 
 /**
  * Gera um código de protocolo simples, ex: RQ2502-0001
@@ -97,116 +94,120 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 /**
  * GET /api/solicitacoes
  */
-export async function GET(req: NextRequest) {
-  return withRequestMetrics('GET /api/solicitacoes', async () => {
-    try {
-      const me = await requireActiveUser()
-    const { searchParams } = new URL(req.url)
+export const GET = withModuleLevel(
+  'solicitacoes',
+  ModuleLevel.NIVEL_1,
+  async (req: NextRequest, ctx) => {
+    return withRequestMetrics('GET /api/solicitacoes', async () => {
+      try {
+        const { me } = ctx
+        const { searchParams } = new URL(req.url)
 
-      const page = Math.max(
-        1,
-        Number.parseInt(searchParams.get('page') ?? '1', 10) || 1,
-      )
-      const pageSize =
-        Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
+        const page = Math.max(
+          1,
+          Number.parseInt(searchParams.get('page') ?? '1', 10) || 1,
+        )
+        const pageSize =
+          Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
 
-      const skip = (page - 1) * pageSize
-      const where = buildWhereFromSearchParams(searchParams)
+        const skip = (page - 1) * pageSize
+        const where = buildWhereFromSearchParams(searchParams)
 
-      const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
+        const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
 
-      if (scope === 'sent') {
-        where.solicitanteId = me.id
-      } else if (scope === 'received') {
-        const ccIds = new Set<string>()
+        if (scope === 'sent') {
+          where.solicitanteId = me.id
+        } else if (scope === 'received') {
+          const ccIds = new Set<string>()
 
-        if (me.costCenterId) {
-          ccIds.add(me.costCenterId)
-        }
+          if (me.costCenterId) {
+            ccIds.add(me.costCenterId)
+          }
 
-        const links = await prisma.userCostCenter.findMany({
-          where: { userId: me.id },
-          select: { costCenterId: true },
-        })
+          const links = await prisma.userCostCenter.findMany({
+            where: { userId: me.id },
+            select: { costCenterId: true },
+          })
 
-        for (const l of links) {
-          ccIds.add(l.costCenterId)
-        }
+          for (const l of links) {
+            ccIds.add(l.costCenterId)
+          }
 
-        if (ccIds.size === 0) {
-          where.id = '__never__' as any
-        } else {
-          where.costCenterId = { in: [...ccIds] }
-        }
-        // RQ_063 só deve chegar na fila após aprovação (nível 3)
-        where.AND = [
-          ...(where.AND ?? []),
-          {
-            NOT: {
-              AND: [
-                { requiresApproval: true },
-                { approvalStatus: 'PENDENTE' },
-                { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
-              ],
+          if (ccIds.size === 0) {
+            where.id = '__never__' as any
+          } else {
+            where.costCenterId = { in: [...ccIds] }
+          }
+          // RQ_063 só deve chegar na fila após aprovação (nível 3)
+          where.AND = [
+            ...(where.AND ?? []),
+            {
+              NOT: {
+                AND: [
+                  { requiresApproval: true },
+                  { approvalStatus: 'PENDENTE' },
+                  { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                ],
+              },
             },
-          },
-        ]
-      } else if (scope === 'to-approve') {
-        where.requiresApproval = true
-        where.approvalStatus = 'PENDENTE'
-        // se quiser filtrar por aprovador:
-        // where.approverId = me.id
+          ]
+        } else if (scope === 'to-approve') {
+          where.requiresApproval = true
+          where.approvalStatus = 'PENDENTE'
+          // se quiser filtrar por aprovador:
+          // where.approverId = me.id
+        }
+
+       const [solicitations, total] = await Promise.all([
+          prisma.solicitation.findMany({
+            where,
+            skip,
+            take: pageSize,
+            orderBy: { dataAbertura: 'desc' },
+            include: {
+              tipo: { select: { nome: true } },
+              department: { select: { name: true } },
+              approver: { select: { id: true, fullName: true } },
+              assumidaPor: { select: { id: true, fullName: true } },
+              solicitante: { select: { id: true, fullName: true } },
+            },
+          }),
+          prisma.solicitation.count({ where }),
+        ])
+
+        const rows = solicitations.map((s) => ({
+          id: s.id,
+          titulo: s.titulo,
+          status: s.status,
+          protocolo: s.protocolo,
+          createdAt: s.dataAbertura.toISOString(),
+          tipo: s.tipo ? { nome: s.tipo.nome } : null,
+
+          responsavelId: s.assumidaPor?.id ?? null,
+          responsavel: s.assumidaPor
+            ? { fullName: s.assumidaPor.fullName }
+            : null,
+
+          autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+
+          sla: null,
+          setorDestino: s.department?.name ?? null,
+
+          requiresApproval: s.requiresApproval,
+          approvalStatus: s.approvalStatus,
+        }))
+
+        return NextResponse.json({ rows, total })
+      } catch (e) {
+        console.error('GET /api/solicitacoes error', e)
+        return NextResponse.json(
+          { error: 'Erro ao listar solicitações.' },
+          { status: 500 },
+        )
       }
-
-      const [solicitations, total] = await Promise.all([
-        prisma.solicitation.findMany({
-          where,
-          skip,
-          take: pageSize,
-          orderBy: { dataAbertura: 'desc' },
-          include: {
-            tipo: { select: { nome: true } },
-            department: { select: { name: true } },
-            approver: { select: { id: true, fullName: true } },
-            assumidaPor: { select: { id: true, fullName: true } },
-            solicitante: { select: { id: true, fullName: true } },
-          },
-        }),
-        prisma.solicitation.count({ where }),
-      ])
-
-      const rows = solicitations.map((s) => ({
-        id: s.id,
-        titulo: s.titulo,
-        status: s.status,
-        protocolo: s.protocolo,
-        createdAt: s.dataAbertura.toISOString(),
-        tipo: s.tipo ? { nome: s.tipo.nome } : null,
-
-        responsavelId: s.assumidaPor?.id ?? null,
-        responsavel: s.assumidaPor
-          ? { fullName: s.assumidaPor.fullName }
-          : null,
-
-        autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
-
-        sla: null,
-        setorDestino: s.department?.name ?? null,
-
-        requiresApproval: s.requiresApproval,
-        approvalStatus: s.approvalStatus,
-      }))
-
-      return NextResponse.json({ rows, total })
-    } catch (e) {
-      console.error('GET /api/solicitacoes error', e)
-      return NextResponse.json(
-        { error: 'Erro ao listar solicitações.' },
-        { status: 500 },
-      )
-    }
-  })
-}
+      })
+  },
+)
 
 /**
  * Acha um "aprovador nível 3" vinculado ao centro de custo,
@@ -263,223 +264,220 @@ async function buildPayload(
 export const POST = withModuleLevel(
   'solicitacoes',
   ModuleLevel.NIVEL_1,
-  async (req: NextRequest, ctx: { me: AuthenticatedUser }) => {
-    const { me } = ctx
+  async (req: NextRequest, ctx) => {
+    return withRequestMetrics('POST /api/solicitacoes', async () => {
+      try {
+        const { me } = ctx
+        const body = await req.json().catch(() => null)
 
-    try {
-      const body = await req.json().catch(() => null)
+        if (!body || typeof body !== 'object') {
+          return NextResponse.json(
+            { error: 'Payload inválido para criação de solicitação.' },
+            { status: 400 },
+          )
+        }
 
-      if (!body || typeof body !== 'object') {
-        return NextResponse.json(
-          { error: 'Payload inválido para criação de solicitação.' },
-          { status: 400 },
-        )
-      }
-
-    const tipoId = body.tipoId as string | undefined
-      const costCenterId = body.costCenterId as string | undefined
-      const departmentId = body.departmentId as string | undefined
-      const campos = (body.campos ?? {}) as Record<string, any>
-      const solicitanteId = me.id
-
-     if (!tipoId || !costCenterId || !departmentId) {
-        return NextResponse.json(
-          {
-            error:
-              'Tipo, centro de custo e departamento são obrigatórios.',
-          },
-          { status: 400 },
-        )
-      }
-
-      const [tipo, costCenter, department, userCostCenters] =
-        await Promise.all([
-          prisma.tipoSolicitacao.findUnique({
-            where: { id: tipoId },
-          }),
-          prisma.costCenter.findUnique({
-            where: { id: costCenterId },
-            select: { id: true, departmentId: true },
-          }),
-          prisma.department.findUnique({
-            where: { id: departmentId },
-            select: { id: true },
-          }),
-          prisma.userCostCenter.findMany({
-            where: { userId: solicitanteId },
-            select: { costCenterId: true },
-          }),
-        ])
-
-      if (!tipo) {
-        return NextResponse.json(
-          { error: 'Tipo de solicitação não encontrado.' },
-          { status: 400 },
-        )
-      }
-
-      if (!costCenter) {
-        return NextResponse.json(
-          { error: 'Centro de custo não encontrado.' },
-          { status: 400 },
-        )
-      }
+     const tipoId = body.tipoId as string | undefined
+        const costCenterId = body.costCenterId as string | undefined
+        const departmentId = body.departmentId as string | undefined
+        const solicitanteId = me.id
+        const campos = (body.campos ?? {}) as Record<string, any>
 
 
-     if (!department) {
-        return NextResponse.json(
-          { error: 'Departamento não encontrado.' },
-          { status: 400 },
-        )
-      }
-
-      const allowedCostCenters = new Set<string>(
-        [
-          me.costCenterId,
-          ...userCostCenters.map((link) => link.costCenterId),
-        ].filter(Boolean) as string[],
-      )
-
-      if (!allowedCostCenters.has(costCenterId)) {
-        return NextResponse.json(
-          {
-            error:
-              'Você não possui permissão para abrir solicitações neste centro de custo.',
-          },
-          { status: 403 },
-        )
-      }
-
-      if (!me.departmentId) {
-        return NextResponse.json(
-          {
-             error:
-              'Usuário não possui departamento vinculado para abrir solicitações.',
-          },
-          { status: 403 },
-        )
-      }
-
-      if (me.departmentId !== departmentId) {
-        return NextResponse.json(
-          {
-             error:
-              'Você não possui permissão para abrir solicitações para este departamento.',
-          },
-        { status: 403 },
-        )
-      }
-
-      if (costCenter.departmentId && costCenter.departmentId !== departmentId) {
-        return NextResponse.json(
-          {
-            error:
-              'Departamento informado não corresponde ao centro de custo selecionado.',
-          },
-          { status: 400 },
-        )
-      }
-
-      const protocolo = generateProtocolo()
-      const titulo = tipo.nome
-      const descricao = null
-
-      // monta o payload com dados do solicitante + campos do formulário
-      const payload: any = await buildPayload(solicitanteId, campos)
-
-      // 1) cria a solicitação básica
-      const created = await prisma.solicitation.create({
-        data: {
-          protocolo,
-          tipoId,
-          costCenterId,
-          departmentId,
-          solicitanteId,
-          titulo,
-          descricao,
-          payload,
-        },
-      })
-
-      // 2) registra evento de criação
-      await prisma.event.create({
-        data: {
-          id: crypto.randomUUID(),
-          solicitationId: created.id,
-          actorId: solicitanteId,
-          tipo: 'CRIACAO',
-        },
-      })
-
-      const isSolicitacaoPessoal =
-        tipo.nome === 'RQ_063 - Solicitação de Pessoal'
-      const isSolicitacaoIncentivo =
-        tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-      const isAbonoEducacional =
-        tipo.nome === 'Solicitação de Abono Educacional'
-
-    const rhCostCenter = await prisma.costCenter.findFirst({
-        where: {
-          OR: [
+   if (!tipoId || !costCenterId || !departmentId) {
+          return NextResponse.json(
             {
-              description: {
-                contains: 'Recursos Humanos',
-                mode: 'insensitive',
+              error:
+                'Tipo, centro de custo e departamento são obrigatórios.',
+            },
+            { status: 400 },
+          )
+        }
+
+        const tipo = await prisma.tipoSolicitacao.findUnique({
+          where: { id: tipoId },
+        })
+
+        if (!tipo) {
+          return NextResponse.json(
+            { error: 'Tipo de solicitação não encontrado.' },
+            { status: 400 },
+          )
+        }
+
+        const protocolo = generateProtocolo()
+        const titulo = tipo.nome
+        const descricao = null
+
+        // monta o payload com dados do solicitante + campos do formulário
+        const payload: any = await buildPayload(solicitanteId, campos)
+
+        // 1) cria a solicitação básica
+        const created = await prisma.solicitation.create({
+          data: {
+            protocolo,
+            tipoId,
+            costCenterId,
+            departmentId,
+            solicitanteId,
+            titulo,
+            descricao,
+            payload,
+          },
+        })
+
+        // 2) registra evento de criação
+        await prisma.event.create({
+          data: {
+            id: crypto.randomUUID(),
+            solicitationId: created.id,
+            actorId: solicitanteId,
+            tipo: 'CRIACAO',
+          },
+        })
+
+        const isSolicitacaoPessoal =
+          tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+        const isSolicitacaoIncentivo =
+          tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+        const isAbonoEducacional =
+          tipo.nome === 'Solicitação de Abono Educacional'
+
+        const rhCostCenter = await prisma.costCenter.findFirst({
+          where: {
+            OR: [
+              {
+                description: {
+                  contains: 'Recursos Humanos',
+                  mode: 'insensitive',
+                },
               },
-            },
-            {
-              abbreviation: {
-                contains: 'RH',
-                mode: 'insensitive',
+              {
+                abbreviation: {
+                  contains: 'RH',
+                  mode: 'insensitive',
+                },
               },
+              {
+                code: { contains: 'RH', mode: 'insensitive' },
+              },
+            ],
+          },
+        })
+
+         /* =====================================================================
+           3) RQ_063 - Solicitação de Pessoal
+           ===================================================================== */
+        if (isSolicitacaoPessoal) {
+          const rawCampo =
+            (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
+            (payload?.campos?.vagaPrevista as string | undefined) ??
+            ''
+
+          const normalized = rawCampo
+            ? rawCampo
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toUpperCase()
+            : ''
+
+          const isSim = normalized === 'SIM' || normalized === 'S'
+
+          if (isSim) {
+            if (!rhCostCenter) {
+              return NextResponse.json(
+                {
+                  error:
+                    'Centro de custo de Recursos Humanos não encontrado para encaminhar a vaga prevista.',
+                },
+                { status: 400 },
+              )
+            }
+
+            // vaga já prevista em contrato -> aprovação automática e direcionamento ao RH
+            const updated = await prisma.solicitation.update({
+              where: { id: created.id },
+              data: {
+                requiresApproval: false,
+                approvalStatus: 'APROVADO',
+                approvalAt: new Date(),
+                approverId: null,
+                status: 'ABERTA',
+                costCenterId: rhCostCenter.id,
+                departmentId: rhCostCenter.departmentId ?? departmentId,
+              },
+            })
+
+            await prisma.event.create({
+              data: {
+                id: crypto.randomUUID(),
+                solicitationId: created.id,
+                actorId: solicitanteId,
+                tipo: 'APROVACAO_AUTOMATICA_CONTRATO',
+              },
+            })
+
+            await prisma.solicitationTimeline.create({
+              data: {
+                solicitationId: created.id,
+                status: 'AGUARDANDO_ATENDIMENTO',
+                message:
+                  'Solicitação aprovada automaticamente e encaminhada para o RH preencher os dados do candidato.',
+              },
+            })
+
+            return NextResponse.json(updated, { status: 201 })
+          }
+
+          // qualquer coisa diferente de SIM exige aprovação
+          const approver = await findLevel3ApproverForCostCenter(costCenterId)
+          const approverId = approver?.id ?? null
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
             },
-            {
-              code: { contains: 'RH', mode: 'insensitive' },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
-          ],
-        },
-      })
+          })
+
+    return NextResponse.json(updated, { status: 201 })
+        }
 
       /* =====================================================================
-         3) RQ_063 - Solicitação de Pessoal
-         ===================================================================== */
-      if (isSolicitacaoPessoal) {
-        const rawCampo =
-          (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
-          (payload?.campos?.vagaPrevista as string | undefined) ??
-          ''
-
-        const normalized = rawCampo
-          ? rawCampo
-              .toString()
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .trim()
-              .toUpperCase()
-          : ''
-
-        const isSim = normalized === 'SIM' || normalized === 'S'
-
-        if (isSim) {
+           4) RQ_091 - Solicitação de Incentivo à Educação
+           ===================================================================== */
+        if (isSolicitacaoIncentivo) {
           if (!rhCostCenter) {
             return NextResponse.json(
               {
                 error:
-                  'Centro de custo de Recursos Humanos não encontrado para encaminhar a vaga prevista.',
+                  'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
               },
               { status: 400 },
             )
           }
 
-          // vaga já prevista em contrato -> aprovação automática e direcionamento ao RH
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              requiresApproval: false,
-              approvalStatus: 'APROVADO',
-              approvalAt: new Date(),
-              approverId: null,
-              status: 'ABERTA',
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId: null, // RH vai tratar
+              status: 'AGUARDANDO_APROVACAO',
               costCenterId: rhCostCenter.id,
               departmentId: rhCostCenter.departmentId ?? departmentId,
             },
@@ -490,142 +488,62 @@ export const POST = withModuleLevel(
               id: crypto.randomUUID(),
               solicitationId: created.id,
               actorId: solicitanteId,
-              tipo: 'APROVACAO_AUTOMATICA_CONTRATO',
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
           })
 
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
+              status: 'AGUARDANDO_APROVACAO',
               message:
-                'Solicitação aprovada automaticamente e encaminhada para o RH preencher os dados do candidato.',
+                'Solicitação enviada diretamente ao RH para aprovação e tratamento.',
+            },
+          })
+
+       return NextResponse.json(updated, { status: 201 })
+        }
+
+         /* =====================================================================
+           5) Solicitação de Abono Educacional
+           ===================================================================== */
+        if (isAbonoEducacional) {
+          const approver = await findLevel3ApproverForCostCenter(costCenterId)
+          const approverId = approver?.id ?? null
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
           })
 
           return NextResponse.json(updated, { status: 201 })
         }
 
-        // qualquer coisa diferente de SIM exige aprovação
-        const approver = await findLevel3ApproverForCostCenter(costCenterId)
-        const approverId = approver?.id ?? null
-
-        const updated = await prisma.solicitation.update({
-          where: { id: created.id },
-          data: {
-            requiresApproval: true,
-            approvalStatus: 'PENDENTE',
-            approverId,
-            status: 'AGUARDANDO_APROVACAO',
-          },
-        })
-
-        await prisma.event.create({
-          data: {
-            id: crypto.randomUUID(),
-            solicitationId: created.id,
-            actorId: approverId ?? solicitanteId,
-            tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-          },
-        })
-
-        return NextResponse.json(updated, { status: 201 })
+        // ======================================================================
+        // 6) Demais tipos: segue fluxo simples, sem aprovação especial
+        // ======================================================================
+        return NextResponse.json(created, { status: 201 })
+      } catch (e) {
+        console.error('POST /api/solicitacoes error', e)
+        return NextResponse.json(
+          { error: 'Erro ao criar solicitação.' },
+          { status: 500 },
+        )
       }
-
-      /* =====================================================================
-         4) RQ_091 - Solicitação de Incentivo à Educação
-         ===================================================================== */
-      if (isSolicitacaoIncentivo) {
-        if (!rhCostCenter) {
-          return NextResponse.json(
-            {
-              error:
-                'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
-            },
-            { status: 400 },
-          )
-        }
-
-        const updated = await prisma.solicitation.update({
-          where: { id: created.id },
-          data: {
-            requiresApproval: true,
-            approvalStatus: 'PENDENTE',
-            approverId: null, // RH vai tratar
-            status: 'AGUARDANDO_APROVACAO',
-            costCenterId: rhCostCenter.id,
-            departmentId: rhCostCenter.departmentId ?? departmentId,
-          },
-        })
-
-        await prisma.event.create({
-          data: {
-            id: crypto.randomUUID(),
-            solicitationId: created.id,
-            actorId: solicitanteId,
-            tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-          },
-        })
-
-        await prisma.solicitationTimeline.create({
-          data: {
-            solicitationId: created.id,
-            status: 'AGUARDANDO_APROVACAO',
-            message:
-              'Solicitação enviada diretamente ao RH para aprovação e tratamento.',
-          },
-        })
-
-        return NextResponse.json(updated, { status: 201 })
-      }
-
-      /* =====================================================================
-         5) Solicitação de Abono Educacional
-         ===================================================================== */
-      if (isAbonoEducacional) {
-        const approver = await findLevel3ApproverForCostCenter(costCenterId)
-        const approverId = approver?.id ?? null
-
-        const updated = await prisma.solicitation.update({
-          where: { id: created.id },
-          data: {
-            requiresApproval: true,
-            approvalStatus: 'PENDENTE',
-            approverId,
-            status: 'AGUARDANDO_APROVACAO',
-          },
-        })
-
-        await prisma.event.create({
-          data: {
-            id: crypto.randomUUID(),
-            solicitationId: created.id,
-            actorId: approverId ?? solicitanteId,
-            tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-          },
-        })
-
-        await prisma.solicitationTimeline.create({
-          data: {
-            solicitationId: created.id,
-            status: 'AGUARDANDO_APROVACAO',
-            message: 'Solicitação enviada para aprovação (Abono Educacional).',
-          },
-        })
-
-        return NextResponse.json(updated, { status: 201 })
-      }
-
-      // ======================================================================
-      // 6) Demais tipos: segue fluxo simples, sem aprovação especial
-      // ======================================================================
-      return NextResponse.json(created, { status: 201 })
-    } catch (e) {
-      console.error('POST /api/solicitacoes error', e)
-      return NextResponse.json(
-        { error: 'Erro ao criar solicitação.' },
-        { status: 500 },
-      )
-    }
+    })
   },
 )
