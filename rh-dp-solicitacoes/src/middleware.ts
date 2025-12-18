@@ -13,6 +13,8 @@ export async function middleware(req: NextRequest) {
   const isPublic =
     path.startsWith('/login') ||
     path.startsWith('/_next') ||
+    path.startsWith('/api/auth') ||
+    path.startsWith('/api/session') ||
     path.startsWith('/api/test-session') ||
     /\.[a-z0-9]+$/i.test(path) // arquivos estáticos
 
