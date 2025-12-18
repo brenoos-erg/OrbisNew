@@ -119,21 +119,72 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 /**
- * DELETE: NÃO APAGA (evita FK). Só INATIVA.
- * (Se quiser esconder na tela, filtre status ATIVO no GET)
+ * DELETE: remove do Prisma e também do Auth (se houver credenciais e authId)
  */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params
 
-    await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { id },
-      data: { status: 'INATIVO' },
+      select: { id: true, authId: true },
     })
+if (!user) {
+      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+    }
 
-    return NextResponse.json({ ok: true })
+    const admin = user.authId ? getSupabaseAdmin() : null
+
+    if (user.authId && !admin) {
+      return NextResponse.json(
+        { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível excluir no Auth.' },
+        { status: 500 },
+      )
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.userCostCenter.deleteMany({ where: { userId: id } })
+        await tx.userModuleAccess.deleteMany({ where: { userId: id } })
+        await tx.groupMember.deleteMany({ where: { userId: id } })
+
+        await tx.user.delete({ where: { id } })
+      })
+    } catch (dbErr: any) {
+      console.error('DELETE /configuracoes/usuarios/[id] prisma error', dbErr)
+
+      if (dbErr?.code === 'P2003') {
+        return NextResponse.json(
+          {
+            error:
+              'Não é possível excluir: existem registros relacionados a este usuário. ' +
+              'Caso precise remover, inative-o ou limpe vínculos antes de tentar novamente.',
+          },
+          { status: 409 },
+        )
+      }
+
+      return NextResponse.json({ error: 'Erro ao excluir no banco de dados.' }, { status: 500 })
+    }
+
+    if (user.authId && admin) {
+      const { error: authErr } = await admin.auth.admin.deleteUser(user.authId)
+
+      if (authErr) {
+        console.error('DELETE /configuracoes/usuarios/[id] auth error', authErr)
+        return NextResponse.json(
+          {
+            error:
+              'Usuário removido do banco, mas falhou ao apagar no Supabase Auth: ' +
+              authErr.message,
+          },
+          { status: 500 },
+        )
+      }
+    }
+     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error('DELETE /configuracoes/usuarios/[id] error', e)
-    return NextResponse.json({ error: 'Erro ao inativar usuário.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
   }
 }
