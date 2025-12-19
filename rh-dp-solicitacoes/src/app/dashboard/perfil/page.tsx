@@ -24,6 +24,9 @@ export default function PerfilPage() {
 
   // Prisma
   const [me, setMe] = useState<PrismaMe>({})
+  // Senha
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   // Metadata Supabase
   const [avatarUrl, setAvatarUrl]   = useState('')
@@ -68,6 +71,15 @@ export default function PerfilPage() {
     setOk(null)
     setSaving(true)
     try {
+      const wantsPasswordChange = newPassword || confirmPassword
+      if (wantsPasswordChange) {
+        if (newPassword.length < 6) {
+          throw new Error('A nova senha deve ter ao menos 6 caracteres.')
+        }
+        if (newPassword !== confirmPassword) {
+          throw new Error('As senhas não coincidem.')
+        }
+      }
       const r = await fetch('/api/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -85,6 +97,13 @@ export default function PerfilPage() {
         const err = await r.json().catch(() => ({}))
         throw new Error(err?.error || `Falha ao atualizar (${r.status})`)
       }
+       if (wantsPasswordChange) {
+        const { error: passErr } = await sb.auth.updateUser({ password: newPassword })
+        if (passErr) throw new Error(passErr.message || 'Falha ao atualizar a senha.')
+        setNewPassword('')
+        setConfirmPassword('')
+      }
+
       await sb.auth.refreshSession()
       setOk('Perfil atualizado com sucesso!')
     } catch (e: any) {
@@ -291,6 +310,30 @@ const AVATAR_BUCKET = 'avatars'
               </div>
             </div>
 
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+              <div>
+                <label className="block text-xs font-semibold text-black uppercase tracking-wide">Senha</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
+                  placeholder="Nova senha"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-black uppercase tracking-wide">Confirme a senha</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
+                  placeholder="Confirmar senha"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="flex justify-end">
               <button
                 type="submit"
