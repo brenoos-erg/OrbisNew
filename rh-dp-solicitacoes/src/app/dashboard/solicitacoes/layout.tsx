@@ -7,6 +7,7 @@ import {
   userHasDepartmentOrCostCenter,
 } from '@/lib/moduleAccess'
 import { ModuleLevel } from '@prisma/client'
+export const dynamic = 'force-dynamic'
 
 export default async function SolicitacoesLayout({
   children,
@@ -32,7 +33,7 @@ export default async function SolicitacoesLayout({
     ),
   ])
 
- const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+  const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
   const solicitLevel = context.levels['solicitacoes']
   const canAccess =
     solicitLevel !== undefined &&
