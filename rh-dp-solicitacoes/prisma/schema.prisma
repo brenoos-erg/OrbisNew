@@ -8,11 +8,376 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
-/**
- * =========================
- * ENUMS
- * =========================
- */
+model Attachment {
+  id             String       @id
+  solicitationId String
+  filename       String
+  url            String
+  mimeType       String
+  sizeBytes      Int
+  createdAt      DateTime     @default(now())
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+model Comment {
+  id             String       @id
+  solicitationId String
+  autorId        String
+  texto          String
+  createdAt      DateTime     @default(now())
+  autor          User         @relation("CommentAutor", fields: [autorId], references: [id])
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+model Event {
+  id             String       @id
+  solicitationId String
+  actorId        String
+  tipo           String
+  createdAt      DateTime     @default(now())
+  actor          User         @relation("EventActor", fields: [actorId], references: [id])
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+model CostCenter {
+  id                 String              @id @default(uuid())
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  abbreviation       String?
+  area               String?
+  code               String?
+  description        String
+  externalCode       String?             @unique(map: "CostCenter_externalCode_uq")
+  managementType     String?
+  status             CCStatus            @default(ACTIVE)
+  groupName          String?             @map("group_name")
+  observations       String?
+  departmentId       String?
+  department         Department?         @relation(fields: [departmentId], references: [id])
+  modules            CostCenterModule[]
+  solicitations      Solicitation[]
+  users              User[]
+  userLinks          UserCostCenter[]
+  vehicleCostCenters VehicleCostCenter[]
+
+  @@map("CostCenter")
+}
+
+model Position {
+  id                      String      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name                    String      @unique
+  description             String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  behavioralCompetencies  String?
+  complementaryActivities String?
+  course                  String?
+  courseInProgress        String?
+  departmentId            String?
+  enxoval                 String?
+  experience              String?
+  mainActivities          String?
+  others                  String?
+  periodModule            String?
+  requiredKnowledge       String?
+  schooling               String?
+  schoolingCompleted      String?
+  sectorProject           String?
+  site                    String?
+  uniform                 String?
+  workPoint               String?
+  workSchedule            String?
+  workplace               String?
+  department              Department? @relation(fields: [departmentId], references: [id])
+  users                   User[]
+
+  @@map("Position")
+}
+
+model Leader {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  fullName  String
+  email     String?  @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   User[]
+
+  @@map("Leader")
+}
+
+model TipoSolicitacao {
+  id           String         @id
+  nome         String         @unique
+  descricao    String?
+  schemaJson   Json
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  solicitacoes Solicitation[]
+}
+
+model Department {
+  id            String             @id @default(uuid())
+  name          String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  code          String             @unique
+  costCenters   CostCenter[]
+  modules       DepartmentModule[]
+  positions     Position[]
+  solicitations Solicitation[]
+  users         User[]
+}
+
+model Solicitation {
+  id               String                 @id @default(uuid())
+  titulo           String
+  descricao        String?
+  tipoId           String
+  payload          Json
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  approvalAt       DateTime?
+  approvalComment  String?
+  approvalStatus   ApprovalStatus         @default(NAO_PRECISA)
+  approverId       String?
+  costCenterId     String
+  dataAbertura     DateTime               @default(now())
+  dataCancelamento DateTime?
+  dataFechamento   DateTime?
+  dataPrevista     DateTime?
+  departmentId     String
+  prioridade       SolicitationPriority?
+  protocolo        String                 @unique
+  requiresApproval Boolean                @default(false)
+  solicitanteId    String
+  status           SolicitationStatus     @default(ABERTA)
+  parentId         String?
+  vagaPrevista     Boolean                @default(false)
+  assumidaPorId    String?
+  assumidaEm       DateTime?
+  anexos           Attachment[]
+  comentarios      Comment[]
+  eventos          Event[]
+  approver         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  assumidaPor      User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
+  costCenter       CostCenter             @relation(fields: [costCenterId], references: [id])
+  department       Department             @relation(fields: [departmentId], references: [id])
+  parent           Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
+  children         Solicitation[]         @relation("SolicitationParent")
+  solicitante      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
+  tipo             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
+  timelines        SolicitationTimeline[]
+}
+
+model User {
+  id                    String             @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email                 String             @unique
+  role                  Role               @default(COLABORADOR)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  authId                String?            @unique @db.Uuid
+  fullName              String
+  login                 String?            @unique(map: "user_login_key")
+  phone                 String?
+  status                UserStatus         @default(ATIVO)
+  leaderId              String?
+  costCenterId          String?
+  positionId            String?
+  avatarUrl             String?
+  departmentId          String?
+  comments              Comment[]          @relation("CommentAutor")
+  events                Event[]            @relation("EventActor")
+  membersOfGroups       GroupMember[]
+  solicitacoesAprovador Solicitation[]     @relation("SolicitationAprovador")
+  solicitacoesAssumidas Solicitation[]     @relation("SolicitationAssumidaPor")
+  solicitacoesCriadas   Solicitation[]     @relation("SolicitationSolicitante")
+  costCenter            CostCenter?        @relation(fields: [costCenterId], references: [id])
+  department            Department?        @relation(fields: [departmentId], references: [id])
+  leader                Leader?            @relation(fields: [leaderId], references: [id])
+  position              Position?          @relation(fields: [positionId], references: [id])
+  costCenters           UserCostCenter[]
+  moduleAccesses        UserModuleAccess[]
+  vehicleCheckins       VehicleCheckin[]
+  vehicleStatusLogs     VehicleStatusLog[]
+
+  @@map("User")
+}
+
+model Module {
+  id          String             @id @default(uuid())
+  key         String             @unique
+  name        String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  grants      AccessGroupGrant[]
+  costCenters CostCenterModule[]
+  deptAccess  DepartmentModule[]
+  userAccess  UserModuleAccess[]
+
+  @@map("Module")
+}
+
+model AccessGroup {
+  id        String             @id @default(uuid())
+  name      String             @unique
+  notes     String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  grants    AccessGroupGrant[]
+  members   GroupMember[]
+
+  @@map("AccessGroup")
+}
+
+model GroupMember {
+  id        String      @id @default(uuid())
+  userId    String
+  groupId   String
+  role      GroupRole   @default(MEMBER)
+  createdAt DateTime    @default(now())
+  group     AccessGroup @relation(fields: [groupId], references: [id])
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, groupId])
+  @@map("GroupMember")
+}
+
+model AccessGroupGrant {
+  id        String      @id @default(uuid())
+  groupId   String
+  moduleId  String
+  actions   Action[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  group     AccessGroup @relation(fields: [groupId], references: [id])
+  module    Module      @relation(fields: [moduleId], references: [id])
+
+  @@unique([groupId, moduleId])
+  @@map("AccessGroupGrant")
+}
+
+model CostCenterModule {
+  id           String     @id @default(uuid())
+  costCenterId String
+  moduleId     String
+  createdAt    DateTime   @default(now())
+  costCenter   CostCenter @relation(fields: [costCenterId], references: [id])
+  module       Module     @relation(fields: [moduleId], references: [id])
+
+  @@unique([costCenterId, moduleId])
+  @@map("CostCenterModule")
+}
+
+model UserCostCenter {
+  id           String     @id @default(uuid())
+  userId       String
+  costCenterId String
+  createdAt    DateTime   @default(now())
+  costCenter   CostCenter @relation(fields: [costCenterId], references: [id])
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, costCenterId])
+  @@map("UserCostCenter")
+}
+
+model SolicitationTimeline {
+  id             String       @id @default(uuid())
+  solicitationId String
+  status         String
+  message        String?
+  createdAt      DateTime     @default(now())
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
+}
+
+model UserModuleAccess {
+  id       String      @id @default(uuid())
+  userId   String
+  moduleId String
+  level    ModuleLevel
+  module   Module      @relation(fields: [moduleId], references: [id])
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, moduleId])
+  @@map("UserModuleAccess")
+}
+
+model DepartmentModule {
+  id           String     @id @default(uuid())
+  departmentId String
+  moduleId     String
+  department   Department @relation(fields: [departmentId], references: [id])
+  module       Module     @relation(fields: [moduleId], references: [id])
+
+  @@unique([departmentId, moduleId])
+  @@map("DepartmentModule")
+}
+
+model Vehicle {
+  id          String              @id @default(cuid())
+  plate       String              @unique
+  type        String
+  model       String?
+  costCenter  String?
+  sector      String?
+  kmCurrent   Int                 @default(0)
+  status      String              @default("DISPONIVEL")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  checkins    VehicleCheckin[]
+  costCenters VehicleCostCenter[]
+  statusLogs  VehicleStatusLog[]
+}
+
+model VehicleCostCenter {
+  id           String     @id @default(uuid())
+  vehicleId    String
+  costCenterId String
+  createdAt    DateTime   @default(now())
+  costCenter   CostCenter @relation(fields: [costCenterId], references: [id])
+  vehicle      Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, costCenterId])
+  @@map("VehicleCostCenter")
+}
+
+model VehicleCheckin {
+  id                       String    @id @default(cuid())
+  vehicleId                String
+  driverId                 String
+  inspectionDate           DateTime
+  costCenter               String?
+  sectorActivity           String?
+  driverName               String
+  vehiclePlateSnapshot     String
+  vehicleTypeSnapshot      String
+  kmAtInspection           Int
+  checklistJson            Json
+  fatigueJson              Json
+  fatigueScore             Int
+  fatigueRisk              String
+  driverStatus             String
+  hasNonConformity         Boolean
+  nonConformityCriticality String?
+  nonConformityActions     String?
+  nonConformityManager     String?
+  nonConformityDate        DateTime?
+  createdAt                DateTime  @default(now())
+  vehicleStatus            String    @default("DISPONIVEL")
+  driver                   User      @relation(fields: [driverId], references: [id])
+  vehicle                  Vehicle   @relation(fields: [vehicleId], references: [id])
+}
+
+model VehicleStatusLog {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  status      String
+  reason      String
+  createdById String?
+  createdAt   DateTime @default(now())
+  createdBy   User?    @relation(fields: [createdById], references: [id], onUpdate: NoAction)
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
 
 enum Role {
   COLABORADOR
@@ -45,10 +410,6 @@ enum CCStatus {
   INACTIVE
 }
 
-/**
- * ===== NOVOS ENUMS =====
- */
-
 enum Action {
   VIEW
   CREATE
@@ -61,10 +422,6 @@ enum GroupRole {
   MEMBER
   MANAGER
 }
-
-/**
- * ===== ENUMS DE SOLICITAÇÃO =====
- */
 
 enum ApprovalStatus {
   NAO_PRECISA
@@ -88,509 +445,8 @@ enum SolicitationPriority {
   URGENTE
 }
 
-/**
- * =========================
- * MODELOS DE SUPORTE
- * =========================
- */
-
-model Attachment {
-  id             String   @id
-  solicitationId String
-  filename       String
-  url            String
-  mimeType       String
-  sizeBytes      Int
-  createdAt      DateTime @default(now())
-
-  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
-}
-
-model Comment {
-  id             String   @id
-  solicitationId String
-  autorId        String
-  texto          String
-  createdAt      DateTime @default(now())
-
-  autor        User         @relation("CommentAutor", fields: [autorId], references: [id])
-  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
-}
-
-model Event {
-  id             String   @id
-  solicitationId String
-  actorId        String
-  tipo           String
-  createdAt      DateTime @default(now())
-
-  actor        User         @relation("EventActor", fields: [actorId], references: [id])
-  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
-}
-
-/**
- * =========================
- * CATALOGOS / CADASTROS
- * =========================
- */
-
-model CostCenter {
-  id             String   @id @default(uuid())
-  code           String?
-  externalCode   String?
-  abbreviation   String?
-  area           String?
-  managementType String?
-  groupName      String?  @map("group_name")
-  status         CCStatus @default(ACTIVE)
-  description    String
-  observations   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  users User[]
-
-  // N:N via UserCostCenter
-  userLinks UserCostCenter[]
-
-  // N:N veículos
-  vehicleCostCenters VehicleCostCenter[]
-
-  // relação com módulos (modelo antigo)
-  modules CostCenterModule[]
-
-  // relação com solicitações
-  solicitations Solicitation[]
-
-  // relação com departamento
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
-
-  @@map("CostCenter")
-}
-
-/**
- * =========================
- * MODEL Position
- * =========================
- */
-
-model Position {
-  id          String  @id @default(dbgenerated("(gen_random_uuid())::text"))
-  name        String  @unique
-  description String?
-
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
-
-  users User[]
-
-  // AUTO-PREENCHIMENTO RQ_063
-  sectorProject           String?
-  workplace               String?
-  workSchedule            String?
-  mainActivities          String?
-  complementaryActivities String?
-  schooling               String?
-  course                  String?
-  schoolingCompleted      String?
-  courseInProgress        String?
-  periodModule            String?
-  requiredKnowledge       String?
-  behavioralCompetencies  String?
-  enxoval                 String?
-  uniform                 String?
-  others                  String?
-  workPoint               String?
-  site                    String?
-  experience              String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("Position")
-}
-
-/**
- * =========================
- * MODEL Leader
- * =========================
- */
-
-model Leader {
-  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
-  fullName  String
-  email     String?  @unique
-  phone     String?
-  members   User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("Leader")
-}
-
-/**
- * =========================
- * NÚCLEO DE SOLICITAÇÕES
- * =========================
- */
-
-model TipoSolicitacao {
-  id           String         @id
-  nome         String         @unique
-  descricao    String?
-  schemaJson   Json
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime
-  solicitacoes Solicitation[]
-}
-
-model Department {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users         User[]
-  solicitations Solicitation[]
-
-  // relação com centros de custo
-  costCenters CostCenter[]
-
-  // módulos habilitados para esse departamento
-  modules DepartmentModule[]
-
-  // relação ONE Department → MANY Positions
-  positions Position[]
-}
-
-model Solicitation {
-  id        String @id @default(uuid())
-  protocolo String @unique
-
-  tipoId String
-  tipo   TipoSolicitacao @relation(fields: [tipoId], references: [id])
-
-  costCenterId String
-  costCenter   CostCenter @relation(fields: [costCenterId], references: [id])
-
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
-
-  solicitanteId String
-  solicitante   User   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
-
-  requiresApproval Boolean @default(false)
-  approverId       String?
-  approver         User?   @relation("SolicitationAprovador", fields: [approverId], references: [id])
-
-  approvalStatus  ApprovalStatus @default(NAO_PRECISA)
-  approvalAt      DateTime?
-  approvalComment String?
-
-  status     SolicitationStatus    @default(ABERTA)
-  prioridade SolicitationPriority?
-
-  vagaPrevista Boolean @default(false)
-
-  titulo    String
-  descricao String?
-
-  payload Json
-
-  dataAbertura     DateTime  @default(now())
-  dataPrevista     DateTime?
-  dataFechamento   DateTime?
-  dataCancelamento DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  timelines SolicitationTimeline[]
-
-  anexos      Attachment[]
-  comentarios Comment[]
-  eventos     Event[]
-
-  parentId String?
-  parent   Solicitation?  @relation("SolicitationParent", fields: [parentId], references: [id])
-  children Solicitation[] @relation("SolicitationParent")
-
-  assumidaPorId String?
-  assumidaEm    DateTime?
-  assumidaPor   User?     @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id])
-}
-
-/**
- * =========================
- * USUÁRIO
- * =========================
- */
-
-model User {
-  id        String  @id @default(dbgenerated("(gen_random_uuid())::text"))
-  email     String  @unique
-  fullName  String
-  login     String? @unique(map: "user_login_key")
-  phone     String?
-  avatarUrl String?
-
-  // CC principal
-  costCenterId String?
-  costCenter   CostCenter? @relation(fields: [costCenterId], references: [id])
-
-  // N:N via UserCostCenter
-  costCenters UserCostCenter[]
-
-  // departamento
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id])
-
-  status    UserStatus @default(ATIVO)
-  role      Role       @default(COLABORADOR)
-  authId    String?    @unique @db.Uuid
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  // relações com Solicitation
-  solicitacoesCriadas   Solicitation[] @relation("SolicitationSolicitante")
-  solicitacoesAprovador Solicitation[] @relation("SolicitationAprovador")
-  solicitacoesAssumidas Solicitation[] @relation("SolicitationAssumidaPor")
-
-  comments Comment[] @relation("CommentAutor")
-  events   Event[]   @relation("EventActor")
-
-  membersOfGroups GroupMember[]
-
-  // relação MANY Users → ONE Position
-  positionId String?
-  position   Position? @relation(fields: [positionId], references: [id])
-
-  leaderId String?
-  leader   Leader? @relation(fields: [leaderId], references: [id])
-
-  // relação com níveis de módulo
-  moduleAccesses UserModuleAccess[]
-
-  // relação com check-ins de veículos
-  vehicleCheckins   VehicleCheckin[]
-  vehicleStatusLogs VehicleStatusLog[]
-
-  @@map("User")
-}
-
-/**
- * =========================
- * CONTROLE DE ACESSOS
- * =========================
- */
-
-model Module {
-  id        String   @id @default(uuid())
-  key       String   @unique // 'SOLICITACOES' | 'CONFIGURACOES'
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relações existentes
-  grants      AccessGroupGrant[]
-  costCenters CostCenterModule[]
-
-  // Novas relações de controle de nível
-  userAccess UserModuleAccess[]
-  deptAccess DepartmentModule[]
-
-  @@map("Module")
-}
-
-model AccessGroup {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  members GroupMember[]
-  grants  AccessGroupGrant[]
-
-  @@map("AccessGroup")
-}
-
-model GroupMember {
-  id        String    @id @default(uuid())
-  userId    String
-  groupId   String
-  role      GroupRole @default(MEMBER)
-  createdAt DateTime  @default(now())
-
-  user  User        @relation(fields: [userId], references: [id])
-  group AccessGroup @relation(fields: [groupId], references: [id])
-
-  @@unique([userId, groupId])
-  @@map("GroupMember")
-}
-
-model AccessGroupGrant {
-  id        String   @id @default(uuid())
-  groupId   String
-  moduleId  String
-  actions   Action[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  group  AccessGroup @relation(fields: [groupId], references: [id])
-  module Module      @relation(fields: [moduleId], references: [id])
-
-  @@unique([groupId, moduleId])
-  @@map("AccessGroupGrant")
-}
-
-model CostCenterModule {
-  id           String   @id @default(uuid())
-  costCenterId String
-  moduleId     String
-  createdAt    DateTime @default(now())
-
-  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
-  module     Module     @relation(fields: [moduleId], references: [id])
-
-  @@unique([costCenterId, moduleId])
-  @@map("CostCenterModule")
-}
-
-model UserCostCenter {
-  id           String   @id @default(uuid())
-  userId       String
-  costCenterId String
-  createdAt    DateTime @default(now())
-
-  user       User       @relation(fields: [userId], references: [id])
-  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
-
-  @@unique([userId, costCenterId])
-  @@map("UserCostCenter")
-}
-
-model SolicitationTimeline {
-  id             String   @id @default(uuid())
-  solicitationId String
-  status         String
-  message        String?
-  createdAt      DateTime @default(now())
-
-  solicitation Solicitation @relation(fields: [solicitationId], references: [id])
-}
-
-/**
- * =========================
- * CONTROLE DE NÍVEL POR MÓDULO
- * =========================
- */
-
 enum ModuleLevel {
   NIVEL_1
   NIVEL_2
   NIVEL_3
-}
-
-model UserModuleAccess {
-  id       String      @id @default(uuid())
-  userId   String
-  moduleId String
-  level    ModuleLevel
-
-  user   User   @relation(fields: [userId], references: [id])
-  module Module @relation(fields: [moduleId], references: [id])
-
-  @@unique([userId, moduleId])
-  @@map("UserModuleAccess")
-}
-
-model DepartmentModule {
-  id           String @id @default(uuid())
-  departmentId String
-  moduleId     String
-
-  department Department @relation(fields: [departmentId], references: [id])
-  module     Module     @relation(fields: [moduleId], references: [id])
-
-  @@unique([departmentId, moduleId])
-  @@map("DepartmentModule")
-}
-
-/**
- * =========================
- * GESTÃO DE FROTAS
- * =========================
- */
-
-model Vehicle {
-  id         String   @id @default(cuid())
-  plate      String   @unique
-  type       String
-  model      String?
-  costCenter String?
-  sector     String?
-  kmCurrent  Int      @default(0)
-  status     String   @default("DISPONIVEL")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  checkins    VehicleCheckin[]
-  costCenters VehicleCostCenter[]
-  statusLogs  VehicleStatusLog[]
-}
-
-model VehicleCostCenter {
-  id           String   @id @default(uuid())
-  vehicleId    String
-  costCenterId String
-  createdAt    DateTime @default(now())
-
-  vehicle    Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  costCenter CostCenter @relation(fields: [costCenterId], references: [id])
-
-  @@unique([vehicleId, costCenterId])
-  @@map("VehicleCostCenter")
-}
-
-model VehicleCheckin {
-  id                       String    @id @default(cuid())
-  vehicleId                String
-  driverId                 String
-  inspectionDate           DateTime
-  costCenter               String?
-  sectorActivity           String?
-  driverName               String
-  vehiclePlateSnapshot     String
-  vehicleTypeSnapshot      String
-  kmAtInspection           Int
-  vehicleStatus            String    @default("DISPONIVEL")
-  checklistJson            Json
-  fatigueJson              Json
-  fatigueScore             Int
-  fatigueRisk              String
-  driverStatus             String
-  hasNonConformity         Boolean
-  nonConformityCriticality String?
-  nonConformityActions     String?
-  nonConformityManager     String?
-  nonConformityDate        DateTime?
-  createdAt                DateTime  @default(now())
-
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
-  driver  User    @relation(fields: [driverId], references: [id])
-}
-
-model VehicleStatusLog {
-  id          String   @id @default(cuid())
-  vehicleId   String
-  status      String
-  reason      String
-  createdById String?
-  createdAt   DateTime @default(now())
-
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  createdBy User?   @relation(fields: [createdById], references: [id])
 }
