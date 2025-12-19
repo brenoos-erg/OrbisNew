@@ -7,5 +7,6 @@ declare namespace NodeJS {
     DATABASE_URL: string;
     DIRECT_DATABASE_URL?: string;
     // adicione outras que você usa
+    CRON_SECRET?: string
   }
 }
