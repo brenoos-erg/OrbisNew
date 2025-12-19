@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
 import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
 import { ModuleLevel } from '@prisma/client'
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({
   children,
