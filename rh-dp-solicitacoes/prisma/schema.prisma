@@ -3,11 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-    /// Pooled URL (ex.: Vercel + Supabase pgBouncer). Keep migrations using `directUrl`.
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
-
-  /// Direct URL for local development/migrations. Optional in serverless runtimes.
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
