@@ -1,7 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarDays, ClipboardList, FileDown, SlidersHorizontal, UserRound } from 'lucide-react'
+import {
+  AlertTriangle,
+  CalendarDays,
+  ClipboardList,
+  FileDown,
+  SlidersHorizontal,
+  UserRound,
+} from 'lucide-react'
+import { fetchSessionMe } from '@/lib/session-cache'
+
 
 type CostCenter = {
   id: string
@@ -40,6 +49,7 @@ type Question = {
   weight: number
 }
 
+type FleetLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
 const costCenters: CostCenter[] = [
   { id: 'cc1', name: 'Campo', code: '141', externalCode: '555', sigla: 'EXT', status: 'ACTIVE' },
   { id: 'cc2', name: 'Matriz', code: '099', externalCode: '450', sigla: 'MTZ', status: 'ACTIVE' },
@@ -183,6 +193,9 @@ function getDayScore(dayAnswers: Record<string, 'SIM' | 'NAO'> | undefined) {
 }
 
 export default function DriversPage() {
+  const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
+  const [loadingAccess, setLoadingAccess] = useState(true)
+  const [accessError, setAccessError] = useState<string | null>(null)
   const [selectedCostCenter, setSelectedCostCenter] = useState(costCenters[0].id)
   const [selectedDriver, setSelectedDriver] = useState(initialDrivers[0].id)
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0].value)
@@ -196,6 +209,39 @@ export default function DriversPage() {
   const [driverAnswers, setDriverAnswers] = useState<
     Record<string, MonthlyAnswers>
   >(() => Object.fromEntries(initialDrivers.map((driver) => [driver.id, driver.monthlyAnswers])))
+  const canAccess = fleetLevel === 'NIVEL_3'
+
+  useEffect(() => {
+    async function loadAccessLevel() {
+      setLoadingAccess(true)
+      setAccessError(null)
+
+      try {
+        const data = await fetchSessionMe()
+        if (!data) {
+          throw new Error('Não foi possível carregar dados da sessão.')
+        }
+
+        const rawLevel =
+          data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
+          data?.appUser?.moduleLevels?.gestao_frotas
+
+        const level: FleetLevel | null =
+          rawLevel === 'NIVEL_1' || rawLevel === 'NIVEL_2' || rawLevel === 'NIVEL_3' ? rawLevel : null
+
+        setFleetLevel(level)
+      } catch (err) {
+        console.error(err)
+        setAccessError('Não foi possível verificar suas permissões no momento.')
+        setFleetLevel(null)
+      } finally {
+        setLoadingAccess(false)
+      }
+    }
+
+    loadAccessLevel()
+  }, [])
+
 
   const filteredDrivers = useMemo(
     () =>
@@ -430,6 +476,42 @@ export default function DriversPage() {
       })),
     [filteredDrivers, driverAnswers, endDay, selectedMonth, startDay]
   )
+   if (loadingAccess) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 text-slate-700">
+          <SlidersHorizontal className="text-orange-500" size={18} />
+          <div>
+            <p className="text-sm font-semibold">Carregando permissões do módulo…</p>
+            <p className="text-xs text-slate-500">Aguarde enquanto validamos seu nível de acesso.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="rounded-xl border border-orange-200 bg-orange-50 p-6 shadow-sm">
+        <div className="flex items-start gap-3 text-orange-800">
+          <AlertTriangle size={20} className="mt-0.5 text-orange-500" />
+          <div className="space-y-1">
+            <p className="text-lg font-semibold">Acesso restrito</p>
+            <p className="text-sm">
+              Esta tela está em desenvolvimento e, no momento, está disponível apenas para usuários com nível 3 no módulo
+              de Gestão de Frotas.
+            </p>
+            {accessError ? (
+              <p className="text-xs text-orange-700">{accessError}</p>
+            ) : (
+              <p className="text-xs text-orange-700">Solicite elevação de permissão ao administrador do módulo.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
 
 
   return (
