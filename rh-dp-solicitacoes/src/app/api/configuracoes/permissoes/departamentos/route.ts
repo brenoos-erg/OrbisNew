@@ -15,15 +15,72 @@ const CORE_MODULES = [
 ]
 
 async function ensureCoreModules() {
-  await Promise.all(
-    CORE_MODULES.map((module) =>
-      prisma.module.upsert({
-        where: { key: module.key },
-        update: { name: module.name },
-        create: module,
-      }),
-    ),
-  )
+   for (const module of CORE_MODULES) {
+    // Evita criar duplicados com variações da key (maiúsculas/underscores etc.)
+    const existing = await prisma.module.findFirst({
+      where: { key: { equals: module.key, mode: 'insensitive' } },
+      select: { id: true },
+    })
+
+    if (existing) {
+      await prisma.module.update({
+        where: { id: existing.id },
+        data: { key: module.key, name: module.name },
+      })
+    } else {
+      await prisma.module.create({ data: module })
+    }
+  }
+}
+
+function normalizeModulesAndLinks(
+  modules: { id: string; key: string; name: string }[],
+  links: { departmentId: string; moduleId: string }[],
+) {
+  const byKey = new Map<
+    string,
+    { canonical: { id: string; key: string; name: string }; allIds: Set<string> }
+  >()
+
+  modules.forEach((mod) => {
+    const slugKey = mod.key.toLowerCase()
+    const entry = byKey.get(slugKey)
+
+    if (!entry) {
+      byKey.set(slugKey, {
+        canonical: { ...mod, key: slugKey },
+        allIds: new Set([mod.id]),
+      })
+      return
+    }
+
+    entry.allIds.add(mod.id)
+
+    // preferir o módulo que já está com key slugificada como canonical
+    if (mod.key.toLowerCase() === mod.key) {
+      entry.canonical = { ...mod, key: slugKey }
+    }
+  })
+
+  const normalizedModules = Array.from(byKey.values())
+    .map(({ canonical }) => canonical)
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const normalizedLinks: { departmentId: string; moduleId: string }[] = []
+  links.forEach((link) => {
+    const normalized = Array.from(byKey.values()).find((entry) => entry.allIds.has(link.moduleId))
+    if (!normalized) return
+
+    const alreadyInserted = normalizedLinks.some(
+      (l) => l.departmentId === link.departmentId && l.moduleId === normalized.canonical.id,
+    )
+
+    if (!alreadyInserted) {
+      normalizedLinks.push({ departmentId: link.departmentId, moduleId: normalized.canonical.id })
+    }
+  })
+
+  return { modules: normalizedModules, links: normalizedLinks }
 }
 
 
@@ -46,7 +103,13 @@ export async function GET() {
     select: { departmentId: true, moduleId: true },
   })
 
-  return NextResponse.json({ departments, modules, links })
+  const normalized = normalizeModulesAndLinks(modules, links)
+
+  return NextResponse.json({
+    departments,
+    modules: normalized.modules,
+    links: normalized.links,
+  })
 }
 
 // POST: habilitar / desabilitar módulo para um departamento

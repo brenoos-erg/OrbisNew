@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({
       id: updated.id,
       fullName: updated.fullName,
-      email: updated.email,
+       email: updated.email,
       login: updated.login ?? '',
       phone: updated.phone ?? '',
       costCenterId: updated.costCenterId ?? null,
@@ -117,13 +117,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       where: { id },
       select: { id: true, authId: true },
     })
- if (!user) {
+    if (!user) {
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
     const admin = user.authId ? getSupabaseAdmin() : null
 
-     if (user.authId) {
+    if (user.authId) {
       if (!admin) {
         return NextResponse.json(
           { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível excluir no Auth.' },
@@ -133,15 +133,34 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
       const { error: authErr } = await admin.auth.admin.deleteUser(user.authId)
       if (authErr) {
-        console.error('DELETE /configuracoes/usuarios/[id] auth error', authErr)
-        return NextResponse.json(
-          {
-            error:
-              'Não foi possível remover o usuário do Supabase Auth: ' + authErr.message,
-          },
-          { status: 500 },
+        const errObj = authErr as any
+        const statusCode = Number(errObj?.statusCode ?? errObj?.status)
+        const code = errObj?.code
+        const message = (authErr.message ?? '').toLowerCase()
+        const isMissingAuthUser =
+          statusCode === 404 ||
+          code === 'auth/user-not-found' ||
+          message.includes('user not found') ||
+          message.includes('resource was not found')
+
+        if (!isMissingAuthUser) {
+          console.error('DELETE /configuracoes/usuarios/[id] auth error', authErr)
+          return NextResponse.json(
+            {
+              error:
+                'Não foi possível remover o usuário do Supabase Auth: ' + authErr.message,
+            },
+            { status: 500 },
+          )
+        }
+
+        console.warn(
+          'Supabase Auth user was already missing; continuing Prisma cleanup.',
+          { authId: user.authId, error: authErr },
         )
       }
+    }
+
     try {
       await prisma.$transaction(async (tx) => {
         const solicitations = await tx.solicitation.findMany({
@@ -167,22 +186,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
         await tx.comment.deleteMany({ where: { autorId: id } })
         await tx.event.deleteMany({ where: { actorId: id } })
-
-        await tx.solicitation.updateMany({
-          where: { approverId: id },
-          data: { approverId: null },
-        })
-
-        await tx.solicitation.updateMany({
-          where: { assumidaPorId: id },
-          data: { assumidaPorId: null },
-        })
-
-        await tx.vehicleStatusLog.updateMany({
-          where: { createdById: id },
-          data: { createdById: null },
-        })
-
         await tx.vehicleCheckin.deleteMany({ where: { driverId: id } })
         await tx.userCostCenter.deleteMany({ where: { userId: id } })
         await tx.userModuleAccess.deleteMany({ where: { userId: id } })
@@ -208,7 +211,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     }
 
     return NextResponse.json({ ok: true })
-  }  } catch (e: any) {
+  } catch (e: any) {
     console.error('DELETE /configuracoes/usuarios/[id] error', e)
     return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
   }
