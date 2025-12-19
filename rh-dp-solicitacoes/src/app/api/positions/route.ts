@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withRequestMetrics } from "@/lib/request-metrics"
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 // GET /api/positions?pageSize=200
 export async function GET(req: Request) {
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       console.error('Erro em GET /api/positions:', error)
       return NextResponse.json(
         { error: 'Erro ao buscar cargos' },
-        { status: 500 }
+             { status: 500 }
       )
     }
   })

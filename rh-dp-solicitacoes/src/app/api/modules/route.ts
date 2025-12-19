@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   return withRequestMetrics('GET /api/modules', async () => {
