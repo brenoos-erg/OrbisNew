@@ -178,7 +178,12 @@ export default function Page() {
   const [bulkCreateFirstAccess, setBulkCreateFirstAccess] = useState(true)
   const [bulkCostCenterId, setBulkCostCenterId] = useState('')
   const [bulkResults, setBulkResults] = useState<
-    { line: number; name: string; status: 'ok' | 'error'; message: string }[]
+    {
+      line: number
+      name: string
+      status: 'created' | 'existed' | 'synced' | 'failed'
+      message: string
+    }[]
   >([])
 
   // filtro de usuários
@@ -446,7 +451,7 @@ export default function Page() {
     const results: {
       line: number
       name: string
-      status: 'ok' | 'error'
+      status: 'created' | 'existed' | 'synced' | 'failed'
       message: string
     }[] = []
 
@@ -459,7 +464,7 @@ export default function Page() {
         results.push({
           line: i + 1,
           name: name || '—',
-          status: 'error',
+          status: 'failed',
           message: 'Nome é obrigatório.',
         })
         continue
@@ -471,37 +476,50 @@ export default function Page() {
 
       const passwordValue = (passwordInput || '').trim()
 
-      try {
+       try {
         const r = await fetch('/api/configuracoes/usuarios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fullName: name,
-              email: emailValue,
-              login: loginValue,
-              phone: phoneInput || '',
-              costCenterId: bulkCostCenterId || null,
+          body: JSON.stringify({
+            fullName: name,
+            email: emailValue,
+            login: loginValue,
+            phone: phoneInput || '',
+            costCenterId: bulkCostCenterId || null,
             password: passwordValue,
-              firstAccess: bulkCreateFirstAccess,
-            }),
-          })
+            firstAccess: bulkCreateFirstAccess,
+          }),
+        })
 
         if (!r.ok) {
           const err = await r.json().catch(() => ({}))
           throw new Error(err?.error || `Falha ao criar (status ${r.status}).`)
         }
+         const payload = await r
+          .json()
+          .catch(() => ({ status: 'created', message: 'Criado com sucesso' }))
+
+        const normalizedStatus: 'created' | 'existed' | 'synced' =
+          payload?.status === 'existed' || payload?.status === 'synced'
+            ? payload.status
+            : 'created'
+
 
         results.push({
           line: i + 1,
           name,
-          status: 'ok',
-          message: 'Criado com sucesso',
+          status: normalizedStatus,
+          message:
+            payload?.message ||
+            (normalizedStatus === 'existed'
+              ? 'Usuário já existia, sincronizado.'
+              : 'Criado com sucesso'),
         })
       } catch (e: any) {
         results.push({
           line: i + 1,
           name,
-          status: 'error',
+          status: 'failed',
           message: e?.message || 'Erro inesperado ao criar.',
         })
       }
@@ -510,7 +528,7 @@ export default function Page() {
     setBulkResults(results)
     setBulkCreating(false)
 
-    if (results.length > 0 && results.every((r) => r.status === 'ok')) {
+    if (results.length > 0 && results.every((r) => r.status !== 'failed')) {
       setBulkText('')
       await load()
     }
@@ -1022,9 +1040,9 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                       </span>
                       <span
                         className={
-                          r.status === 'ok'
-                            ? 'text-green-700'
-                            : 'text-red-700'
+                          r.status === 'failed'
+                            ? 'text-red-700'
+                            : 'text-green-700'
                         }
                       >
                         {r.message}

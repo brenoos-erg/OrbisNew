@@ -1,20 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
-
-// Admin client (Service Role) – só no servidor. Retorna null se não houver credenciais.
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !key) {
-    console.warn('Supabase admin credentials missing; skipping Auth sync.')
-    return null
-  }
-  return createClient(url, key, { auth: { persistSession: false } })
-}
 
 /** GET: retorna dados do usuário */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

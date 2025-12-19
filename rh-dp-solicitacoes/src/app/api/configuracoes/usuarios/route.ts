@@ -115,33 +115,59 @@ export async function POST(req: NextRequest) {
     let authId: string | null = null
 
     if (admin) {
+      const userMetadata = {
+        fullName,
+        login,
+        phone,
+        costCenterId,
+        mustChangePassword: firstAccess,
+      }
       authId = await findAuthUserIdByEmail(admin, email)
 
-      if (!authId) {
-        const effectivePassword = rawPassword || `${login}@123`
+      if (authId) {
+        const { error: updateErr } = await admin.auth.admin.updateUserById(authId, {
+          email,
+          user_metadata: userMetadata,
+          ...(rawPassword ? { password: rawPassword } : {}),
+        })
+
+        if (updateErr) {
+          return NextResponse.json(
+            {
+              error:
+                'Usuário já existia no Auth, mas falhou ao sincronizar os dados: ' +
+                updateErr.message,
+            },
+            { status: 500 },
+          )
+        }
+      } else {
+        const effectivePassword =
+          rawPassword || `${login || fullName.split(' ')[0] || 'User'}@123`
 
         const { data: authData, error: createErr } =
           await admin.auth.admin.createUser({
             email,
             password: effectivePassword,
             email_confirm: true,
-            user_metadata: {
-              fullName,
-              login,
-              phone,
-              costCenterId,
-              mustChangePassword: firstAccess,
-            },
+            user_metadata: userMetadata,
           })
 
         if (createErr) {
-          return NextResponse.json(
-            { error: 'Falha ao criar no Auth: ' + createErr.message },
-            { status: 500 },
-          )
-        }
+          // Recheca o usuário em caso de condição de corrida ou cache
+          if (createErr.message?.toLowerCase().includes('already registered')) {
+            authId = await findAuthUserIdByEmail(admin, email)
+          }
 
-        authId = authData?.user?.id ?? null
+          if (!authId) {
+            return NextResponse.json(
+              { error: 'Falha ao criar no Auth: ' + createErr.message },
+              { status: 500 },
+            )
+          }
+        } else {
+          authId = authData?.user?.id ?? null
+        }
       }
     }
 
