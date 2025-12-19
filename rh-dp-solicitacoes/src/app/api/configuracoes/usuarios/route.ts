@@ -111,67 +111,7 @@ export async function POST(req: NextRequest) {
 
     const admin = getSupabaseAdmin()
 
-    // 1) AUTH: acha por email; se não existir, cria
-    let authId: string | null = null
-
-    if (admin) {
-      const userMetadata = {
-        fullName,
-        login,
-        phone,
-        costCenterId,
-        mustChangePassword: firstAccess,
-      }
-      authId = await findAuthUserIdByEmail(admin, email)
-
-      if (authId) {
-        const { error: updateErr } = await admin.auth.admin.updateUserById(authId, {
-          email,
-          user_metadata: userMetadata,
-          ...(rawPassword ? { password: rawPassword } : {}),
-        })
-
-        if (updateErr) {
-          return NextResponse.json(
-            {
-              error:
-                'Usuário já existia no Auth, mas falhou ao sincronizar os dados: ' +
-                updateErr.message,
-            },
-            { status: 500 },
-          )
-        }
-      } else {
-        const effectivePassword =
-          rawPassword || `${login || fullName.split(' ')[0] || 'User'}@123`
-
-        const { data: authData, error: createErr } =
-          await admin.auth.admin.createUser({
-            email,
-            password: effectivePassword,
-            email_confirm: true,
-            user_metadata: userMetadata,
-          })
-
-        if (createErr) {
-          // Recheca o usuário em caso de condição de corrida ou cache
-          if (createErr.message?.toLowerCase().includes('already registered')) {
-            authId = await findAuthUserIdByEmail(admin, email)
-          }
-
-          if (!authId) {
-            return NextResponse.json(
-              { error: 'Falha ao criar no Auth: ' + createErr.message },
-              { status: 500 },
-            )
-          }
-        } else {
-          authId = authData?.user?.id ?? null
-        }
-      }
-    }
-
-    // Se não tem admin, não dá pra criar/atualizar Auth -> retorna erro claro
+// Se não tem admin, não dá pra criar/atualizar Auth -> retorna erro claro
     if (!admin) {
       return NextResponse.json(
         { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível criar usuário no Auth.' },
@@ -179,9 +119,75 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 1) AUTH: tenta criar primeiro; se der erro de email, busca via listUsers
+    let authId: string | null = null
+    let authStatus: 'created' | 'synced' = 'created'
+
+    const userMetadata = {
+      fullName,
+      login,
+      phone,
+      costCenterId,
+      mustChangePassword: firstAccess,
+    }
+
+  const effectivePassword =
+      rawPassword || `${login || fullName.split(' ')[0] || 'User'}@123`
+
+    const { data: authData, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      password: effectivePassword,
+      email_confirm: true,
+      user_metadata: userMetadata,
+    })
+
+    if (createErr) {
+      const message = createErr.message?.toLowerCase() ?? ''
+      const isEmailConflict =
+        message.includes('already exists') ||
+        message.includes('already registered') ||
+        message.includes('database error checking email')
+
+      if (!isEmailConflict) {
+        return NextResponse.json(
+          { error: 'Falha ao criar no Auth: ' + createErr.message },
+          { status: 500 },
+        )
+       }
+
+      authId = await findAuthUserIdByEmail(admin, email)
+
+      if (!authId) {
+        return NextResponse.json(
+          { error: 'Falha ao criar no Auth: ' + createErr.message },
+          { status: 500 },
+        )
+      }
+    const { error: updateErr } = await admin.auth.admin.updateUserById(authId, {
+        email,
+        user_metadata: userMetadata,
+        ...(rawPassword ? { password: rawPassword } : {}),
+      })
+
+      if (updateErr) {
+        return NextResponse.json(
+          {
+            error:
+              'Usuário já existia no Auth, mas falhou ao sincronizar os dados: ' +
+              updateErr.message,
+          },
+          { status: 500 },
+        )
+      }
+
+      authStatus = 'synced'
+    } else {
+      authId = authData?.user?.id ?? null
+    }
+
     if (!authId) {
       return NextResponse.json(
-        { error: 'Não foi possível obter o authId do usuário.' },
+      { error: 'Não foi possível obter o authId do usuário.' },
         { status: 500 },
       )
     }
@@ -209,6 +215,14 @@ export async function POST(req: NextRequest) {
       },
       select: { id: true, fullName: true, email: true, login: true },
     })
+    const responsePayload = {
+      ...appUser,
+      status: authStatus,
+      message:
+        authStatus === 'synced'
+          ? 'Usuário já existia no Auth; dados sincronizados.'
+          : 'Usuário criado no Auth e sincronizado.',
+    }
 
     // 3) Vincula UserCostCenter (N:N) com upsert
     if (costCenterId) {
@@ -239,7 +253,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json(appUser, { status: 201 })
+    return NextResponse.json(responsePayload, { status: 201 })
   } catch (e: any) {
     if (e?.code === 'P2002') {
       return NextResponse.json(
