@@ -117,21 +117,73 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       where: { id },
       select: { id: true, authId: true },
     })
-if (!user) {
+ if (!user) {
       return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
     }
 
     const admin = user.authId ? getSupabaseAdmin() : null
 
-    if (user.authId && !admin) {
-      return NextResponse.json(
-        { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível excluir no Auth.' },
-        { status: 500 },
-      )
-    }
+     if (user.authId) {
+      if (!admin) {
+        return NextResponse.json(
+          { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível excluir no Auth.' },
+          { status: 500 },
+        )
+      }
 
+      const { error: authErr } = await admin.auth.admin.deleteUser(user.authId)
+      if (authErr) {
+        console.error('DELETE /configuracoes/usuarios/[id] auth error', authErr)
+        return NextResponse.json(
+          {
+            error:
+              'Não foi possível remover o usuário do Supabase Auth: ' + authErr.message,
+          },
+          { status: 500 },
+        )
+      }
     try {
       await prisma.$transaction(async (tx) => {
+        const solicitations = await tx.solicitation.findMany({
+          where: { solicitanteId: id },
+          select: { id: true },
+        })
+
+        const solicitationIds = solicitations.map((s) => s.id)
+
+        if (solicitationIds.length) {
+          await tx.solicitation.updateMany({
+            where: { parentId: { in: solicitationIds } },
+            data: { parentId: null },
+          })
+
+          await tx.attachment.deleteMany({ where: { solicitationId: { in: solicitationIds } } })
+          await tx.comment.deleteMany({ where: { solicitationId: { in: solicitationIds } } })
+          await tx.event.deleteMany({ where: { solicitationId: { in: solicitationIds } } })
+          await tx.solicitationTimeline.deleteMany({ where: { solicitationId: { in: solicitationIds } } })
+
+          await tx.solicitation.deleteMany({ where: { id: { in: solicitationIds } } })
+        }
+
+        await tx.comment.deleteMany({ where: { autorId: id } })
+        await tx.event.deleteMany({ where: { actorId: id } })
+
+        await tx.solicitation.updateMany({
+          where: { approverId: id },
+          data: { approverId: null },
+        })
+
+        await tx.solicitation.updateMany({
+          where: { assumidaPorId: id },
+          data: { assumidaPorId: null },
+        })
+
+        await tx.vehicleStatusLog.updateMany({
+          where: { createdById: id },
+          data: { createdById: null },
+        })
+
+        await tx.vehicleCheckin.deleteMany({ where: { driverId: id } })
         await tx.userCostCenter.deleteMany({ where: { userId: id } })
         await tx.userModuleAccess.deleteMany({ where: { userId: id } })
         await tx.groupMember.deleteMany({ where: { userId: id } })
@@ -155,23 +207,8 @@ if (!user) {
       return NextResponse.json({ error: 'Erro ao excluir no banco de dados.' }, { status: 500 })
     }
 
-    if (user.authId && admin) {
-      const { error: authErr } = await admin.auth.admin.deleteUser(user.authId)
-
-      if (authErr) {
-        console.error('DELETE /configuracoes/usuarios/[id] auth error', authErr)
-        return NextResponse.json(
-          {
-            error:
-              'Usuário removido do banco, mas falhou ao apagar no Supabase Auth: ' +
-              authErr.message,
-          },
-          { status: 500 },
-        )
-      }
-    }
-     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+    return NextResponse.json({ ok: true })
+  }  } catch (e: any) {
     console.error('DELETE /configuracoes/usuarios/[id] error', e)
     return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
   }
