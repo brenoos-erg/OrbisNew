@@ -56,15 +56,24 @@ async function ensureAuthUser(
 
   if (!error) return data.user?.id ?? null
 
+const normalizedMessage = error.message?.toLowerCase() ?? ''
   const conflict =
-    error.message?.toLowerCase().includes('already exist') ||
-    error.message?.toLowerCase().includes('already registered') ||
-    error.message?.toLowerCase().includes('email rate limit')
+    error.code === 'email_exists' ||
+    normalizedMessage.includes('already exist') ||
+    normalizedMessage.includes('already registered') ||
+    normalizedMessage.includes('already been registered') ||
+    normalizedMessage.includes('email rate limit')
 
   if (!conflict) throw error
 
   const existingId = await findAuthUserIdByEmail(admin, email)
-  if (!existingId) throw error
+  if (!existingId) {
+    console.warn(
+      '⚠️  Conta já existe no Supabase Auth, mas não foi possível localizar o authId para:',
+      email,
+    )
+    return null
+  }
 
   const { error: updateErr } = await admin.auth.admin.updateUserById(existingId, {
     email,
