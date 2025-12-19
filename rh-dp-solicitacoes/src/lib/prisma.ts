@@ -5,6 +5,20 @@ import { recordPrismaQuery } from '@/lib/request-metrics'
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
+const directDatabaseUrl = process.env.DIRECT_DATABASE_URL
+const shouldUseDirectUrl =
+  process.env.NODE_ENV !== 'production' &&
+  directDatabaseUrl &&
+  process.env.PRISMA_CLIENT_USE_DIRECT_URL !== 'false'
+
+if (shouldUseDirectUrl) {
+  if (process.env.DATABASE_URL !== directDatabaseUrl) {
+    console.info('[prisma] Usando DIRECT_DATABASE_URL no ambiente de desenvolvimento.')
+  }
+
+  process.env.DATABASE_URL = directDatabaseUrl
+}
+
 
 const enableQueryMetrics =
   process.env.NODE_ENV === 'development' || process.env.PRISMA_QUERY_METRICS === '1'
