@@ -11,6 +11,13 @@ import {
   type SelectedAppUser,
 } from '@/lib/auth'
 import { withRequestMetrics } from '@/lib/request-metrics'
+function isDbUnavailableError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P1001' || error.code === 'P1002'))
+  )
+}
 
 async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | null> {
   if (!sessionUser) return null
@@ -52,7 +59,7 @@ async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | nul
       select: appUserSelect,
     })
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (isDbUnavailableError(error)) {
       console.error(
         'Não foi possível conectar ao banco de dados para sincronizar usuário',
         error,
@@ -90,7 +97,7 @@ export async function GET() {
     try {
       syncedUser = await syncUser(sessionUser)
     } catch (err) {
-      const isDbUnavailable = err instanceof Prisma.PrismaClientInitializationError
+      const isDbUnavailable = isDbUnavailableError(err)
       console.error('Erro ao sincronizar usuário no bootstrap', err)
 
       return NextResponse.json(
@@ -107,8 +114,7 @@ export async function GET() {
         sessionUser,
         syncedUser,
       )
-
-     if (!appUser) {
+ if (!appUser) {
         return NextResponse.json(
           {
             error: 'Usuário não encontrado no banco',
@@ -124,7 +130,7 @@ export async function GET() {
         dbUnavailable,
       })
     } catch (err) {
-      const isDbUnavailable = err instanceof Prisma.PrismaClientInitializationError
+      const isDbUnavailable = isDbUnavailableError(err)
       console.error('Erro ao carregar appUser a partir da sessão', err)
 
       return NextResponse.json(

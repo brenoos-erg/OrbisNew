@@ -4,7 +4,7 @@ export type SessionMePayload = {
   appUser?: any
   session?: any
   dbUnavailable?: boolean
-    error?: string
+  error?: string
 }
 
 const SESSION_CACHE_TTL_MS = 15_000
@@ -17,17 +17,27 @@ async function requestSessionMe(): Promise<SessionMePayload | null> {
   const res = await fetch('/api/session/bootstrap', { cache: 'no-store' })
   const data = await res.json().catch(() => null)
 
+  const payload = data as SessionMePayload | null
+
   if (!res.ok) {
+    if (payload?.dbUnavailable) {
+      return {
+        ...payload,
+        dbUnavailable: true,
+        error: payload.error || 'Banco de dados indisponível no momento.',
+      }
+    }
+
     const err = new Error(
-      (data as any)?.error || `Falha no bootstrap (status ${res.status})`,
+      payload?.error || `Falha no bootstrap (status ${res.status})`,
     ) as Error & { status?: number; payload?: any }
 
     err.status = res.status
-    err.payload = data
+    err.payload = payload
     throw err
   }
-  
-  return data as SessionMePayload | null
+
+  return payload
 }
 
 export async function fetchSessionMe(options?: { force?: boolean }) {
