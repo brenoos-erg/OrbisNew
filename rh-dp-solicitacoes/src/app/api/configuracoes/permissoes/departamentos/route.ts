@@ -15,23 +15,29 @@ const CORE_MODULES = [
 ]
 
 async function ensureCoreModules() {
-   for (const module of CORE_MODULES) {
+  for (const module of CORE_MODULES) {
     // Evita criar duplicados com variações da key (maiúsculas/underscores etc.)
     const existing = await prisma.module.findFirst({
       where: { key: { equals: module.key, mode: 'insensitive' } },
-      select: { id: true },
+      select: { id: true, key: true },
     })
 
     if (existing) {
-      await prisma.module.update({
-        where: { id: existing.id },
-        data: { key: module.key, name: module.name },
-      })
-    } else {
-      await prisma.module.create({ data: module })
+      // Se existir mas estiver com key diferente em caixa (ex.: "Solicitacoes" vs "solicitacoes"),
+      // atualiza para a canonical
+      if (existing.key !== module.key) {
+        await prisma.module.update({
+          where: { id: existing.id },
+          data: { key: module.key, name: module.name },
+        })
+      }
+      continue
     }
+
+    await prisma.module.create({ data: module })
   }
 }
+
 
 function normalizeModulesAndLinks(
   modules: { id: string; key: string; name: string }[],

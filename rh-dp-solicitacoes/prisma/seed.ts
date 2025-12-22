@@ -120,53 +120,7 @@ async function main() {
   const prisma = new PrismaClient()
   const supabaseAdmin = getSupabaseAdmin()
 
-  /* =========================
-     USUÁRIO ADMINISTRADOR
-     ========================= */
-  const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@empresa.com' },
-    update: {},
-    create: {
-      login: 'admin',
-      fullName: 'Administrador do Sistema',
-      email: 'admin@empresa.com',
-      phone: '+55 31 99999-9999',
-      status: UserStatus.ATIVO,
-      role: 'ADMIN',
-    },
-  })
-  console.log('✅ Usuário admin criado:', adminUser.email)
-
-  /* =========================
-     USUÁRIOS APROVADORES (VIDAL / LORENA)
-     ========================= */
-  const vidalUser = await prisma.user.upsert({
-    where: { email: 'eduardo.vidal@ergengenharia.com.br' },
-    update: {},
-    create: {
-      login: 'vidal',
-      fullName: 'Eduardo Vidal',
-      email: 'eduardo.vidal@ergengenharia.com.br',
-      phone: '',
-      status: UserStatus.ATIVO,
-      role: 'RH',
-    },
-  })
-
-  const lorenaUser = await prisma.user.upsert({
-    where: { email: 'lorena.oliveira@ergengenharia.com.br' },
-    update: {},
-    create: {
-      login: 'lorena',
-      fullName: 'Lorena Oliveira',
-      email: 'lorena.oliveira@ergengenharia.com.br',
-      phone: '',
-      status: UserStatus.ATIVO,
-      role: 'RH',
-    },
-  })
-
-  console.log('✅ Usuários aprovadores criados:', vidalUser.email, lorenaUser.email)
+  
 
   /* =========================
      DEPARTAMENTOS
@@ -354,12 +308,6 @@ async function main() {
   }
 
   await prisma.groupMember.upsert({
-    where: { userId_groupId: { userId: adminUser.id, groupId: adminGroup.id } },
-    update: {},
-    create: { userId: adminUser.id, groupId: adminGroup.id, role: 'MANAGER' },
-  })
-
-  await prisma.groupMember.upsert({
     where: { userId_groupId: { userId: superAdminUser.id, groupId: adminGroup.id } },
     update: {},
     create: { userId: superAdminUser.id, groupId: adminGroup.id, role: 'MANAGER' },
@@ -397,17 +345,6 @@ async function main() {
     create: { groupId: rq063ApproversGroup.id, moduleId: solicitacoesModule.id, actions: ['VIEW', 'APPROVE'] },
   })
 
-  await prisma.groupMember.upsert({
-    where: { userId_groupId: { userId: vidalUser.id, groupId: rq063ApproversGroup.id } },
-    update: {},
-    create: { userId: vidalUser.id, groupId: rq063ApproversGroup.id, role: 'MANAGER' },
-  })
-
-  await prisma.groupMember.upsert({
-    where: { userId_groupId: { userId: lorenaUser.id, groupId: rq063ApproversGroup.id } },
-    update: {},
-    create: { userId: lorenaUser.id, groupId: rq063ApproversGroup.id, role: 'MANAGER' },
-  })
 
   console.log('🎉 Seed concluído com sucesso!')
   await prisma.$disconnect()

@@ -15,20 +15,35 @@ const CORE_MODULES = [
 
 async function ensureCoreModules() {
    for (const module of CORE_MODULES) {
-    // Evita criar duplicados com variações da key (maiúsculas/underscores etc.)
-    const existing = await prisma.module.findFirst({
+    // Primeiro tenta o match exato da key para evitar colisões de unique ao normalizar
+    const canonical = await prisma.module.findUnique({
+      where: { key: module.key },
+      select: { id: true },
+    })
+
+    if (canonical) {
+      await prisma.module.update({
+        where: { id: canonical.id },
+        data: { name: module.name },
+      })
+      continue
+    }
+
+    // Se não houver, procura uma variação case-insensitive para normalizar com segurança
+    const existingVariant = await prisma.module.findFirst({
       where: { key: { equals: module.key, mode: 'insensitive' } },
       select: { id: true },
     })
 
-    if (existing) {
+    if (existingVariant) {
       await prisma.module.update({
-        where: { id: existing.id },
+        where: { id: existingVariant.id },
         data: { key: module.key, name: module.name },
       })
-    } else {
-      await prisma.module.create({ data: module })
+      continue
     }
+
+    await prisma.module.create({ data: module })
   }
 }
 
@@ -64,7 +79,7 @@ export async function GET(_req: NextRequest) {
       }),
     ])
 
-   const normalizedModules = normalizeModules(modules)
+    const normalizedModules = normalizeModules(modules)
     const normalizedLinks = normalizeModuleLinks(links, normalizedModules.idToCanonicalId)
 
     return NextResponse.json({

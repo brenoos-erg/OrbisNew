@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { normalizeModules } from '@/lib/normalizeModules'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,9 @@ export async function GET() {
       orderBy: { name: 'asc' },
       select: { id: true, key: true, name: true },
     })
-    return NextResponse.json(mods)
+
+    const normalized = normalizeModules(mods)
+
+    return NextResponse.json(normalized.modules)
   })
 }

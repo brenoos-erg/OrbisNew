@@ -22,24 +22,35 @@ function toSlugKey(value: string) {
 
 export function normalizeModules(modules: BasicModule[]): NormalizedModulesResult {
   const byKey = new Map<string, { canonical: BasicModule; allIds: Set<string> }>()
+   const aliasByName = new Map<string, string>()
 
   modules.forEach((mod) => {
     const slugKey = toSlugKey(mod.key || mod.name)
-    const entry = byKey.get(slugKey)
+     const slugName = toSlugKey(mod.name)
+
+    const canonicalKey = byKey.has(slugKey)
+      ? slugKey
+      : aliasByName.get(slugName) || slugKey
+
+    const entry = byKey.get(canonicalKey)
 
     if (!entry) {
-      byKey.set(slugKey, {
-        canonical: { ...mod, key: slugKey },
+      byKey.set(canonicalKey, {
+        canonical: { ...mod, key: canonicalKey },
         allIds: new Set([mod.id]),
       })
+      aliasByName.set(slugName, canonicalKey)
+      aliasByName.set(slugKey, canonicalKey)
       return
     }
 
     entry.allIds.add(mod.id)
+    aliasByName.set(slugName, canonicalKey)
+    aliasByName.set(slugKey, canonicalKey)
 
     // Preferimos o registro cuja key já está normalizada como canonical
     if (toSlugKey(mod.key) === mod.key.toLowerCase()) {
-      entry.canonical = { ...mod, key: slugKey }
+      entry.canonical = { ...mod, key: canonicalKey }
     }
   })
 
@@ -52,9 +63,16 @@ export function normalizeModules(modules: BasicModule[]): NormalizedModulesResul
 
   byKey.forEach(({ canonical, allIds }, key) => {
     keyToId.set(key, canonical.id)
+    keyToId.set(toSlugKey(canonical.name), canonical.id)
+
     allIds.forEach((id) => idToCanonicalId.set(id, canonical.id))
   })
 
+  aliasByName.forEach((canonicalKey, alias) => {
+    const canonical = byKey.get(canonicalKey)
+    if (!canonical) return
+    keyToId.set(alias, canonical.canonical.id)
+  })
   return { modules: normalizedModules, keyToId, idToCanonicalId }
 }
 
