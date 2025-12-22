@@ -8,12 +8,16 @@ const globalForPrisma = globalThis as unknown as {
 
 const isProd = process.env.NODE_ENV === 'production'
 
-const directDatabaseUrl = process.env.DIRECT_DATABASE_URL
+// Remove espaços/quebras de linha acidentais das variáveis de ambiente
+const cleanEnvUrl = (value?: string | null) => value?.trim() || null
+
+const directDatabaseUrl = cleanEnvUrl(process.env.DIRECT_DATABASE_URL)
 const poolDatabaseUrl =
-  process.env.DATABASE_URL ||
-  process.env.SUPABASE_PRISMA_URL ||
-  process.env.SUPABASE_POOLER_URL ||
+  cleanEnvUrl(process.env.DATABASE_URL) ||
+  cleanEnvUrl(process.env.SUPABASE_PRISMA_URL) ||
+  cleanEnvUrl(process.env.SUPABASE_POOLER_URL) ||
   null
+
 
 // ✅ Em produção, EXIGIR pooler
 if (isProd && !poolDatabaseUrl) {
