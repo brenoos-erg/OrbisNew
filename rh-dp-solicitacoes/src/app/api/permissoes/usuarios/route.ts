@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { getUserModuleContext } from '@/lib/moduleAccess'
+import { normalizeModules } from '@/lib/normalizeModules'
 
 /**
  * Helper para montar o payload que o frontend espera
@@ -15,6 +16,7 @@ async function buildUserPayload(email: string) {
   const modules = await prisma.module.findMany({
     orderBy: { name: 'asc' },
   })
+  const normalizedModules = normalizeModules(modules)
 
   const departments = await prisma.department.findMany({
     orderBy: { name: 'asc' },
@@ -24,12 +26,10 @@ async function buildUserPayload(email: string) {
 
   if (user) {
     const { levels } = await getUserModuleContext(user.id)
-    const moduleByKey = new Map(
-      modules.map((m) => [m.key.toLowerCase(), m.id]),
-    )
+    const moduleByKey = normalizedModules.keyToId
 
-      access = Object.entries(levels).flatMap(([key, level]) => {
-      const moduleId = moduleByKey.get(key)
+    access = Object.entries(levels).flatMap(([key, level]) => {
+      const moduleId = moduleByKey.get(key.toLowerCase())
       if (!moduleId) return []
       return [{ moduleId, level }]
     })
@@ -44,7 +44,7 @@ async function buildUserPayload(email: string) {
           departmentId: user.departmentId,
         }
       : null,
-    modules: modules.map((m) => ({
+      modules: normalizedModules.modules.map((m) => ({
       id: m.id,
       key: m.key,
       name: m.name,

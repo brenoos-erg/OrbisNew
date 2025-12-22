@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+import { normalizeModuleLinks, normalizeModules } from '@/lib/normalizeModules'
 
 export const dynamic = 'force-dynamic'
 const CORE_MODULES = [
@@ -29,56 +30,6 @@ async function ensureCoreModules() {
       await prisma.module.create({ data: module })
     }
   }
-}
-
-function normalizeModulesAndLinks(
-  modules: { id: string; key: string; name: string }[],
-  links: { departmentId: string; moduleId: string }[],
-) {
-  const byKey = new Map<
-    string,
-    { canonical: { id: string; key: string; name: string }; allIds: Set<string> }
-  >()
-
-  modules.forEach((mod) => {
-    const slugKey = mod.key.toLowerCase()
-    const entry = byKey.get(slugKey)
-
-    if (!entry) {
-      byKey.set(slugKey, {
-        canonical: { ...mod, key: slugKey },
-        allIds: new Set([mod.id]),
-      })
-      return
-    }
-
-    entry.allIds.add(mod.id)
-
-    // preferir o módulo que já está com key slugificada como canonical
-    if (mod.key.toLowerCase() === mod.key) {
-      entry.canonical = { ...mod, key: slugKey }
-    }
-  })
-
-  const normalizedModules = Array.from(byKey.values())
-    .map(({ canonical }) => canonical)
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const normalizedLinks: { departmentId: string; moduleId: string }[] = []
-  links.forEach((link) => {
-    const normalized = Array.from(byKey.values()).find((entry) => entry.allIds.has(link.moduleId))
-    if (!normalized) return
-
-    const alreadyInserted = normalizedLinks.some(
-      (l) => l.departmentId === link.departmentId && l.moduleId === normalized.canonical.id,
-    )
-
-    if (!alreadyInserted) {
-      normalizedLinks.push({ departmentId: link.departmentId, moduleId: normalized.canonical.id })
-    }
-  })
-
-  return { modules: normalizedModules, links: normalizedLinks }
 }
 
 
@@ -113,9 +64,14 @@ export async function GET(_req: NextRequest) {
       }),
     ])
 
-   const normalized = normalizeModulesAndLinks(modules, links)
+   const normalizedModules = normalizeModules(modules)
+    const normalizedLinks = normalizeModuleLinks(links, normalizedModules.idToCanonicalId)
 
-    return NextResponse.json({ departments, modules: normalized.modules, links: normalized.links })
+    return NextResponse.json({
+      departments,
+      modules: normalizedModules.modules,
+      links: normalizedLinks,
+    })
   } catch (e: any) {
     console.error('GET /api/permissoes/departamentos error', e)
 
