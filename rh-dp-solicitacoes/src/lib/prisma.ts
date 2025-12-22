@@ -7,17 +7,27 @@ const globalForPrisma = globalThis as unknown as {
 }
 const directDatabaseUrl = process.env.DIRECT_DATABASE_URL
 const isProd = process.env.NODE_ENV === 'production'
+// Algumas hospedagens (ex.: Supabase dashboard) expõem a URL de pool em variáveis
+// como SUPABASE_PRISMA_URL ou SUPABASE_POOLER_URL, enquanto o Vercel espera
+// DATABASE_URL. Aqui trazemos esses nomes alternativos como fallback para evitar
+// falha de conexão em produção por falta da variável padrão.
+const poolDatabaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.SUPABASE_PRISMA_URL ||
+  process.env.SUPABASE_POOLER_URL ||
+  null
+
 
 // Preferimos a string de pool (DATABASE_URL). Em produção, cair para a URL direta
 // evita que o app quebre por falta de configuração, mas mostramos um alerta bem
 // explícito para ajustar no Vercel.
-if (!process.env.DATABASE_URL && directDatabaseUrl) {
+if (!poolDatabaseUrl && directDatabaseUrl) {
   process.env.DATABASE_URL = directDatabaseUrl
 
   if (isProd) {
     console.warn(
       '[prisma] DATABASE_URL ausente em produção; usando DIRECT_DATABASE_URL como fallback. ' +
-        'Configure DATABASE_URL com a URL do pool (aws-*-pooler.supabase.net) para evitar erros de conexão.',
+         'Configure DATABASE_URL (ou SUPABASE_PRISMA_URL) com a URL do pool para evitar erros de conexão.',
     )
   } else if (process.env.PRISMA_CLIENT_USE_DIRECT_URL !== 'false') {
     console.info('[prisma] Usando DIRECT_DATABASE_URL no ambiente de desenvolvimento.')
@@ -32,7 +42,7 @@ const shouldUseDirectUrl =
 
 const resolvedDatabaseUrl = shouldUseDirectUrl
   ? directDatabaseUrl
-  : process.env.DATABASE_URL ?? directDatabaseUrl
+   : poolDatabaseUrl ?? directDatabaseUrl
 
 if (!resolvedDatabaseUrl) {
   throw new Error(
