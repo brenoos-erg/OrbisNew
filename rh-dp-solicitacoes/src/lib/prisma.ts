@@ -22,13 +22,23 @@ if (!process.env.DATABASE_URL && directDatabaseUrl) {
   } else if (process.env.PRISMA_CLIENT_USE_DIRECT_URL !== 'false') {
     console.info('[prisma] Usando DIRECT_DATABASE_URL no ambiente de desenvolvimento.')
   }
-
 }
+
 // Somente em dev mantemos a opção de forçar o uso da directUrl (útil para migrações locais)
 const shouldUseDirectUrl =
   process.env.NODE_ENV !== 'production' &&
   directDatabaseUrl &&
   process.env.PRISMA_CLIENT_USE_DIRECT_URL !== 'false'
+
+const resolvedDatabaseUrl = shouldUseDirectUrl
+  ? directDatabaseUrl
+  : process.env.DATABASE_URL ?? directDatabaseUrl
+
+if (!resolvedDatabaseUrl) {
+  throw new Error(
+    'DATABASE_URL não configurada. Defina a URL do pool (aws-*-pooler.supabase.net) no Vercel e mantenha DIRECT_DATABASE_URL como reserva.',
+  )
+}
 
 
 const enableQueryMetrics =
@@ -45,6 +55,11 @@ type PrismaQueryEvent = {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: {
+      db: {
+        url: resolvedDatabaseUrl,
+      },
+    },
     log: enableQueryMetrics
       ? [{ emit: 'event', level: 'query' }, { emit: 'stdout', level: 'error' }]
       : [{ emit: 'stdout', level: 'error' }],

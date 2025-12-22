@@ -112,10 +112,19 @@ function LoginPageContent() {
       `/api/auth/resolve-identifier?identifier=${encodeURIComponent(trimmed)}`,
       { cache: 'no-store' },
     )
+const payload = await res.json().catch(() => null)
+
+    if (res.status === 503 || payload?.dbUnavailable) {
+      const error: any = new Error(
+        'Serviço indisponível no momento. Tente novamente em instantes ou contate o administrador para conferir a DATABASE_URL no Vercel.',
+      )
+      error.dbUnavailable = true
+      throw error
+    }
 
     if (!res.ok) throw new Error('Login não encontrado. Verifique e tente novamente.')
 
-    const data = await res.json().catch(() => null)
+    const data = payload
     if (!data?.email) throw new Error('Login não encontrado. Verifique e tente novamente.')
 
     return data.email as string
@@ -133,6 +142,11 @@ function LoginPageContent() {
       emailToUse = await resolveEmail(identifier)
     } catch (err: any) {
       setLoading(false)
+       if (err?.dbUnavailable) {
+        router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+        router.refresh()
+        return
+      }
       alert(err?.message || 'Não foi possível localizar seu acesso. Tente novamente.')
       return
     }

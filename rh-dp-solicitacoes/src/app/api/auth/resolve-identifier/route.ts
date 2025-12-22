@@ -1,8 +1,17 @@
 export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+
+function isDbUnavailableError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P1001' || error.code === 'P1002'))
+  )
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,8 +42,13 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ email: user.email })
-  } catch (error) {
+  } catch (error) {const dbUnavailable = isDbUnavailableError(error)
+    const message = dbUnavailable
+      ? 'Banco de dados indisponível. Confira DATABASE_URL no Vercel ou tente novamente em instantes.'
+      : 'Internal server error'
+
     console.error('Error resolving identifier', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return NextResponse.json({ error: message, dbUnavailable }, { status: dbUnavailable ? 503 : 500 })
   }
 }
