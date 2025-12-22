@@ -3,10 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-  const { data: { user } } = await supabase.auth.getUser()
-
   const url = req.nextUrl
   const path = url.pathname
 
@@ -16,18 +12,26 @@ export async function middleware(req: NextRequest) {
     path.startsWith('/api/auth') ||
     path.startsWith('/api/session') ||
     path.startsWith('/api/test-session') ||
-    /\.[a-z0-9]+$/i.test(path) // arquivos estáticos
+    /\.[a-z0-9]+$/i.test(path)
 
-  if (!user && !isPublic) {
+  // ✅ IMPORTANTÍSSIMO: não chama Supabase no Edge em rota pública
+  if (isPublic) {
+    return NextResponse.next()
+  }
+
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
     const loginUrl = new URL('/login', url.origin)
     loginUrl.searchParams.set('next', path + url.search)
     return NextResponse.redirect(loginUrl)
   }
 
-  // força a página de primeiro acesso se o flag estiver ligado
-  const must = (user?.user_metadata as any)?.mustChangePassword === true
+  const must = (user.user_metadata as any)?.mustChangePassword === true
   const isFirstAccessPage = path.startsWith('/primeiro-acesso')
-  if (user && must && !isFirstAccessPage) {
+  if (must && !isFirstAccessPage) {
     const fa = new URL('/primeiro-acesso', url.origin)
     fa.searchParams.set('next', path + url.search)
     return NextResponse.redirect(fa)
