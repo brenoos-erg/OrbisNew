@@ -1,4 +1,5 @@
 // src/app/api/session/bootstrap/route.ts
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
@@ -18,6 +19,7 @@ function isDbUnavailableError(error: unknown) {
       (error.code === 'P1001' || error.code === 'P1002'))
   )
 }
+
 
 async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | null> {
   if (!sessionUser) return null
