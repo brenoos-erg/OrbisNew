@@ -10,12 +10,21 @@ export type NormalizedModulesResult = {
   keyToId: Map<string, string>
   idToCanonicalId: Map<string, string>
 }
+function toSlugKey(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[^\p{ASCII}]/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+}
+
 
 export function normalizeModules(modules: BasicModule[]): NormalizedModulesResult {
   const byKey = new Map<string, { canonical: BasicModule; allIds: Set<string> }>()
 
   modules.forEach((mod) => {
-    const slugKey = mod.key.toLowerCase()
+    const slugKey = toSlugKey(mod.key || mod.name)
     const entry = byKey.get(slugKey)
 
     if (!entry) {
@@ -29,7 +38,7 @@ export function normalizeModules(modules: BasicModule[]): NormalizedModulesResul
     entry.allIds.add(mod.id)
 
     // Preferimos o registro cuja key já está normalizada como canonical
-    if (mod.key.toLowerCase() === mod.key) {
+    if (toSlugKey(mod.key) === mod.key.toLowerCase()) {
       entry.canonical = { ...mod, key: slugKey }
     }
   })
