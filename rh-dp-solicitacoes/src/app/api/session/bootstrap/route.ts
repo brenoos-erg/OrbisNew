@@ -12,8 +12,12 @@ import {
   type SelectedAppUser,
 } from '@/lib/auth'
 import { withRequestMetrics } from '@/lib/request-metrics'
+
+const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
+
 function isDbUnavailableError(error: unknown) {
   return (
+    isDbDisabled ||
     error instanceof Prisma.PrismaClientInitializationError ||
     (error instanceof Prisma.PrismaClientKnownRequestError &&
       (error.code === 'P1001' || error.code === 'P1002'))
@@ -93,6 +97,15 @@ export async function GET() {
     }
 
     const sessionUser = data.user
+     if (isDbDisabled) {
+      return NextResponse.json(
+        {
+          error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
+          dbUnavailable: true,
+        },
+        { status: 503 },
+      )
+    }
 
     let syncedUser: SelectedAppUser | null = null
 
