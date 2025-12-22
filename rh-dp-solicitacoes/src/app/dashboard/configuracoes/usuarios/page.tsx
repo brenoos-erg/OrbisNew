@@ -130,12 +130,33 @@ function toLoginFromName(fullName: string) {
   return [first, last].filter(Boolean).join('.').replace(/[^a-z.]/g, '')
 }
 
-// ✅ AJUSTE 1: gera e-mail automaticamente (login@ergengenharia.com.br)
+// Gera e-mail automaticamente (primeiro nome + iniciais dos 2 últimos sobrenomes)
 function toEmailFromName(fullName: string) {
-  const login = toLoginFromName(fullName)
-  if (!login) return ''
-  return `${login}@ergengenharia.com.br`
+  const parts = fullName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (parts.length === 0) return ''
+
+  const firstName = parts[0].replace(/[^a-z]/g, '')
+  const lastTwoInitials = parts
+    .slice(1)
+    .filter((p) => !['da', 'de', 'do', 'das', 'dos'].includes(p))
+    .slice(-2)
+    .map((p) => p.replace(/[^a-z]/g, ''))
+    .filter(Boolean)
+    .map((p) => p[0])
+    .join('')
+
+  const localPart = `${firstName}${lastTwoInitials}`.replace(/[^a-z]/g, '')
+  if (!localPart) return ''
+
+  return `${localPart}@ergengenharia.com.br`
 }
+
 
 export default function Page() {
   const router = useRouter()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ModuleLevel } from '@prisma/client'
+import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { sendMail } from '@/lib/mailer'
@@ -53,16 +53,26 @@ function calculateFatigue(fatigue: Array<{ name: string; answer?: string }>) {
   return { fatigueScore, fatigueRisk, driverStatus }
 }
 
-async function findFleetLevel3Emails() {
-  const fleetModule = await prisma.module.findFirst({ where: { key: 'gestao-de-frotas' } })
-  if (!fleetModule) return [] as string[]
+async function findConfigLevel3Emails() {
+  const configModule = await prisma.module.findFirst({
+    where: { key: { equals: 'configuracoes', mode: 'insensitive' } },
+  })
+
+  if (!configModule) {
+    console.warn('[checkins][notify] Module "configuracoes" not found')
+    return [] as string[]
+  }
 
   const accesses = await prisma.userModuleAccess.findMany({
-    where: { moduleId: fleetModule.id, level: ModuleLevel.NIVEL_3 },
+    where: { moduleId: configModule.id, level: ModuleLevel.NIVEL_3 },
     include: { user: { select: { email: true } } },
   })
 
-  return accesses.map((access) => access.user.email).filter(Boolean) as string[]
+  const emails = accesses
+    .map((access) => access.user?.email)
+    .filter((email): email is string => Boolean(email))
+
+  return Array.from(new Set(emails))
 }
 
 function buildEmailContent({
@@ -97,6 +107,7 @@ function buildEmailContent({
   const formattedDate = inspectionDate || '—'
   const formattedTime = inspectionTime && inspectionTime !== '' ? inspectionTime : '—'
   const formattedKm = Number.isFinite(vehicleKm) ? vehicleKm.toLocaleString('pt-BR') : '—'
+
   const issues =
     itemsWithProblem
       .map((item) => item.label || item.name)
@@ -114,8 +125,7 @@ function buildEmailContent({
       ? `Descrição: Checklist de fadiga indicou motorista INAPTO (risco ${fatigueRisk}).`
       : `Descrição: ${issues}`,
     `Criticidade: ${
-      nonConformityCriticality ||
-      (driverStatus === 'INAPTO' ? 'Motorista inapto' : 'Item crítico')
+      nonConformityCriticality || (driverStatus === 'INAPTO' ? 'Motorista inapto' : 'Item crítico')
     }`,
     `Medidas Tomadas: ${
       nonConformityActions ||
@@ -225,8 +235,7 @@ export async function POST(req: Request) {
     const hasVehicleProblem = itemsWithProblem.length > 0
     const hasNonConformityBool = String(hasNonConformity).toUpperCase() === 'SIM'
 
-    const vehicleStatus =
-      hasVehicleProblem || hasNonConformityBool ? 'RESTRITO' : 'DISPONIVEL'
+    const vehicleStatus = hasVehicleProblem || hasNonConformityBool ? 'RESTRITO' : 'DISPONIVEL'
 
     const vehicle = await prisma.vehicle.findUnique({
       where: { plate: normalizedPlate },
@@ -301,11 +310,14 @@ export async function POST(req: Request) {
       },
     })
 
-    const shouldNotify =
-      hasVehicleProblem || hasNonConformityBool || driverStatus === 'INAPTO'
+    const shouldNotify = hasVehicleProblem || hasNonConformityBool || driverStatus === 'INAPTO'
+
+    console.info('[checkins][notify] shouldNotify', shouldNotify)
 
     if (shouldNotify) {
-      const recipients = await findFleetLevel3Emails()
+      const recipients = await findConfigLevel3Emails()
+
+      console.info('[checkins][notify] recipients', recipients)
 
       if (recipients.length > 0) {
         const { subject, text } = buildEmailContent({
@@ -324,11 +336,17 @@ export async function POST(req: Request) {
           nonConformityHandlingDate,
         })
 
-        const mailResult = await sendMail({ to: recipients, subject, text })
+        try {
+          const mailResult = await sendMail({ to: recipients, subject, text })
 
-        if (!mailResult.sent) {
-          console.warn('Falha ao enviar alerta de check-in', mailResult.error)
+          if (!mailResult.sent) {
+            console.warn('Falha ao enviar alerta de check-in', mailResult.error)
+          }
+        } catch (error) {
+          console.error('Erro ao enviar alerta de check-in', error)
         }
+        } else {
+        console.warn('[checkins][notify] Nenhum destinatário encontrado para NIVEL_3 em configuracoes')
       }
     }
 
@@ -340,9 +358,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('Erro ao registrar check-in de veículo', error)
-    return NextResponse.json(
-      { error: 'Erro ao registrar check-in' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Erro ao registrar check-in' }, { status: 500 })
   }
 }

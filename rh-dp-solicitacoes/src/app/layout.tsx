@@ -4,8 +4,8 @@ import type { Metadata } from 'next'
 import { ThemeProvider } from '@/components/theme/ThemeProvider'
 
 export const metadata: Metadata = {
-  title: 'RH ↔ DP — Solicitações',
-  description: 'MVP de solicitações entre RH e DP',
+  title: 'SGI',
+  description: 'Sistema de Gestão Integrada',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
