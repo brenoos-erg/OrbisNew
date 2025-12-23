@@ -244,8 +244,10 @@ const payload = await res.json().catch(() => null)
         }
       }
 
+      const siteUrl = getSiteUrl()
+      if (!siteUrl) throw new Error('NEXT_PUBLIC_SITE_URL não configurada.')
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${getSiteUrl()}/auth/callback?next=${encodeURIComponent('/primeiro-acesso')}`,
+        redirectTo: `${siteUrl}/primeiro-acesso`,
       })
       if (error) throw error
 
