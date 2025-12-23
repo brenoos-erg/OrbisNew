@@ -244,7 +244,7 @@ const payload = await res.json().catch(() => null)
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${getSiteUrl()}/primeiro-acesso`,
+        redirectTo: `${getSiteUrl()}/auth/reset-password`,
       })
       if (error) throw error
 

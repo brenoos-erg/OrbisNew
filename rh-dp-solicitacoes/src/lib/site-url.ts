@@ -8,25 +8,22 @@ function normalizeUrl(url: string) {
 }
 
 export function getSiteUrl() {
-  let url = process.env.NEXT_PUBLIC_SITE_URL || ''
+  let url = normalizeUrl(process.env.NEXT_PUBLIC_SITE_URL || '')
 
   if (!url) {
     const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL || ''
-    if (vercelUrl) {
-      url = vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`
-    }
+    const vercelWithProtocol = vercelUrl ? (vercelUrl.startsWith('http') ? vercelUrl : `https://${vercelUrl}`) : ''
+    url = normalizeUrl(vercelWithProtocol)
   }
 
   if (!url && typeof window !== 'undefined') {
-    url = window.location.origin
+    url = normalizeUrl(window.location.origin)
   }
 
-  const normalized = normalizeUrl(url)
-
-  if (!normalized && process.env.NODE_ENV === 'production' && !warnedMissingSiteUrl) {
+  if (!url && process.env.NODE_ENV === 'production' && !warnedMissingSiteUrl) {
     console.warn('NEXT_PUBLIC_SITE_URL não configurada. Defina esta variável no Vercel.')
     warnedMissingSiteUrl = true
   }
 
-  return normalized
+   return url
 }
