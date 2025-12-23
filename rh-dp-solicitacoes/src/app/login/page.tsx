@@ -245,9 +245,16 @@ const payload = await res.json().catch(() => null)
       }
 
       const siteUrl = getSiteUrl()
+      const redirectTo = `${siteUrl}/primeiro-acesso`
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.info('[login/reset] resolved siteUrl', { siteUrl, redirectTo })
+      }
+
       if (!siteUrl) throw new Error('NEXT_PUBLIC_SITE_URL não configurada.')
+
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${siteUrl}/primeiro-acesso`,
+        redirectTo,
       })
       if (error) throw error
 
