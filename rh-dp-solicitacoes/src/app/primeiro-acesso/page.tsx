@@ -30,16 +30,38 @@ function PrimeiroAcessoContent() {
 
   // garante que existe sessão; se não, manda pro login
   useEffect(() => {
+    let active = true
     ;(async () => {
+      const code = search.get('code')
+      const errorDescription = search.get('error_description')
+
+      if (errorDescription && active) {
+        setError(errorDescription)
+        setChecking(false)
+        return
+      }
+
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+        if (!active) return
+        if (exchangeError) {
+          setError(exchangeError.message)
+          setChecking(false)
+          return
+        }
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
+      if (!active) return
       if (!user) {
         router.replace(`/login?next=${encodeURIComponent('/primeiro-acesso')}`)
         return
-      }
+       }
       setChecking(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    return () => { active = false }
+  }, [router, search, supabase])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
