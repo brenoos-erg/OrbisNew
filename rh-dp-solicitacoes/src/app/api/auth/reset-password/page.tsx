@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { Loader2, LockKeyhole } from 'lucide-react'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => supabaseBrowser(), [])
@@ -173,5 +173,21 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+          <div className="flex items-center gap-2 rounded-2xl border border-orange-200 bg-white px-4 py-3 text-sm text-orange-700 shadow">
+            <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
