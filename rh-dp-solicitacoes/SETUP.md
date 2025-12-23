@@ -55,6 +55,10 @@ Isso cria o diretório `/prisma` e o arquivo `schema.prisma`.
 
 ### 5. Configuração do Banco (Supabase)
 Banco de dados hospedado no **Supabase**, que usa PostgreSQL.
+#### Redirect URLs necessárias no Supabase
+- `https://sgi-plus.vercel.app/auth/callback`
+- `http://localhost:3000/auth/callback`
+- (opcional) `http://localhost:3000/primeiro-acesso`
 
 #### `.env` Final (funcional)
 ```env

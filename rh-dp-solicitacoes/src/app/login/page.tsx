@@ -245,7 +245,7 @@ const payload = await res.json().catch(() => null)
       }
 
       const siteUrl = getSiteUrl()
-      const redirectTo = `${siteUrl}/primeiro-acesso`
+      const redirectTo = `${siteUrl}/auth/callback?next=/primeiro-acesso`
 
       if (process.env.NODE_ENV !== 'production') {
         console.info('[login/reset] resolved siteUrl', { siteUrl, redirectTo })

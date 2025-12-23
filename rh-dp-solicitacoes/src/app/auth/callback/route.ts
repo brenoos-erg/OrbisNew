@@ -29,14 +29,14 @@ export async function GET(request: Request) {
   }
 
   if (!code) {
-    return redirectToLogin('Link inválido ou expirado.')
+    return redirectToLogin('Link inválido ou expirado. Solicite um novo e-mail de recuperação.')
   }
 
   const supabase = createRouteHandlerClient({ cookies })
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
   if (exchangeError) {
-    return redirectToLogin(exchangeError.message)
+    return redirectToLogin(exchangeError.message || 'Não foi possível validar o link. Solicite um novo e-mail de recuperação.')
   }
 
   const destination = new URL(next, requestUrl.origin)

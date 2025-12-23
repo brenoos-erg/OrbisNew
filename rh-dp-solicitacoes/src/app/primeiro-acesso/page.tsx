@@ -33,7 +33,6 @@ function PrimeiroAcessoContent() {
     let active = true
     ;(async () => {
        const errorDescription = search.get('error') || search.get('error_description')
-      const code = search.get('code')
       const type = search.get('type')
 
       if (errorDescription && active) {
@@ -41,29 +40,18 @@ function PrimeiroAcessoContent() {
         setChecking(false)
         return
       }
-      if (code) {
-        console.info('[primeiro-acesso] code recebido na URL', { type })
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-        if (!active) return
-        if (exchangeError) {
-          console.info('[primeiro-acesso] erro no exchangeCodeForSession', exchangeError)
-          setError(exchangeError.message)
-          setChecking(false)
-          return
-        }
-      }
 
       const { data: { user }, error: sessionError } = await supabase.auth.getUser()
       if (!active) return
       if (sessionError) {
-        setError(sessionError.message)
+        setError(sessionError.message || 'Não foi possível validar sua sessão. Tente novamente.')
         setChecking(false)
         return
       }
       if (!user) {
         console.info('[primeiro-acesso] nenhum usuário autenticado; redirecionando para /login', {
           type,
-          hasCode: Boolean(code),
+          hasCode: false,
         })
         router.replace(`/login?next=${encodeURIComponent('/primeiro-acesso')}`)
         return
