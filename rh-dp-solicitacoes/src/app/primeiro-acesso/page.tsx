@@ -32,8 +32,7 @@ function PrimeiroAcessoContent() {
   useEffect(() => {
     let active = true
     ;(async () => {
-      const code = search.get('code')
-      const errorDescription = search.get('error_description')
+       const errorDescription = search.get('error') || search.get('error_description')
 
       if (errorDescription && active) {
         setError(errorDescription)
@@ -41,22 +40,17 @@ function PrimeiroAcessoContent() {
         return
       }
 
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-        if (!active) return
-        if (exchangeError) {
-          setError(exchangeError.message)
-          setChecking(false)
-          return
-        }
-      }
-
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: sessionError } = await supabase.auth.getUser()
       if (!active) return
+      if (sessionError) {
+        setError(sessionError.message)
+        setChecking(false)
+        return
+      }
       if (!user) {
         router.replace(`/login?next=${encodeURIComponent('/primeiro-acesso')}`)
         return
-       }
+      }
       setChecking(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,7 +62,7 @@ function PrimeiroAcessoContent() {
     setError(null)
 
     if (pwd1.length < 6) return setError('A nova senha deve ter ao menos 6 caracteres.')
-    if (pwd1 !== pwd2)  return setError('As senhas não coincidem.')
+    if (pwd1 !== pwd2) return setError('As senhas não coincidem.')
 
     setSaving(true)
 

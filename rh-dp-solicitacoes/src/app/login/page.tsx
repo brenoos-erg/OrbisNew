@@ -26,6 +26,7 @@ function LoginPageContent() {
   const nextUrl = search.get('next') || '/dashboard'
   const isInactive = search.get('inactive') === '1'
   const isDbUnavailable = search.get('db-unavailable') === '1'
+  const callbackError = search.get('error')
   const supabase = supabaseBrowser()
 
   const [loadingSession, setLoadingSession] = useState(true)
@@ -244,7 +245,7 @@ const payload = await res.json().catch(() => null)
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${getSiteUrl()}/auth/reset-password`,
+        redirectTo: `${getSiteUrl()}/auth/callback?next=${encodeURIComponent('/primeiro-acesso')}`,
       })
       if (error) throw error
 
@@ -266,6 +267,11 @@ const payload = await res.json().catch(() => null)
         {isInactive && (
           <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
             Sua conta está inativa. Solicite ativação ao administrador.
+          </div>
+        )}
+        {callbackError && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {callbackError}
           </div>
         )}
         {isDbUnavailable && (
