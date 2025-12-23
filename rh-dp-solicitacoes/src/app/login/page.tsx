@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { Suspense, useEffect, useState } from 'react'
 import { clearSessionMeCache, fetchSessionMe } from '@/lib/session-cache'
 import { supabaseBrowser } from '@/lib/supabase/client'
+import { getSiteUrl } from '@/lib/site-url'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, Loader2 } from 'lucide-react'
 
@@ -243,7 +244,7 @@ const payload = await res.json().catch(() => null)
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${location.origin}/primeiro-acesso`,
+        redirectTo: `${getSiteUrl()}/primeiro-acesso`,
       })
       if (error) throw error
 

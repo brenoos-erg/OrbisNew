@@ -8,6 +8,8 @@ export async function middleware(req: NextRequest) {
 
   const isPublic =
     path.startsWith('/login') ||
+    path.startsWith('/primeiro-acesso') ||
+    path.startsWith('/auth/reset-password') ||
     path.startsWith('/_next') ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/health') ||
