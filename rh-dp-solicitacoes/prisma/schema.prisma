@@ -19,6 +19,45 @@ model Attachment {
   solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
 }
 
+model RefusalAttachment {
+  id        String        @id
+  reportId  String
+  filename  String
+  url       String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime      @default(now())
+  report    RefusalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model RefusalReport {
+  id                     String              @id @default(uuid())
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  employeeId             String
+  employeeName           String
+  sectorOrContract       String
+  riskSituation          String
+  locationOrEquipment    String
+  detailedCondition      String
+  contractManagerName    String?
+  generalCoordinatorName String?
+  contractManagerId      String?
+  generalCoordinatorId   String?
+  status                 RefusalStatus       @default(PENDENTE)
+  decision               Boolean?
+  decisionComment        String?
+  decidedAt              DateTime?
+  decidedById            String?
+  decisionLevel          ModuleLevel?
+  attachments            RefusalAttachment[]
+
+  employee           User  @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
+  contractManager    User? @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
+  generalCoordinator User? @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
+  decidedBy          User? @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
+}
+
 model Comment {
   id             String       @id
   solicitationId String
@@ -200,6 +239,12 @@ model User {
   moduleAccesses        UserModuleAccess[]
   vehicleCheckins       VehicleCheckin[]
   vehicleStatusLogs     VehicleStatusLog[]
+
+  // Direito de Recusa - relações inversas de RefusalReport
+  refusalReportsAsEmployee           RefusalReport[] @relation("RefusalReportEmployee")
+  refusalReportsAsContractManager    RefusalReport[] @relation("RefusalReportContractManager")
+  refusalReportsAsGeneralCoordinator RefusalReport[] @relation("RefusalReportGeneralCoordinator")
+  refusalReportsAsDecidedBy          RefusalReport[] @relation("RefusalReportDecisionUser")
 
   @@map("User")
 }
@@ -449,4 +494,10 @@ enum ModuleLevel {
   NIVEL_1
   NIVEL_2
   NIVEL_3
+}
+
+enum RefusalStatus {
+  PENDENTE
+  APROVADA
+  REJEITADA
 }

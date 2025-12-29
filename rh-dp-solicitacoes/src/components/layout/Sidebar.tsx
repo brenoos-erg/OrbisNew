@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
    Clock3,
   User2,
+  ShieldAlert,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -25,16 +26,19 @@ type Props = {
   showConfig: boolean
 showConfigPermissions: boolean
   showFleet: boolean
+  showRefusal: boolean
   canApprove: boolean
+  canReviewRefusal: boolean
  userMenu: ReactNode
 }
-
 export default function Sidebar({
   showSolic,
   showConfig,
   showConfigPermissions,
   showFleet,
+  showRefusal,
   canApprove,
+  canReviewRefusal,
   userMenu,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
@@ -43,10 +47,12 @@ export default function Sidebar({
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
+  const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
   const [openFleet, setOpenFleet] = useState(inFleet)
+  const [openRefusal, setOpenRefusal] = useState(inRefusal)
 
   // quando mudar de rota, abre o grupo correspondente e fecha o outro
   useEffect(() => {
@@ -54,16 +60,24 @@ export default function Sidebar({
       setOpenSolic(true)
       setOpenConfig(false)
       setOpenFleet(false)
+      setOpenRefusal(false)
     } else if (inConfig) {
       setOpenConfig(true)
       setOpenSolic(false)
       setOpenFleet(false)
+      setOpenRefusal(false)
     } else if (inFleet) {
       setOpenFleet(true)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenRefusal(false)
+    } else if (inRefusal) {
+      setOpenRefusal(true)
+      setOpenFleet(false)
+      setOpenSolic(false)
+      setOpenConfig(false)
     }
-  }, [inSolic, inConfig, inFleet])
+  }, [inSolic, inConfig, inFleet, inRefusal])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -153,6 +167,60 @@ export default function Sidebar({
                   >
                     <User2 size={16} /> <span>Motoristas</span>
                   </Link>                  
+                </div>
+              )}
+            </div>
+          )}
+           {showRefusal && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenRefusal((v) => !v)}
+                className={`${baseSection} ${
+                  inRefusal ? activeSection : inactiveSection
+                }`}
+              >
+                <ShieldAlert className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>Direito de Recusa</span>}
+              </button>
+
+              {openRefusal && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/direito-de-recusa"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname === '/dashboard/direito-de-recusa'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ShieldAlert size={16} /> <span>Painel</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/direito-de-recusa/nova"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/direito-de-recusa/nova')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardList size={16} /> <span>Registrar recusa</span>
+                  </Link>
+                  {canReviewRefusal && (
+                    <Link
+                      href="/dashboard/direito-de-recusa"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/direito-de-recusa'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <CheckCircle2 size={16} /> <span>Pendentes para avaliar</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

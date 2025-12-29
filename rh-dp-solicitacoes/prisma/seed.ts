@@ -290,7 +290,13 @@ async function main() {
     create: { key: 'GESTAO_DE_FROTAS', name: 'Gestão de Frotas' },
   })
 
-  const allModules = [solicitacoesModule, configModule, fleetModule]
+  const refusalModule = await prisma.module.upsert({
+    where: { key: 'DIREITO-DE-RECUSA' },
+    update: { name: 'Direito de Recusa', key: 'DIREITO-DE-RECUSA' },
+    create: { key: 'DIREITO-DE-RECUSA', name: 'Direito de Recusa' },
+  })
+
+  const allModules = [solicitacoesModule, configModule, fleetModule, refusalModule]
   const fullActions: Action[] = ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE']
 
   const adminGroup = await prisma.accessGroup.upsert({
@@ -344,6 +350,15 @@ async function main() {
     update: { actions: ['VIEW', 'APPROVE'] },
     create: { groupId: rq063ApproversGroup.id, moduleId: solicitacoesModule.id, actions: ['VIEW', 'APPROVE'] },
   })
+
+  const safetyDepartment = await prisma.department.findUnique({ where: { code: '19' } })
+  if (safetyDepartment) {
+    await prisma.departmentModule.upsert({
+      where: { departmentId_moduleId: { departmentId: safetyDepartment.id, moduleId: refusalModule.id } },
+      update: {},
+      create: { departmentId: safetyDepartment.id, moduleId: refusalModule.id },
+    })
+  }
 
 
   console.log('🎉 Seed concluído com sucesso!')

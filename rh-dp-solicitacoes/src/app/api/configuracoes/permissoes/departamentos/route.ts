@@ -12,6 +12,7 @@ const CORE_MODULES = [
   { key: 'solicitacoes', name: 'Solicitações' },
   { key: 'configuracoes', name: 'Configurações' },
   { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
+  { key: 'direito-de-recusa', name: 'Direito de Recusa' },
 ]
 
 async function ensureCoreModules() {

@@ -66,6 +66,8 @@ export default async function DashboardLayout({
   let showConfigPermissions = false
   let canApprove = false
   let showFleet = false
+  let showRefusal = false
+  let canReviewRefusal = false
 
   if (appUser.id) {
     const levels = appUser.moduleLevels ?? {}
@@ -79,6 +81,7 @@ export default async function DashboardLayout({
     const solicitLevel = levels['solicitacoes']
     const configLevel = levels['configuracoes']
     const fleetLevel = levels['gestao-de-frotas'] ?? levels['gestao_frotas']
+    const refusalLevel = levels['direito-de-recusa'] ?? levels['direito_de_recusa']
     const isTi = departmentCode === 'TI'
 
     // Módulos aparecem com nível final >= NIVEL_1 (departamento já libera)
@@ -92,9 +95,11 @@ export default async function DashboardLayout({
       showConfigPermissions
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
+    showRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) && hasStructure
 
     // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
     canApprove = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_3) && hasStructure
+    canReviewRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_2) && hasStructure
   }
 
   return (
@@ -104,7 +109,9 @@ export default async function DashboardLayout({
         showConfig={showConfig}
         showConfigPermissions={showConfigPermissions}
         showFleet={showFleet}
+        showRefusal={showRefusal}
         canApprove={canApprove}
+        canReviewRefusal={canReviewRefusal}
         userMenu={<UserMenu collapsed={false} user={appUser} />}
       />
 
