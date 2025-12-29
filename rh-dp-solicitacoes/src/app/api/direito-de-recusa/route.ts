@@ -1,7 +1,9 @@
+
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, RefusalStatus, UserStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +29,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
 
-    const isReviewer = hasMinLevel(level, ModuleLevel.NIVEL_2)
+    const isLevel3 = hasMinLevel(level, ModuleLevel.NIVEL_3)
+    const canReview = hasMinLevel(level, ModuleLevel.NIVEL_2)
     const { searchParams } = new URL(req.url)
     const statusParam = searchParams.get('status')
 
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ reports, canReview: true })
+    return NextResponse.json({ reports, canReview })
   } catch (e) {
     console.error('GET /api/direito-de-recusa error', e)
     return NextResponse.json(
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({} as any))
     const {
-        contractManagerId,
+      contractManagerId,
       generalCoordinatorId,
       contractManagerName,
       generalCoordinatorName,
@@ -95,7 +98,7 @@ export async function POST(req: NextRequest) {
       locationOrEquipment,
       detailedCondition,
     } = body as {
-        contractManagerId?: string | null
+      contractManagerId?: string | null
       generalCoordinatorId?: string | null
       contractManagerName?: string
       generalCoordinatorName?: string
@@ -162,7 +165,7 @@ export async function POST(req: NextRequest) {
         riskSituation: riskSituation.trim(),
         locationOrEquipment: locationOrEquipment.trim(),
         detailedCondition: detailedCondition.trim(),
-         contractManagerId: contractManager?.user.id ?? null,
+        contractManagerId: contractManager?.user.id ?? null,
         contractManagerName: contractManager?.user.fullName ?? contractManagerName?.trim() ?? null,
         generalCoordinatorId: generalCoordinator?.user.id ?? null,
         generalCoordinatorName: generalCoordinator?.user.fullName ?? generalCoordinatorName?.trim() ?? null,
