@@ -41,9 +41,17 @@ export async function GET(
     }
 
     const isReviewer = hasMinLevel(level, ModuleLevel.NIVEL_2)
+     const isLevel3 = level === ModuleLevel.NIVEL_3
+    const isResponsible =
+      report.contractManagerId === me.id || report.generalCoordinatorId === me.id
     if (!isReviewer && report.employeeId !== me.id) {
       return NextResponse.json({ error: 'Usuário não possui permissão para visualizar este registro.' }, { status: 403 })
     }
+
+    if (isReviewer && !isLevel3 && !isResponsible && report.employeeId !== me.id) {
+      return NextResponse.json({ error: 'Usuário não possui permissão para visualizar este registro.' }, { status: 403 })
+    }
+
 
     return NextResponse.json({
       report,

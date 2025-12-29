@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, RefusalStatus } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { ModuleLevel, RefusalStatus, UserStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 
@@ -24,7 +23,7 @@ export async function GET(req: NextRequest) {
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeLevel(levels)
 
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
 
@@ -33,8 +32,11 @@ export async function GET(req: NextRequest) {
     const statusParam = searchParams.get('status')
 
     const where: any = {}
-    if (!isReviewer) {
-      where.employeeId = me.id
+    if (!isLevel3) {
+      where.OR = [
+        { contractManagerId: me.id },
+        { generalCoordinatorId: me.id },
+      ]
     }
     if (statusParam && Object.values(RefusalStatus).includes(statusParam as RefusalStatus)) {
       where.status = statusParam as RefusalStatus
@@ -49,6 +51,10 @@ export async function GET(req: NextRequest) {
         status: true,
         riskSituation: true,
         sectorOrContract: true,
+        contractManagerId: true,
+        contractManagerName: true,
+        generalCoordinatorId: true,
+        generalCoordinatorName: true,
         employeeName: true,
         employeeId: true,
         decision: true,
@@ -58,7 +64,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ reports, canReview: isReviewer })
+    return NextResponse.json({ reports, canReview: true })
   } catch (e) {
     console.error('GET /api/direito-de-recusa error', e)
     return NextResponse.json(
@@ -80,6 +86,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({} as any))
     const {
+        contractManagerId,
+      generalCoordinatorId,
       contractManagerName,
       generalCoordinatorName,
       sectorOrContract,
@@ -87,6 +95,8 @@ export async function POST(req: NextRequest) {
       locationOrEquipment,
       detailedCondition,
     } = body as {
+        contractManagerId?: string | null
+      generalCoordinatorId?: string | null
       contractManagerName?: string
       generalCoordinatorName?: string
       sectorOrContract?: string
@@ -106,6 +116,43 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+    const contractManager = contractManagerId
+      ? await prisma.userModuleAccess.findFirst({
+          where: {
+            userId: contractManagerId,
+            module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
+            level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
+            user: { status: UserStatus.ATIVO },
+          },
+          select: { user: { select: { id: true, fullName: true } } },
+        })
+      : null
+
+    if (contractManagerId && !contractManager) {
+      return NextResponse.json(
+        { error: 'Gestor de contrato (Nível 2) inválido ou inativo.' },
+        { status: 400 },
+      )
+    }
+
+    const generalCoordinator = generalCoordinatorId
+      ? await prisma.userModuleAccess.findFirst({
+          where: {
+            userId: generalCoordinatorId,
+            module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
+            level: ModuleLevel.NIVEL_3,
+            user: { status: UserStatus.ATIVO },
+          },
+          select: { user: { select: { id: true, fullName: true } } },
+        })
+      : null
+
+    if (generalCoordinatorId && !generalCoordinator) {
+      return NextResponse.json(
+        { error: 'Coordenador geral (Nível 3) inválido ou inativo.' },
+        { status: 400 },
+      )
+    }
 
     const report = await prisma.refusalReport.create({
       data: {
@@ -115,8 +162,10 @@ export async function POST(req: NextRequest) {
         riskSituation: riskSituation.trim(),
         locationOrEquipment: locationOrEquipment.trim(),
         detailedCondition: detailedCondition.trim(),
-        contractManagerName: contractManagerName?.trim() || null,
-        generalCoordinatorName: generalCoordinatorName?.trim() || null,
+         contractManagerId: contractManager?.user.id ?? null,
+        contractManagerName: contractManager?.user.fullName ?? contractManagerName?.trim() ?? null,
+        generalCoordinatorId: generalCoordinator?.user.id ?? null,
+        generalCoordinatorName: generalCoordinator?.user.fullName ?? generalCoordinatorName?.trim() ?? null,
         status: RefusalStatus.PENDENTE,
       },
       select: { id: true },

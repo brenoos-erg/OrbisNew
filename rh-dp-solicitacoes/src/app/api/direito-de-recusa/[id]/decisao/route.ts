@@ -52,6 +52,16 @@ export async function PATCH(
         { status: 400 },
       )
     }
+    const isLevel3 = level === ModuleLevel.NIVEL_3
+    const isResponsible =
+      report.contractManagerId === me.id || report.generalCoordinatorId === me.id
+
+    if (!isLevel3 && !isResponsible) {
+      return NextResponse.json(
+        { error: 'Apenas gestores responsáveis podem registrar a decisão.' },
+        { status: 403 },
+      )
+    }
 
     const updated = await prisma.refusalReport.update({
       where: { id: report.id },

@@ -1,28 +1,39 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Paperclip, Upload } from 'lucide-react'
 
 type FormState = {
-  contractManagerName: string
-  generalCoordinatorName: string
+  contractManagerId: string
+  generalCoordinatorId: string
   sectorOrContract: string
   riskSituation: string
   locationOrEquipment: string
   detailedCondition: string
 }
 
+type ResponsibleOption = {
+  id: string
+  name: string
+  email: string
+  department: string | null
+  level: 'NIVEL_2' | 'NIVEL_3'
+}
+
 export default function NewRefusalReportPage() {
   const router = useRouter()
   const [form, setForm] = useState<FormState>({
-    contractManagerName: '',
-    generalCoordinatorName: '',
+    contractManagerId: '',
+    generalCoordinatorId: '',
     sectorOrContract: '',
     riskSituation: '',
     locationOrEquipment: '',
     detailedCondition: '',
   })
+  const [responsibles, setResponsibles] = useState<ResponsibleOption[]>([])
+  const [responsiblesError, setResponsiblesError] = useState<string | null>(null)
+  const [loadingResponsibles, setLoadingResponsibles] = useState(true)
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +48,37 @@ export default function NewRefusalReportPage() {
     )
   }, [form])
 
-  function handleFileChange(ev: React.ChangeEvent<HTMLInputElement>) {
+   const level2Responsibles = useMemo(
+    () => responsibles.filter((r) => r.level === 'NIVEL_2' || r.level === 'NIVEL_3'),
+    [responsibles],
+  )
+  const level3Responsibles = useMemo(
+    () => responsibles.filter((r) => r.level === 'NIVEL_3'),
+    [responsibles],
+  )
+
+  useEffect(() => {
+    async function loadResponsibles() {
+      try {
+        setResponsiblesError(null)
+        const res = await fetch('/api/direito-de-recusa/responsaveis', { cache: 'no-store' })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          throw new Error(json?.error || 'Erro ao carregar responsáveis.')
+        }
+        const json = (await res.json()) as { responsibles?: ResponsibleOption[] }
+        setResponsibles(json.responsibles ?? [])
+      } catch (err: any) {
+        setResponsiblesError(err?.message || 'Erro ao carregar responsáveis.')
+      } finally {
+        setLoadingResponsibles(false)
+      }
+    }
+
+    loadResponsibles()
+  }, [])
+
+  function handleFileChange(ev: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(ev.target.files || [])
     setFiles(selected)
   }
@@ -57,7 +98,14 @@ export default function NewRefusalReportPage() {
       const res = await fetch('/api/direito-de-recusa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          contractManagerId: form.contractManagerId || null,
+          generalCoordinatorId: form.generalCoordinatorId || null,
+          sectorOrContract: form.sectorOrContract,
+          riskSituation: form.riskSituation,
+          locationOrEquipment: form.locationOrEquipment,
+          detailedCondition: form.detailedCondition,
+        }),
       })
 
       if (!res.ok) {
@@ -115,21 +163,52 @@ export default function NewRefusalReportPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Gestor do contrato (Nível 2)</label>
-            <input
+             <select
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-              value={form.contractManagerName}
-              onChange={(e) => setForm((prev) => ({ ...prev, contractManagerName: e.target.value }))}
-              placeholder="Nome completo do gestor"
-            />
+              value={form.contractManagerId}
+              onChange={(e) => setForm((prev) => ({ ...prev, contractManagerId: e.target.value }))}
+              disabled={loadingResponsibles}
+            >
+              <option value="">Selecione o gestor</option>
+              {level2Responsibles.map((responsible) => (
+                <option key={responsible.id} value={responsible.id}>
+                  {responsible.name}
+                  {responsible.department ? ` — ${responsible.department}` : ''}
+                </option>
+              ))}
+            </select>
+            {loadingResponsibles ? (
+              <p className="text-xs text-slate-500">Carregando responsáveis...</p>
+            ) : null}
+            {!loadingResponsibles && level2Responsibles.length === 0 ? (
+              <p className="text-xs text-slate-500">Nenhum responsável de nível 2 cadastrado.</p>
+            ) : null}
+            {responsiblesError ? (
+              <p className="text-xs text-rose-600">{responsiblesError}</p>
+            ) : null}
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Coordenador geral (Nível 3)</label>
-            <input
+            <select
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-              value={form.generalCoordinatorName}
-              onChange={(e) => setForm((prev) => ({ ...prev, generalCoordinatorName: e.target.value }))}
-              placeholder="Nome do coordenador ou equipe de SST"
-            />
+              value={form.generalCoordinatorId}
+              onChange={(e) => setForm((prev) => ({ ...prev, generalCoordinatorId: e.target.value }))}
+              disabled={loadingResponsibles}
+            >
+              <option value="">Selecione o coordenador</option>
+              {level3Responsibles.map((responsible) => (
+                <option key={responsible.id} value={responsible.id}>
+                  {responsible.name}
+                  {responsible.department ? ` — ${responsible.department}` : ''}
+                </option>
+              ))}
+            </select>
+            {!loadingResponsibles && level3Responsibles.length === 0 ? (
+              <p className="text-xs text-slate-500">Nenhum responsável de nível 3 cadastrado.</p>
+            ) : null}
+            {responsiblesError ? (
+              <p className="text-xs text-rose-600">{responsiblesError}</p>
+            ) : null}
           </div>
         </div>
 

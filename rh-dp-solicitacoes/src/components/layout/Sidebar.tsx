@@ -186,17 +186,19 @@ export default function Sidebar({
 
               {openRefusal && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link
-                    href="/dashboard/direito-de-recusa"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname === '/dashboard/direito-de-recusa'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <ShieldAlert size={16} /> <span>Painel</span>
-                  </Link>
+                   {canReviewRefusal && (
+                    <Link
+                      href="/dashboard/direito-de-recusa"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/direito-de-recusa'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ShieldAlert size={16} /> <span>Painel</span>
+                    </Link>
+                  )}
                   <Link
                     href="/dashboard/direito-de-recusa/nova"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3

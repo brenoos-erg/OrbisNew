@@ -14,6 +14,8 @@ type RefusalReportRow = {
   riskSituation: string
   sectorOrContract: string
   employeeName: string
+  contractManagerName?: string | null
+  generalCoordinatorName?: string | null
   decision?: boolean | null
   decisionComment?: string | null
   decidedAt?: string | null
@@ -130,8 +132,8 @@ export default function RefusalDashboardClient({ canReview }: Props) {
           <div className="col-span-2">Abertura</div>
           <div className="col-span-3">Situação de risco</div>
           <div className="col-span-2">Setor / Contrato</div>
-          <div className="col-span-2">Responsável</div>
-          <div className="col-span-2">Status</div>
+           <div className="col-span-3">Responsáveis (N2 / N3)</div>
+          <div className="col-span-1">Status</div>
           <div className="col-span-1 text-right">Ação</div>
         </div>
         {loading ? (
@@ -145,18 +147,27 @@ export default function RefusalDashboardClient({ canReview }: Props) {
           <div className="divide-y divide-slate-100">
             {reports.map((report) => {
               const badge = statusBadge[report.status]
-              return (
+              const responsibleNames = [
+                report.contractManagerName ? `N2: ${report.contractManagerName}` : null,
+                report.generalCoordinatorName ? `N3: ${report.generalCoordinatorName}` : null,
+              ]
+                .filter(Boolean)
+                .join(' • ')
+               return (
                 <div key={report.id} className="grid grid-cols-12 gap-3 px-4 py-3 text-sm text-slate-800">
                   <div className="col-span-2 text-slate-600">
-                    {format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm')}
+                    <p>{format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm')}</p>
+                    <p className="text-xs text-slate-500">Por {report.employeeName}</p>
                   </div>
                   <div className="col-span-3">
                     <p className="font-medium text-slate-900">{report.riskSituation}</p>
                     <p className="text-xs text-slate-500 line-clamp-2">{report.decisionComment}</p>
                   </div>
                   <div className="col-span-2 text-slate-700">{report.sectorOrContract}</div>
-                  <div className="col-span-2 text-slate-700">{report.employeeName}</div>
-                  <div className="col-span-2">
+                  <div className="col-span-3 text-slate-700">
+                    {responsibleNames || 'Não informado'}
+                  </div>
+                  <div className="col-span-1">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${badge.className}`}
                     >

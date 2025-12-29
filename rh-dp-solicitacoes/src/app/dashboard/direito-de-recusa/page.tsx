@@ -19,7 +19,11 @@ export default async function Page() {
     appUser.moduleLevels?.['direito-de-recusa'] ??
     appUser.moduleLevels?.['direito_de_recusa']
 
-  const canReview = hasMinLevel(level, ModuleLevel.NIVEL_2)
+  if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
+    redirect('/dashboard/direito-de-recusa/nova')
+  }
+
+  const canReview = true
 
   return <RefusalDashboardClient canReview={canReview} />
 }
