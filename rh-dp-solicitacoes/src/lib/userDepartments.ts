@@ -1,7 +1,7 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-type TransactionClient = Pick<PrismaClient, 'userDepartment'> & PrismaClient
+type TransactionClient = Prisma.TransactionClient
 
 /**
  * Garante que exista um vínculo na tabela UserDepartment sem criar duplicados.
