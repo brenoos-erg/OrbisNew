@@ -195,10 +195,21 @@ export default function Sidebar({
                             ? 'bg-orange-500/90 text-white'
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
-                    >
-                      <ShieldAlert size={16} /> <span>Painel</span>
-                    </Link>
+                     >
+                    <ShieldAlert size={16} /> <span>Painel</span>
+                  </Link>
                   )}
+                   <Link
+                    href="/dashboard/direito-de-recusa/minhas"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/direito-de-recusa/minhas')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardList size={16} /> <span>Meus direitos de recusa</span>
+                  </Link>
                   <Link
                     href="/dashboard/direito-de-recusa/nova"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3

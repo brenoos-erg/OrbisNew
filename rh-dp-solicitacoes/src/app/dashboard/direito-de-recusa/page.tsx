@@ -20,7 +20,7 @@ export default async function Page() {
     appUser.moduleLevels?.['direito_de_recusa']
 
   if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-    redirect('/dashboard/direito-de-recusa/nova')
+    redirect('/dashboard/direito-de-recusa/minhas')
   }
 
   const canReview = true
