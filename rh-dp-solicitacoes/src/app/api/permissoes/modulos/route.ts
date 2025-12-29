@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { ModuleLevel } from '@prisma/client'
+import { ModuleLevel, UserStatus } from '@prisma/client'
 
 import { assertUserMinLevel } from '@/lib/access'
 import { requireActiveUser } from '@/lib/auth'
@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const moduleId = searchParams.get('moduleId')
+      const departmentId = searchParams.get('departmentId')
 
     if (!moduleId) {
       return NextResponse.json(
@@ -21,10 +22,18 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const module = await prisma.module.findUnique({
-      where: { id: moduleId },
-      select: { id: true, key: true, name: true },
-    })
+    const [module, department] = await Promise.all([
+      prisma.module.findUnique({
+        where: { id: moduleId },
+        select: { id: true, key: true, name: true },
+      }),
+      departmentId
+        ? prisma.department.findUnique({
+            where: { id: departmentId },
+            select: { id: true, code: true, name: true },
+          })
+        : Promise.resolve(null),
+    ])
 
     if (!module) {
       return NextResponse.json(
@@ -32,9 +41,52 @@ export async function GET(req: NextRequest) {
         { status: 404 },
       )
     }
+    if (departmentId && !department) {
+      return NextResponse.json(
+        { error: 'Departamento não encontrado.' },
+        { status: 404 },
+      )
+    }
 
-    const accesses = await prisma.userModuleAccess.findMany({
-      where: { moduleId },
+    if (department) {
+      const users = await prisma.user.findMany({
+        where: { departmentId, status: UserStatus.ATIVO },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          department: { select: { id: true, code: true, name: true } },
+          moduleAccesses: {
+            where: { moduleId },
+            select: { level: true },
+          },
+        },
+        orderBy: { fullName: 'asc' },
+      })
+
+      return NextResponse.json({
+        module,
+        department,
+        users: users.map((user) => ({
+          level: user.moduleAccesses[0]?.level ?? null,
+          user: {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            department: user.department
+              ? {
+                  id: user.department.id,
+                  code: user.department.code,
+                  name: user.department.name,
+                }
+              : null,
+          },
+        })),
+      })
+    }
+
+     const accesses = await prisma.userModuleAccess.findMany({
+      where: { moduleId, user: { status: UserStatus.ATIVO } },
       select: {
         level: true,
         user: {
@@ -51,6 +103,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       module,
+      department: null,
       users: accesses.map((access) => ({
         level: access.level,
         user: {

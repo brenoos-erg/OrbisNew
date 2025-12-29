@@ -27,6 +27,13 @@ export async function GET() {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
+     if (!me.departmentId) {
+      return NextResponse.json(
+        { error: 'Associe-se a um departamento para listar os responsáveis.' },
+        { status: 400 },
+      )
+    }
+
 
     const moduleRecord = await prisma.module.findFirst({
       where: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
@@ -40,8 +47,8 @@ export async function GET() {
     const responsibles = await prisma.userModuleAccess.findMany({
       where: {
         moduleId: moduleRecord.id,
-        level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
-        user: { status: UserStatus.ATIVO },
+         level: ModuleLevel.NIVEL_2,
+        user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
       },
       select: {
         level: true,
@@ -54,7 +61,7 @@ export async function GET() {
           },
         },
       },
-      orderBy: [{ level: 'asc' }, { user: { fullName: 'asc' } }],
+      orderBy: [{ user: { fullName: 'asc' } }],
     })
 
     return NextResponse.json({

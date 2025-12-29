@@ -18,7 +18,7 @@ type ResponsibleOption = {
   name: string
   email: string
   department: string | null
-  level: 'NIVEL_2' | 'NIVEL_3'
+  level: 'NIVEL_2'
 }
 
 export default function NewRefusalReportPage() {
@@ -41,6 +41,8 @@ export default function NewRefusalReportPage() {
 
   const isValid = useMemo(() => {
     return (
+        form.contractManagerId.trim() &&
+      form.generalCoordinatorId.trim() &&
       form.sectorOrContract.trim() &&
       form.riskSituation.trim() &&
       form.locationOrEquipment.trim() &&
@@ -48,14 +50,7 @@ export default function NewRefusalReportPage() {
     )
   }, [form])
 
-   const level2Responsibles = useMemo(
-    () => responsibles.filter((r) => r.level === 'NIVEL_2' || r.level === 'NIVEL_3'),
-    [responsibles],
-  )
-  const level3Responsibles = useMemo(
-    () => responsibles.filter((r) => r.level === 'NIVEL_3'),
-    [responsibles],
-  )
+    const availableResponsibles = useMemo(() => responsibles, [responsibles])
 
   useEffect(() => {
     async function loadResponsibles() {
@@ -143,8 +138,8 @@ export default function NewRefusalReportPage() {
         <p className="text-sm font-semibold uppercase text-slate-500">Direito de Recusa</p>
         <h1 className="text-2xl font-bold text-slate-900">Registrar recusa de atividade</h1>
         <p className="text-slate-600">
-          Informe a situação de risco observada e os responsáveis diretos. Enviaremos para avaliação do gestor do
-          contrato (Nível 2) ou equipe de SST (Nível 3).
+          Informe a situação de risco observada e os responsáveis diretos. Enviaremos para avaliação dos responsáveis
+          do seu departamento com nível 2 no módulo.
         </p>
       </div>
 
@@ -162,15 +157,16 @@ export default function NewRefusalReportPage() {
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Gestor do contrato (Nível 2)</label>
+            <label className="text-sm font-medium text-slate-700">Gestor do contrato</label>
              <select
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
               value={form.contractManagerId}
               onChange={(e) => setForm((prev) => ({ ...prev, contractManagerId: e.target.value }))}
               disabled={loadingResponsibles}
+              required
             >
               <option value="">Selecione o gestor</option>
-              {level2Responsibles.map((responsible) => (
+              {availableResponsibles.map((responsible) => (
                 <option key={responsible.id} value={responsible.id}>
                   {responsible.name}
                   {responsible.department ? ` — ${responsible.department}` : ''}
@@ -180,31 +176,37 @@ export default function NewRefusalReportPage() {
             {loadingResponsibles ? (
               <p className="text-xs text-slate-500">Carregando responsáveis...</p>
             ) : null}
-            {!loadingResponsibles && level2Responsibles.length === 0 ? (
-              <p className="text-xs text-slate-500">Nenhum responsável de nível 2 cadastrado.</p>
+            {!loadingResponsibles && availableResponsibles.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Nenhum responsável do seu departamento com nível 2 cadastrado.
+              </p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>
             ) : null}
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Coordenador geral (Nível 3)</label>
+            <label className="text-sm font-medium text-slate-700">Coordenador geral </label>
             <select
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
               value={form.generalCoordinatorId}
               onChange={(e) => setForm((prev) => ({ ...prev, generalCoordinatorId: e.target.value }))}
               disabled={loadingResponsibles}
+            
+              required
             >
               <option value="">Selecione o coordenador</option>
-              {level3Responsibles.map((responsible) => (
+              {availableResponsibles.map((responsible) => (
                 <option key={responsible.id} value={responsible.id}>
                   {responsible.name}
                   {responsible.department ? ` — ${responsible.department}` : ''}
                 </option>
               ))}
             </select>
-            {!loadingResponsibles && level3Responsibles.length === 0 ? (
-              <p className="text-xs text-slate-500">Nenhum responsável de nível 3 cadastrado.</p>
+            {!loadingResponsibles && availableResponsibles.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Nenhum coordenador disponível no seu departamento com nível 2.
+              </p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>

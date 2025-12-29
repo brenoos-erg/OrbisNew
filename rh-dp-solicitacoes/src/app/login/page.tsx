@@ -314,7 +314,7 @@ const payload = await res.json().catch(() => null)
             <input
               type="text"
               required
-              placeholder="seuemail@empresa.com ou joao.silva"
+              placeholder="Ex: joao.silva"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300"

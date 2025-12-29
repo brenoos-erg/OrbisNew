@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,17 +25,24 @@ export async function GET(req: NextRequest) {
     await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
 
     const { searchParams } = new URL(req.url)
-    const email = searchParams.get('email')?.trim().toLowerCase()
+    const searchTerm = searchParams.get('search') ?? searchParams.get('email')
+    const normalizedTerm = searchTerm?.trim()
 
-    if (!email) {
+    if (!normalizedTerm) {
       return NextResponse.json(
-        { error: 'Parâmetro "email" é obrigatório.' },
+        { error: 'Informe o nome ou e-mail do usuário.' },
         { status: 400 },
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: { equals: normalizedTerm, mode: 'insensitive' } },
+          { fullName: { contains: normalizedTerm, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { fullName: 'asc' },
       select: {
         id: true,
         fullName: true,
@@ -125,17 +133,25 @@ export async function PATCH(req: NextRequest) {
 
     // 1) Atualizar departamento do usuário
     if (typeof departmentId !== 'undefined') {
-      const updated = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          departmentId: departmentId || null,
-        },
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          departmentId: true,
-        },
+       const updated = await prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
+          where: { id: user.id },
+          data: {
+            departmentId: departmentId || null,
+          },
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            departmentId: true,
+          },
+        })
+
+        if (departmentId) {
+          await ensureUserDepartmentLink(user.id, departmentId, tx)
+        }
+
+        return updatedUser
       })
 
       return NextResponse.json(updated)

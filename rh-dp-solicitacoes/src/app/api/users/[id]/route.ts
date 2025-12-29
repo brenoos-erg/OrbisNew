@@ -32,6 +32,7 @@ export async function GET(
         phone: true,
         status: true,
         avatarUrl: true,
+        departmentId: true,
 
         costCenters: {
           include: {
@@ -57,6 +58,7 @@ export async function GET(
       phone: user.phone,
       status: user.status, // 'ATIVO' | 'INATIVO'
       avatarUrl: user.avatarUrl ?? null, // 👈 devolve a foto
+      departmentId: user.departmentId,
       costCenters: user.costCenters.map(
   (link: { costCenter: { id: string; description: string } }) => ({
     id: link.costCenter.id,

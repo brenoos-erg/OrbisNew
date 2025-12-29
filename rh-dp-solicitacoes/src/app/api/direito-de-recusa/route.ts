@@ -86,6 +86,12 @@ export async function POST(req: NextRequest) {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
+    if (!me.departmentId) {
+      return NextResponse.json(
+        { error: 'Associe-se a um departamento para registrar uma recusa.' },
+        { status: 400 },
+      )
+    }
 
     const body = await req.json().catch(() => ({} as any))
     const {
@@ -112,10 +118,12 @@ export async function POST(req: NextRequest) {
       !sectorOrContract ||
       !riskSituation ||
       !locationOrEquipment ||
-      !detailedCondition
+        !detailedCondition ||
+      !contractManagerId ||
+      !generalCoordinatorId
     ) {
-      return NextResponse.json(
-        { error: 'Preencha todos os campos obrigatórios.' },
+       return NextResponse.json(
+        { error: 'Preencha todos os campos obrigatórios, incluindo responsáveis.' },
         { status: 400 },
       )
     }
@@ -124,8 +132,8 @@ export async function POST(req: NextRequest) {
           where: {
             userId: contractManagerId,
             module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
-            level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
-            user: { status: UserStatus.ATIVO },
+            level: ModuleLevel.NIVEL_2,
+            user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
           },
           select: { user: { select: { id: true, fullName: true } } },
         })
@@ -143,8 +151,8 @@ export async function POST(req: NextRequest) {
           where: {
             userId: generalCoordinatorId,
             module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
-            level: ModuleLevel.NIVEL_3,
-            user: { status: UserStatus.ATIVO },
+            level: ModuleLevel.NIVEL_2,
+            user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
           },
           select: { user: { select: { id: true, fullName: true } } },
         })
@@ -152,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     if (generalCoordinatorId && !generalCoordinator) {
       return NextResponse.json(
-        { error: 'Coordenador geral (Nível 3) inválido ou inativo.' },
+        { error: 'Coordenador geral inválido ou inativo.' },
         { status: 400 },
       )
     }

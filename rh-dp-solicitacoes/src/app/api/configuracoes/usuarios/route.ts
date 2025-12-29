@@ -1,7 +1,8 @@
 // src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { createClient } from '@supabase/supabase-js'
+import { ensureDefaultModuleAccess } from '@/lib/defaultModuleAccess'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -235,23 +236,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 4) NIVEL_1 nos módulos (ajuste o key se necessário)
-    // Se no seu banco for 'solicitacoes' (minúsculo), troque aqui.
-    const modules = await prisma.module.findMany({
-      where: { key: 'SOLICITACOES' },
-      select: { id: true },
-    })
-
-    if (modules.length > 0) {
-      await prisma.userModuleAccess.createMany({
-        data: modules.map((m) => ({
-          userId: appUser.id,
-          moduleId: m.id,
-          level: 'NIVEL_1',
-        })),
-        skipDuplicates: true,
-      })
-    }
+     // 4) Garantir acesso padrão de nível 1 aos módulos básicos (inclui Direito de Recusa)
+    await ensureDefaultModuleAccess(appUser.id)
 
     return NextResponse.json(responsePayload, { status: 201 })
   } catch (e: any) {

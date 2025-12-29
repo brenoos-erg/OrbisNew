@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth' // se você já usa isso em outras rotas
+import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,9 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
           where: { id: userId },
           data: { departmentId: departmentId || null },
         })
+         if (departmentId) {
+          await ensureUserDepartmentLink(userId, departmentId, tx)
+        }
       }
 
       // 2) Atualiza níveis de módulo, se veio no body

@@ -2,7 +2,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {UserCostCenterPanel} from '../UserCostCenterPanel'
+import { UserCostCenterPanel } from '../UserCostCenterPanel'
+import { UserDepartmentPanel } from '../UserDepartmentPanel'
 
 type UserStatus = 'ATIVO' | 'INATIVO'
 
@@ -14,6 +15,7 @@ type UserData = {
   phone: string | null
   status: UserStatus
   avatarUrl?: string | null  // 👈 foto que vem da API
+  departmentId?: string | null
 }
 
 const LABEL = 'form-label'
@@ -220,8 +222,8 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
             </div>
           </div>
 
-          {/* CENTROS DE CUSTO (card embaixo) */}
-          <div className="mt-6">
+          <div className="mt-6 space-y-6">
+            <UserDepartmentPanel key={`dept-${user.id}`} userId={user.id} />
             <UserCostCenterPanel key={user.id} userId={user.id} />
           </div>
         </div>

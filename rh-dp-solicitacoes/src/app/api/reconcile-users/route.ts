@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withModuleLevel } from '@/lib/access'
+import { ensureDefaultModuleAccess } from '@/lib/defaultModuleAccess'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
@@ -103,7 +104,7 @@ async function reconcileUser(orphan: OrphanRecord) {
   const existingByEmail = await prisma.user.findUnique({ where: { email } })
 
   if (existingByEmail) {
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: existingByEmail.id },
       data: {
         authId: orphan.auth_id,
@@ -114,10 +115,12 @@ async function reconcileUser(orphan: OrphanRecord) {
       },
     })
 
+    await ensureDefaultModuleAccess(updated.id)
+
     return { skipped: false, reason: null }
   }
 
-  await prisma.user.upsert({
+  const createdOrUpdated = await prisma.user.upsert({
     where: { authId: orphan.auth_id },
     update: {
       email,
@@ -133,6 +136,7 @@ async function reconcileUser(orphan: OrphanRecord) {
       status: UserStatus.ATIVO,
     },
   })
+  await ensureDefaultModuleAccess(createdOrUpdated.id)
 
   return { skipped: false, reason: null }
 }

@@ -4,13 +4,22 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeModules } from '@/lib/normalizeModules'
+import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
 /**
  * Helper para montar o payload que o frontend espera
  */
-async function buildUserPayload(email: string) {
-  const user = await prisma.user.findUnique({
-    where: { email },
+async function buildUserPayload(search: string) {
+  const searchTerm = search.trim()
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: searchTerm, mode: 'insensitive' } },
+        { fullName: { contains: searchTerm, mode: 'insensitive' } },
+      ],
+    },
+    orderBy: { fullName: 'asc' },
   })
 
   const modules = await prisma.module.findMany({
@@ -65,16 +74,16 @@ export async function GET(req: NextRequest) {
     await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
 
     const { searchParams } = new URL(req.url)
-    const email = searchParams.get('email')
+    const search = searchParams.get('search') ?? searchParams.get('email')
 
-    if (!email) {
+    if (!search) {
       return NextResponse.json(
-        { error: 'Parâmetro "email" é obrigatório.' },
+        { error: 'Informe o nome ou e-mail do usuário.' },
         { status: 400 },
       )
     }
 
-    const payload = await buildUserPayload(email)
+    const payload = await buildUserPayload(search)
     return NextResponse.json(payload)
   } catch (e: any) {
     console.error('GET /api/permissoes/usuarios error', e)
@@ -115,11 +124,17 @@ export async function PATCH(req: NextRequest) {
 
     // 1) Atualizar departamento, se veio no payload
     if (departmentId !== undefined) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          departmentId: departmentId || null,
-        },
+       await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            departmentId: departmentId || null,
+          },
+        })
+
+        if (departmentId) {
+          await ensureUserDepartmentLink(user.id, departmentId, tx)
+        }
       })
      
     }

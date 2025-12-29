@@ -38,6 +38,16 @@ async function loadUserModuleContext(
           },
         },
       },
+       userDepartments: {
+        include: {
+          department: {
+            select: {
+              code: true,
+              modules: { include: { module: { select: { key: true } } } },
+            },
+          },
+        },
+      },
       moduleAccesses: {
         include: { module: { select: { key: true } } },
       },
@@ -45,10 +55,17 @@ async function loadUserModuleContext(
   })
   const levels: AccessMap = {}
 
-  // Base: todos os módulos vinculados ao departamento ficam visíveis com NIVEL_1
-  for (const deptModule of user?.department?.modules ?? []) {
-    const key = deptModule.module.key.toLowerCase()
-    levels[key] = ModuleLevel.NIVEL_1
+   // Base: todos os módulos vinculados aos departamentos ficam visíveis com NIVEL_1
+  const departments = [
+    ...(user?.department ? [user.department] : []),
+    ...(user?.userDepartments.map((link) => link.department) ?? []),
+  ]
+
+  for (const dept of departments) {
+    for (const deptModule of dept?.modules ?? []) {
+      const key = deptModule.module.key.toLowerCase()
+      levels[key] = ModuleLevel.NIVEL_1
+    }
   }
 
   // Sobrescritas individuais (UserModuleAccess) podem elevar o nível (ex.: aprovador NIVEL_3)
@@ -57,7 +74,12 @@ async function loadUserModuleContext(
     levels[key] = pickHigherLevel(levels[key], access.level)
   }
 
-  return { levels, departmentCode: user?.department?.code ?? null }
+  const departmentCode =
+    user?.department?.code ??
+    user?.userDepartments.find((d) => d.department?.code)?.department?.code ??
+    null
+
+  return { levels, departmentCode }
 }
 
 export async function getUserModuleContext(
@@ -83,12 +105,15 @@ export async function userHasDepartmentOrCostCenter(
   costCenterId?: string | null,
   departmentId?: string | null,
 ): Promise<boolean> {
-  const [userRecord, extraCostCenters] = await Promise.all([
+  const [userRecord, extraCostCenters, extraDepartments] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { costCenterId: true, departmentId: true },
     }),
     prisma.userCostCenter.count({
+      where: { userId },
+    }),
+    prisma.userDepartment.count({
       where: { userId },
     }),
   ])
@@ -103,5 +128,5 @@ export async function userHasDepartmentOrCostCenter(
     return true
   }
 
-  return extraCostCenters > 0
+  return extraCostCenters > 0 || extraDepartments > 0
 }

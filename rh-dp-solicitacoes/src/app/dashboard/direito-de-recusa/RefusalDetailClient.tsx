@@ -165,8 +165,8 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
           <InfoRow label="Setor / Contrato" value={report.sectorOrContract} />
           <InfoRow label="Situação de risco" value={report.riskSituation} />
           <InfoRow label="Local / Equipamento" value={report.locationOrEquipment} />
-          <InfoRow label="Gestor do contrato (Nível 2)" value={report.contractManagerName || 'Não informado'} />
-          <InfoRow label="Coordenador / SST (Nível 3)" value={report.generalCoordinatorName || 'Não informado'} />
+          <InfoRow label="Gestor do contrato " value={report.contractManagerName || 'Não informado'} />
+          <InfoRow label="Coordenador / SST" value={report.generalCoordinatorName || 'Não informado'} />
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">

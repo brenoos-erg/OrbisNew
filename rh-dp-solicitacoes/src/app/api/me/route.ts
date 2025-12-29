@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { prisma } from '@/lib/prisma';
+import { ensureUserDepartmentLink } from '@/lib/userDepartments';
 
 // GET /api/me
 export async function GET() {
@@ -148,6 +149,11 @@ export async function PATCH(req: Request) {
       leaderId: body.leaderId ?? undefined,
     },
   });
+
+  if (body.departmentId) {
+    await ensureUserDepartmentLink(updated.id, body.departmentId);
+  }
+
 
   return NextResponse.json(updated);
 }

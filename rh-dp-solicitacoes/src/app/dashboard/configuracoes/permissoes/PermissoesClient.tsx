@@ -53,9 +53,18 @@ type ModuleLevelUser = {
 
 type ModuleLevelPayload = {
   module: ModuleDTO
-  users: { level: UserModuleAccessDTO['level']; user: ModuleLevelUser }[]
+  department: { id: string; code: string; name: string } | null
+  users: { level: UserModuleAccessDTO['level'] | null; user: ModuleLevelUser }[]
 }
-
+type DepartmentUser = {
+  id: string
+  fullName: string
+  email: string
+  departmentId: string | null
+  isMember: boolean
+  isPrimary?: boolean
+  canRemove?: boolean
+}
 type Tab = 'departamentos' | 'usuarios'
 
 export default function PermissoesClient() {
@@ -65,9 +74,14 @@ export default function PermissoesClient() {
   const [deptData, setDeptData] = useState<DepartmentPayload | null>(null)
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null)
   const [loadingDepartamentos, setLoadingDepartamentos] = useState(false)
+  const [deptMembers, setDeptMembers] = useState<DepartmentUser[]>([])
+  const [loadingDeptMembers, setLoadingDeptMembers] = useState(false)
+  const [searchDeptTerm, setSearchDeptTerm] = useState('')
+  const [deptSearchResults, setDeptSearchResults] = useState<DepartmentUser[]>([])
+  const [searchingDeptUsers, setSearchingDeptUsers] = useState(false)
 
   // ---- Usuários ----
-  const [userEmailInput, setUserEmailInput] = useState('')
+  const [userSearchInput, setUserSearchInput] = useState('')
   const [userData, setUserData] = useState<UserPayload | null>(null)
   const [loadingUser, setLoadingUser] = useState(false)
 
@@ -77,14 +91,9 @@ export default function PermissoesClient() {
 
   // ---- Usuários por módulo (visualização) ----
   const [selectedModuleForLevels, setSelectedModuleForLevels] = useState<string>('')
+  const [selectedDepartmentForLevels, setSelectedDepartmentForLevels] = useState<string>('')
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
-
-  const levelLabels: Record<UserModuleAccessDTO['level'], string> = {
-    NIVEL_1: 'Nível 1',
-    NIVEL_2: 'Nível 2',
-    NIVEL_3: 'Nível 3',
-  }
 
   // =========================
   // CARREGAR DADOS DEPARTAMENTOS
@@ -124,10 +133,126 @@ export default function PermissoesClient() {
       setSelectedModuleForLevels(deptData.modules[0].id)
     }
   }, [deptData, selectedModuleForLevels])
+  
+
+  useEffect(() => {
+    if (!selectedDeptId) {
+      setDeptMembers([])
+      setDeptSearchResults([])
+      setSearchDeptTerm('')
+      return
+    }
+    loadDepartmentMembers(selectedDeptId)
+  }, [selectedDeptId])
 
   // =========================
   // HANDLERS DEPARTAMENTOS
   // =========================
+  const loadDepartmentMembers = async (departmentId: string) => {
+    try {
+      setLoadingDeptMembers(true)
+      const params = new URLSearchParams({ departmentId })
+      const res = await fetch(`/api/permissoes/departamentos/usuarios?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao carregar usuários do departamento.')
+      }
+
+      const json: DepartmentUser[] = await res.json()
+      setDeptMembers(json.filter((user) => user.isMember))
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao carregar usuários do departamento.')
+    } finally {
+      setLoadingDeptMembers(false)
+    }
+  }
+
+  const searchUsersForDepartment = async () => {
+    if (!selectedDeptId || !searchDeptTerm.trim()) return
+
+    try {
+      setSearchingDeptUsers(true)
+      const params = new URLSearchParams({ search: searchDeptTerm.trim(), departmentId: selectedDeptId })
+      const res = await fetch(`/api/permissoes/departamentos/usuarios?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao buscar usuários.')
+      }
+
+      const json: DepartmentUser[] = await res.json()
+      setDeptSearchResults(json)
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao buscar usuários.')
+    } finally {
+      setSearchingDeptUsers(false)
+    }
+  }
+
+  const addUserToDepartment = async (userId: string) => {
+    if (!selectedDeptId) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const res = await fetch('/api/permissoes/departamentos/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departmentId: selectedDeptId, userId }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao adicionar usuário ao departamento.')
+      }
+
+      await loadDepartmentMembers(selectedDeptId)
+      await searchUsersForDepartment()
+      setSuccess('Usuário adicionado ao departamento.')
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao adicionar usuário ao departamento.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeUserFromDepartment = async (userId: string) => {
+    if (!selectedDeptId) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const params = new URLSearchParams({ departmentId: selectedDeptId, userId })
+      const res = await fetch(`/api/permissoes/departamentos/usuarios?${params.toString()}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao remover usuário do departamento.')
+      }
+
+      await loadDepartmentMembers(selectedDeptId)
+      setDeptSearchResults((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isMember: false, isPrimary: false, canRemove: false } : u)),
+      )
+      setSuccess('Usuário removido do departamento.')
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao remover usuário do departamento.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const isModuleEnabledForDept = (moduleId: string) => {
     if (!deptData || !selectedDeptId) return false
     return deptData.links.some((l) => l.departmentId === selectedDeptId && l.moduleId === moduleId)
@@ -181,7 +306,7 @@ export default function PermissoesClient() {
   // =========================
   const handleLoadUser = async (e: FormEvent) => {
     e.preventDefault()
-    if (!userEmailInput.trim()) return
+    if (!userSearchInput.trim()) return
 
     try {
       setLoadingUser(true)
@@ -189,9 +314,8 @@ export default function PermissoesClient() {
       setSuccess(null)
       setUserData(null)
 
-      const params = new URLSearchParams({ email: userEmailInput.trim() })
+      const params = new URLSearchParams({ search: userSearchInput.trim() })
       const res = await fetch(`/api/permissoes/usuarios?${params.toString()}`, { cache: 'no-store' })
-
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error || 'Erro ao carregar usuário.')
@@ -265,6 +389,10 @@ export default function PermissoesClient() {
       setSuccess(null)
 
       const params = new URLSearchParams({ moduleId: selectedModuleForLevels })
+      if (selectedDepartmentForLevels) {
+        params.set('departmentId', selectedDepartmentForLevels)
+      }
+
       const res = await fetch(`/api/permissoes/modulos?${params.toString()}`, { cache: 'no-store' })
 
       if (!res.ok) {
@@ -281,7 +409,7 @@ export default function PermissoesClient() {
     }
   }
 
-  const updateModuleLevelForUser = async (targetUser: ModuleLevelUser, level: UserModuleAccessDTO['level']) => {
+  const updateModuleLevelForUser = async (targetUser: ModuleLevelUser, level: UserModuleAccessDTO['level'] | null) => {
     if (!moduleLevelData) return
 
     try {
@@ -435,8 +563,119 @@ export default function PermissoesClient() {
                   </div>
                 </div>
               </div>
+               {/* BLOCO 1.5 - Usuários do departamento */}
+              <div className="space-y-3 rounded-md border p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Usuários do departamento</p>
+                    <p className="text-xs text-gray-500">
+                      Busque pelo nome para adicionar usuários a este departamento.
+                    </p>
+                  </div>
 
-              {/* BLOCO 2 */}
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                    <input
+                      type="text"
+                      className="w-full rounded-md border px-3 py-2 text-sm md:w-64"
+                      placeholder="Digite o nome do usuário"
+                      value={searchDeptTerm}
+                      onChange={(e) => setSearchDeptTerm(e.target.value)}
+                      disabled={!selectedDeptId || searchingDeptUsers}
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                      onClick={searchUsersForDepartment}
+                      disabled={!selectedDeptId || searchingDeptUsers || !searchDeptTerm.trim()}
+                    >
+                      {searchingDeptUsers ? 'Buscando...' : 'Buscar e adicionar'}
+                    </button>
+                  </div>
+                </div>
+
+                {deptSearchResults.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-600">Resultados da busca</p>
+                    <ul className="space-y-2">
+                      {deptSearchResults.map((user) => (
+                        <li
+                          key={user.id}
+                          className="flex flex-col gap-2 rounded-md border px-3 py-2 text-sm md:flex-row md:items-center md:justify-between"
+                        >
+                          <div>
+                            <div className="font-medium">{user.fullName}</div>
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                            {user.isPrimary && (
+                              <div className="text-[11px] text-green-600">Departamento principal</div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                            onClick={() => addUserToDepartment(user.id)}
+                            disabled={saving || user.isMember}
+                          >
+                            {user.isMember ? 'Já adicionado' : 'Adicionar'}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Membros atuais</p>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                      onClick={() => selectedDeptId && loadDepartmentMembers(selectedDeptId)}
+                      disabled={loadingDeptMembers || !selectedDeptId}
+                    >
+                      {loadingDeptMembers ? 'Atualizando...' : 'Recarregar'}
+                    </button>
+                  </div>
+
+                  {loadingDeptMembers ? (
+                    <p className="text-xs text-gray-500">Carregando usuários...</p>
+                  ) : deptMembers.length === 0 ? (
+                    <p className="text-xs text-gray-500">Nenhum usuário vinculado a este departamento.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {deptMembers.map((user) => (
+                        <li
+                          key={user.id}
+                          className="flex flex-col gap-2 rounded-md bg-gray-50 px-3 py-2 text-sm md:flex-row md:items-center md:justify-between"
+                        >
+                          <div>
+                            <div className="font-medium">{user.fullName}</div>
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                            {user.isPrimary && (
+                              <div className="text-[11px] text-green-600">Departamento principal</div>
+                            )}
+                          </div>
+
+                          {user.canRemove ? (
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
+                              onClick={() => removeUserFromDepartment(user.id)}
+                              disabled={saving}
+                            >
+                              Remover
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-gray-500">Não é possível remover o principal.</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* BLOCO 2 (corrigido) */}
               <div className="space-y-3 rounded-md border p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                   <div className="space-y-1">
@@ -446,7 +685,8 @@ export default function PermissoesClient() {
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                    {/* seletor de módulo */}
                     <select
                       className="rounded-md border px-3 py-2 text-sm"
                       value={selectedModuleForLevels}
@@ -456,6 +696,20 @@ export default function PermissoesClient() {
                       {deptData.modules.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* seletor de departamento */}
+                    <select
+                      className="rounded-md border px-3 py-2 text-sm"
+                      value={selectedDepartmentForLevels}
+                      onChange={(e) => setSelectedDepartmentForLevels(e.target.value)}
+                      disabled={!deptData.departments.length || loadingModuleLevels}
+                    >
+                      {deptData.departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.code} - {dept.name}
                         </option>
                       ))}
                     </select>
@@ -473,56 +727,71 @@ export default function PermissoesClient() {
 
                 {moduleLevelData && (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">{moduleLevelData.module.name}</div>
+                    <div className="text-sm font-medium">
+                      {moduleLevelData.module.name}
+                      {moduleLevelData.department ? (
+                        <span className="text-xs font-normal text-gray-500">
+                          {' '}
+                          — {moduleLevelData.department.code} - {moduleLevelData.department.name}
+                        </span>
+                      ) : null}
+                    </div>
 
-                    <div className="grid gap-3 md:grid-cols-3">
-                      {(['NIVEL_1', 'NIVEL_2', 'NIVEL_3'] as const).map((level) => {
-                        const list = moduleLevelData.users.filter((u) => u.level === level)
-
-                        return (
-                          <div key={level} className="space-y-2 rounded-md border p-3">
-                            <div className="text-sm font-semibold">{levelLabels[level]}</div>
-
-                            {list.length === 0 ? (
-                              <p className="text-xs text-gray-500">Nenhum usuário neste nível.</p>
-                            ) : (
-                              <ul className="space-y-2 text-sm">
-                                {list.map(({ user }) => (
-                                  <li key={user.id} className="rounded-md bg-gray-50 px-2 py-2">
-                                    <div className="font-medium">{user.fullName}</div>
+                    {moduleLevelData.users.length === 0 ? (
+                      <p className="text-sm text-gray-500">Nenhum usuário encontrado para os filtros selecionados.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold text-gray-700">Nome</th>
+                              <th className="px-3 py-2 text-center font-semibold text-gray-700">Nível 1</th>
+                              <th className="px-3 py-2 text-center font-semibold text-gray-700">Nível 2</th>
+                              <th className="px-3 py-2 text-center font-semibold text-gray-700">Nível 3</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {moduleLevelData.users.map(({ user, level }) => {
+                              const radioName = `level-${user.id}`
+                              return (
+                                <tr key={user.id} className="hover:bg-gray-50">
+                                  <td className="px-3 py-2 align-top">
+                                    <div className="font-medium text-gray-900">{user.fullName}</div>
                                     <div className="text-xs text-gray-600">{user.email}</div>
                                     <div className="text-xs text-gray-500">
                                       {user.department
                                         ? `${user.department.code} - ${user.department.name}`
-                                        : 'Sem setor vinculado'}
+                                        : 'Sem departamento'}
                                     </div>
+                                    <button
+                                      type="button"
+                                      className="mt-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                                      disabled={saving}
+                                      onClick={() => updateModuleLevelForUser(user, null)}
+                                    >
+                                      Remover acesso
+                                    </button>
+                                  </td>
 
-                                    <div className="mt-2 flex flex-col gap-1 text-xs text-gray-700">
-                                      <label className="font-medium" htmlFor={`${user.id}-${level}`}>
-                                        Mover para
-                                      </label>
-                                      <select
-                                        id={`${user.id}-${level}`}
-                                        className="w-full rounded-md border px-2 py-1 text-sm"
-                                        value={level}
+                                  {(['NIVEL_1', 'NIVEL_2', 'NIVEL_3'] as const).map((option) => (
+                                    <td key={option} className="px-3 py-2 text-center align-middle">
+                                      <input
+                                        type="radio"
+                                        name={radioName}
+                                        className="h-4 w-4"
+                                        checked={level === option}
                                         disabled={saving}
-                                        onChange={(e) =>
-                                          updateModuleLevelForUser(user, e.target.value as UserModuleAccessDTO['level'])
-                                        }
-                                      >
-                                        <option value="NIVEL_1">Nível 1</option>
-                                        <option value="NIVEL_2">Nível 2</option>
-                                        <option value="NIVEL_3">Nível 3</option>
-                                      </select>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
+                                        onChange={() => updateModuleLevelForUser(user, option)}
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -537,13 +806,13 @@ export default function PermissoesClient() {
 
           <form onSubmit={handleLoadUser} className="flex flex-col gap-2 md:flex-row md:items-end">
             <div className="flex-1 space-y-1">
-              <label className="text-sm font-medium">E-mail do usuário</label>
+              <label className="text-sm font-medium">Nome do usuário</label>
               <input
-                type="email"
+                type="text"
                 className="w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="usuario@empresa.com.br"
-                value={userEmailInput}
-                onChange={(e) => setUserEmailInput(e.target.value)}
+                placeholder="Digite o nome para buscar"
+                value={userSearchInput}
+                onChange={(e) => setUserSearchInput(e.target.value)}
               />
             </div>
 
@@ -578,9 +847,7 @@ export default function PermissoesClient() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500">
-                  Aqui você vincula o cadastro do usuário a um departamento oficial.
-                </p>
+                <p className="text-xs text-gray-500">Aqui você vincula o cadastro do usuário a um departamento oficial.</p>
               </div>
             </div>
           )}
