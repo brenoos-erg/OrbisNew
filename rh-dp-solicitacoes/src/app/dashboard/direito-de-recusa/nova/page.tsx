@@ -18,7 +18,7 @@ type ResponsibleOption = {
   name: string
   email: string
   department: string | null
-  level: 'NIVEL_2'
+   level: 'NIVEL_2' | 'NIVEL_3'
 }
 
 export default function NewRefusalReportPage() {
@@ -139,7 +139,7 @@ export default function NewRefusalReportPage() {
         <h1 className="text-2xl font-bold text-slate-900">Registrar recusa de atividade</h1>
         <p className="text-slate-600">
           Informe a situação de risco observada e os responsáveis diretos. Enviaremos para avaliação dos responsáveis
-          do seu departamento com nível 2 no módulo.
+          com nível 3 em qualquer módulo.
         </p>
       </div>
 
@@ -177,9 +177,7 @@ export default function NewRefusalReportPage() {
               <p className="text-xs text-slate-500">Carregando responsáveis...</p>
             ) : null}
             {!loadingResponsibles && availableResponsibles.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Nenhum responsável do seu departamento com nível 2 cadastrado.
-              </p>
+               <p className="text-xs text-slate-500">Nenhum responsável com nível 3 cadastrado.</p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>
@@ -202,11 +200,9 @@ export default function NewRefusalReportPage() {
                   {responsible.department ? ` — ${responsible.department}` : ''}
                 </option>
               ))}
-            </select>
+             </select>
             {!loadingResponsibles && availableResponsibles.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Nenhum coordenador disponível no seu departamento com nível 2.
-              </p>
+              <p className="text-xs text-slate-500">Nenhum coordenador disponível com nível 3.</p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>

@@ -27,50 +27,28 @@ export async function GET() {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
-     if (!me.departmentId) {
-      return NextResponse.json(
-        { error: 'Associe-se a um departamento para listar os responsáveis.' },
-        { status: 400 },
-      )
-    }
 
-
-    const moduleRecord = await prisma.module.findFirst({
-      where: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
-      select: { id: true },
-    })
-
-    if (!moduleRecord) {
-      return NextResponse.json({ error: 'Módulo não configurado.' }, { status: 500 })
-    }
-
-    const responsibles = await prisma.userModuleAccess.findMany({
+    const responsibles = await prisma.user.findMany({
       where: {
-        moduleId: moduleRecord.id,
-         level: ModuleLevel.NIVEL_2,
-        user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
+        status: UserStatus.ATIVO,
+        moduleAccesses: { some: { level: ModuleLevel.NIVEL_3 } },
       },
       select: {
-        level: true,
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            department: { select: { name: true } },
-          },
-        },
+        id: true,
+        fullName: true,
+        email: true,
+        department: { select: { name: true } },
       },
-      orderBy: [{ user: { fullName: 'asc' } }],
+      orderBy: [{ fullName: 'asc' }],
     })
 
     return NextResponse.json({
-      responsibles: responsibles.map((r) => ({
-        id: r.user.id,
-        name: r.user.fullName,
-        email: r.user.email,
-        department: r.user.department?.name ?? null,
-        level: r.level,
+      responsibles: responsibles.map((user) => ({
+        id: user.id,
+        name: user.fullName,
+        email: user.email,
+        department: user.department?.name ?? null,
+        level: ModuleLevel.NIVEL_3,
       })),
     })
   } catch (e) {
