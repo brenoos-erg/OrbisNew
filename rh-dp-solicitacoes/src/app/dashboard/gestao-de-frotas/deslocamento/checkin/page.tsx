@@ -9,6 +9,7 @@ type VehicleOption = {
   plate: string
   type: string
   model?: string | null
+  kmCurrent?: number | null
   costCenters: Array<{
     costCenter?: {
       id: string
@@ -23,6 +24,7 @@ type VehicleSummary = {
   plate: string
   type: string
   model?: string | null
+  kmCurrent?: number | null
   costCenters: Array<{
     id: string
     label: string
@@ -36,6 +38,7 @@ export default function DisplacementCheckinPage() {
   const [tripDate, setTripDate] = useState('')
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
+  const [vehicleKmInput, setVehicleKmInput] = useState('')
   const [costCenterId, setCostCenterId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,6 +60,7 @@ export default function DisplacementCheckinPage() {
       setLoadingVehicle(true)
       setVehicle(null)
       setCostCenterId(null)
+      setVehicleKmInput('')
       try {
         const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, {
           cache: 'no-store',
@@ -87,12 +91,18 @@ export default function DisplacementCheckinPage() {
           plate: found.plate,
           type: found.type,
           model: found.model,
+          kmCurrent: found.kmCurrent ?? null,
           costCenters: mappedCostCenters,
         })
 
         if (mappedCostCenters.length === 1) {
           setCostCenterId(mappedCostCenters[0].id)
         }
+        setVehicleKmInput(
+          typeof found.kmCurrent === 'number' && Number.isFinite(found.kmCurrent)
+            ? String(found.kmCurrent)
+            : '',
+        )
       } catch (err) {
         console.error(err)
         setVehicle(null)
@@ -106,6 +116,7 @@ export default function DisplacementCheckinPage() {
       loadVehicle(normalizedPlate)
     } else {
       setVehicle(null)
+      setVehicleKmInput('')
     }
   }, [plateInput])
 
@@ -139,6 +150,26 @@ export default function DisplacementCheckinPage() {
       setError('Origem e destino são obrigatórios.')
       return
     }
+    const vehicleKmValue =
+      vehicleKmInput.trim() === '' ? null : Number.parseInt(vehicleKmInput.trim(), 10)
+
+    if (vehicleKmValue === null || !Number.isFinite(vehicleKmValue) || vehicleKmValue <= 0) {
+      setError('Informe a quilometragem do veículo no momento do deslocamento.')
+      return
+    }
+
+    if (vehicle?.kmCurrent !== null && typeof vehicle?.kmCurrent === 'number') {
+      if (vehicleKmValue < vehicle.kmCurrent) {
+        setError(
+          `A quilometragem informada (${vehicleKmValue.toLocaleString(
+            'pt-BR',
+          )}) é menor que a última registrada para este veículo (${vehicle.kmCurrent.toLocaleString(
+            'pt-BR',
+          )}).`,
+        )
+        return
+      }
+    }
 
     setSubmitting(true)
     try {
@@ -148,6 +179,7 @@ export default function DisplacementCheckinPage() {
         body: JSON.stringify({
           tripDate,
           vehiclePlate: normalizedPlate,
+          vehicleKm: vehicleKmValue,
           costCenterId: costCenterId ?? undefined,
           origin: origin.trim(),
           destination: destination.trim(),
@@ -162,6 +194,7 @@ export default function DisplacementCheckinPage() {
       setSuccess('Check-in de deslocamento registrado com sucesso!')
       setOrigin('')
       setDestination('')
+      setVehicleKmInput(vehicleKmValue ? String(vehicleKmValue) : '')
       setCostCenterId(costCenterOptions.length === 1 ? costCenterOptions[0].id : null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado ao registrar.'
@@ -255,6 +288,24 @@ export default function DisplacementCheckinPage() {
                 </span>
               )}
             </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Quilometragem do veículo
+              <input
+                required
+                type="number"
+                min={0}
+                value={vehicleKmInput}
+                onChange={(event) => setVehicleKmInput(event.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 focus:border-slate-500 focus:outline-none"
+                placeholder="Informe a quilometragem atual"
+              />
+              <span className="text-xs text-slate-500">
+                Último registro conhecido:{' '}
+                {typeof vehicle?.kmCurrent === 'number' && Number.isFinite(vehicle.kmCurrent)
+                  ? `${vehicle.kmCurrent.toLocaleString('pt-BR')} km`
+                  : '—'}
+              </span>
+            </label>
 
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
               Origem
@@ -293,6 +344,10 @@ export default function DisplacementCheckinPage() {
               <div><span className="font-medium">Placa:</span> {vehicle?.plate ?? '—'}</div>
               <div><span className="font-medium">Modelo:</span> {vehicle?.model ?? '—'}</div>
               <div><span className="font-medium">Tipo:</span> {vehicle?.type ?? '—'}</div>
+              <div>
+                <span className="font-medium">Quilometragem:</span>{' '}
+                {vehicleKmInput ? `${Number(vehicleKmInput).toLocaleString('pt-BR')} km` : '—'}
+              </div>
             </div>
           </div>
         </section>

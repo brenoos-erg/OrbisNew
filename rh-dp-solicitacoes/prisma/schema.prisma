@@ -452,6 +452,7 @@ model VehicleDisplacementCheckin {
   vehiclePlateSnapshot String
   vehicleTypeSnapshot  String
   vehicleModelSnapshot String?
+  vehicleKmSnapshot    Int?
   createdAt            DateTime @default(now())
 
   vehicle    Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)

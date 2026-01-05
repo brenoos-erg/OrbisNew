@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { tripDate, vehiclePlate, costCenterId, origin, destination } = body ?? {}
+    const { tripDate, vehiclePlate, costCenterId, origin, destination, vehicleKm } = body ?? {}
 
     const tripDateValue = parseDate(tripDate)
     if (!tripDateValue) {
@@ -76,6 +76,16 @@ export async function POST(req: Request) {
     if (!vehiclePlate || typeof vehiclePlate !== 'string') {
       return NextResponse.json({ error: 'Informe a placa do veículo.' }, { status: 400 })
     }
+    const vehicleKmValue =
+      vehicleKm === null || vehicleKm === undefined ? null : Number.parseInt(vehicleKm, 10)
+
+    if (vehicleKmValue !== null && (!Number.isFinite(vehicleKmValue) || vehicleKmValue < 0)) {
+      return NextResponse.json(
+        { error: 'Informe uma quilometragem válida para o veículo ou deixe em branco.' },
+        { status: 400 },
+      )
+    }
+
 
     const normalizedPlate = normalizePlate(vehiclePlate)
     if (!isValidPlate(normalizedPlate)) {
@@ -94,6 +104,20 @@ export async function POST(req: Request) {
 
     if (!vehicle) {
       return NextResponse.json({ error: 'Veículo não cadastrado.' }, { status: 400 })
+    }
+     if (vehicleKmValue !== null && typeof vehicle.kmCurrent === 'number' && vehicle.kmCurrent > 0) {
+      if (vehicleKmValue < vehicle.kmCurrent) {
+        return NextResponse.json(
+          {
+            error: `A quilometragem informada (${vehicleKmValue.toLocaleString(
+              'pt-BR',
+            )}) é menor que a última registrada para o veículo (${vehicle.kmCurrent.toLocaleString(
+              'pt-BR',
+            )}).`,
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const allowedCostCenters = vehicle.costCenters.map((link) => link.costCenterId)
@@ -118,6 +142,7 @@ export async function POST(req: Request) {
         vehiclePlateSnapshot: normalizedPlate,
         vehicleTypeSnapshot: vehicle.type,
         vehicleModelSnapshot: vehicle.model,
+        vehicleKmSnapshot: vehicleKmValue ?? vehicle.kmCurrent ?? null,
       },
       include: {
         vehicle: { select: { plate: true, type: true, model: true } },

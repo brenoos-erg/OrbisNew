@@ -228,7 +228,8 @@ export default function VehicleCheckinPage() {
         setVehicleExists(Boolean(found))
         setLastKm(found?.kmCurrent ?? null)
         setVehicleStatus(found?.status ?? null)
-        setVehicleType(found?.type ?? 'VEICULO_LEVE')
+        const normalizedType = (found?.type ?? 'VEICULO_LEVE').toUpperCase()
+        setVehicleType(normalizedType)
 
         const vehicleCenters =
           found?.costCenters
