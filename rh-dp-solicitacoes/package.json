@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.js",
+    "prebuild": "prisma generate",
     "build": "next build",
     "start": "prisma migrate deploy && next start",
     "lint": "next lint",
