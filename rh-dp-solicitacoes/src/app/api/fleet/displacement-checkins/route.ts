@@ -28,8 +28,8 @@ export async function GET(req: Request) {
   }
 
   const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-  if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)) {
-    return NextResponse.json({ error: 'Acesso negado ao módulo de frotas.' }, { status: 403 })
+  if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_2)) {
+    return NextResponse.json({ error: 'O painel de deslocamentos requer nível 2 no módulo de frotas.' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     if (!vehicle) {
       return NextResponse.json({ error: 'Veículo não cadastrado.' }, { status: 400 })
     }
-     if (vehicleKmValue !== null && typeof vehicle.kmCurrent === 'number' && vehicle.kmCurrent > 0) {
+    if (vehicleKmValue !== null && typeof vehicle.kmCurrent === 'number' && vehicle.kmCurrent > 0) {
       if (vehicleKmValue < vehicle.kmCurrent) {
         return NextResponse.json(
           {

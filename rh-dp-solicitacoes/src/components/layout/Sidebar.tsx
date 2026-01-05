@@ -15,8 +15,6 @@ import {
   Shield,
   Truck,
   ClipboardCheck,
-   Clock3,
-  User2,
   ShieldAlert,
   Route,
   LayoutDashboard,
@@ -26,12 +24,13 @@ import { usePathname } from 'next/navigation'
 type Props = {
   showSolic: boolean
   showConfig: boolean
-showConfigPermissions: boolean
+  showConfigPermissions: boolean
   showFleet: boolean
   showRefusal: boolean
   canApprove: boolean
   canReviewRefusal: boolean
- userMenu: ReactNode
+  fleetLevel?: 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | null
+  userMenu: ReactNode
 }
 export default function Sidebar({
   showSolic,
@@ -41,6 +40,7 @@ export default function Sidebar({
   showRefusal,
   canApprove,
   canReviewRefusal,
+  fleetLevel,
   userMenu,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
@@ -94,6 +94,14 @@ export default function Sidebar({
     'w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors cursor-pointer'
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
+  const fleetLevelOrder = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3'] as const
+  const hasFleetLevel = (min: (typeof fleetLevelOrder)[number]) => {
+    if (!fleetLevel) return false
+    return fleetLevelOrder.indexOf(fleetLevel) >= fleetLevelOrder.indexOf(min)
+  }
+
+  const canSeeFleetBasics = hasFleetLevel('NIVEL_1')
+  const canSeeFleetPanels = hasFleetLevel('NIVEL_2')
 
   return (
     <aside
@@ -135,67 +143,64 @@ export default function Sidebar({
 
               {openFleet && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link
-                    href="/dashboard/gestao-de-frotas/veiculos"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/gestao-de-frotas/veiculos')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Truck size={16} /> <span>Veículos</span>
-                  </Link>
+                    {canSeeFleetPanels && (
+                    <Link
+                      href="/dashboard/gestao-de-frotas/veiculos"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/gestao-de-frotas/veiculos')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Truck size={16} /> <span>Veículos</span>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/dashboard/gestao-de-frotas/checkins"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/gestao-de-frotas/checkins')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <ClipboardCheck size={16} /> <span>Check-ins diários</span>
-                  </Link>
-                   <Link
-                    href="/dashboard/gestao-de-frotas/deslocamento/checkin"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/checkin')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Route size={16} /> <span>Check-in de deslocamento</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/gestao-de-frotas/deslocamento/painel"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/painel')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <LayoutDashboard size={16} /> <span>Painel deslocamentos</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/gestao-de-frotas/motoristas"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/gestao-de-frotas/motoristas')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <User2 size={16} /> <span>Motoristas</span>
-                  </Link>                  
+                  {canSeeFleetBasics && (
+                    <Link
+                      href="/dashboard/gestao-de-frotas/checkins"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/gestao-de-frotas/checkins')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ClipboardCheck size={16} /> <span>Check-ins diários</span>
+                    </Link>
+                  )}
+                  {canSeeFleetBasics && (
+                    <Link
+                      href="/dashboard/gestao-de-frotas/deslocamento/checkin"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/checkin')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Route size={16} /> <span>Check-in de deslocamento</span>
+                    </Link>
+                  )}
+                  {canSeeFleetPanels && (
+                    <Link
+                      href="/dashboard/gestao-de-frotas/deslocamento/painel"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/painel')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <LayoutDashboard size={16} /> <span>Painel deslocamentos</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
           )}
-           {showRefusal && (
+            {showRefusal && (
             <div>
               <button
                 type="button"
@@ -210,7 +215,7 @@ export default function Sidebar({
 
               {openRefusal && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                   {canReviewRefusal && (
+                  {canReviewRefusal && (
                     <Link
                       href="/dashboard/direito-de-recusa"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -219,9 +224,9 @@ export default function Sidebar({
                             ? 'bg-orange-500/90 text-white'
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
-                     >
-                    <ShieldAlert size={16} /> <span>Painel</span>
-                  </Link>
+                      >
+                      <ShieldAlert size={16} /> <span>Painel</span>
+                    </Link>
                   )}
                    <Link
                     href="/dashboard/direito-de-recusa/minhas"

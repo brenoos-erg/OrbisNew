@@ -28,6 +28,14 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') ?? undefined
   const plate = searchParams.get('plate') ?? undefined
+  const canListVehicles = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_2)
+
+  if (!canListVehicles && !plate) {
+    return NextResponse.json(
+      { error: 'Consulte veículos individualmente ou solicite acesso de nível 2 para listar.' },
+      { status: 403 },
+    )
+  }
 
   const vehicles = await prisma.vehicle.findMany({
     where: {
@@ -52,7 +60,7 @@ export async function GET(req: Request) {
     },
   })
 
-   const withLastCheckin = vehicles
+  const withLastCheckin = vehicles
     .map((vehicle) => {
       const { checkins, ...rest } = vehicle
       return {
