@@ -18,6 +18,8 @@ import {
    Clock3,
   User2,
   ShieldAlert,
+  Route,
+  LayoutDashboard,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -157,6 +159,28 @@ export default function Sidebar({
                     <ClipboardCheck size={16} /> <span>Check-ins diários</span>
                   </Link>
                    <Link
+                    href="/dashboard/gestao-de-frotas/deslocamento/checkin"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/checkin')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <Route size={16} /> <span>Check-in de deslocamento</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/gestao-de-frotas/deslocamento/painel"
+                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      ${
+                        pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/painel')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <LayoutDashboard size={16} /> <span>Painel deslocamentos</span>
+                  </Link>
+                  <Link
                     href="/dashboard/gestao-de-frotas/motoristas"
                     className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
                       ${

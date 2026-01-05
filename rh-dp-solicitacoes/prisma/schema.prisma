@@ -79,25 +79,26 @@ model Event {
 }
 
 model CostCenter {
-  id                 String              @id @default(uuid())
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  abbreviation       String?
-  area               String?
-  code               String?
-  description        String
-  externalCode       String?             @unique(map: "CostCenter_externalCode_uq")
-  managementType     String?
-  status             CCStatus            @default(ACTIVE)
-  groupName          String?             @map("group_name")
-  observations       String?
-  departmentId       String?
-  department         Department?         @relation(fields: [departmentId], references: [id])
-  modules            CostCenterModule[]
-  solicitations      Solicitation[]
-  users              User[]
-  userLinks          UserCostCenter[]
-  vehicleCostCenters VehicleCostCenter[]
+  id                   String                       @id @default(uuid())
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  abbreviation         String?
+  area                 String?
+  code                 String?
+  description          String
+  externalCode         String?                      @unique(map: "CostCenter_externalCode_uq")
+  managementType       String?
+  status               CCStatus                     @default(ACTIVE)
+  groupName            String?                      @map("group_name")
+  observations         String?
+  departmentId         String?
+  department           Department?                  @relation(fields: [departmentId], references: [id])
+  modules              CostCenterModule[]
+  solicitations        Solicitation[]
+  users                User[]
+  userLinks            UserCostCenter[]
+  vehicleCostCenters   VehicleCostCenter[]
+  displacementCheckins VehicleDisplacementCheckin[]
 
   @@map("CostCenter")
 }
@@ -156,16 +157,16 @@ model TipoSolicitacao {
 }
 
 model Department {
-  id            String             @id @default(uuid())
-  name          String
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  code          String             @unique
-  costCenters   CostCenter[]
-  modules       DepartmentModule[]
-  positions     Position[]
-  solicitations Solicitation[]
-  users         User[]
+  id              String             @id @default(uuid())
+  name            String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  code            String             @unique
+  costCenters     CostCenter[]
+  modules         DepartmentModule[]
+  positions       Position[]
+  solicitations   Solicitation[]
+  users           User[]
   userDepartments UserDepartment[]
 }
 
@@ -243,10 +244,11 @@ model User {
   vehicleStatusLogs     VehicleStatusLog[]
 
   // Direito de Recusa - relações inversas de RefusalReport
-  refusalReportsAsEmployee           RefusalReport[] @relation("RefusalReportEmployee")
-  refusalReportsAsContractManager    RefusalReport[] @relation("RefusalReportContractManager")
-  refusalReportsAsGeneralCoordinator RefusalReport[] @relation("RefusalReportGeneralCoordinator")
-  refusalReportsAsDecidedBy          RefusalReport[] @relation("RefusalReportDecisionUser")
+  refusalReportsAsEmployee           RefusalReport[]              @relation("RefusalReportEmployee")
+  refusalReportsAsContractManager    RefusalReport[]              @relation("RefusalReportContractManager")
+  refusalReportsAsGeneralCoordinator RefusalReport[]              @relation("RefusalReportGeneralCoordinator")
+  refusalReportsAsDecidedBy          RefusalReport[]              @relation("RefusalReportDecisionUser")
+  vehicleDisplacementCheckins        VehicleDisplacementCheckin[]
 
   @@map("User")
 }
@@ -373,19 +375,20 @@ model UserDepartment {
 }
 
 model Vehicle {
-  id          String              @id @default(cuid())
-  plate       String              @unique
-  type        String
-  model       String?
-  costCenter  String?
-  sector      String?
-  kmCurrent   Int                 @default(0)
-  status      String              @default("DISPONIVEL")
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  checkins    VehicleCheckin[]
-  costCenters VehicleCostCenter[]
-  statusLogs  VehicleStatusLog[]
+  id                   String                       @id @default(cuid())
+  plate                String                       @unique
+  type                 String
+  model                String?
+  costCenter           String?
+  sector               String?
+  kmCurrent            Int                          @default(0)
+  status               String                       @default("DISPONIVEL")
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  checkins             VehicleCheckin[]
+  costCenters          VehicleCostCenter[]
+  statusLogs           VehicleStatusLog[]
+  displacementCheckins VehicleDisplacementCheckin[]
 }
 
 model VehicleCostCenter {
@@ -436,6 +439,24 @@ model VehicleStatusLog {
   createdAt   DateTime @default(now())
   createdBy   User?    @relation(fields: [createdById], references: [id], onUpdate: NoAction)
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model VehicleDisplacementCheckin {
+  id                   String   @id @default(cuid())
+  vehicleId            String
+  driverId             String
+  tripDate             DateTime
+  costCenterId         String?
+  origin               String
+  destination          String
+  vehiclePlateSnapshot String
+  vehicleTypeSnapshot  String
+  vehicleModelSnapshot String?
+  createdAt            DateTime @default(now())
+
+  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver     User        @relation(fields: [driverId], references: [id])
+  costCenter CostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
 }
 
 enum Role {
