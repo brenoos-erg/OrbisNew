@@ -234,8 +234,8 @@ export default function DisplacementPanelPage() {
               </button>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+             <div className="grid gap-4 md:grid-cols-[1.6fr,1fr] lg:min-h-[420px]">
+              <div className="flex min-h-[340px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase text-slate-500">Log atual</p>
@@ -249,7 +249,7 @@ export default function DisplacementPanelPage() {
                 </div>
 
                 {activeLog ? (
-                  <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                   <div className="grid flex-1 gap-3 overflow-y-auto text-sm text-slate-700 sm:grid-cols-2">
                     <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
                       <p className="text-xs font-semibold uppercase text-slate-500">Origem</p>
                       <p className="text-base font-semibold text-slate-900">{activeLog.origin}</p>
@@ -298,13 +298,13 @@ export default function DisplacementPanelPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500">
+                 <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500">
                     Nenhum deslocamento registrado para esta placa.
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex min-h-[340px] flex-col space-y-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-xs font-semibold uppercase text-slate-500">Logs anteriores</p>
@@ -314,21 +314,21 @@ export default function DisplacementPanelPage() {
                     {logEntries.length} log(s)
                   </span>
                 </div>
-                <div className="space-y-2">
-
+                <div className="flex-1 space-y-2 overflow-y-auto pr-1">
                   {logEntries.length === 0 && (
                     <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-center text-sm text-slate-500">
                       Nenhum deslocamento registrado para esta placa.
                     </p>
 
                   )}
-                 {logEntries.map((log) => {
+                  {logEntries.map((log) => {
                     const isActive = activeLog?.id === log.id
                     return (
                       <button
                         type="button"
                         key={log.id}
                         onClick={() => setActiveLogId(log.id)}
+                        aria-pressed={isActive}
                         className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition ${
                           isActive
                             ? 'border-orange-200 bg-white shadow-sm'
