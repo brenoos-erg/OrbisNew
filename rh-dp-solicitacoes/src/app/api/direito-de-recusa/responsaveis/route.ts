@@ -7,6 +7,7 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 export const dynamic = 'force-dynamic'
 
 const MODULE_KEY = 'direito-de-recusa'
+const MODULE_KEY_VARIANTS = ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa']
 const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
 function hasMinLevel(level: ModuleLevel | undefined, min: ModuleLevel) {
@@ -28,10 +29,40 @@ export async function GET() {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
 
-    const responsibles = await prisma.user.findMany({
+    const departmentFilter = me.departmentId
+      ? { departmentId: me.departmentId }
+      : {}
+
+    const contractManagers = await prisma.user.findMany({
       where: {
         status: UserStatus.ATIVO,
-        moduleAccesses: { some: { level: ModuleLevel.NIVEL_3 } },
+        ...departmentFilter,
+        moduleAccesses: {
+          some: {
+            module: { key: { in: MODULE_KEY_VARIANTS } },
+            level: ModuleLevel.NIVEL_2,
+          },
+        },
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        department: { select: { name: true } },
+      },
+      orderBy: [{ fullName: 'asc' }],
+    })
+
+    const coordinators = await prisma.user.findMany({
+      where: {
+        status: UserStatus.ATIVO,
+        ...departmentFilter,
+        moduleAccesses: {
+          some: {
+            module: { key: { in: MODULE_KEY_VARIANTS } },
+            level: ModuleLevel.NIVEL_3,
+          },
+        },
       },
       select: {
         id: true,
@@ -43,7 +74,14 @@ export async function GET() {
     })
 
     return NextResponse.json({
-      responsibles: responsibles.map((user) => ({
+      contractManagers: contractManagers.map((user) => ({
+        id: user.id,
+        name: user.fullName,
+        email: user.email,
+        department: user.department?.name ?? null,
+        level: ModuleLevel.NIVEL_2,
+      })),
+      coordinators: coordinators.map((user) => ({
         id: user.id,
         name: user.fullName,
         email: user.email,

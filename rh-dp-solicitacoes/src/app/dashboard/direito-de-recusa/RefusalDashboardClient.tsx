@@ -24,6 +24,10 @@ type RefusalReportRow = {
 
 type Props = {
   canReview: boolean
+   title?: string
+  description?: string
+  defaultStatus?: '' | RefusalStatus
+  showStatusFilter?: boolean
 }
 
 const statusBadge: Record<
@@ -35,11 +39,19 @@ const statusBadge: Record<
   REJEITADA: { label: 'Não procede', className: 'bg-rose-100 text-rose-800' },
 }
 
-export default function RefusalDashboardClient({ canReview }: Props) {
+export default function RefusalDashboardClient({
+  canReview,
+  title = 'Direito de Recusa',
+  description = 'Registre e acompanhe recusas de atividades por risco identificado. O colaborador abre o formulário e os responsáveis de nível 2 ou 3 avaliam se a situação procede.',
+  defaultStatus = '',
+  showStatusFilter = true,
+}: Props) {
   const [reports, setReports] = useState<RefusalReportRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'' | RefusalStatus>('')
+  const [statusFilter, setStatusFilter] = useState<'' | RefusalStatus>(
+    defaultStatus,
+  )
 
   async function load() {
     try {
@@ -83,11 +95,8 @@ export default function RefusalDashboardClient({ canReview }: Props) {
           </div>
           <div className="space-y-1">
             <p className="text-sm font-semibold uppercase text-slate-500">Segurança do Trabalho</p>
-            <h1 className="text-3xl font-bold text-slate-900">Direito de Recusa</h1>
-            <p className="text-slate-600 max-w-3xl">
-              Registre e acompanhe recusas de atividades por risco identificado. O colaborador abre o formulário e
-              os responsáveis de nível 2 ou 3 avaliam se a situação procede.
-            </p>
+             <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
+            <p className="text-slate-600 max-w-3xl">{description}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -106,19 +115,23 @@ export default function RefusalDashboardClient({ canReview }: Props) {
             <RefreshCcw size={16} />
             Atualizar
           </button>
-          <div className="ml-auto flex items-center gap-2">
-            <label className="text-sm text-slate-600">Status:</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as RefusalStatus | '')}
-              className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800"
-            >
-              <option value="">Todos</option>
-              <option value="PENDENTE">Pendente</option>
-              <option value="APROVADA">Procede</option>
-              <option value="REJEITADA">Não procede</option>
-            </select>
-          </div>
+          {showStatusFilter ? (
+            <div className="ml-auto flex items-center gap-2">
+              <label className="text-sm text-slate-600">Status:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as RefusalStatus | '')}
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800"
+              >
+                <option value="">Todos</option>
+                <option value="PENDENTE">Pendente</option>
+                <option value="APROVADA">Procede</option>
+                <option value="REJEITADA">Não procede</option>
+              </select>
+            </div>
+          ) : (
+            <div className="ml-auto" />
+          )}
         </div>
         {error ? (
           <div className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-800 border border-rose-200">

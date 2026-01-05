@@ -18,7 +18,7 @@ type ResponsibleOption = {
   name: string
   email: string
   department: string | null
-   level: 'NIVEL_2' | 'NIVEL_3'
+  level: 'NIVEL_2' | 'NIVEL_3'
 }
 
 export default function NewRefusalReportPage() {
@@ -32,6 +32,7 @@ export default function NewRefusalReportPage() {
     detailedCondition: '',
   })
   const [responsibles, setResponsibles] = useState<ResponsibleOption[]>([])
+  const [coordinators, setCoordinators] = useState<ResponsibleOption[]>([])
   const [responsiblesError, setResponsiblesError] = useState<string | null>(null)
   const [loadingResponsibles, setLoadingResponsibles] = useState(true)
   const [files, setFiles] = useState<File[]>([])
@@ -41,7 +42,7 @@ export default function NewRefusalReportPage() {
 
   const isValid = useMemo(() => {
     return (
-        form.contractManagerId.trim() &&
+      form.contractManagerId.trim() &&
       form.generalCoordinatorId.trim() &&
       form.sectorOrContract.trim() &&
       form.riskSituation.trim() &&
@@ -50,7 +51,14 @@ export default function NewRefusalReportPage() {
     )
   }, [form])
 
-    const availableResponsibles = useMemo(() => responsibles, [responsibles])
+    const contractManagers = useMemo(
+    () => responsibles.filter((resp) => resp.level === 'NIVEL_2'),
+    [responsibles],
+  )
+  const availableCoordinators = useMemo(
+    () => coordinators.filter((resp) => resp.level === 'NIVEL_3'),
+    [coordinators],
+  )
 
   useEffect(() => {
     async function loadResponsibles() {
@@ -61,8 +69,12 @@ export default function NewRefusalReportPage() {
           const json = await res.json().catch(() => ({}))
           throw new Error(json?.error || 'Erro ao carregar responsáveis.')
         }
-        const json = (await res.json()) as { responsibles?: ResponsibleOption[] }
-        setResponsibles(json.responsibles ?? [])
+        const json = (await res.json()) as {
+          contractManagers?: ResponsibleOption[]
+          coordinators?: ResponsibleOption[]
+        }
+        setResponsibles(json.contractManagers ?? [])
+        setCoordinators(json.coordinators ?? [])
       } catch (err: any) {
         setResponsiblesError(err?.message || 'Erro ao carregar responsáveis.')
       } finally {
@@ -138,8 +150,8 @@ export default function NewRefusalReportPage() {
         <p className="text-sm font-semibold uppercase text-slate-500">Direito de Recusa</p>
         <h1 className="text-2xl font-bold text-slate-900">Registrar recusa de atividade</h1>
         <p className="text-slate-600">
-          Informe a situação de risco observada e os responsáveis diretos. Enviaremos para avaliação dos responsáveis
-          com nível 3 em qualquer módulo.
+           Informe a situação de risco observada e os responsáveis diretos. O gestor de contrato (nível 2) e o
+          coordenador geral (nível 3) cadastrados receberão a solicitação para avaliação.
         </p>
       </div>
 
@@ -154,11 +166,11 @@ export default function NewRefusalReportPage() {
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <label className="text-sm font-medium text-slate-700">Gestor do contrato</label>
-             <select
+            <select
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
               value={form.contractManagerId}
               onChange={(e) => setForm((prev) => ({ ...prev, contractManagerId: e.target.value }))}
@@ -166,7 +178,7 @@ export default function NewRefusalReportPage() {
               required
             >
               <option value="">Selecione o gestor</option>
-              {availableResponsibles.map((responsible) => (
+              {contractManagers.map((responsible) => (
                 <option key={responsible.id} value={responsible.id}>
                   {responsible.name}
                   {responsible.department ? ` — ${responsible.department}` : ''}
@@ -176,8 +188,8 @@ export default function NewRefusalReportPage() {
             {loadingResponsibles ? (
               <p className="text-xs text-slate-500">Carregando responsáveis...</p>
             ) : null}
-            {!loadingResponsibles && availableResponsibles.length === 0 ? (
-               <p className="text-xs text-slate-500">Nenhum responsável com nível 3 cadastrado.</p>
+            {!loadingResponsibles && contractManagers.length === 0 ? (
+              <p className="text-xs text-slate-500">Nenhum gestor de contrato (nível 2) disponível.</p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>
@@ -194,15 +206,15 @@ export default function NewRefusalReportPage() {
               required
             >
               <option value="">Selecione o coordenador</option>
-              {availableResponsibles.map((responsible) => (
+              {availableCoordinators.map((responsible) => (
                 <option key={responsible.id} value={responsible.id}>
                   {responsible.name}
                   {responsible.department ? ` — ${responsible.department}` : ''}
                 </option>
               ))}
-             </select>
-            {!loadingResponsibles && availableResponsibles.length === 0 ? (
-              <p className="text-xs text-slate-500">Nenhum coordenador disponível com nível 3.</p>
+            </select>
+            {!loadingResponsibles && availableCoordinators.length === 0 ? (
+              <p className="text-xs text-slate-500">Nenhum coordenador geral (nível 3) disponível.</p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>

@@ -29,6 +29,7 @@ type Props = {
   showRefusal: boolean
   canApprove: boolean
   canReviewRefusal: boolean
+  canAccessRefusalPanel?: boolean
   fleetLevel?: 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | null
   userMenu: ReactNode
 }
@@ -40,6 +41,7 @@ export default function Sidebar({
   showRefusal,
   canApprove,
   canReviewRefusal,
+  canAccessRefusalPanel = false,
   fleetLevel,
   userMenu,
 }: Props) {
@@ -215,7 +217,7 @@ export default function Sidebar({
 
               {openRefusal && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  {canReviewRefusal && (
+                  {canAccessRefusalPanel && (
                     <Link
                       href="/dashboard/direito-de-recusa"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -246,16 +248,16 @@ export default function Sidebar({
                         pathname.startsWith('/dashboard/direito-de-recusa/nova')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
+                        }`}
                   >
                     <ClipboardList size={16} /> <span>Registrar recusa</span>
                   </Link>
                   {canReviewRefusal && (
                     <Link
-                      href="/dashboard/direito-de-recusa"
+                      href="/dashboard/direito-de-recusa/pendentes"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
                         ${
-                          pathname === '/dashboard/direito-de-recusa'
+                          pathname === '/dashboard/direito-de-recusa/pendentes'
                             ? 'bg-orange-500/90 text-white'
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}

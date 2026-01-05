@@ -1,8 +1,7 @@
-// src/app/dashboard/direito-de-recusa/page.tsx
 import { redirect } from 'next/navigation'
 import { ModuleLevel } from '@prisma/client'
 import { getCurrentAppUser } from '@/lib/auth'
-import RefusalDashboardClient from './RefusalDashboardClient'
+import RefusalDashboardClient from '../RefusalDashboardClient'
 
 const ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
@@ -11,7 +10,7 @@ function hasMinLevel(level: ModuleLevel | undefined, min: ModuleLevel) {
   return ORDER.indexOf(level) >= ORDER.indexOf(min)
 }
 
-export default async function Page() {
+export default async function PendingRefusalsPage() {
   const { appUser } = await getCurrentAppUser()
   if (!appUser) redirect('/login')
 
@@ -23,11 +22,13 @@ export default async function Page() {
     redirect('/dashboard/direito-de-recusa/minhas')
   }
 
-  if (!hasMinLevel(level, ModuleLevel.NIVEL_3)) {
-    redirect('/dashboard/direito-de-recusa/pendentes')
-  }
-
-  const canReview = true
-
-  return <RefusalDashboardClient canReview={canReview} />
+  return (
+    <RefusalDashboardClient
+      canReview
+      title="Pendentes para avaliar"
+      description="Visualize as recusas atribuídas ao seu nome e registre a decisão."
+      defaultStatus="PENDENTE"
+      showStatusFilter={false}
+    />
+  )
 }

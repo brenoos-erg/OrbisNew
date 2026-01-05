@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 const MODULE_KEY = 'direito-de-recusa'
+const MODULE_KEY_VARIANTS = ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa']
 const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
 function hasMinLevel(level: ModuleLevel | undefined, min: ModuleLevel) {
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
       ? await prisma.userModuleAccess.findFirst({
           where: {
             userId: contractManagerId,
-            module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
+            module: { key: { in: MODULE_KEY_VARIANTS } },
             level: ModuleLevel.NIVEL_2,
             user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
           },
@@ -150,8 +151,8 @@ export async function POST(req: NextRequest) {
       ? await prisma.userModuleAccess.findFirst({
           where: {
             userId: generalCoordinatorId,
-            module: { key: { in: ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa'] } },
-            level: ModuleLevel.NIVEL_2,
+            module: { key: { in: MODULE_KEY_VARIANTS } },
+            level: ModuleLevel.NIVEL_3,
             user: { status: UserStatus.ATIVO, departmentId: me.departmentId },
           },
           select: { user: { select: { id: true, fullName: true } } },

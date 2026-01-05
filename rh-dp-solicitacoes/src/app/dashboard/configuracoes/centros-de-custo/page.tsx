@@ -2,7 +2,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Save, X, Download } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Save,
+  X,
+  Download,
+  FileSpreadsheet,
+} from 'lucide-react'
 import EditarCentroDeCusto, { type CostCenterRow } from './EditarCentroDeCusto'
 
 type Row = CostCenterRow & { updatedAt: string }
@@ -33,6 +41,13 @@ export default function CostCentersPage() {
 
   // edição
   const [editing, setEditing] = useState<Row | null>(null)
+  // bulk
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [bulkResults, setBulkResults] = useState<
+    { line: number; description: string; status: 'created' | 'failed'; message: string }[]
+  >([])
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -145,6 +160,108 @@ export default function CostCentersPage() {
     a.click()
     URL.revokeObjectURL(url)
   }
+  async function handleBulkCreate() {
+    const lines = bulkText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+
+    if (lines.length === 0) {
+      alert('Cole ou digite pelo menos uma linha para cadastro em massa.')
+      return
+    }
+
+    setBulkResults([])
+    setBulkProcessing(true)
+
+    const results: {
+      line: number
+      description: string
+      status: 'created' | 'failed'
+      message: string
+    }[] = []
+
+    const normalizeStatus = (value?: string | null) => {
+      const normalized = (value || '').trim().toUpperCase()
+      return normalized === 'INATIVO' || normalized === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i]
+      const parts = raw.split(';').map((p) => p.trim())
+      const [
+        lineDescription,
+        lineCode,
+        lineExternalCode,
+        lineAbbreviation,
+        lineArea,
+        lineManagementType,
+        lineGroupName,
+        lineStatus,
+        lineNotes,
+      ] = parts
+
+      if (!lineDescription) {
+        results.push({
+          line: i + 1,
+          description: '—',
+          status: 'failed',
+          message: 'Descrição é obrigatória.',
+        })
+        continue
+      }
+
+      try {
+        const r = await fetch('/api/cost-centers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: lineDescription,
+            code: lineCode || undefined,
+            externalCode: lineExternalCode || undefined,
+            abbreviation: lineAbbreviation || undefined,
+            area: lineArea || undefined,
+            managementType: lineManagementType || undefined,
+            groupName: lineGroupName || undefined,
+            status: normalizeStatus(lineStatus),
+            notes: lineNotes || undefined,
+          }),
+        })
+
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}))
+          throw new Error(err?.error || `Falha ao criar (status ${r.status}).`)
+        }
+
+        results.push({
+          line: i + 1,
+          description: lineDescription,
+          status: 'created',
+          message: 'Criado com sucesso.',
+        })
+      } catch (e: any) {
+        results.push({
+          line: i + 1,
+          description: lineDescription,
+          status: 'failed',
+          message: e?.message || 'Erro inesperado ao criar.',
+        })
+      }
+    }
+
+    setBulkResults(results)
+    setBulkProcessing(false)
+
+    const anySuccess = results.some((r) => r.status === 'created')
+    if (anySuccess) {
+      setPage(1)
+      load()
+    }
+    const onlySuccess = results.length > 0 && results.every((r) => r.status === 'created')
+    if (onlySuccess) {
+      setBulkText('')
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -162,6 +279,12 @@ export default function CostCentersPage() {
             title="Exportar CSV"
           >
             <Download size={16} /> Excel
+          </button>
+           <button
+            onClick={() => setBulkOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-white/5"
+          >
+            <FileSpreadsheet size={16} /> Cadastro em massa
           </button>
           <button
             onClick={() => setCreating(true)}
@@ -466,6 +589,114 @@ export default function CostCentersPage() {
               load()
             }}
           />
+        </div>
+      )}
+       {/* Modal cadastro em massa */}
+      {bulkOpen && (
+        <div className="fixed inset-0 bg-black/40 grid place-items-center z-50 p-4">
+          <div className="w-full max-w-5xl rounded-2xl bg-[var(--card)] text-[var(--foreground)] p-6 shadow-xl border border-[var(--border-subtle)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Cadastro em massa</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Informe uma linha por centro de custo, separando campos com ponto e vírgula.
+                </p>
+              </div>
+              <button onClick={() => setBulkOpen(false)} className="rounded-md p-1 hover:bg-white/5">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-1 space-y-2 text-sm text-slate-600">
+                <p className="font-semibold text-slate-800">Formato esperado</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>
+                    <span className="font-semibold">Campos:</span>{' '}
+                    Descrição; Código; Cód. Externo; Sigla; Área; Tipo de Gestão; Grupo; Status
+                    (ATIVO/INATIVO); Observações.
+                  </li>
+                  <li>Descrição é obrigatória. Status vazio será considerado ATIVO.</li>
+                  <li>
+                    Use ponto e vírgula para separar os valores. Linhas em branco são ignoradas.
+                  </li>
+                </ul>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button
+                    onClick={() =>
+                      setBulkText(
+                        [
+                          'Metro BH Topografia; 5840; ; MBH; Engenharia; Terceirização; Metro; ATIVO; Observação opcional',
+                          'Vale Topografia Proj. Fel e Correntes; 5620; 5620; ; Engenharia; Interno; Vale; INATIVO; ',
+                        ].join('\n'),
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-white/5"
+                    type="button"
+                  >
+                    Preencher exemplo
+                  </button>
+                  <button
+                    onClick={() => {
+                      setBulkText('')
+                      setBulkResults([])
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-white/5"
+                    type="button"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 space-y-3">
+                <textarea
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-white/80 p-3 text-sm text-slate-800 shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
+                  rows={8}
+                  placeholder="Descrição; Código; Cód. Externo; Sigla; Área; Tipo de Gestão; Grupo; Status; Observações"
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                />
+
+                {bulkResults.length > 0 && (
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-white/60 p-3 text-xs text-slate-700">
+                    <p className="font-semibold text-slate-800">Resultados do processamento:</p>
+                    <ul className="mt-2 space-y-1">
+                      {bulkResults.map((r) => (
+                        <li key={r.line} className="flex items-center justify-between gap-2">
+                          <span>
+                            Linha {r.line}: <b>{r.description}</b>
+                          </span>
+                          <span className={r.status === 'failed' ? 'text-red-700' : 'text-green-700'}>
+                            {r.message}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setBulkOpen(false)}
+                    className="btn-table px-4 py-2"
+                    type="button"
+                    disabled={bulkProcessing}
+                  >
+                    <X size={16} /> Cancelar
+                  </button>
+                  <button
+                    onClick={handleBulkCreate}
+                    className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+                    type="button"
+                    disabled={bulkProcessing}
+                  >
+                    {bulkProcessing ? 'Processando…' : 'Registrar em massa'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
