@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { isValidPlate } from '@/lib/plate'
 
 type VehicleOption = {
@@ -207,7 +206,7 @@ export default function DisplacementCheckinPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
       <header className="space-y-2 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
           <div>
             <p className="text-xs font-semibold uppercase text-slate-500">Gestão de Frotas</p>
             <h1 className="text-2xl font-bold text-slate-900">Check-in de deslocamento</h1>
@@ -215,12 +214,6 @@ export default function DisplacementCheckinPage() {
               Informe os dados do deslocamento. Ao digitar a placa, os dados do veículo e seus centros de custo são preenchidos automaticamente.
             </p>
           </div>
-          <Link
-            href="/dashboard/gestao-de-frotas/deslocamento/painel"
-            className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
-          >
-            Painel
-          </Link>
         </div>
       </header>
 

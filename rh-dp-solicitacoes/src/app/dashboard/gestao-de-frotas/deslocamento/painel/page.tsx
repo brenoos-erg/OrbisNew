@@ -22,6 +22,7 @@ export default function DisplacementPanelPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null)
+  const [activeLogId, setActiveLogId] = useState<string | null>(null)
 
   const formatter = useMemo(
     () =>
@@ -74,11 +75,30 @@ export default function DisplacementPanelPage() {
   const logEntries = useMemo(() => {
     if (!selectedPlate) return []
     const normalized = selectedPlate.toUpperCase()
-    return checkins.filter((checkin) => {
-      const plate = checkin.vehiclePlateSnapshot || checkin.vehicle?.plate || ''
-      return plate.toUpperCase() === normalized
-    })
+    return checkins
+      .filter((checkin) => {
+        const plate = checkin.vehiclePlateSnapshot || checkin.vehicle?.plate || ''
+        return plate.toUpperCase() === normalized
+      })
+      .sort((a, b) => {
+        const aDate = a.tripDate ? new Date(a.tripDate).getTime() : 0
+        const bDate = b.tripDate ? new Date(b.tripDate).getTime() : 0
+        return bDate - aDate
+      })
   }, [checkins, selectedPlate])
+  useEffect(() => {
+    if (logEntries.length > 0) {
+      setActiveLogId(logEntries[0].id)
+    } else {
+      setActiveLogId(null)
+    }
+  }, [logEntries])
+
+  const activeLog = useMemo(() => {
+    if (!logEntries.length) return null
+    return logEntries.find((log) => log.id === activeLogId) ?? logEntries[0] ?? null
+  }, [activeLogId, logEntries])
+
 
   const handleOpenLog = (plate: string) => {
     setSelectedPlate(plate)
@@ -214,61 +234,129 @@ export default function DisplacementPanelPage() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Data</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Placa</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Modelo</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Tipo</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Centro de custo</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Origem</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Destino</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Motorista</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-600">Quilometragem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {logEntries.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-2 text-slate-700">
-                        {log.tripDate ? formatter.format(new Date(log.tripDate)) : '—'}
-                      </td>
-                      <td className="px-3 py-2 font-semibold text-slate-900">
-                        {log.vehiclePlateSnapshot || log.vehicle?.plate || '—'}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {log.vehicleModelSnapshot || log.vehicle?.model || '—'}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {log.vehicleTypeSnapshot || log.vehicle?.type || '—'}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {log.costCenter
-                          ? `${log.costCenter.externalCode ? `${log.costCenter.externalCode} - ` : ''}${log.costCenter.description ?? ''}`
+            <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Log atual</p>
+                    <h4 className="text-lg font-bold text-slate-900">
+                      {activeLog?.tripDate ? formatter.format(new Date(activeLog.tripDate)) : '—'}
+                    </h4>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                    {activeLog?.vehiclePlateSnapshot || activeLog?.vehicle?.plate || '—'}
+                  </span>
+                </div>
+
+                {activeLog ? (
+                  <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Origem</p>
+                      <p className="text-base font-semibold text-slate-900">{activeLog.origin}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Destino</p>
+                      <p className="text-base font-semibold text-slate-900">{activeLog.destination}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Centro de custo</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {activeLog.costCenter
+                          ? `${activeLog.costCenter.externalCode ? `${activeLog.costCenter.externalCode} - ` : ''}${activeLog.costCenter.description ?? ''}`
                           : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-slate-700">{log.origin}</td>
-                      <td className="px-3 py-2 text-slate-700">{log.destination}</td>
-                      <td className="px-3 py-2 text-slate-700">{log.driver?.fullName || '—'}</td>
-                      <td className="px-3 py-2 text-slate-700">
-                        {typeof log.vehicleKmSnapshot === 'number'
-                          ? `${log.vehicleKmSnapshot.toLocaleString('pt-BR')} km`
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Motorista</p>
+                      <p className="text-base font-semibold text-slate-900">{activeLog.driver?.fullName || '—'}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Modelo</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {activeLog.vehicleModelSnapshot || activeLog.vehicle?.model || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Tipo</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {activeLog.vehicleTypeSnapshot || activeLog.vehicle?.type || '—'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Quilometragem</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {typeof activeLog.vehicleKmSnapshot === 'number'
+                          ? `${activeLog.vehicleKmSnapshot.toLocaleString('pt-BR')} km`
                           : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                       </p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Placa</p>
+                      <p className="text-base font-semibold text-slate-900">
+                        {activeLog.vehiclePlateSnapshot || activeLog.vehicle?.plate || '—'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500">
+                    Nenhum deslocamento registrado para esta placa.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Logs anteriores</p>
+                    <h4 className="text-lg font-bold text-slate-900">Histórico</h4>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                    {logEntries.length} log(s)
+                  </span>
+                </div>
+                <div className="space-y-2">
 
                   {logEntries.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-4 text-center text-slate-500">
-                        Nenhum deslocamento registrado para esta placa.
-                      </td>
-                    </tr>
+                    <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-center text-sm text-slate-500">
+                      Nenhum deslocamento registrado para esta placa.
+                    </p>
+
                   )}
-                </tbody>
-              </table>
+                 {logEntries.map((log) => {
+                    const isActive = activeLog?.id === log.id
+                    return (
+                      <button
+                        type="button"
+                        key={log.id}
+                        onClick={() => setActiveLogId(log.id)}
+                        className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition ${
+                          isActive
+                            ? 'border-orange-200 bg-white shadow-sm'
+                            : 'border-transparent bg-white/60 hover:border-orange-200 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex-1 space-y-1 text-sm text-slate-700">
+                          <div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">
+                            <span>{log.tripDate ? formatter.format(new Date(log.tripDate)) : '—'}</span>
+                            {typeof log.vehicleKmSnapshot === 'number' && (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                {log.vehicleKmSnapshot.toLocaleString('pt-BR')} km
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-semibold text-slate-900">
+                            {log.origin} → {log.destination}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {log.vehiclePlateSnapshot || log.vehicle?.plate || '—'} ·{' '}
+                            {log.vehicleModelSnapshot || log.vehicle?.model || '—'}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
