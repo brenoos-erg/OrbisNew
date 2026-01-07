@@ -111,7 +111,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="text-sm text-slate-400 mb-2">Sistema de Solicitações</div>
+      <div className="text-sm text-slate-400 mb-2">Sistema de Gestão Integrada</div>
       <h1 className="text-xl font-semibold mb-6 text-[var(--foreground)]">
         Perfil do Usuário
       </h1>

@@ -17,6 +17,14 @@ import {
   ShieldAlert,
   Route,
   LayoutDashboard,
+  Laptop,
+  Monitor,
+  Smartphone,
+  Printer,
+  Phone,
+  Router,
+  Cpu,
+  Package,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -25,6 +33,7 @@ type Props = {
   showConfig: boolean
   showFleet: boolean
   showRefusal: boolean
+  showEquipments: boolean
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
@@ -53,6 +62,16 @@ type Props = {
     nova: boolean
     pendentes: boolean
   }
+  equipmentFeatures: {
+    linhaTelefonica: boolean
+    smartphone: boolean
+    notebook: boolean
+    desktop: boolean
+    monitor: boolean
+    impressora: boolean
+    tplink: boolean
+    outros: boolean
+  }
   userMenu: ReactNode
 }
 export default function Sidebar({
@@ -60,6 +79,7 @@ export default function Sidebar({
   showConfig,
   showFleet,
   showRefusal,
+  showEquipments,
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
@@ -67,6 +87,7 @@ export default function Sidebar({
   solicitacaoFeatures,
   fleetFeatures,
   refusalFeatures,
+  equipmentFeatures,
   userMenu,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
@@ -76,11 +97,13 @@ export default function Sidebar({
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
   const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
+  const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
   const [openFleet, setOpenFleet] = useState(inFleet)
   const [openRefusal, setOpenRefusal] = useState(inRefusal)
+  const [openEquipment, setOpenEquipment] = useState(inEquipment)
 
   // quando mudar de rota, abre o grupo correspondente e fecha o outro
   useEffect(() => {
@@ -89,23 +112,33 @@ export default function Sidebar({
       setOpenConfig(false)
       setOpenFleet(false)
       setOpenRefusal(false)
+      setOpenEquipment(false)
     } else if (inConfig) {
       setOpenConfig(true)
       setOpenSolic(false)
       setOpenFleet(false)
       setOpenRefusal(false)
+      setOpenEquipment(false)
     } else if (inFleet) {
       setOpenFleet(true)
       setOpenSolic(false)
       setOpenConfig(false)
       setOpenRefusal(false)
+      setOpenEquipment(false)
     } else if (inRefusal) {
       setOpenRefusal(true)
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenEquipment(false)
+    } else if (inEquipment) {
+      setOpenEquipment(true)
+      setOpenRefusal(false)
+      setOpenFleet(false)
+      setOpenSolic(false)
+      setOpenConfig(false)
     }
-  }, [inSolic, inConfig, inFleet, inRefusal])
+  }, [inSolic, inConfig, inFleet, inRefusal, inEquipment])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -130,7 +163,7 @@ export default function Sidebar({
         {/* Cabeçalho com botão recolher/expandir */}
         <div className="h-16 flex items-center px-3 border-b border-white/10">
           {!collapsed && (
-            <div className="font-semibold mr-2">Sistema de Solicitações</div>
+            <div className="font-semibold mr-2">Sistema de Gestão Integrada</div>
           )}
           <button
             onClick={() => setCollapsed((v) => !v)}
@@ -212,6 +245,129 @@ export default function Sidebar({
                         }`}
                     >
                       <LayoutDashboard size={16} /> <span>Painel deslocamentos</span>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+            )}
+          {showEquipments && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenEquipment((v) => !v)}
+                className={`${baseSection} ${
+                  inEquipment ? activeSection : inactiveSection
+                }`}
+              >
+                <Package className="h-5 w-5 shrink-0" />
+                {!collapsed && <span>Controle de Equipamentos TI</span>}
+              </button>
+
+              {openEquipment && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  {equipmentFeatures.linhaTelefonica && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/linha-telefonica"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/linha-telefonica')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Phone size={16} /> <span>Linhas telefônicas</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.smartphone && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/smartphones"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/smartphones')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Smartphone size={16} /> <span>Smartphones</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.notebook && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/notebooks"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/notebooks')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Laptop size={16} /> <span>Notebooks</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.desktop && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/desktops"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/desktops')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Cpu size={16} /> <span>Desktops</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.monitor && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/monitores"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/monitores')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Monitor size={16} /> <span>Monitores</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.impressora && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/impressoras"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/impressoras')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Printer size={16} /> <span>Impressoras</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.tplink && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/tplink"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/tplink')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Router size={16} /> <span>TP-Link</span>
+                    </Link>
+                  )}
+                  {equipmentFeatures.outros && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/outros"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/outros')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Package size={16} /> <span>Outros equipamentos</span>
                     </Link>
                   )}
                 </div>

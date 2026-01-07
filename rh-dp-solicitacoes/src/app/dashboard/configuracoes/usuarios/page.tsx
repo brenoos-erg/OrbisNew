@@ -576,7 +576,7 @@ export default function Page() {
   return (
     <div className="max-w-7xl mx-auto w-full">
       <div className="text-sm text-slate-400 mb-6">
-        Sistema de Solicitações
+        Sistema de Gestão Integrada
       </div>
 
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">

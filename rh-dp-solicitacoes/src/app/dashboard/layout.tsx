@@ -64,11 +64,12 @@ export default async function DashboardLayout({
   }
 
   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
-  let showSolic = false
+let showSolic = false
   let showConfig = false
   let canApprove = false
   let showFleet = false
   let showRefusal = false
+  let showEquipments = false
   let canReviewRefusal = false
   let canAccessRefusalPanel = false
   let configFeatures = {
@@ -96,6 +97,16 @@ export default async function DashboardLayout({
     nova: false,
     pendentes: false,
   }
+  let equipmentFeatures = {
+    linhaTelefonica: false,
+    smartphone: false,
+    notebook: false,
+    desktop: false,
+    monitor: false,
+    impressora: false,
+    tplink: false,
+    outros: false,
+  }
 
   if (appUser.id) {
     const levels = appUser.moduleLevels ?? {}
@@ -109,6 +120,7 @@ export default async function DashboardLayout({
     const configLevel = levels[MODULE_KEYS.CONFIGURACOES]
     const fleetLevel = levels[MODULE_KEYS.FROTAS] ?? levels['gestao_frotas']
     const refusalLevel = levels[MODULE_KEYS.RECUSA] ?? levels['direito_de_recusa']
+    const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
 
     const [
       canViewConfigPainel,
@@ -128,6 +140,14 @@ export default async function DashboardLayout({
       canViewRecusaMinhas,
       canViewRecusaNova,
       canViewRecusaPendentes,
+      canViewEquipLinhaTelefonica,
+      canViewEquipSmartphone,
+      canViewEquipNotebook,
+      canViewEquipDesktop,
+      canViewEquipMonitor,
+      canViewEquipImpressora,
+      canViewEquipTplink,
+      canViewEquipOutros,
     ] = await Promise.all([
       canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW),
       canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW),
@@ -146,6 +166,54 @@ export default async function DashboardLayout({
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.LINHA_TELEFONICA,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.SMARTPHONE,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.NOTEBOOK,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.DESKTOP,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.MONITOR,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.IMPRESSORA,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.TPLINK,
+        Action.VIEW,
+      ),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS,
+        Action.VIEW,
+      ),
     ])
 
     configFeatures = {
@@ -176,12 +244,23 @@ export default async function DashboardLayout({
       nova: canViewRecusaNova,
       pendentes: canViewRecusaPendentes,
     }
+    equipmentFeatures = {
+      linhaTelefonica: canViewEquipLinhaTelefonica,
+      smartphone: canViewEquipSmartphone,
+      notebook: canViewEquipNotebook,
+      desktop: canViewEquipDesktop,
+      monitor: canViewEquipMonitor,
+      impressora: canViewEquipImpressora,
+      tplink: canViewEquipTplink,
+      outros: canViewEquipOutros,
+    }
 
     showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(solicitacaoFeatures).some(Boolean)
     showConfig = hasMinLevel(configLevel, ModuleLevel.NIVEL_1) && Object.values(configFeatures).some(Boolean)
     showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1) && Object.values(fleetFeatures).some(Boolean)
     showRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(refusalFeatures).some(Boolean)
-
+    showEquipments =
+      hasMinLevel(equipmentLevel, ModuleLevel.NIVEL_1) && Object.values(equipmentFeatures).some(Boolean)
     canApprove =
       hasStructure &&
       (await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.APPROVE))
@@ -198,6 +277,7 @@ export default async function DashboardLayout({
         showConfig={showConfig}
         showFleet={showFleet}
         showRefusal={showRefusal}
+        showEquipments={showEquipments}
         canApprove={canApprove}
         canReviewRefusal={canReviewRefusal}
         canAccessRefusalPanel={canAccessRefusalPanel}
@@ -205,13 +285,14 @@ export default async function DashboardLayout({
         solicitacaoFeatures={solicitacaoFeatures}
         fleetFeatures={fleetFeatures}
         refusalFeatures={refusalFeatures}
+        equipmentFeatures={equipmentFeatures}
         userMenu={<UserMenu collapsed={false} user={appUser} />}
       />
 
       {/* conteúdo */}
       <main className="flex-1 flex flex-col">
         <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
-          Sistema de Solicitações
+          Sistema de Gestão Integrada
         </div>
         <div className="p-6 flex-1 overflow-auto">{children}</div>
       </main>

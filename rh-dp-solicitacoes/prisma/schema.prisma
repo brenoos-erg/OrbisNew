@@ -246,6 +246,7 @@ model User {
   vehicleCheckins                            VehicleCheckin[]
   vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
   vehicleStatusLogs                          VehicleStatusLog[]
+  tiEquipments                               TiEquipment[]
   WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                @relation("WorkRefusal_analyzedByIdToUser")
   WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
   WorkRefusalAttachment                      WorkRefusalAttachment[]
@@ -414,6 +415,43 @@ model UserDepartment {
 
   @@unique([userId, departmentId])
   @@map("UserDepartment")
+}
+enum TiEquipmentCategory {
+  LINHA_TELEFONICA
+  SMARTPHONE
+  NOTEBOOK
+  DESKTOP
+  MONITOR
+  IMPRESSORA
+  TPLINK
+  OUTROS
+}
+
+enum TiEquipmentStatus {
+  IN_STOCK
+  ASSIGNED
+  MAINTENANCE
+  RETIRED
+}
+
+model TiEquipment {
+  id                    String              @id @default(uuid())
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  name                  String
+  patrimonio            String              @unique
+  userId                String
+  value                 Decimal?           @db.Decimal(14, 2)
+  costCenterIdSnapshot  String?
+  serialNumber          String?             @unique
+  category              TiEquipmentCategory
+  status                TiEquipmentStatus   @default(IN_STOCK)
+  observations          String?
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  costCenterSnapshot    CostCenter?         @relation(fields: [costCenterIdSnapshot], references: [id], onDelete: SetNull)
+
+  @@index([category, status])
+  @@map("TiEquipment")
 }
 
 model Vehicle {

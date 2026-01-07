@@ -298,8 +298,8 @@ const payload = await res.json().catch(() => null)
           <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-orange-300 bg-orange-50">
             <LogIn className="h-6 w-6 text-orange-500" />
           </div>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900">Canal de Solicitações</h1>
-          <p className="text-xs text-slate-500">RH ↔ DP</p>
+          <h1 className="mt-2 text-2xl font-semibold text-slate-900">Sistema de Gestão Integrada</h1>
+          <p className="text-xs text-slate-500">SGI</p>
         </div>
 
         <form

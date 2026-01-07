@@ -190,7 +190,7 @@ const AVATAR_BUCKET = 'avatars'
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="text-sm text-slate-500 mb-6">Sistema de Solicitações</div>
+      <div className="text-sm text-slate-500 mb-6">Sistema de Gestão Integrada</div>
       <h1 className="text-2xl font-semibold text-slate-900 mb-1">Meu Perfil</h1>
       <p className="text-sm text-slate-500 mb-6">Gerencie suas informações pessoais e de contato.</p>
 

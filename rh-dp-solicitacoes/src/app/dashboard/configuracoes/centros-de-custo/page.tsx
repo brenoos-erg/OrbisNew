@@ -265,7 +265,7 @@ export default function CostCentersPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="text-sm text-slate-400 mb-6">Sistema de Solicitações</div>
+      <div className="text-sm text-slate-400 mb-6">Sistema de Gestão Integrada</div>
 
       <div className="flex items-center justify-between mb-2">
         {/* AQUI: título mais escuro */}

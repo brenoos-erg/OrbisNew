@@ -22,7 +22,7 @@ export default function Header() {
 
   return (
     <header className="flex items-center justify-between bg-slate-900 px-6 py-3 text-white">
-      <h1 className="text-lg font-semibold">RH ⇆ DP — Sistema de Solicitações</h1>
+      <h1 className="text-lg font-semibold">SGI — Sistema de Gestão Integrada</h1>
       <button
         onClick={handleSignOut}
         className="rounded-md bg-orange-500 px-4 py-2 text-sm font-medium hover:bg-orange-600"

@@ -14,6 +14,7 @@ const CORE_MODULES = [
   { key: 'configuracoes', name: 'Configurações' },
   { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
   { key: 'direito-de-recusa', name: 'Direito de Recusa' },
+  { key: 'controle-equipamentos-ti', name: 'Controle de Equipamentos TI' },
 ]
 
 async function ensureCoreModules() {
@@ -45,6 +46,23 @@ async function ensureCoreModules() {
       })
       continue
     }
+    const normalizedKey = normalizeModuleKey(module.key)
+    const candidates = await prisma.module.findMany({
+      select: { id: true, key: true, name: true },
+    })
+    const normalizedMatch = candidates.find(
+      (candidate) =>
+        normalizeModuleKey(candidate.key) === normalizedKey ||
+        normalizeModuleKey(candidate.name) === normalizedKey,
+    )
+    if (normalizedMatch) {
+      await prisma.module.update({
+        where: { id: normalizedMatch.id },
+        data: { key: module.key, name: module.name },
+      })
+      continue
+    }
+
 
     await prisma.module.create({ data: module })
   }

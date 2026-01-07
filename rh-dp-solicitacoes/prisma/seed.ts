@@ -298,8 +298,18 @@ async function main() {
   const configModule = await ensureModule(MODULE_KEYS.CONFIGURACOES, 'Configurações')
   const fleetModule = await ensureModule(MODULE_KEYS.FROTAS, 'Gestão de Frotas')
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
+  const equipmentsModule = await ensureModule(
+    MODULE_KEYS.EQUIPAMENTOS_TI,
+    'Controle de Equipamentos TI',
+  )
 
-  const allModules = [solicitacoesModule, configModule, fleetModule, refusalModule]
+  const allModules = [
+    solicitacoesModule,
+    configModule,
+    fleetModule,
+    refusalModule,
+    equipmentsModule,
+  ]
 
   const adminGroup = await prisma.accessGroup.upsert({
     where: { name: 'Administradores' },
@@ -361,6 +371,12 @@ async function main() {
       create: { departmentId: safetyDepartment.id, moduleId: refusalModule.id },
     })
   }
+
+  await prisma.departmentModule.upsert({
+    where: { departmentId_moduleId: { departmentId: tiDepartment.id, moduleId: equipmentsModule.id } },
+    update: {},
+    create: { departmentId: tiDepartment.id, moduleId: equipmentsModule.id },
+  })
   /* =========================
      FEATURES E GRANTS POR FEATURE
      ========================= */
@@ -408,6 +424,20 @@ async function main() {
         { key: FEATURE_KEYS.RECUSA.PENDENTES, name: 'Pendentes para avaliar' },
       ],
     },
+    {
+      moduleId: equipmentsModule.id,
+      moduleKey: MODULE_KEYS.EQUIPAMENTOS_TI,
+      items: [
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.LINHA_TELEFONICA, name: 'Linhas telefônicas' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.SMARTPHONE, name: 'Smartphones' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.NOTEBOOK, name: 'Notebooks' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.DESKTOP, name: 'Desktops' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.MONITOR, name: 'Monitores' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.IMPRESSORA, name: 'Impressoras' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.TPLINK, name: 'TP-Link' },
+        { key: FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS, name: 'Outros equipamentos' },
+      ],
+    },
   ]
 
   const createdFeatures: { id: string; key: string; moduleKey: string }[] = []
@@ -441,8 +471,15 @@ async function main() {
     })
   }
 
-  const tiActions = (moduleKey: string) =>
-    moduleKey === MODULE_KEYS.CONFIGURACOES ? (['VIEW', 'CREATE', 'UPDATE'] as Action[]) : (['VIEW'] as Action[])
+  const tiActions = (moduleKey: string) => {
+    if (moduleKey === MODULE_KEYS.CONFIGURACOES) {
+      return ['VIEW', 'CREATE', 'UPDATE'] as Action[]
+    }
+    if (moduleKey === MODULE_KEYS.EQUIPAMENTOS_TI) {
+      return ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as Action[]
+    }
+    return ['VIEW'] as Action[]
+  }
 
   for (const feature of createdFeatures) {
     await prisma.featureGrant.upsert({

@@ -13,6 +13,7 @@ const CORE_MODULES = [
   { key: 'configuracoes', name: 'Configurações' },
   { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
   { key: 'direito-de-recusa', name: 'Direito de Recusa' },
+  { key: 'controle-equipamentos-ti', name: 'Controle de Equipamentos TI' },
 ]
 
 async function ensureCoreModules() {
