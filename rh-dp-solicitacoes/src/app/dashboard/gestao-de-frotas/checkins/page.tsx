@@ -96,6 +96,13 @@ const criticalOptions = [
   { value: 'OK', label: 'Ok' },
   { value: 'COM_PROBLEMA', label: 'Com problema' },
 ]
+const criticalNotApplicableItems = new Set(['10', '19'])
+
+const criticalOptionsWithNotApplicable = [
+  ...criticalOptions,
+  { value: 'NAO_SE_APLICA', label: 'Não se aplica' },
+]
+
 
 const nonCriticalOptions = [
   { value: 'OK', label: 'Ok' },
@@ -642,7 +649,10 @@ const vehicleKmRaw = formData.get('vehicleKm')
                     <option value="" disabled>
                       Selecione...
                     </option>
-                    {criticalOptions.map((option) => (
+                      {(criticalNotApplicableItems.has(item.name)
+                      ? criticalOptionsWithNotApplicable
+                      : criticalOptions
+                    ).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
