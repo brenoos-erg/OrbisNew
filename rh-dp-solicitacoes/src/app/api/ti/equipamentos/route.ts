@@ -4,7 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
-import { TI_EQUIPMENT_CATEGORIES, TI_EQUIPMENT_STATUSES } from '@/lib/tiEquipment'
+import {
+  TI_EQUIPMENT_CATEGORIES,
+  TI_EQUIPMENT_STATUSES,
+  type TiEquipmentCategory,
+  type TiEquipmentStatus,
+} from '@/lib/tiEquipment'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +27,7 @@ async function getAllowedCategories(userId: string, action: Action) {
     }),
   )
 
-  return checks.filter(Boolean) as string[]
+  return checks.filter(Boolean) as TiEquipmentCategory[]
 }
 
 function buildSearchWhere(search?: string | null) {
@@ -84,22 +89,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Categoria inválida.' }, { status: 400 })
   }
 
-  if (status && !TI_EQUIPMENT_STATUSES.includes(status as any)) {
+  if (status && !TI_EQUIPMENT_STATUSES.includes(status as TiEquipmentStatus)) {
     return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
   }
 
-  if (category && !allowedCategories.includes(category)) {
+  if (category && !allowedCategories.includes(category as TiEquipmentCategory)) {
     return NextResponse.json({ error: 'Acesso negado à categoria solicitada.' }, { status: 403 })
   }
 
-  const baseWhere = {
-    ...(category ? { category } : { category: { in: allowedCategories } }),
+  const categoryValue = category ? (category as TiEquipmentCategory) : null
+  const statusValue = status ? (status as TiEquipmentStatus) : null
+
+  const baseWhere: Prisma.TiEquipmentWhereInput = {
+    ...(categoryValue ? { category: categoryValue } : { category: { in: allowedCategories } }),
     ...(buildSearchWhere(search) ?? {}),
   }
 
-  const listWhere = {
+  const listWhere: Prisma.TiEquipmentWhereInput = {
     ...baseWhere,
-    ...(status ? { status } : {}),
+    ...(statusValue ? { status: statusValue } : {}),
   }
 
   const [rows, total, grouped] = await Promise.all([

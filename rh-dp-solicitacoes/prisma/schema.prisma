@@ -98,6 +98,7 @@ model CostCenter {
   userLinks            UserCostCenter[]
   vehicleCostCenters   VehicleCostCenter[]
   displacementCheckins VehicleDisplacementCheckin[]
+  tiEquipmentSnapshots TiEquipment[]
 
   @@map("CostCenter")
 }

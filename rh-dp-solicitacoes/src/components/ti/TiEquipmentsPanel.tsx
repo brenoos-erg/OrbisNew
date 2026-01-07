@@ -13,6 +13,7 @@ import {
 import {
   TI_EQUIPMENT_CATEGORIES,
   type TiEquipmentCategory,
+  type TiEquipmentStatus,
   getTiEquipmentCategoryLabel,
 } from '@/lib/tiEquipment'
 
@@ -22,8 +23,8 @@ type EquipmentRow = {
   patrimonio: string
   serialNumber?: string | null
   value?: string | number | null
-  category: string
-  status: string
+  category: TiEquipmentCategory
+  status: TiEquipmentStatus
   observations?: string | null
   createdAt?: string
   updatedAt?: string
@@ -49,17 +50,18 @@ type UserOption = {
 const INPUT =
   'mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300 shadow-sm transition-colors'
 
-const categories = [
+const categories: Array<{ value: TiEquipmentCategory | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'Todos' },
   ...TI_EQUIPMENT_CATEGORIES,
 ]
 
-const statusOptions = [
+const statusOptions: Array<{ value: TiEquipmentStatus; label: string }> = [
   { value: 'IN_STOCK', label: 'Em estoque' },
   { value: 'ASSIGNED', label: 'Em uso' },
   { value: 'MAINTENANCE', label: 'Em manutenção' },
   { value: 'RETIRED', label: 'Baixado' },
 ]
+
 
 function formatCurrency(value?: string | number | null) {
   if (value === null || value === undefined || value === '') return '—'
@@ -101,8 +103,12 @@ export default function TiEquipmentsPanel({
   title = 'Controle de Equipamentos TI',
   subtitle = 'Inventário e status de equipamentos por categoria.',
 }: TiEquipmentsPanelProps) {
-  const [categoryFilter, setCategoryFilter] = useState(initialCategory)
-  const [statusFilter, setStatusFilter] = useState('')
+  const defaultCategory: TiEquipmentCategory =
+    initialCategory === 'ALL' ? 'NOTEBOOK' : initialCategory
+  const [categoryFilter, setCategoryFilter] = useState<TiEquipmentCategory | 'ALL'>(
+    initialCategory,
+  )
+  const [statusFilter, setStatusFilter] = useState<TiEquipmentStatus | ''>('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -126,14 +132,26 @@ export default function TiEquipmentsPanel({
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const [formValues, setFormValues] = useState({
+  const [formValues, setFormValues] = useState<{
+    name: string
+    patrimonio: string
+    userId: string
+    userLabel: string
+    value: string
+    serialNumber: string
+    category: TiEquipmentCategory
+    status: TiEquipmentStatus
+    observations: string
+    costCenterText: string
+    costCenterMissing: boolean
+  }>({
     name: '',
     patrimonio: '',
     userId: '',
     userLabel: '',
     value: '',
     serialNumber: '',
-    category: initialCategory === 'ALL' ? 'NOTEBOOK' : initialCategory,
+    category: defaultCategory,
     status: 'IN_STOCK',
     observations: '',
     costCenterText: '',
@@ -443,7 +461,7 @@ export default function TiEquipmentsPanel({
             className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm"
             value={statusFilter}
             onChange={(e) => {
-              setStatusFilter(e.target.value)
+              setStatusFilter(e.target.value as TiEquipmentStatus | '')
               setPage(1)
             }}
           >
@@ -750,7 +768,10 @@ export default function TiEquipmentsPanel({
                   className={INPUT}
                   value={formValues.category}
                   onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, category: e.target.value }))
+                    setFormValues((prev) => ({
+                      ...prev,
+                      category: e.target.value as TiEquipmentCategory,
+                    }))
                   }
                   disabled={lockCategory}
                 >
@@ -772,7 +793,10 @@ export default function TiEquipmentsPanel({
                   className={INPUT}
                   value={formValues.status}
                   onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, status: e.target.value }))
+                    setFormValues((prev) => ({
+                      ...prev,
+                      status: e.target.value as TiEquipmentStatus,
+                    }))
                   }
                 >
                   {statusOptions.map((s) => (
