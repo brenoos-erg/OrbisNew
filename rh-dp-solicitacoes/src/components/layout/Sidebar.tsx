@@ -25,6 +25,7 @@ import {
   Router,
   Cpu,
   Package,
+  ScanLine,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
@@ -63,6 +64,7 @@ type Props = {
     pendentes: boolean
   }
   equipmentFeatures: {
+    atalho: boolean
     linhaTelefonica: boolean
     smartphone: boolean
     notebook: boolean
@@ -266,6 +268,19 @@ export default function Sidebar({
 
               {openEquipment && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
+                   {equipmentFeatures.atalho && (
+                    <Link
+                      href="/dashboard/controle-equipamentos-ti/atalho"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/controle-equipamentos-ti/atalho')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ScanLine size={16} /> <span>Atalho rápido</span>
+                    </Link>
+                  )}
                   {equipmentFeatures.linhaTelefonica && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/linha-telefonica"

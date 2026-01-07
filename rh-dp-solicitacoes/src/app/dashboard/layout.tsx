@@ -98,6 +98,7 @@ let showSolic = false
     pendentes: false,
   }
   let equipmentFeatures = {
+    atalho: false,
     linhaTelefonica: false,
     smartphone: false,
     notebook: false,
@@ -140,6 +141,7 @@ let showSolic = false
       canViewRecusaMinhas,
       canViewRecusaNova,
       canViewRecusaPendentes,
+      canViewEquipAtalho,
       canViewEquipLinhaTelefonica,
       canViewEquipSmartphone,
       canViewEquipNotebook,
@@ -166,6 +168,12 @@ let showSolic = false
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
       canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
+      canFeature(
+        appUser.id,
+        MODULE_KEYS.EQUIPAMENTOS_TI,
+        FEATURE_KEYS.EQUIPAMENTOS_TI.ATALHO,
+        Action.VIEW,
+      ),
       canFeature(
         appUser.id,
         MODULE_KEYS.EQUIPAMENTOS_TI,
@@ -245,6 +253,7 @@ let showSolic = false
       pendentes: canViewRecusaPendentes,
     }
     equipmentFeatures = {
+      atalho: canViewEquipAtalho,
       linhaTelefonica: canViewEquipLinhaTelefonica,
       smartphone: canViewEquipSmartphone,
       notebook: canViewEquipNotebook,

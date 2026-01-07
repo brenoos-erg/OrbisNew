@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   RefreshCw,
+  ScanLine,
 } from 'lucide-react'
 import {
   TI_EQUIPMENT_CATEGORIES,
@@ -156,6 +157,7 @@ type TiEquipmentsPanelProps = {
   lockCategory?: boolean
   title?: string
   subtitle?: string
+  enableScanShortcut?: boolean
 }
 
 export default function TiEquipmentsPanel({
@@ -163,6 +165,7 @@ export default function TiEquipmentsPanel({
   lockCategory = false,
   title = 'Controle de Equipamentos TI',
   subtitle = 'Inventário e status de equipamentos por categoria.',
+  enableScanShortcut = false,
 }: TiEquipmentsPanelProps) {
   const defaultCategory: TiEquipmentCategory =
     initialCategory === 'ALL' ? 'NOTEBOOK' : initialCategory
@@ -192,6 +195,11 @@ export default function TiEquipmentsPanel({
   const [editing, setEditing] = useState<EquipmentRow | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [scanActive, setScanActive] = useState(false)
+  const [scanInput, setScanInput] = useState('')
+  const [scanValue, setScanValue] = useState('')
+  const [scanMatch, setScanMatch] = useState<EquipmentRow | null>(null)
+  const scanInputRef = useRef<HTMLInputElement | null>(null)
 
   const [formValues, setFormValues] = useState<{
     name: string
@@ -276,12 +284,26 @@ export default function TiEquipmentsPanel({
     if (!lockCategory) return
     setCategoryFilter(initialCategory)
   }, [initialCategory, lockCategory])
+  useEffect(() => {
+    if (!enableScanShortcut || !scanActive) return
+    scanInputRef.current?.focus()
+  }, [enableScanShortcut, scanActive])
 
   useEffect(() => {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryFilter, statusFilter, search, page, pageSize])
-
+useEffect(() => {
+    if (!scanValue) {
+      setScanMatch(null)
+      return
+    }
+    const normalized = scanValue.trim().toLowerCase()
+    const match =
+      rows.find((row) => row.patrimonio?.trim().toLowerCase() === normalized) ?? null
+    setScanMatch(match)
+    if (match) setSelected(match)
+  }, [rows, scanValue])
   function openCreate() {
     setEditing(null)
     setUserSearch('')
@@ -327,7 +349,15 @@ export default function TiEquipmentsPanel({
     setEditing(null)
     setFormError(null)
   }
-
+function handleScanSubmit(value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    setScanValue(trimmed)
+    setSearch(trimmed)
+    setPage(1)
+    setSelected(null)
+    setScanInput('')
+  }
   function handleUserSelect(user: UserOption) {
     const ccText = formatCostCenter(user.costCenter || null)
     setFormValues((prev) => ({
@@ -444,7 +474,7 @@ export default function TiEquipmentsPanel({
       ? 'Todos'
       : getTiEquipmentCategoryLabel(categoryFilter) || categoryFilter
 
-       const tableExtraLabel =
+    const tableExtraLabel =
     categoryFilter === 'ALL'
       ? 'Identificação'
       : getCategoryFieldConfig(categoryFilter).label
@@ -507,6 +537,98 @@ export default function TiEquipmentsPanel({
         <SummaryCard title="Em manutenção" value={counts.maintenance} accent="bg-amber-100 text-amber-800" />
         <SummaryCard title="Baixados" value={counts.retired} accent="bg-slate-100 text-slate-800" />
       </div>
+      {enableScanShortcut && (
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Atalho de leitura rápida</h2>
+              <p className="text-sm text-slate-500">
+                Clique no botão para ativar a leitura e passe o patrimônio no leitor de código de barras.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setScanActive((prev) => !prev)}
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                  scanActive ? 'border-orange-200 bg-orange-50 text-orange-700' : ''
+                }`}
+              >
+                <ScanLine className="h-4 w-4" />
+                {scanActive ? 'Leitura ativa' : 'Ativar leitura'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setScanValue('')
+                  setScanMatch(null)
+                  setSearch('')
+                  setScanInput('')
+                  setSelected(null)
+                }}
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex-1">
+              <label className="text-xs font-semibold uppercase text-slate-500">
+                Patrimônio (scanner)
+              </label>
+              <input
+                ref={scanInputRef}
+                className={INPUT}
+                placeholder="Aguardando leitura do código..."
+                value={scanInput}
+                onChange={(e) => setScanInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleScanSubmit(scanInput)
+                  }
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => handleScanSubmit(scanInput)}
+              className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+            >
+              Buscar equipamento
+            </button>
+          </div>
+
+          {scanValue && (
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <div className="font-semibold text-slate-800">
+                Última leitura: <span className="font-normal">{scanValue}</span>
+              </div>
+              {scanMatch ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <span>
+                    Equipamento encontrado: <strong>{scanMatch.name}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(scanMatch)}
+                    className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar equipamento
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600">
+                  Nenhum equipamento encontrado com este patrimônio. Verifique a leitura e tente novamente.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
