@@ -317,6 +317,7 @@ model ModuleFeature {
   updatedAt DateTime    @updatedAt
   module    Module      @relation(fields: [moduleId], references: [id])
   grants    FeatureGrant[]
+  levelGrants FeatureLevelGrant[]
 
   @@unique([moduleId, key])
   @@map("ModuleFeature")
