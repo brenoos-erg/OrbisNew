@@ -171,7 +171,10 @@ export default function PermissoesClient() {
     if (!deptData) return
     if (modulesForFeatures.length > 0) return
     setModulesForFeatures(deptData.modules)
-  }, [deptData, modulesForFeatures.length])
+    if (!selectedFeatureModuleKey && deptData.modules.length > 0) {
+      setSelectedFeatureModuleKey(deptData.modules[0].key)
+    }
+  }, [deptData, modulesForFeatures.length, selectedFeatureModuleKey])
   
 
   useEffect(() => {
@@ -247,6 +250,12 @@ export default function PermissoesClient() {
     void loadFeatures()
   }, [activeTab, selectedFeatureModuleKey, featureReloadKey])
 
+  useEffect(() => {
+    if (!featureData?.features.length) return
+    if (!selectedFeatureId || !featureData.features.some((feature) => feature.id === selectedFeatureId)) {
+      setSelectedFeatureId(featureData.features[0].id)
+    }
+  }, [featureData, selectedFeatureId])
 
   // =========================
   // HANDLERS DEPARTAMENTOS
