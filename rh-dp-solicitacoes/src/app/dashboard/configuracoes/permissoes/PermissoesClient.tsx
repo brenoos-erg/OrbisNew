@@ -3,6 +3,7 @@
 import React, { useEffect, useState, type FormEvent } from 'react'
 
 type FeatureAction = 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE'
+type ModuleLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
 
 type ModuleDTO = {
   id: string
@@ -72,23 +73,25 @@ type FeatureDTO = {
   key: string
   name: string
 }
-type AccessGroupDTO = {
+type FeatureLevelGrantDTO = {
   id: string
-  name: string
-}
-type FeatureGrantDTO = {
-  id: string
-  groupId: string
   featureId: string
+  level: ModuleLevel
   actions: FeatureAction[]
 }
 type FeaturePayload = {
   module: ModuleDTO
   features: FeatureDTO[]
-  groups: AccessGroupDTO[]
-  grants: FeatureGrantDTO[]
+  levelGrants: FeatureLevelGrantDTO[]
 }
 type Tab = 'departamentos' | 'usuarios' | 'submodulos'
+
+const LEVELS: { id: ModuleLevel; label: string }[] = [
+  { id: 'NIVEL_1', label: 'Nível 1' },
+  { id: 'NIVEL_2', label: 'Nível 2' },
+  { id: 'NIVEL_3', label: 'Nível 3' },
+]
+
 
 export default function PermissoesClient() {
   const [activeTab, setActiveTab] = useState<Tab>('departamentos')
@@ -96,7 +99,7 @@ export default function PermissoesClient() {
   // ---- Departamentos ----
   const [deptData, setDeptData] = useState<DepartmentPayload | null>(null)
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null)
-  const [loadingDepartamentos, setLoadingDepartamentos] = useState(false)
+ const [loadingDepartamentos, setLoadingDepartamentos] = useState(false)
   const [deptMembers, setDeptMembers] = useState<DepartmentUser[]>([])
   const [loadingDeptMembers, setLoadingDeptMembers] = useState(false)
   const [searchDeptTerm, setSearchDeptTerm] = useState('')
@@ -118,10 +121,10 @@ export default function PermissoesClient() {
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
 
-  // ---- Submódulos ----
+ // ---- Submódulos ----
   const [modulesForFeatures, setModulesForFeatures] = useState<ModuleDTO[]>([])
   const [selectedFeatureModuleKey, setSelectedFeatureModuleKey] = useState<string>('')
-  const [selectedFeatureGroupId, setSelectedFeatureGroupId] = useState<string>('')
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string>('')
   const [featureData, setFeatureData] = useState<FeaturePayload | null>(null)
   const [loadingFeatures, setLoadingFeatures] = useState(false)
   const [featureReloadKey, setFeatureReloadKey] = useState(0)
@@ -229,9 +232,9 @@ export default function PermissoesClient() {
 
         const json: FeaturePayload = await res.json()
         setFeatureData(json)
-        if (!selectedFeatureGroupId || !json.groups.some((g) => g.id === selectedFeatureGroupId)) {
-          if (json.groups.length > 0) {
-            setSelectedFeatureGroupId(json.groups[0].id)
+        if (!selectedFeatureId || !json.features.some((feature) => feature.id === selectedFeatureId)) {
+          if (json.features.length > 0) {
+            setSelectedFeatureId(json.features[0].id)
           }
         }
       } catch (e: any) {
@@ -1019,6 +1022,7 @@ export default function PermissoesClient() {
                 value={selectedFeatureModuleKey}
                 onChange={(e) => {
                   setSelectedFeatureModuleKey(e.target.value)
+                  setSelectedFeatureId('')
                   setFeatureData(null)
                 }}
                 disabled={loadingFeatures || modulesForFeatures.length === 0}
@@ -1032,20 +1036,19 @@ export default function PermissoesClient() {
             </div>
 
             <div className="flex-1 space-y-1">
-              <label className="text-sm font-medium">Grupo</label>
+              <label className="text-sm font-medium">Submódulo</label>
               <select
                 className="w-full rounded-md border px-3 py-2 text-sm"
-                value={selectedFeatureGroupId}
-                onChange={(e) => setSelectedFeatureGroupId(e.target.value)}
-                disabled={loadingFeatures || !featureData?.groups.length}
+                value={selectedFeatureId}
+                onChange={(e) => setSelectedFeatureId(e.target.value)}
+                disabled={loadingFeatures || !featureData?.features.length}
               >
-                {featureData?.groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
+                {featureData?.features.map((feature) => (
+                  <option key={feature.id} value={feature.id}>
+                    {feature.name}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500">Selecione o grupo para editar as ações permitidas.</p>
             </div>
           </div>
 
@@ -1054,7 +1057,16 @@ export default function PermissoesClient() {
           {featureData && (
             <div className="rounded-md border">
               <div className="border-b px-4 py-3">
-                <p className="text-sm font-medium">{featureData.module.name}</p>
+                <p className="text-sm font-medium">
+                  {featureData.module.name}
+                  {selectedFeatureId &&
+                    featureData.features.find((feature) => feature.id === selectedFeatureId) && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        •{' '}
+                        {featureData.features.find((feature) => feature.id === selectedFeatureId)?.name}
+                      </span>
+                    )}
+                </p>
                 <p className="text-xs text-gray-500">{featureData.module.key}</p>
               </div>
 
@@ -1062,7 +1074,7 @@ export default function PermissoesClient() {
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Submódulo</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Nível</th>
                       {(['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'] satisfies FeatureAction[]).map((action) => (
                         <th key={action} className="px-3 py-2 text-center font-semibold text-gray-700">
                           {action}
@@ -1071,14 +1083,15 @@ export default function PermissoesClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {featureData.features.map((feature) => {
+                    {LEVELS.map((level) => {
+                      const selectedFeature = featureData.features.find((feature) => feature.id === selectedFeatureId)
                       const currentActions =
-                        featureData.grants.find(
-                          (grant) => grant.featureId === feature.id && grant.groupId === selectedFeatureGroupId,
+                        featureData.levelGrants.find(
+                          (grant) => grant.featureId === selectedFeatureId && grant.level === level.id,
                         )?.actions ?? []
 
                       const toggleAction = async (action: FeatureAction, enabled: boolean) => {
-                        if (!selectedFeatureGroupId) return
+                        if (!selectedFeature) return
                         try {
                           setSaving(true)
                           setError(null)
@@ -1090,35 +1103,33 @@ export default function PermissoesClient() {
 
                           setFeatureData((prev) => {
                             if (!prev) return prev
-                            const nextGrants = prev.grants.slice()
+                            const nextGrants = prev.levelGrants.slice()
                             const existingIdx = nextGrants.findIndex(
-                              (grant) => grant.featureId === feature.id && grant.groupId === selectedFeatureGroupId,
+                              (grant) => grant.featureId === selectedFeature.id && grant.level === level.id,
                             )
-                            if (nextActions.length === 0) {
-                              if (existingIdx >= 0) nextGrants.splice(existingIdx, 1)
-                            } else if (existingIdx >= 0) {
+                            if (existingIdx >= 0) {
                               nextGrants[existingIdx] = {
                                 ...nextGrants[existingIdx],
                                 actions: nextActions,
                               }
                             } else {
                               nextGrants.push({
-                                id: `${feature.id}-${selectedFeatureGroupId}`,
-                                featureId: feature.id,
-                                groupId: selectedFeatureGroupId,
+                                id: `${selectedFeature.id}-${level.id}`,
+                                featureId: selectedFeature.id,
+                                level: level.id,
                                 actions: nextActions,
                               })
                             }
 
-                            return { ...prev, grants: nextGrants }
+                            return { ...prev, levelGrants: nextGrants }
                           })
 
                           const res = await fetch('/api/permissoes/features', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                              groupId: selectedFeatureGroupId,
-                              featureKey: feature.key,
+                              level: level.id,
+                              featureKey: selectedFeature.key,
                               actions: nextActions,
                             }),
                           })
@@ -1140,8 +1151,8 @@ export default function PermissoesClient() {
                       }
 
                       return (
-                        <tr key={feature.id}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{feature.name}</td>
+                        <tr key={level.id}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{level.label}</td>
                           {(['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'] satisfies FeatureAction[]).map(
                             (action) => (
                               <td key={action} className="px-3 py-2 text-center">
@@ -1149,7 +1160,7 @@ export default function PermissoesClient() {
                                   type="checkbox"
                                   className="h-4 w-4"
                                   checked={currentActions.includes(action)}
-                                  disabled={saving}
+                                  disabled={saving || !selectedFeatureId}
                                   onChange={(e) => toggleAction(action, e.target.checked)}
                                 />
                               </td>

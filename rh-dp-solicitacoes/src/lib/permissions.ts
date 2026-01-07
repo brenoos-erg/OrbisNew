@@ -3,8 +3,6 @@ import { Action, ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 
-const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
-
 function normalizeModuleKey(moduleKey: string) {
   return moduleKey.trim().toLowerCase()
 }
@@ -32,21 +30,11 @@ export async function getUserModuleLevel(userId: string, moduleKey: string): Pro
   return levels[normalizedKey] ?? null
 }
 
-export async function getUserGroupIds(userId: string): Promise<string[]> {
-  const memberships = await prisma.groupMember.findMany({
-    where: { userId },
-    select: { groupId: true },
-  })
-
-  return memberships.map((m) => m.groupId)
-}
-
 export async function canFeature(
   userId: string,
   moduleKey: string,
   featureKey: string,
   action: Action,
-  opts?: { groupIds?: string[] },
 ): Promise<boolean> {
   const normalizedModuleKey = normalizeModuleKey(moduleKey)
   const normalizedFeatureKey = normalizeFeatureKey(featureKey)
@@ -54,10 +42,9 @@ export async function canFeature(
   const level = await getUserModuleLevel(userId, normalizedModuleKey)
   if (!level) return false
 
-  const groupIds = opts?.groupIds ?? (await getUserGroupIds(userId))
-  const featureGrant = await prisma.featureGrant.findMany({
+  const levelGrant = await prisma.featureLevelGrant.findFirst({
     where: {
-      groupId: { in: groupIds },
+      level,
       feature: {
         key: { equals: normalizedFeatureKey, mode: 'insensitive' },
         module: { key: { equals: normalizedModuleKey, mode: 'insensitive' } },
@@ -66,8 +53,8 @@ export async function canFeature(
     select: { actions: true },
   })
 
-  if (featureGrant.length > 0) {
-    return featureGrant.some((grant) => grant.actions.includes(action))
+  if (levelGrant) {
+    return levelGrant.actions.includes(action)
   }
 
   const fallbackActions = mapLevelToDefaultActions(level)

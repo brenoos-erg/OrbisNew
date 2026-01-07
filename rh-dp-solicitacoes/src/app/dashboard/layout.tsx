@@ -7,7 +7,7 @@ import UserMenu from '@/components/layout/userMenu'
 import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
 import { Action, ModuleLevel } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { canFeature, getUserGroupIds } from '@/lib/permissions'
+import { canFeature } from '@/lib/permissions'
 export const dynamic = 'force-dynamic'
 
 
@@ -110,8 +110,6 @@ export default async function DashboardLayout({
     const fleetLevel = levels[MODULE_KEYS.FROTAS] ?? levels['gestao_frotas']
     const refusalLevel = levels[MODULE_KEYS.RECUSA] ?? levels['direito_de_recusa']
 
-    const userGroupIds = await getUserGroupIds(appUser.id)
-
     const [
       canViewConfigPainel,
       canViewConfigUsuarios,
@@ -131,51 +129,23 @@ export default async function DashboardLayout({
       canViewRecusaNova,
       canViewRecusaPendentes,
     ] = await Promise.all([
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PAINEL, Action.VIEW, { groupIds: userGroupIds }),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW, { groupIds: userGroupIds }),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW, { groupIds: userGroupIds }),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW, {
-        groupIds: userGroupIds,
-      }),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PAINEL, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
     ])
 
     configFeatures = {
@@ -214,14 +184,10 @@ export default async function DashboardLayout({
 
     canApprove =
       hasStructure &&
-      (await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.APPROVE, {
-        groupIds: userGroupIds,
-      }))
+      (await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.APPROVE))
     canReviewRefusal =
       hasStructure &&
-      (await canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.APPROVE, {
-        groupIds: userGroupIds,
-      }))
+      (await canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.APPROVE))
     canAccessRefusalPanel = refusalFeatures.painel
   }
 

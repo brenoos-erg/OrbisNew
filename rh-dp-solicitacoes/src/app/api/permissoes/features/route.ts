@@ -5,7 +5,7 @@ import { Action, ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature } from '@/lib/permissions'
+import { assertCanFeature, mapLevelToDefaultActions } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -39,27 +39,38 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })
     }
 
-    const [features, groups, grants] = await Promise.all([
+    const [features, levelGrants] = await Promise.all([
       prisma.moduleFeature.findMany({
         where: { moduleId: module.id },
         select: { id: true, key: true, name: true },
         orderBy: { name: 'asc' },
       }),
-      prisma.accessGroup.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.featureGrant.findMany({
+      prisma.featureLevelGrant.findMany({
         where: { feature: { moduleId: module.id } },
-        select: { id: true, groupId: true, featureId: true, actions: true },
+        select: { id: true, featureId: true, level: true, actions: true },
       }),
     ])
+
+    const levels: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+    const grantsByKey = new Map(levelGrants.map((grant) => [`${grant.featureId}-${grant.level}`, grant]))
+    const resolvedGrants = features.flatMap((feature) =>
+      levels.map((level) => {
+        const existing = grantsByKey.get(`${feature.id}-${level}`)
+        return (
+          existing ?? {
+            id: `${feature.id}-${level}`,
+            featureId: feature.id,
+            level,
+            actions: mapLevelToDefaultActions(level),
+          }
+        )
+      }),
+    )
 
     return NextResponse.json({
       module,
       features,
-      groups,
-      grants,
+      levelGrants: resolvedGrants,
     })
   } catch (e: any) {
     console.error('GET /api/permissoes/features error', e)
@@ -79,51 +90,35 @@ export async function PATCH(req: NextRequest) {
     await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
     const body = await req.json().catch(() => ({}))
-    const groupId = body.groupId as string | undefined
+    const level = body.level as ModuleLevel | undefined
     const featureKey = body.featureKey as string | undefined
     const actions = normalizeActionList(body.actions)
 
-    if (!groupId || !featureKey) {
-      return NextResponse.json(
-        { error: 'groupId e featureKey são obrigatórios.' },
-        { status: 400 },
-      )
+    if (!level || !featureKey) {
+      return NextResponse.json({ error: 'level e featureKey são obrigatórios.' }, { status: 400 })
     }
 
-    const [group, feature] = await Promise.all([
-      prisma.accessGroup.findUnique({ where: { id: groupId }, select: { id: true } }),
-      prisma.moduleFeature.findFirst({
-        where: {
-          key: { equals: featureKey, mode: 'insensitive' },
-        },
-        select: { id: true },
-      }),
-    ])
-
-    if (!group) {
-      return NextResponse.json({ error: 'Grupo não encontrado.' }, { status: 404 })
+    if (!['NIVEL_1', 'NIVEL_2', 'NIVEL_3'].includes(level)) {
+      return NextResponse.json({ error: 'Nível inválido.' }, { status: 400 })
     }
+
+    const feature = await prisma.moduleFeature.findFirst({
+      where: {
+        key: { equals: featureKey, mode: 'insensitive' },
+      },
+      select: { id: true },
+    })
+
 
     if (!feature) {
       return NextResponse.json({ error: 'Submódulo não encontrado.' }, { status: 404 })
     }
 
-    if (actions.length === 0) {
-      await prisma.featureGrant.deleteMany({
-        where: {
-          groupId,
-          featureId: feature.id,
-        },
-      })
-
-      return NextResponse.json({ deleted: true })
-    }
-
-    const grant = await prisma.featureGrant.upsert({
-      where: { groupId_featureId: { groupId, featureId: feature.id } },
+    const grant = await prisma.featureLevelGrant.upsert({
+      where: { featureId_level: { featureId: feature.id, level } },
       update: { actions },
-      create: { groupId, featureId: feature.id, actions },
-      select: { id: true, groupId: true, featureId: true, actions: true },
+      create: { featureId: feature.id, level, actions },
+      select: { id: true, featureId: true, level: true, actions: true },
     })
 
     return NextResponse.json(grant)

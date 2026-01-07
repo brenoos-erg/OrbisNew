@@ -335,7 +335,18 @@ model FeatureGrant {
   @@unique([groupId, featureId])
   @@map("FeatureGrant")
 }
+model FeatureLevelGrant {
+  id        String       @id @default(uuid())
+  featureId String
+  level     ModuleLevel
+  actions   Action[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  feature   ModuleFeature @relation(fields: [featureId], references: [id])
 
+  @@unique([featureId, level])
+  @@map("FeatureLevelGrant")
+}
 model CostCenterModule {
   id           String     @id @default(uuid())
   costCenterId String
