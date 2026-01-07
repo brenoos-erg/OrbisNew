@@ -9,6 +9,7 @@ import {
   ChangeEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { fetchMe } from '@/lib/me-cache';
 
 /* ================================================================
    TYPES
@@ -133,14 +134,7 @@ export default function NovaSolicitacaoPage() {
         setMeLoading(true);
         setMeError(null);
 
-        const res = await fetch('/api/me');
-        if (!res.ok) {
-          const text = await res.text();
-          console.error('Erro /api/me:', text);
-          throw new Error('Erro ao buscar dados do usuário.');
-        }
-
-        const data = (await res.json()) as UserMe;
+        const data = (await fetchMe()) as UserMe;
         setMe(data);
       } catch (err: any) {
         console.error(err);

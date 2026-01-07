@@ -27,9 +27,7 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
         setLoadingAll(true)
 
         // mesma rota usada na tela "Nova Solicitação"
-        const res = await fetch('/api/cost-centers/select', {
-          cache: 'no-store',
-        })
+        const res = await fetch('/api/cost-centers/select')
 
         if (!res.ok) {
           console.error('Erro ao buscar centros de custo (all)')

@@ -10,7 +10,7 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
 
   async function load() {
     const [allR, enR] = await Promise.all([
-      fetch('/api/modules', { cache: 'no-store' }),
+      fetch('/api/modules'),
       fetch(`/api/configuracoes/centros-de-custo/${costCenterId}/modules`, { cache: 'no-store' }),
     ])
     setAllModules(await allR.json())
@@ -25,6 +25,16 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
       body: JSON.stringify({ moduleKey: selectKey }),
     })
     setSelectKey('')
+    await load()
+  }
+
+  async function remove(key: string) {
+    await fetch(
+      `/api/configuracoes/centros-de-custo/${costCenterId}/modules?moduleKey=${encodeURIComponent(
+        key,
+      )}`,
+      { method: 'DELETE' },
+    )
     await load()
   }
 

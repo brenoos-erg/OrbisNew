@@ -9,7 +9,7 @@ import { normalizeModules } from '@/lib/normalizeModules'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
-
+import { withRequestMetrics } from '@/lib/request-metrics'
 /**
  * Helper para montar o payload que o frontend espera
  */
@@ -73,116 +73,116 @@ async function buildUserPayload(search: string) {
 
 // GET /api/permissoes/usuarios?email=...
 export async function GET(req: NextRequest) {
-  try {
-    const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
-    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
+  return withRequestMetrics('GET /api/permissoes/usuarios', async () => {
+    try {
+      const me = await requireActiveUser()
+      await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
+      await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
 
-    const { searchParams } = new URL(req.url)
-    const search = searchParams.get('search') ?? searchParams.get('email')
+      const { searchParams } = new URL(req.url)
+      const search = searchParams.get('search') ?? searchParams.get('email')
 
-    if (!search) {
-      return NextResponse.json(
-        { error: 'Informe o nome ou e-mail do usuário.' },
-        { status: 400 },
-      )
-    }
+      if (!search) {
+        return NextResponse.json(
+          { error: 'Informe o nome ou e-mail do usuário.' },
+          { status: 400 },
+        )
+      }
 
     const payload = await buildUserPayload(search)
-    return NextResponse.json(payload)
-  } catch (e: any) {
-    console.error('GET /api/permissoes/usuarios error', e)
-    return NextResponse.json(
-      { error: e?.message || 'Erro ao carregar permissões do usuário.' },
-      { status: 500 },
-    )
-  }
+      return NextResponse.json(payload)
+    } catch (e: any) {
+      console.error('GET /api/permissoes/usuarios error', e)
+      return NextResponse.json(
+        { error: e?.message || 'Erro ao carregar permissões do usuário.' },
+        { status: 500 },
+      )
+    }
+  })
 }
 
 // PATCH /api/permissoes/usuarios
 export async function PATCH(req: NextRequest) {
-  try {
-    const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
-    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
+  return withRequestMetrics('PATCH /api/permissoes/usuarios', async () => {
+    try {
+      const me = await requireActiveUser()
+      await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
+      await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
-    const body = await req.json().catch(() => ({}))
+      const body = await req.json().catch(() => ({}))
 
-    const email = body.email as string | undefined
-    const moduleId = body.moduleId as string | undefined
-    const level = body.level as 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | '' | null
-    const departmentId = body.departmentId as string | null | undefined
+      const email = body.email as string | undefined
+      const moduleId = body.moduleId as string | undefined
+      const level = body.level as 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | '' | null
+      const departmentId = body.departmentId as string | null | undefined
 
-    if (!email) {
-      return NextResponse.json(
-        { error: 'Campo "email" é obrigatório.' },
-        { status: 400 },
-      )
-    }
-
+      if (!email) {
+        return NextResponse.json(
+          { error: 'Campo "email" é obrigatório.' },
+          { status: 400 },
+        )
+      }
     const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Usuário não encontrado.' },
-        { status: 404 },
-      )
-    }
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Usuário não encontrado.' },
+          { status: 404 },
+        )
+      }
 
-    // 1) Atualizar departamento, se veio no payload
-    if (departmentId !== undefined) {
-       await prisma.$transaction(async (tx) => {
-        await tx.user.update({
-          where: { id: user.id },
-          data: {
-            departmentId: departmentId || null,
-          },
+      // 1) Atualizar departamento, se veio no payload
+      if (departmentId !== undefined) {
+        await prisma.$transaction(async (tx) => {
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              departmentId: departmentId || null,
+            },
+          })
+
+    if (departmentId) {
+            await ensureUserDepartmentLink(user.id, departmentId, tx)
+          }
         })
-
-        if (departmentId) {
-          await ensureUserDepartmentLink(user.id, departmentId, tx)
-        }
-      })
-     
-    }
-
-    // 2) Atualizar acesso de módulo, se veio moduleId
-    if (moduleId) {
-      if (!level) {
-        // remover acesso
-        await prisma.userModuleAccess.deleteMany({
-          where: {
-            userId: user.id,
-            moduleId,
-          },
-        })
-      } else {
-        // upsert no nível do módulo
-        await prisma.userModuleAccess.upsert({
-          where: {
-            userId_moduleId: {
+      }
+        // 2) Atualizar acesso de módulo, se veio moduleId
+      if (moduleId) {
+        if (!level) {
+          // remover acesso
+          await prisma.userModuleAccess.deleteMany({
+            where: {
               userId: user.id,
               moduleId,
             },
-          },
-          create: {
-            userId: user.id,
-            moduleId,
-            level,
-          },
-          update: {
-            level,
-          },
-        })
+          })
+        } else {
+          // upsert no nível do módulo
+          await prisma.userModuleAccess.upsert({
+            where: {
+              userId_moduleId: {
+                userId: user.id,
+                moduleId,
+              },
+            },
+            create: {
+              userId: user.id,
+              moduleId,
+              level,
+            },
+            update: {
+              level,
+            },
+          })
+        }
       }
-    }
-
     const payload = await buildUserPayload(email)
-    return NextResponse.json(payload)
-  } catch (e: any) {
-    console.error('PATCH /api/permissoes/usuarios error', e)
-    return NextResponse.json(
-      { error: e?.message || 'Erro ao atualizar permissões do usuário.' },
-      { status: 500 },
-    )
-  }
+      return NextResponse.json(payload)
+    } catch (e: any) {
+      console.error('PATCH /api/permissoes/usuarios error', e)
+      return NextResponse.json(
+        { error: e?.message || 'Erro ao atualizar permissões do usuário.' },
+        { status: 500 },
+      )
+    }
+  })
 }

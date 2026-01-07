@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/client'
+import { fetchMe, type MePayload } from '@/lib/me-cache'
 import { Save, Loader2, User as UserIcon, BadgeCheck, Image as ImageIcon } from 'lucide-react'
 
-type PrismaMe = {
-  id?: string
-  fullName?: string
-  email?: string
-  login?: string
-  phone?: string | null
+type PrismaMe = MePayload & {
   costCenter?: string | null
   role?: 'COLABORADOR' | 'RH' | 'DP' | 'ADMIN'
 }
@@ -42,9 +38,7 @@ export default function PerfilPage() {
       setOk(null)
       try {
         // 1) Prisma
-        const r = await fetch('/api/me', { cache: 'no-store' })
-        if (!r.ok) throw new Error('Não foi possível carregar seu perfil.')
-        const p: PrismaMe = await r.json()
+        const p = (await fetchMe()) as PrismaMe
         if (!alive) return
         setMe(p)
 

@@ -278,7 +278,7 @@ export default function Page() {
       setRows(list)
 
       // centros de custo (para selects / combos)
-      const cr = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      const cr = await fetch('/api/cost-centers/select')
       if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
       const arr: CostCenter[] = await cr.json()
       setCostCenters(arr)

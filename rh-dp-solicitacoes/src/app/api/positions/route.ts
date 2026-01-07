@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withRequestMetrics } from "@/lib/request-metrics"
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 // GET /api/positions?pageSize=200
 export async function GET(req: Request) {
@@ -31,10 +31,17 @@ export async function GET(req: Request) {
         orderBy: { name: 'asc' },
       })
 
-      return NextResponse.json({
-        items: positions, // formata igual /api/cost-centers
-        total: positions.length,
-      })
+      return NextResponse.json(
+        {
+          items: positions, // formata igual /api/cost-centers
+          total: positions.length,
+        },
+        {
+          headers: {
+            'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=300',
+          },
+        },
+      )
     } catch (error) {
       console.error('Erro em GET /api/positions:', error)
       return NextResponse.json(

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { normalizeModules } from '@/lib/normalizeModules'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 export async function GET() {
   return withRequestMetrics('GET /api/modules', async () => {
@@ -14,6 +14,10 @@ export async function GET() {
 
     const normalized = normalizeModules(mods)
 
-    return NextResponse.json(normalized.modules)
+    return NextResponse.json(normalized.modules, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, s-maxage=300, stale-while-revalidate=300',
+      },
+    })
   })
 }

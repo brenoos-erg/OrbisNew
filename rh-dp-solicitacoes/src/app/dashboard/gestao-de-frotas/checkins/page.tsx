@@ -163,7 +163,7 @@ export default function VehicleCheckinPage() {
   useEffect(() => {
     async function loadCostCenters() {
       try {
-        const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+        const res = await fetch('/api/cost-centers/select')
         if (!res.ok) throw new Error('Falha ao buscar centros de custo')
         const data: Array<{
           id: string
