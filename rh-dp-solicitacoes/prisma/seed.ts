@@ -273,14 +273,21 @@ async function main() {
      ========================= */
 
   async function ensureModule(key: string, name: string) {
-    const existing = await prisma.module.findFirst({
-      where: { key: { equals: key, mode: 'insensitive' } },
-    })
-
+    const existing = await prisma.module.findUnique({ where: { key } })
     if (existing) {
       return prisma.module.update({
         where: { id: existing.id },
-        data: { key, name },
+        data: { name },
+      })
+    }
+
+    const caseInsensitive = await prisma.module.findFirst({
+      where: { key: { equals: key, mode: 'insensitive' } },
+    })
+    if (caseInsensitive) {
+      return prisma.module.update({
+        where: { id: caseInsensitive.id },
+        data: { name },
       })
     }
 
