@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-
 import { Action, ModuleLevel } from '@prisma/client'
 
 import { requireActiveUser } from '@/lib/auth'
@@ -9,13 +8,16 @@ import { normalizeModuleKey } from '@/lib/normalizeModules'
 import { assertCanFeature, mapLevelToDefaultActions } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
+
 export const dynamic = 'force-dynamic'
 
 function normalizeActionList(actions: unknown): Action[] {
   if (!Array.isArray(actions)) return []
   return actions
     .map((item) => (typeof item === 'string' ? item.toUpperCase() : ''))
-    .filter((item): item is Action => ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'].includes(item as Action))
+    .filter((item): item is Action =>
+      ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'].includes(item as Action),
+    )
 }
 
 export async function GET(req: NextRequest) {
@@ -32,13 +34,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'moduleKey é obrigatório.' }, { status: 400 })
       }
 
-    )
+      const normalizedModuleKey = normalizeModuleKey(moduleKey)
 
-    const normalizedModuleKey = normalizeModuleKey(moduleKey)
-
-    const allModules = await prisma.module.findMany({
+      const allModules = await prisma.module.findMany({
         select: { id: true, key: true, name: true },
       })
+
       const matchingModules = allModules.filter(
         (candidate) =>
           normalizeModuleKey(candidate.key) === normalizedModuleKey ||
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
       if (matchingModules.length === 0) {
         return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })
       }
+
       let module =
         matchingModules.find((candidate) => candidate.key.toLowerCase() === moduleKey.toLowerCase()) ??
         matchingModules[0]
@@ -58,6 +60,7 @@ export async function GET(req: NextRequest) {
           where: { moduleId: { in: matchingModules.map((candidate) => candidate.id) } },
           _count: { _all: true },
         })
+
         const countMap = new Map(featureCounts.map((item) => [item.moduleId, item._count._all]))
         module = matchingModules.reduce((best, candidate) => {
           const bestCount = countMap.get(best.id) ?? 0
@@ -66,7 +69,7 @@ export async function GET(req: NextRequest) {
           if (candidateCount === bestCount && candidate.key.toLowerCase() === moduleKey.toLowerCase()) {
             return candidate
           }
-           return best
+          return best
         }, module)
       }
 
@@ -84,6 +87,7 @@ export async function GET(req: NextRequest) {
 
       const levels: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
       const grantsByKey = new Map(levelGrants.map((grant) => [`${grant.featureId}-${grant.level}`, grant]))
+
       const resolvedGrants = features.flatMap((feature) =>
         levels.map((level) => {
           const existing = grantsByKey.get(`${feature.id}-${level}`)
@@ -106,64 +110,11 @@ export async function GET(req: NextRequest) {
     } catch (e: any) {
       console.error('GET /api/permissoes/features error', e)
 
- if (e instanceof Error && e.message.includes('Acesso negado')) {
-        return NextResponse.json({ error: e.message }, { status: 403 })
-      }
-
-      return NextResponse.json({ error: 'Erro ao carregar permissões por submódulo.' }, { status: 500 })
-
-    }
-
-    })
-}
-
-export async function PATCH(req: NextRequest) {
-  return withRequestMetrics('PATCH /api/permissoes/features', async () => {
-    try {
-      const me = await requireActiveUser()
-      await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
-      await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
-
-      const body = await req.json().catch(() => ({}))
-      const level = body.level as ModuleLevel | undefined
-      const featureKey = body.featureKey as string | undefined
-      const actions = normalizeActionList(body.actions)
-
-      if (!level || !featureKey) {
-        return NextResponse.json({ error: 'level e featureKey são obrigatórios.' }, { status: 400 })
-      }
-
-      if (!['NIVEL_1', 'NIVEL_2', 'NIVEL_3'].includes(level)) {
-        return NextResponse.json({ error: 'Nível inválido.' }, { status: 400 })
-      }
-
-      const feature = await prisma.moduleFeature.findFirst({
-        where: {
-          key: { equals: featureKey, mode: 'insensitive' },
-        },
-        select: { id: true },
-      })
-
-      if (!feature) {
-        return NextResponse.json({ error: 'Submódulo não encontrado.' }, { status: 404 })
-      }
-
-    const grant = await prisma.featureLevelGrant.upsert({
-        where: { featureId_level: { featureId: feature.id, level } },
-        update: { actions },
-        create: { featureId: feature.id, level, actions },
-        select: { id: true, featureId: true, level: true, actions: true },
-      })
-
-      return NextResponse.json(grant)
-    } catch (e: any) {
-      console.error('PATCH /api/permissoes/features error', e)
-
       if (e instanceof Error && e.message.includes('Acesso negado')) {
         return NextResponse.json({ error: e.message }, { status: 403 })
       }
 
-      return NextResponse.json({ error: 'Erro ao salvar permissões por submódulo.' }, { status: 500 })
+      return NextResponse.json({ error: 'Erro ao carregar permissões por submódulo.' }, { status: 500 })
     }
   })
 }

@@ -38,15 +38,7 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
     await load()
   }
 
-  async function remove(key: string) {
-    await fetch(
-      `/api/configuracoes/centros-de-custo/${costCenterId}/modules?moduleKey=${encodeURIComponent(
-        key,
-      )}`,
-      { method: 'DELETE' },
-    )
-    await load()
-  }
+  
 
   useEffect(() => {
     if (costCenterId) load()
