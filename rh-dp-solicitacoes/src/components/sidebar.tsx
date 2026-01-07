@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/client'
+import { fetchSessionMe } from '@/lib/session-cache'
 
 type Me = { fullName?: string; email?: string }
 
@@ -11,14 +12,23 @@ export default function Sidebar() {
     let alive = true
 
     async function load() {
-      // tenta direto da sessão do supabase (mais rápido)
+      // usa o bootstrap cacheado para evitar chamadas repetidas de /api/me
+      try {
+        const session = await fetchSessionMe()
+        if (alive && session?.appUser) {
+          setMe({
+            fullName: session.appUser.fullName,
+            email: session.appUser.email,
+          })
+          return
+        }
+      } catch {}
+
+      // fallback para dados básicos do Supabase
       const sb = supabaseBrowser()
       const { data: { user } } = await sb.auth.getUser()
       if (alive && user) {
-        // tenta o espelho do banco para pegar fullName salvo
-        const r = await fetch('/api/me', { cache: 'no-store' })
-        if (r.ok) setMe(await r.json())
-        else setMe({ fullName: user.user_metadata?.name ?? user.email, email: user.email })
+       setMe({ fullName: user.user_metadata?.name ?? user.email, email: user.email })
       } else if (alive) {
         setMe(null)
       }

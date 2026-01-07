@@ -363,7 +363,7 @@ const processedVehicles = useMemo(() => {
   async function loadCostCenters() {
     setLoadingCostCenters(true)
     try {
-      const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      const res = await fetch('/api/cost-centers/select')
       if (!res.ok) throw new Error('Falha ao buscar centros de custo')
       const data: CostCenterOption[] = await res.json()
       setCostCenters(data)
