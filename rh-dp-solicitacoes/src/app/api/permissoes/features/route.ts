@@ -5,9 +5,9 @@ import { Action, ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { normalizeModuleKey } from '@/lib/normalizeModules'
 import { assertCanFeature, mapLevelToDefaultActions } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
-
 export const dynamic = 'force-dynamic'
 
 function normalizeActionList(actions: unknown): Action[] {
@@ -30,10 +30,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'moduleKey é obrigatório.' }, { status: 400 })
     }
 
-    const module = await prisma.module.findFirst({
+    const normalizedModuleKey = normalizeModuleKey(moduleKey)
+
+    let module = await prisma.module.findFirst({
       where: { key: { equals: moduleKey, mode: 'insensitive' } },
       select: { id: true, key: true, name: true },
     })
+
+    if (!module) {
+      const allModules = await prisma.module.findMany({
+        select: { id: true, key: true, name: true },
+      })
+      module =
+        allModules.find(
+          (candidate) =>
+            normalizeModuleKey(candidate.key) === normalizedModuleKey ||
+            normalizeModuleKey(candidate.name) === normalizedModuleKey,
+        ) ?? null
+    }
 
     if (!module) {
       return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })

@@ -19,6 +19,10 @@ function toSlugKey(value: string) {
     .replace(/(^-|-$)+/g, '')
 }
 
+export function normalizeModuleKey(value: string) {
+  return toSlugKey(value)
+}
+
 
 export function normalizeModules(modules: BasicModule[]): NormalizedModulesResult {
   const byKey = new Map<string, { canonical: BasicModule; allIds: Set<string> }>()
