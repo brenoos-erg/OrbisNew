@@ -2,6 +2,7 @@
 
 import { randomUUID } from 'crypto'
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
+import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 function hostOf(url?: string) {
@@ -271,33 +272,27 @@ async function main() {
      CONTROLE DE ACESSO
      ========================= */
 
-  // Padrão coerente com seu schema (comentário do Module.key)
-  const solicitacoesModule = await prisma.module.upsert({
-    where: { key: 'SOLICITACOES' },
-    update: { name: 'Solicitações' },
-    create: { key: 'SOLICITACOES', name: 'Solicitações' },
-  })
+  async function ensureModule(key: string, name: string) {
+    const existing = await prisma.module.findFirst({
+      where: { key: { equals: key, mode: 'insensitive' } },
+    })
 
-  const configModule = await prisma.module.upsert({
-    where: { key: 'CONFIGURACOES' },
-    update: { name: 'Configurações' },
-    create: { key: 'CONFIGURACOES', name: 'Configurações' },
-  })
+    if (existing) {
+      return prisma.module.update({
+        where: { id: existing.id },
+        data: { key, name },
+      })
+    }
 
-  const fleetModule = await prisma.module.upsert({
-    where: { key: 'GESTAO_DE_FROTAS' },
-    update: { name: 'Gestão de Frotas' },
-    create: { key: 'GESTAO_DE_FROTAS', name: 'Gestão de Frotas' },
-  })
+    return prisma.module.create({ data: { key, name } })
+  }
 
-  const refusalModule = await prisma.module.upsert({
-    where: { key: 'DIREITO-DE-RECUSA' },
-    update: { name: 'Direito de Recusa', key: 'DIREITO-DE-RECUSA' },
-    create: { key: 'DIREITO-DE-RECUSA', name: 'Direito de Recusa' },
-  })
+  const solicitacoesModule = await ensureModule(MODULE_KEYS.SOLICITACOES, 'Solicitações')
+  const configModule = await ensureModule(MODULE_KEYS.CONFIGURACOES, 'Configurações')
+  const fleetModule = await ensureModule(MODULE_KEYS.FROTAS, 'Gestão de Frotas')
+  const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
 
   const allModules = [solicitacoesModule, configModule, fleetModule, refusalModule]
-  const fullActions: Action[] = ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE']
 
   const adminGroup = await prisma.accessGroup.upsert({
     where: { name: 'Administradores' },
@@ -308,8 +303,8 @@ async function main() {
   for (const mod of allModules) {
     await prisma.accessGroupGrant.upsert({
       where: { groupId_moduleId: { groupId: adminGroup.id, moduleId: mod.id } },
-      update: { actions: fullActions },
-      create: { groupId: adminGroup.id, moduleId: mod.id, actions: fullActions },
+      update: { actions: ALL_ACTIONS },
+      create: { groupId: adminGroup.id, moduleId: mod.id, actions: ALL_ACTIONS },
     })
   }
 
@@ -359,6 +354,97 @@ async function main() {
       create: { departmentId: safetyDepartment.id, moduleId: refusalModule.id },
     })
   }
+  /* =========================
+     FEATURES E GRANTS POR FEATURE
+     ========================= */
+  type ModuleFeatures = { moduleId: string; moduleKey: string; items: { key: string; name: string }[] }
+
+  const featureCatalog: ModuleFeatures[] = [
+    {
+      moduleId: configModule.id,
+      moduleKey: MODULE_KEYS.CONFIGURACOES,
+      items: [
+        { key: FEATURE_KEYS.CONFIGURACOES.PAINEL, name: 'Painel de Configurações' },
+        { key: FEATURE_KEYS.CONFIGURACOES.USUARIOS, name: 'Usuários' },
+        { key: FEATURE_KEYS.CONFIGURACOES.PERMISSOES, name: 'Permissões' },
+        { key: FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, name: 'Centros de Custo' },
+        { key: FEATURE_KEYS.CONFIGURACOES.CARGOS, name: 'Cargos' },
+      ],
+    },
+    {
+      moduleId: solicitacoesModule.id,
+      moduleKey: MODULE_KEYS.SOLICITACOES,
+      items: [
+        { key: FEATURE_KEYS.SOLICITACOES.ENVIADAS, name: 'Solicitações Enviadas' },
+        { key: FEATURE_KEYS.SOLICITACOES.RECEBIDAS, name: 'Solicitações Recebidas' },
+        { key: FEATURE_KEYS.SOLICITACOES.APROVACAO, name: 'Aprovação de Solicitações' },
+        { key: FEATURE_KEYS.SOLICITACOES.CADASTROS, name: 'Cadastros' },
+      ],
+    },
+    {
+      moduleId: fleetModule.id,
+      moduleKey: MODULE_KEYS.FROTAS,
+      items: [
+        { key: FEATURE_KEYS.FROTAS.VEICULOS, name: 'Veículos' },
+        { key: FEATURE_KEYS.FROTAS.CHECKINS, name: 'Check-ins' },
+        { key: FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, name: 'Check-in de deslocamento' },
+        { key: FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, name: 'Painel de deslocamento' },
+      ],
+    },
+    {
+      moduleId: refusalModule.id,
+      moduleKey: MODULE_KEYS.RECUSA,
+      items: [
+        { key: FEATURE_KEYS.RECUSA.PAINEL, name: 'Painel de Direito de Recusa' },
+        { key: FEATURE_KEYS.RECUSA.MINHAS, name: 'Minhas recusas' },
+        { key: FEATURE_KEYS.RECUSA.NOVA, name: 'Registrar recusa' },
+        { key: FEATURE_KEYS.RECUSA.PENDENTES, name: 'Pendentes para avaliar' },
+      ],
+    },
+  ]
+
+  const createdFeatures: { id: string; key: string; moduleKey: string }[] = []
+
+  for (const catalog of featureCatalog) {
+    for (const item of catalog.items) {
+      const feature = await prisma.moduleFeature.upsert({
+        where: {
+          moduleId_key: {
+            moduleId: catalog.moduleId,
+            key: item.key,
+          },
+        },
+        update: { name: item.name },
+        create: {
+          key: item.key,
+          name: item.name,
+          moduleId: catalog.moduleId,
+        },
+      })
+
+      createdFeatures.push({ id: feature.id, key: feature.key, moduleKey: catalog.moduleKey })
+    }
+  }
+
+  for (const feature of createdFeatures) {
+    await prisma.featureGrant.upsert({
+      where: { groupId_featureId: { groupId: adminGroup.id, featureId: feature.id } },
+      update: { actions: ALL_ACTIONS },
+      create: { groupId: adminGroup.id, featureId: feature.id, actions: ALL_ACTIONS },
+    })
+  }
+
+  const tiActions = (moduleKey: string) =>
+    moduleKey === MODULE_KEYS.CONFIGURACOES ? (['VIEW', 'CREATE', 'UPDATE'] as Action[]) : (['VIEW'] as Action[])
+
+  for (const feature of createdFeatures) {
+    await prisma.featureGrant.upsert({
+      where: { groupId_featureId: { groupId: tiGroup.id, featureId: feature.id } },
+      update: { actions: tiActions(feature.moduleKey) },
+      create: { groupId: tiGroup.id, featureId: feature.id, actions: tiActions(feature.moduleKey) },
+    })
+  }
+
 
 
   console.log('🎉 Seed concluído com sucesso!')

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Action } from '@prisma/client'
+
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeModules } from '@/lib/normalizeModules'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 
 /**
  * Helper para montar o payload que o frontend espera
@@ -71,7 +75,8 @@ async function buildUserPayload(search: string) {
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
 
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search') ?? searchParams.get('email')
@@ -98,7 +103,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, 'NIVEL_3')
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
     const body = await req.json().catch(() => ({}))
 

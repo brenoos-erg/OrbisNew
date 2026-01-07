@@ -792,7 +792,7 @@ const vehicleKmRaw = formData.get('vehicleKm')
       {result && (
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <p className="text-xs font-semibold uppercase text-slate-500">Retorno do checklist</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg bg-slate-50 p-3">
               <p className="text-xs text-slate-500">Status do veículo</p>
               <p className="text-lg font-semibold text-slate-900">{result.vehicleStatus}</p>

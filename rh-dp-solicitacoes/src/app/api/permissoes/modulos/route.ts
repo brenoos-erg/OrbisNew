@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { ModuleLevel, UserStatus } from '@prisma/client'
+import { Action, ModuleLevel, UserStatus } from '@prisma/client'
 
 import { assertUserMinLevel } from '@/lib/access'
 import { requireActiveUser } from '@/lib/auth'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
+    
 
     const { searchParams } = new URL(req.url)
     const moduleId = searchParams.get('moduleId')

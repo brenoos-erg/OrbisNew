@@ -5,7 +5,10 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
 import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
-import { ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel } from '@prisma/client'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { canFeature, getUserGroupIds } from '@/lib/permissions'
+export const dynamic = 'force-dynamic'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({
@@ -63,46 +66,163 @@ export default async function DashboardLayout({
   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
   let showSolic = false
   let showConfig = false
-  let showConfigPermissions = false
   let canApprove = false
   let showFleet = false
   let showRefusal = false
   let canReviewRefusal = false
   let canAccessRefusalPanel = false
-   let fleetLevel: ModuleLevel | undefined
+  let configFeatures = {
+    painel: false,
+    usuarios: false,
+    permissoes: false,
+    centros: false,
+    cargos: false,
+  }
+  let solicitacaoFeatures = {
+    enviadas: false,
+    recebidas: false,
+    aprovacao: false,
+    cadastros: false,
+  }
+  let fleetFeatures = {
+    veiculos: false,
+    checkins: false,
+    deslocamentoCheckin: false,
+    deslocamentoPainel: false,
+  }
+  let refusalFeatures = {
+    painel: false,
+    minhas: false,
+    nova: false,
+    pendentes: false,
+  }
 
   if (appUser.id) {
     const levels = appUser.moduleLevels ?? {}
-    const departmentCode = appUser.department?.code ?? null
     const hasStructure = await userHasDepartmentOrCostCenter(
       appUser.id,
       appUser.costCenterId,
       appUser.departmentId,
     )
 
-    const solicitLevel = levels['solicitacoes']
-    const configLevel = levels['configuracoes']
-    fleetLevel = levels['gestao-de-frotas'] ?? levels['gestao_frotas']
-    const refusalLevel = levels['direito-de-recusa'] ?? levels['direito_de_recusa']
-    const isTi = departmentCode === 'TI'
+    const solicitLevel = levels[MODULE_KEYS.SOLICITACOES]
+    const configLevel = levels[MODULE_KEYS.CONFIGURACOES]
+    const fleetLevel = levels[MODULE_KEYS.FROTAS] ?? levels['gestao_frotas']
+    const refusalLevel = levels[MODULE_KEYS.RECUSA] ?? levels['direito_de_recusa']
 
-    // Módulos aparecem com nível final >= NIVEL_1 (departamento já libera)
-    showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure
-    showConfigPermissions = hasMinLevel(configLevel, ModuleLevel.NIVEL_3)
-    
-    // Exibe o menu de Configurações para TI ou para usuários com acesso total
-    // ao módulo, garantindo que quem pode acessar Permissões também veja o menu
-    showConfig =
-      (isTi && hasMinLevel(configLevel, ModuleLevel.NIVEL_1)) ||
-      showConfigPermissions
-    showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)
-    
-    showRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) && hasStructure
+    const userGroupIds = await getUserGroupIds(appUser.id)
 
-    // Aprovações só para quem tem NIVEL_3 no módulo de solicitações
-    canApprove = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_3) && hasStructure
-    canReviewRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_2) && hasStructure
-    canAccessRefusalPanel = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_3) && hasStructure
+    const [
+      canViewConfigPainel,
+      canViewConfigUsuarios,
+      canViewConfigPermissoes,
+      canViewConfigCentros,
+      canViewConfigCargos,
+      canViewSolicEnviadas,
+      canViewSolicRecebidas,
+      canViewSolicAprovacao,
+      canViewSolicCadastros,
+      canViewFleetVeiculos,
+      canViewFleetCheckins,
+      canViewFleetDeslocamentoCheckin,
+      canViewFleetDeslocamentoPainel,
+      canViewRecusaPainel,
+      canViewRecusaMinhas,
+      canViewRecusaNova,
+      canViewRecusaPendentes,
+    ] = await Promise.all([
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PAINEL, Action.VIEW, { groupIds: userGroupIds }),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW, { groupIds: userGroupIds }),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW, { groupIds: userGroupIds }),
+      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW, {
+        groupIds: userGroupIds,
+      }),
+    ])
+
+    configFeatures = {
+      painel: canViewConfigPainel,
+      usuarios: canViewConfigUsuarios,
+      permissoes: canViewConfigPermissoes,
+      centros: canViewConfigCentros,
+      cargos: canViewConfigCargos,
+    }
+
+    solicitacaoFeatures = {
+      enviadas: canViewSolicEnviadas,
+      recebidas: canViewSolicRecebidas,
+      aprovacao: canViewSolicAprovacao,
+      cadastros: canViewSolicCadastros,
+    }
+
+    fleetFeatures = {
+      veiculos: canViewFleetVeiculos,
+      checkins: canViewFleetCheckins,
+      deslocamentoCheckin: canViewFleetDeslocamentoCheckin,
+      deslocamentoPainel: canViewFleetDeslocamentoPainel,
+    }
+
+    refusalFeatures = {
+      painel: canViewRecusaPainel,
+      minhas: canViewRecusaMinhas,
+      nova: canViewRecusaNova,
+      pendentes: canViewRecusaPendentes,
+    }
+
+    showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(solicitacaoFeatures).some(Boolean)
+    showConfig = hasMinLevel(configLevel, ModuleLevel.NIVEL_1) && Object.values(configFeatures).some(Boolean)
+    showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1) && Object.values(fleetFeatures).some(Boolean)
+    showRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(refusalFeatures).some(Boolean)
+
+    canApprove =
+      hasStructure &&
+      (await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.APPROVE, {
+        groupIds: userGroupIds,
+      }))
+    canReviewRefusal =
+      hasStructure &&
+      (await canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.APPROVE, {
+        groupIds: userGroupIds,
+      }))
+    canAccessRefusalPanel = refusalFeatures.painel
   }
 
   return (
@@ -110,13 +230,15 @@ export default async function DashboardLayout({
       <Sidebar
         showSolic={showSolic}
         showConfig={showConfig}
-        showConfigPermissions={showConfigPermissions}
         showFleet={showFleet}
         showRefusal={showRefusal}
         canApprove={canApprove}
         canReviewRefusal={canReviewRefusal}
         canAccessRefusalPanel={canAccessRefusalPanel}
-        fleetLevel={fleetLevel ?? null}
+        configFeatures={configFeatures}
+        solicitacaoFeatures={solicitacaoFeatures}
+        fleetFeatures={fleetFeatures}
+        refusalFeatures={refusalFeatures}
         userMenu={<UserMenu collapsed={false} user={appUser} />}
       />
 

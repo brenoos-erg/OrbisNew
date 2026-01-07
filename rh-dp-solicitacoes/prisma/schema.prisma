@@ -31,7 +31,7 @@ model RefusalAttachment {
 }
 
 model RefusalReport {
-  id                     String              @id @default(uuid())
+  id                     String              @id @default(dbgenerated("(gen_random_uuid())::text"))
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   employeeId             String
@@ -51,11 +51,10 @@ model RefusalReport {
   decidedById            String?
   decisionLevel          ModuleLevel?
   attachments            RefusalAttachment[]
-
-  employee           User  @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
-  contractManager    User? @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
-  generalCoordinator User? @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
-  decidedBy          User? @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
+  contractManager        User?               @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
+  decidedBy              User?               @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
+  employee               User                @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
+  generalCoordinator     User?               @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
 }
 
 model Comment {
@@ -212,43 +211,45 @@ model Solicitation {
 }
 
 model User {
-  id                    String             @id @default(dbgenerated("(gen_random_uuid())::text"))
-  email                 String             @unique
-  role                  Role               @default(COLABORADOR)
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  authId                String?            @unique @db.Uuid
-  fullName              String
-  login                 String?            @unique(map: "user_login_key")
-  phone                 String?
-  status                UserStatus         @default(ATIVO)
-  leaderId              String?
-  costCenterId          String?
-  positionId            String?
-  avatarUrl             String?
-  departmentId          String?
-  comments              Comment[]          @relation("CommentAutor")
-  events                Event[]            @relation("EventActor")
-  membersOfGroups       GroupMember[]
-  solicitacoesAprovador Solicitation[]     @relation("SolicitationAprovador")
-  solicitacoesAssumidas Solicitation[]     @relation("SolicitationAssumidaPor")
-  solicitacoesCriadas   Solicitation[]     @relation("SolicitationSolicitante")
-  costCenter            CostCenter?        @relation(fields: [costCenterId], references: [id])
-  department            Department?        @relation(fields: [departmentId], references: [id])
-  leader                Leader?            @relation(fields: [leaderId], references: [id])
-  position              Position?          @relation(fields: [positionId], references: [id])
-  costCenters           UserCostCenter[]
-  userDepartments       UserDepartment[]
-  moduleAccesses        UserModuleAccess[]
-  vehicleCheckins       VehicleCheckin[]
-  vehicleStatusLogs     VehicleStatusLog[]
-
-  // Direito de Recusa - relações inversas de RefusalReport
-  refusalReportsAsEmployee           RefusalReport[]              @relation("RefusalReportEmployee")
-  refusalReportsAsContractManager    RefusalReport[]              @relation("RefusalReportContractManager")
-  refusalReportsAsGeneralCoordinator RefusalReport[]              @relation("RefusalReportGeneralCoordinator")
-  refusalReportsAsDecidedBy          RefusalReport[]              @relation("RefusalReportDecisionUser")
-  vehicleDisplacementCheckins        VehicleDisplacementCheckin[]
+  id                                         String                       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  email                                      String                       @unique
+  role                                       Role                         @default(COLABORADOR)
+  createdAt                                  DateTime                     @default(now())
+  updatedAt                                  DateTime                     @updatedAt
+  authId                                     String?                      @unique @db.Uuid
+  fullName                                   String
+  login                                      String?                      @unique(map: "user_login_key")
+  phone                                      String?
+  status                                     UserStatus                   @default(ATIVO)
+  leaderId                                   String?
+  costCenterId                               String?
+  positionId                                 String?
+  avatarUrl                                  String?
+  departmentId                               String?
+  comments                                   Comment[]                    @relation("CommentAutor")
+  events                                     Event[]                      @relation("EventActor")
+  membersOfGroups                            GroupMember[]
+  refusalReportsAsContractManager            RefusalReport[]              @relation("RefusalReportContractManager")
+  refusalReportsAsDecidedBy                  RefusalReport[]              @relation("RefusalReportDecisionUser")
+  refusalReportsAsEmployee                   RefusalReport[]              @relation("RefusalReportEmployee")
+  refusalReportsAsGeneralCoordinator         RefusalReport[]              @relation("RefusalReportGeneralCoordinator")
+  solicitacoesAprovador                      Solicitation[]               @relation("SolicitationAprovador")
+  solicitacoesAssumidas                      Solicitation[]               @relation("SolicitationAssumidaPor")
+  solicitacoesCriadas                        Solicitation[]               @relation("SolicitationSolicitante")
+  costCenter                                 CostCenter?                  @relation(fields: [costCenterId], references: [id])
+  department                                 Department?                  @relation(fields: [departmentId], references: [id])
+  leader                                     Leader?                      @relation(fields: [leaderId], references: [id])
+  position                                   Position?                    @relation(fields: [positionId], references: [id])
+  costCenters                                UserCostCenter[]
+  userDepartments                            UserDepartment[]
+  moduleAccesses                             UserModuleAccess[]
+  vehicleCheckins                            VehicleCheckin[]
+  vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
+  vehicleStatusLogs                          VehicleStatusLog[]
+  WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                @relation("WorkRefusal_analyzedByIdToUser")
+  WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
+  WorkRefusalAttachment                      WorkRefusalAttachment[]
+  WorkRefusalHistory                         WorkRefusalHistory[]
 
   @@map("User")
 }
@@ -263,6 +264,7 @@ model Module {
   costCenters CostCenterModule[]
   deptAccess  DepartmentModule[]
   userAccess  UserModuleAccess[]
+  features    ModuleFeature[]
 
   @@map("Module")
 }
@@ -274,6 +276,7 @@ model AccessGroup {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   grants    AccessGroupGrant[]
+   featureGrants FeatureGrant[]
   members   GroupMember[]
 
   @@map("AccessGroup")
@@ -304,6 +307,33 @@ model AccessGroupGrant {
 
   @@unique([groupId, moduleId])
   @@map("AccessGroupGrant")
+}
+model ModuleFeature {
+  id        String      @id @default(uuid())
+  moduleId  String
+  key       String
+  name      String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  module    Module      @relation(fields: [moduleId], references: [id])
+  grants    FeatureGrant[]
+
+  @@unique([moduleId, key])
+  @@map("ModuleFeature")
+}
+
+model FeatureGrant {
+  id        String      @id @default(uuid())
+  groupId   String
+  featureId String
+  actions   Action[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  group     AccessGroup @relation(fields: [groupId], references: [id])
+  feature   ModuleFeature @relation(fields: [featureId], references: [id])
+
+  @@unique([groupId, featureId])
+  @@map("FeatureGrant")
 }
 
 model CostCenterModule {
@@ -363,12 +393,12 @@ model DepartmentModule {
 }
 
 model UserDepartment {
-  id           String     @id @default(uuid())
+  id           String     @id @default(dbgenerated("(gen_random_uuid())::text"))
   userId       String
   departmentId String
   createdAt    DateTime   @default(now())
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   department   Department @relation(fields: [departmentId], references: [id])
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, departmentId])
   @@map("UserDepartment")
@@ -387,8 +417,8 @@ model Vehicle {
   updatedAt            DateTime                     @updatedAt
   checkins             VehicleCheckin[]
   costCenters          VehicleCostCenter[]
-  statusLogs           VehicleStatusLog[]
   displacementCheckins VehicleDisplacementCheckin[]
+  statusLogs           VehicleStatusLog[]
 }
 
 model VehicleCostCenter {
@@ -442,7 +472,7 @@ model VehicleStatusLog {
 }
 
 model VehicleDisplacementCheckin {
-  id                   String   @id @default(cuid())
+  id                   String      @id @default(cuid())
   vehicleId            String
   driverId             String
   tripDate             DateTime
@@ -452,12 +482,60 @@ model VehicleDisplacementCheckin {
   vehiclePlateSnapshot String
   vehicleTypeSnapshot  String
   vehicleModelSnapshot String?
+  createdAt            DateTime    @default(now())
   vehicleKmSnapshot    Int?
-  createdAt            DateTime @default(now())
+  costCenter           CostCenter? @relation(fields: [costCenterId], references: [id])
+  driver               User        @relation(fields: [driverId], references: [id])
+  vehicle              Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
 
-  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  driver     User        @relation(fields: [driverId], references: [id])
-  costCenter CostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+model WorkRefusal {
+  id                                  String                  @id
+  gestorContrato                      String
+  coordenadorGeral                    String
+  nomeEmpregado                       String
+  matricula                           String?
+  setorContrato                       String
+  situacaoRisco                       String
+  localOuEquipamento                  String
+  descricaoDetalhadaRisco             String
+  status                              WorkRefusalStatus       @default(AGUARDANDO_PARECER)
+  procede                             Boolean?
+  parecerRecomendacoes                String?
+  createdAt                           DateTime                @default(now())
+  updatedAt                           DateTime                @default(now())
+  analyzedAt                          DateTime?
+  createdById                         String
+  analyzedById                        String?
+  deletedAt                           DateTime?
+  User_WorkRefusal_analyzedByIdToUser User?                   @relation("WorkRefusal_analyzedByIdToUser", fields: [analyzedById], references: [id])
+  User_WorkRefusal_createdByIdToUser  User                    @relation("WorkRefusal_createdByIdToUser", fields: [createdById], references: [id])
+  WorkRefusalAttachment               WorkRefusalAttachment[]
+  WorkRefusalHistory                  WorkRefusalHistory[]
+}
+
+model WorkRefusalAttachment {
+  id            String      @id
+  workRefusalId String
+  filename      String
+  url           String
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime    @default(now())
+  createdById   String?
+  User          User?       @relation(fields: [createdById], references: [id])
+  WorkRefusal   WorkRefusal @relation(fields: [workRefusalId], references: [id])
+}
+
+model WorkRefusalHistory {
+  id            String            @id
+  workRefusalId String
+  status        WorkRefusalStatus
+  message       String?
+  createdAt     DateTime          @default(now())
+  createdById   String?
+  User          User?             @relation(fields: [createdById], references: [id])
+  WorkRefusal   WorkRefusal       @relation(fields: [workRefusalId], references: [id])
 }
 
 enum Role {
@@ -536,4 +614,12 @@ enum RefusalStatus {
   PENDENTE
   APROVADA
   REJEITADA
+}
+
+enum WorkRefusalStatus {
+  EM_PREENCHIMENTO
+  AGUARDANDO_PARECER
+  PROCEDENTE
+  NAO_PROCEDENTE
+  ENCERRADO
 }

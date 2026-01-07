@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, type FormEvent } from 'react'
 
+type FeatureAction = 'VIEW' | 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE'
+
 type ModuleDTO = {
   id: string
   key: string
@@ -65,7 +67,28 @@ type DepartmentUser = {
   isPrimary?: boolean
   canRemove?: boolean
 }
-type Tab = 'departamentos' | 'usuarios'
+type FeatureDTO = {
+  id: string
+  key: string
+  name: string
+}
+type AccessGroupDTO = {
+  id: string
+  name: string
+}
+type FeatureGrantDTO = {
+  id: string
+  groupId: string
+  featureId: string
+  actions: FeatureAction[]
+}
+type FeaturePayload = {
+  module: ModuleDTO
+  features: FeatureDTO[]
+  groups: AccessGroupDTO[]
+  grants: FeatureGrantDTO[]
+}
+type Tab = 'departamentos' | 'usuarios' | 'submodulos'
 
 export default function PermissoesClient() {
   const [activeTab, setActiveTab] = useState<Tab>('departamentos')
@@ -94,6 +117,14 @@ export default function PermissoesClient() {
   const [selectedDepartmentForLevels, setSelectedDepartmentForLevels] = useState<string>('')
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
+
+  // ---- Submódulos ----
+  const [modulesForFeatures, setModulesForFeatures] = useState<ModuleDTO[]>([])
+  const [selectedFeatureModuleKey, setSelectedFeatureModuleKey] = useState<string>('')
+  const [selectedFeatureGroupId, setSelectedFeatureGroupId] = useState<string>('')
+  const [featureData, setFeatureData] = useState<FeaturePayload | null>(null)
+  const [loadingFeatures, setLoadingFeatures] = useState(false)
+  const [featureReloadKey, setFeatureReloadKey] = useState(0)
 
   // =========================
   // CARREGAR DADOS DEPARTAMENTOS
@@ -133,6 +164,11 @@ export default function PermissoesClient() {
       setSelectedModuleForLevels(deptData.modules[0].id)
     }
   }, [deptData, selectedModuleForLevels])
+  useEffect(() => {
+    if (!deptData) return
+    if (modulesForFeatures.length > 0) return
+    setModulesForFeatures(deptData.modules)
+  }, [deptData, modulesForFeatures.length])
   
 
   useEffect(() => {
@@ -144,6 +180,70 @@ export default function PermissoesClient() {
     }
     loadDepartmentMembers(selectedDeptId)
   }, [selectedDeptId])
+  useEffect(() => {
+    if (activeTab !== 'submodulos') return
+    if (modulesForFeatures.length === 0) {
+      const loadModules = async () => {
+        try {
+          setLoadingFeatures(true)
+          const res = await fetch('/api/permissoes/departamentos', { cache: 'no-store' })
+          if (!res.ok) {
+            const json = await res.json().catch(() => ({}))
+            throw new Error(json?.error || 'Erro ao carregar módulos.')
+          }
+          const json: DepartmentPayload = await res.json()
+          setModulesForFeatures(json.modules)
+          if (!selectedFeatureModuleKey && json.modules.length > 0) {
+            setSelectedFeatureModuleKey(json.modules[0].key)
+          }
+        } catch (e: any) {
+          setError(e?.message || 'Erro ao carregar módulos.')
+        } finally {
+          setLoadingFeatures(false)
+        }
+      }
+      void loadModules()
+      return
+    }
+
+    if (!selectedFeatureModuleKey && modulesForFeatures.length > 0) {
+      setSelectedFeatureModuleKey(modulesForFeatures[0].key)
+    }
+  }, [activeTab, modulesForFeatures, selectedFeatureModuleKey])
+
+  useEffect(() => {
+    if (activeTab !== 'submodulos') return
+    if (!selectedFeatureModuleKey) return
+
+    const loadFeatures = async () => {
+      try {
+        setLoadingFeatures(true)
+        setError(null)
+
+        const params = new URLSearchParams({ moduleKey: selectedFeatureModuleKey })
+        const res = await fetch(`/api/permissoes/features?${params.toString()}`, { cache: 'no-store' })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          throw new Error(json?.error || 'Erro ao carregar submódulos.')
+        }
+
+        const json: FeaturePayload = await res.json()
+        setFeatureData(json)
+        if (!selectedFeatureGroupId || !json.groups.some((g) => g.id === selectedFeatureGroupId)) {
+          if (json.groups.length > 0) {
+            setSelectedFeatureGroupId(json.groups[0].id)
+          }
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Erro ao carregar submódulos.')
+      } finally {
+        setLoadingFeatures(false)
+      }
+    }
+
+    void loadFeatures()
+  }, [activeTab, selectedFeatureModuleKey, featureReloadKey])
+
 
   // =========================
   // HANDLERS DEPARTAMENTOS
@@ -505,6 +605,15 @@ export default function PermissoesClient() {
           onClick={() => setActiveTab('usuarios')}
         >
           Usuários
+        </button>
+        <button
+          type="button"
+          className={`px-3 py-1 rounded-md text-sm ${
+            activeTab === 'submodulos' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+          }`}
+          onClick={() => setActiveTab('submodulos')}
+        >
+          Submódulos
         </button>
       </div>
 
@@ -895,6 +1004,163 @@ export default function PermissoesClient() {
                 * Todos usuários novos começam como NIVEL_1 (no backend). Aqui é só para elevar ou tirar acesso quando
                 necessário.
               </p>
+            </div>
+          )}
+        </section>
+      )}
+        {activeTab === 'submodulos' && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-medium">Permissões por Submódulo</h2>
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1 space-y-1">
+              <label className="text-sm font-medium">Módulo</label>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={selectedFeatureModuleKey}
+                onChange={(e) => {
+                  setSelectedFeatureModuleKey(e.target.value)
+                  setFeatureData(null)
+                }}
+                disabled={loadingFeatures || modulesForFeatures.length === 0}
+              >
+                {modulesForFeatures.map((mod) => (
+                  <option key={mod.id} value={mod.key}>
+                    {mod.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 space-y-1">
+              <label className="text-sm font-medium">Grupo</label>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                value={selectedFeatureGroupId}
+                onChange={(e) => setSelectedFeatureGroupId(e.target.value)}
+                disabled={loadingFeatures || !featureData?.groups.length}
+              >
+                {featureData?.groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">Selecione o grupo para editar as ações permitidas.</p>
+            </div>
+          </div>
+
+          {loadingFeatures && <p className="text-sm text-gray-600">Carregando submódulos...</p>}
+
+          {featureData && (
+            <div className="rounded-md border">
+              <div className="border-b px-4 py-3">
+                <p className="text-sm font-medium">{featureData.module.name}</p>
+                <p className="text-xs text-gray-500">{featureData.module.key}</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Submódulo</th>
+                      {(['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'] satisfies FeatureAction[]).map((action) => (
+                        <th key={action} className="px-3 py-2 text-center font-semibold text-gray-700">
+                          {action}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {featureData.features.map((feature) => {
+                      const currentActions =
+                        featureData.grants.find(
+                          (grant) => grant.featureId === feature.id && grant.groupId === selectedFeatureGroupId,
+                        )?.actions ?? []
+
+                      const toggleAction = async (action: FeatureAction, enabled: boolean) => {
+                        if (!selectedFeatureGroupId) return
+                        try {
+                          setSaving(true)
+                          setError(null)
+                          setSuccess(null)
+
+                          const nextActions = enabled
+                            ? Array.from(new Set([...currentActions, action]))
+                            : currentActions.filter((a) => a !== action)
+
+                          setFeatureData((prev) => {
+                            if (!prev) return prev
+                            const nextGrants = prev.grants.slice()
+                            const existingIdx = nextGrants.findIndex(
+                              (grant) => grant.featureId === feature.id && grant.groupId === selectedFeatureGroupId,
+                            )
+                            if (nextActions.length === 0) {
+                              if (existingIdx >= 0) nextGrants.splice(existingIdx, 1)
+                            } else if (existingIdx >= 0) {
+                              nextGrants[existingIdx] = {
+                                ...nextGrants[existingIdx],
+                                actions: nextActions,
+                              }
+                            } else {
+                              nextGrants.push({
+                                id: `${feature.id}-${selectedFeatureGroupId}`,
+                                featureId: feature.id,
+                                groupId: selectedFeatureGroupId,
+                                actions: nextActions,
+                              })
+                            }
+
+                            return { ...prev, grants: nextGrants }
+                          })
+
+                          const res = await fetch('/api/permissoes/features', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              groupId: selectedFeatureGroupId,
+                              featureKey: feature.key,
+                              actions: nextActions,
+                            }),
+                          })
+
+                          if (!res.ok) {
+                            const json = await res.json().catch(() => ({}))
+                            throw new Error(json?.error || 'Erro ao salvar permissões.')
+                          }
+
+                          setSuccess('Permissões atualizadas.')
+                        } catch (e: any) {
+                          setError(e?.message || 'Erro ao salvar permissões.')
+                          // força reload na próxima iteração
+                          setFeatureData(null)
+                          setFeatureReloadKey((value) => value + 1)
+                        } finally {
+                          setSaving(false)
+                        }
+                      }
+
+                      return (
+                        <tr key={feature.id}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{feature.name}</td>
+                          {(['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'] satisfies FeatureAction[]).map(
+                            (action) => (
+                              <td key={action} className="px-3 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={currentActions.includes(action)}
+                                  disabled={saving}
+                                  onChange={(e) => toggleAction(action, e.target.checked)}
+                                />
+                              </td>
+                            ),
+                          )}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>

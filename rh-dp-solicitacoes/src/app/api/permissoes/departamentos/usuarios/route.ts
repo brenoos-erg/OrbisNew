@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel } from '@prisma/client'
 
 import { assertUserMinLevel } from '@/lib/access'
 import { requireActiveUser } from '@/lib/auth'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 import { ensureUserDepartmentLink, removeUserDepartmentLink } from '@/lib/userDepartments'
 
@@ -38,7 +40,8 @@ function mapUserWithMembership(user: UserSummary, departmentId?: string | null) 
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
 
     const { searchParams } = new URL(req.url)
     const departmentId = searchParams.get('departmentId')
@@ -132,7 +135,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
     const body = await req.json().catch(() => ({}))
     const departmentId = body.departmentId as string | undefined
@@ -187,7 +191,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
     const url = new URL(req.url)
     const departmentId = url.searchParams.get('departmentId')

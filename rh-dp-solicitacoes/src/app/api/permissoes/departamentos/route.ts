@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
-import { ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel } from '@prisma/client'
 import { normalizeModuleLinks, normalizeModules } from '@/lib/normalizeModules'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 const CORE_MODULES = [
@@ -63,7 +65,8 @@ export async function GET(_req: NextRequest) {
   try {
     const me = await requireActiveUser()
     // 🔐 Só NIVEL_3 no módulo "configuracoes" pode mexer nisso
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
     await ensureCoreModules()
 
     const [departments, modules, links] = await Promise.all([
@@ -109,7 +112,8 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const me = await requireActiveUser()
-    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_3)
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
 
     const body = await req.json().catch(() => ({} as any))
     const { departmentId, moduleId, enabled } = body as {

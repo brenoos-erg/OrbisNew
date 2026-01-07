@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server'
-import { ModuleLevel } from '@prisma/client'
+import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { normalizePlate, isValidPlate } from '@/lib/plate'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { canFeature } from '@/lib/permissions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
 
-function hasMinLevel(current: ModuleLevel | undefined, min: ModuleLevel) {
-  if (!current) return false
-  return LEVEL_ORDER.indexOf(current) >= LEVEL_ORDER.indexOf(min)
-}
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 
 export async function GET(req: Request) {
   const { appUser } = await getCurrentAppUser()
@@ -20,15 +20,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
-  const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-  if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)) {
+  const canViewVehicles = await canFeature(
+    appUser.id,
+    MODULE_KEYS.FROTAS,
+    FEATURE_KEYS.FROTAS.VEICULOS,
+    Action.VIEW,
+  )
+  if (!canViewVehicles) {
     return NextResponse.json({ error: 'Acesso negado ao módulo de frotas.' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') ?? undefined
   const plate = searchParams.get('plate') ?? undefined
-  const canListVehicles = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_2)
+  const canListVehicles = await canFeature(
+    appUser.id,
+    MODULE_KEYS.FROTAS,
+    FEATURE_KEYS.FROTAS.VEICULOS,
+    Action.UPDATE,
+  )
 
   if (!canListVehicles && !plate) {
     return NextResponse.json(
@@ -88,8 +98,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+    const canCreateVehicles = await canFeature(
+      appUser.id,
+      MODULE_KEYS.FROTAS,
+      FEATURE_KEYS.FROTAS.VEICULOS,
+      Action.CREATE,
+    )
+    if (!canCreateVehicles) {
       return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
     }
 
@@ -183,8 +198,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+    const canUpdateVehicles = await canFeature(
+      appUser.id,
+      MODULE_KEYS.FROTAS,
+      FEATURE_KEYS.FROTAS.VEICULOS,
+      Action.UPDATE,
+    )
+    if (!canUpdateVehicles) {
       return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
     }
 
@@ -261,8 +281,13 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_3)) {
+    const canDeleteVehicles = await canFeature(
+      appUser.id,
+      MODULE_KEYS.FROTAS,
+      FEATURE_KEYS.FROTAS.VEICULOS,
+      Action.DELETE,
+    )
+    if (!canDeleteVehicles) {
       return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
     }
     const { searchParams } = new URL(req.url)

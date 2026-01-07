@@ -1,4 +1,3 @@
-
 'use client'
 // src/components/layout/Sidebar.tsx
 import { CheckCircle2 } from 'lucide-react'
@@ -24,25 +23,50 @@ import { usePathname } from 'next/navigation'
 type Props = {
   showSolic: boolean
   showConfig: boolean
-  showConfigPermissions: boolean
   showFleet: boolean
   showRefusal: boolean
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
-  fleetLevel?: 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | null
+  configFeatures: {
+    painel: boolean
+    usuarios: boolean
+    permissoes: boolean
+    centros: boolean
+    cargos: boolean
+  }
+  solicitacaoFeatures: {
+    enviadas: boolean
+    recebidas: boolean
+    aprovacao: boolean
+    cadastros: boolean
+  }
+  fleetFeatures: {
+    veiculos: boolean
+    checkins: boolean
+    deslocamentoCheckin: boolean
+    deslocamentoPainel: boolean
+  }
+  refusalFeatures: {
+    painel: boolean
+    minhas: boolean
+    nova: boolean
+    pendentes: boolean
+  }
   userMenu: ReactNode
 }
 export default function Sidebar({
   showSolic,
   showConfig,
-  showConfigPermissions,
   showFleet,
   showRefusal,
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
-  fleetLevel,
+  configFeatures,
+  solicitacaoFeatures,
+  fleetFeatures,
+  refusalFeatures,
   userMenu,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
@@ -96,14 +120,6 @@ export default function Sidebar({
     'w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors cursor-pointer'
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
-  const fleetLevelOrder = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3'] as const
-  const hasFleetLevel = (min: (typeof fleetLevelOrder)[number]) => {
-    if (!fleetLevel) return false
-    return fleetLevelOrder.indexOf(fleetLevel) >= fleetLevelOrder.indexOf(min)
-  }
-
-  const canSeeFleetBasics = hasFleetLevel('NIVEL_1')
-  const canSeeFleetPanels = hasFleetLevel('NIVEL_2')
 
   return (
     <aside
@@ -145,7 +161,7 @@ export default function Sidebar({
 
               {openFleet && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                    {canSeeFleetPanels && (
+                    {fleetFeatures.veiculos && (
                     <Link
                       href="/dashboard/gestao-de-frotas/veiculos"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -159,7 +175,7 @@ export default function Sidebar({
                     </Link>
                   )}
 
-                  {canSeeFleetBasics && (
+                  {fleetFeatures.checkins && (
                     <Link
                       href="/dashboard/gestao-de-frotas/checkins"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -172,7 +188,7 @@ export default function Sidebar({
                       <ClipboardCheck size={16} /> <span>Check-ins diários</span>
                     </Link>
                   )}
-                  {canSeeFleetBasics && (
+                  {fleetFeatures.deslocamentoCheckin && (
                     <Link
                       href="/dashboard/gestao-de-frotas/deslocamento/checkin"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -185,7 +201,7 @@ export default function Sidebar({
                       <Route size={16} /> <span>Check-in de deslocamento</span>
                     </Link>
                   )}
-                  {canSeeFleetPanels && (
+                  {fleetFeatures.deslocamentoPainel && (
                     <Link
                       href="/dashboard/gestao-de-frotas/deslocamento/painel"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -217,7 +233,7 @@ export default function Sidebar({
 
               {openRefusal && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  {canAccessRefusalPanel && (
+                  {canAccessRefusalPanel && refusalFeatures.painel && (
                     <Link
                       href="/dashboard/direito-de-recusa"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -230,29 +246,33 @@ export default function Sidebar({
                       <ShieldAlert size={16} /> <span>Painel</span>
                     </Link>
                   )}
-                   <Link
-                    href="/dashboard/direito-de-recusa/minhas"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/direito-de-recusa/minhas')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <ClipboardList size={16} /> <span>Meus direitos de recusa</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/direito-de-recusa/nova"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/direito-de-recusa/nova')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                   {refusalFeatures.minhas && (
+                    <Link
+                      href="/dashboard/direito-de-recusa/minhas"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/direito-de-recusa/minhas')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
-                  >
-                    <ClipboardList size={16} /> <span>Registrar recusa</span>
-                  </Link>
-                  {canReviewRefusal && (
+                    >
+                      <ClipboardList size={16} /> <span>Meus direitos de recusa</span>
+                    </Link>
+                  )}
+                  {refusalFeatures.nova && (
+                    <Link
+                      href="/dashboard/direito-de-recusa/nova"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/direito-de-recusa/nova')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ClipboardList size={16} /> <span>Registrar recusa</span>
+                    </Link>
+                  )}
+                  {canReviewRefusal && refusalFeatures.pendentes && (
                     <Link
                       href="/dashboard/direito-de-recusa/pendentes"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -286,32 +306,36 @@ export default function Sidebar({
               {/* Submenu – só aparece se não estiver colapsado e se estiver "openSolic" */}
               {openSolic && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link
-                    href="/dashboard/solicitacoes/enviadas"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname === '/dashboard/solicitacoes/enviadas'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Send size={16} /> <span>Solicitações Enviadas</span>
-                  </Link>
+                  {solicitacaoFeatures.enviadas && (
+                    <Link
+                      href="/dashboard/solicitacoes/enviadas"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/solicitacoes/enviadas'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Send size={16} /> <span>Solicitações Enviadas</span>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/dashboard/solicitacoes/recebidas"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname === '/dashboard/solicitacoes/recebidas'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Inbox size={16} /> <span>Solicitações Recebidas</span>
-                  </Link>
+                   {solicitacaoFeatures.recebidas && (
+                    <Link
+                      href="/dashboard/solicitacoes/recebidas"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/solicitacoes/recebidas'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Inbox size={16} /> <span>Solicitações Recebidas</span>
+                    </Link>
+                  )}
 
                   {/* 👉 Painel de Aprovações – só aparece para quem pode aprovar */}
-                  {canApprove && (
+                    {canApprove && solicitacaoFeatures.aprovacao && (
                     <Link
                       href="/dashboard/solicitacoes/aprovacao"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -325,19 +349,21 @@ export default function Sidebar({
                     </Link>
                   )}
 
-                  <Link
-                    href="/dashboard/solicitacoes/cadastros"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith(
-                          '/dashboard/solicitacoes/cadastros',
-                        )
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <FolderCog size={16} /> <span>Cadastros</span>
-                  </Link>
+                  {solicitacaoFeatures.cadastros && (
+                    <Link
+                      href="/dashboard/solicitacoes/cadastros"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/solicitacoes/cadastros',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <FolderCog size={16} /> <span>Cadastros</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
@@ -360,31 +386,35 @@ export default function Sidebar({
               {/* Submenu */}
               {openConfig && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
-                  <Link
-                    href="/dashboard/configuracoes"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname === '/dashboard/configuracoes'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Settings size={16} /> <span>Painel</span>
-                  </Link>
+                   {configFeatures.painel && (
+                    <Link
+                      href="/dashboard/configuracoes"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname === '/dashboard/configuracoes'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Settings size={16} /> <span>Painel</span>
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/dashboard/configuracoes/usuarios"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith('/dashboard/configuracoes/usuarios')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <Users size={16} /> <span>Usuários</span>
-                  </Link>
+                  {configFeatures.usuarios && (
+                    <Link
+                      href="/dashboard/configuracoes/usuarios"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith('/dashboard/configuracoes/usuarios')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Users size={16} /> <span>Usuários</span>
+                    </Link>
+                  )}
 
-                  {showConfigPermissions && (
+                  {configFeatures.permissoes && (
                     <Link
                       href="/dashboard/configuracoes/permissoes"
                       className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
@@ -400,34 +430,37 @@ export default function Sidebar({
                     </Link>
                   )}
 
-                  <Link
-                    href="/dashboard/configuracoes/centros-de-custo"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith(
-                          '/dashboard/configuracoes/centros-de-custo',
-                        )
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <FolderCog size={16} /> <span>Centros de Custo</span>
-                  </Link>
+                  {configFeatures.centros && (
+                    <Link
+                      href="/dashboard/configuracoes/centros-de-custo"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/centros-de-custo',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <FolderCog size={16} /> <span>Centros de Custo</span>
+                    </Link>
+                  )}
 
-                  {/* 👉 NOVO SUBMENU: CARGOS */}
-                  <Link
-                    href="/dashboard/configuracoes/cargos"
-                    className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
-                      ${
-                        pathname.startsWith(
-                          '/dashboard/configuracoes/cargos',
-                        )
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <FolderCog size={16} /> <span>Cargos</span>
-                  </Link>
+                  {configFeatures.cargos && (
+                    <Link
+                      href="/dashboard/configuracoes/cargos"
+                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/cargos',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <FolderCog size={16} /> <span>Cargos</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

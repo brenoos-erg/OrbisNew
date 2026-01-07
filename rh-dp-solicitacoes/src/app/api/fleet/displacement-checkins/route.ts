@@ -1,18 +1,14 @@
-import { ModuleLevel } from '@prisma/client'
+import { Action } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { isValidPlate, normalizePlate } from '@/lib/plate'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { canFeature } from '@/lib/permissions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
-
-function hasMinLevel(current: ModuleLevel | undefined, min: ModuleLevel) {
-  if (!current) return false
-  return LEVEL_ORDER.indexOf(current) >= LEVEL_ORDER.indexOf(min)
-}
 
 function parseDate(value?: string | null) {
   if (!value) return null
@@ -27,9 +23,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
-  const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-  if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_2)) {
-    return NextResponse.json({ error: 'O painel de deslocamentos requer nível 2 no módulo de frotas.' }, { status: 403 })
+  const canViewDisplacementPanel = await canFeature(
+    appUser.id,
+    MODULE_KEYS.FROTAS,
+    FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL,
+    Action.VIEW,
+  )
+  if (!canViewDisplacementPanel) {
+    return NextResponse.json({ error: 'O painel de deslocamentos requer permissão de visualização.' }, { status: 403 })
   }
 
   const { searchParams } = new URL(req.url)
@@ -56,8 +57,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const fleetLevel = appUser.moduleLevels?.['gestao-de-frotas'] ?? appUser.moduleLevels?.['gestao_frotas']
-    if (!hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1)) {
+     const canCreateDisplacement = await canFeature(
+      appUser.id,
+      MODULE_KEYS.FROTAS,
+      FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN,
+      Action.CREATE,
+    )
+    if (!canCreateDisplacement) {
       return NextResponse.json({ error: 'Sem permissão para registrar deslocamento.' }, { status: 403 })
     }
 
