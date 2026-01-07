@@ -46,6 +46,12 @@ type UserOption = {
   email: string
   costCenter?: { id: string; description: string | null; externalCode: string | null; code: string | null } | null
 }
+type CategoryFieldConfig = {
+  label: string
+  source: 'serialNumber' | 'observations'
+  placeholder?: string
+}
+
 
 const INPUT =
   'mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300 shadow-sm transition-colors'
@@ -61,6 +67,54 @@ const statusOptions: Array<{ value: TiEquipmentStatus; label: string }> = [
   { value: 'MAINTENANCE', label: 'Em manutenção' },
   { value: 'RETIRED', label: 'Baixado' },
 ]
+const categoryFieldConfig: Record<TiEquipmentCategory, CategoryFieldConfig> = {
+  LINHA_TELEFONICA: {
+    label: 'Número da linha',
+    source: 'serialNumber',
+    placeholder: 'Opcional',
+  },
+  SMARTPHONE: {
+    label: 'IMEI',
+    source: 'serialNumber',
+    placeholder: 'Opcional',
+  },
+  NOTEBOOK: {
+    label: 'Número de série',
+    source: 'serialNumber',
+    placeholder: 'Opcional',
+  },
+  DESKTOP: {
+    label: 'Número de série',
+    source: 'serialNumber',
+    placeholder: 'Opcional',
+  },
+  MONITOR: {
+    label: 'Tamanho',
+    source: 'observations',
+    placeholder: 'Opcional',
+  },
+  IMPRESSORA: {
+    label: 'Local (se compartilhada)',
+    source: 'observations',
+    placeholder: 'Opcional',
+  },
+  TPLINK: {
+    label: 'IP (se aplicável)',
+    source: 'observations',
+    placeholder: 'Opcional',
+  },
+  OUTROS: {
+    label: 'Descrição curta',
+    source: 'observations',
+    placeholder: 'Opcional',
+  },
+}
+
+const userLabelByCategory: Partial<Record<TiEquipmentCategory, string>> = {
+  IMPRESSORA: 'Usuário (ou local)',
+  TPLINK: 'Usuário (ou responsável)',
+}
+
 
 
 function formatCurrency(value?: string | number | null) {
@@ -88,6 +142,13 @@ function formatCostCenter(
 function statusLabel(status: string) {
   const found = statusOptions.find((s) => s.value === status)
   return found?.label ?? status
+}
+function getUserLabel(category: TiEquipmentCategory) {
+  return userLabelByCategory[category] ?? 'Usuário'
+}
+
+function getCategoryFieldConfig(category: TiEquipmentCategory) {
+  return categoryFieldConfig[category]
 }
 
 type TiEquipmentsPanelProps = {
@@ -383,6 +444,12 @@ export default function TiEquipmentsPanel({
       ? 'Todos'
       : getTiEquipmentCategoryLabel(categoryFilter) || categoryFilter
 
+       const tableExtraLabel =
+    categoryFilter === 'ALL'
+      ? 'Identificação'
+      : getCategoryFieldConfig(categoryFilter).label
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -502,9 +569,13 @@ export default function TiEquipmentsPanel({
                 <tr>
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Patrimônio</th>
-                  <th className="px-4 py-3">Usuário</th>
+                  <th className="px-4 py-3">
+                    {categoryFilter === 'ALL'
+                      ? 'Usuário'
+                      : getUserLabel(categoryFilter)}
+                  </th>
                   <th className="px-4 py-3">Centro de custo</th>
-                  <th className="px-4 py-3">Nº Série</th>
+                  <th className="px-4 py-3">{tableExtraLabel}</th>
                   <th className="px-4 py-3">Valor</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Atualizado em</th>
@@ -534,11 +605,15 @@ export default function TiEquipmentsPanel({
                       }`}
                       onClick={() => setSelected(row)}
                     >
-                      <td className="px-4 py-3 font-medium text-slate-800">{row.name}</td>
+                       <td className="px-4 py-3 font-medium text-slate-800">{row.name}</td>
                       <td className="px-4 py-3">{row.patrimonio}</td>
                       <td className="px-4 py-3">{row.user?.fullName || '—'}</td>
                       <td className="px-4 py-3">{formatCostCenter(row.costCenterSnapshot)}</td>
-                      <td className="px-4 py-3">{row.serialNumber || '—'}</td>
+                      <td className="px-4 py-3">
+                        {getCategoryFieldConfig(row.category).source === 'serialNumber'
+                          ? row.serialNumber || '—'
+                          : row.observations || '—'}
+                      </td>
                       <td className="px-4 py-3">{formatCurrency(row.value)}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={row.status} />
@@ -606,22 +681,36 @@ export default function TiEquipmentsPanel({
             <div className="mt-4 space-y-2 text-sm">
               <DetailRow label="Nome" value={selected.name} />
               <DetailRow label="Patrimônio" value={selected.patrimonio} />
-              <DetailRow label="Usuário" value={selected.user?.fullName || '—'} />
+              <DetailRow
+                label={getUserLabel(selected.category)}
+                value={selected.user?.fullName || '—'}
+              />
               <DetailRow label="Centro de custo" value={formatCostCenter(selected.costCenterSnapshot)} />
               <DetailRow
                 label="Categoria"
                 value={getTiEquipmentCategoryLabel(selected.category) || selected.category}
               />
               <DetailRow label="Status" value={statusLabel(selected.status)} />
-              <DetailRow label="Nº Série" value={selected.serialNumber || '—'} />
+               <DetailRow
+                label={getCategoryFieldConfig(selected.category).label}
+                value={
+                  getCategoryFieldConfig(selected.category).source === 'serialNumber'
+                    ? selected.serialNumber || '—'
+                    : selected.observations || '—'
+                }
+              />
               <DetailRow label="Valor" value={formatCurrency(selected.value)} />
               <DetailRow label="Atualizado em" value={formatDate(selected.updatedAt)} />
-              <div>
-                <div className="text-xs font-semibold uppercase text-slate-500">Observações</div>
-                <div className="mt-1 whitespace-pre-wrap rounded-md border bg-slate-50 px-3 py-2 text-slate-700">
-                  {selected.observations || '—'}
+               {getCategoryFieldConfig(selected.category).source === 'serialNumber' && (
+                <div>
+                  <div className="text-xs font-semibold uppercase text-slate-500">
+                    Observações
+                  </div>
+                  <div className="mt-1 whitespace-pre-wrap rounded-md border bg-slate-50 px-3 py-2 text-slate-700">
+                    {selected.observations || '—'}
+                  </div>
                 </div>
-              </div>
+                 )}
             </div>
           )}
         </div>
@@ -678,7 +767,7 @@ export default function TiEquipmentsPanel({
 
               <div>
                 <label className="text-xs font-semibold uppercase text-slate-600">
-                  Usuário *
+                   {getUserLabel(formValues.category)} *
                 </label>
                 <div className="relative">
                   <input
@@ -746,19 +835,35 @@ export default function TiEquipmentsPanel({
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold uppercase text-slate-600">
-                  Nº de série
-                </label>
-                <input
-                  className={INPUT}
-                  value={formValues.serialNumber}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, serialNumber: e.target.value }))
-                  }
-                  placeholder="Opcional"
-                />
-              </div>
+              {getCategoryFieldConfig(formValues.category).source === 'serialNumber' ? (
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-600">
+                    {getCategoryFieldConfig(formValues.category).label}
+                  </label>
+                  <input
+                    className={INPUT}
+                    value={formValues.serialNumber}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, serialNumber: e.target.value }))
+                    }
+                    placeholder={getCategoryFieldConfig(formValues.category).placeholder}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-600">
+                    {getCategoryFieldConfig(formValues.category).label}
+                  </label>
+                  <input
+                    className={INPUT}
+                    value={formValues.observations}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, observations: e.target.value }))
+                    }
+                    placeholder={getCategoryFieldConfig(formValues.category).placeholder}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-semibold uppercase text-slate-600">
@@ -807,20 +912,22 @@ export default function TiEquipmentsPanel({
                 </select>
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="text-xs font-semibold uppercase text-slate-600">
-                  Observações
-                </label>
-                <textarea
-                  className={INPUT}
-                  rows={3}
-                  value={formValues.observations}
-                  onChange={(e) =>
-                    setFormValues((prev) => ({ ...prev, observations: e.target.value }))
-                  }
-                  placeholder="Opcional"
-                />
-              </div>
+               {getCategoryFieldConfig(formValues.category).source === 'serialNumber' && (
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase text-slate-600">
+                    Observações
+                  </label>
+                  <textarea
+                    className={INPUT}
+                    rows={3}
+                    value={formValues.observations}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({ ...prev, observations: e.target.value }))
+                    }
+                    placeholder="Opcional"
+                  />
+                </div>
+              )}
 
               <div className="sm:col-span-2 flex items-center justify-end gap-2">
                 <button

@@ -30,20 +30,20 @@ async function getAllowedCategories(userId: string, action: Action) {
   return checks.filter(Boolean) as TiEquipmentCategory[]
 }
 
-function buildSearchWhere(search?: string | null) {
+function buildSearchWhere(search?: string | null): Prisma.TiEquipmentWhereInput | undefined {
   if (!search) return undefined
   const term = search.trim()
   if (!term) return undefined
 
-  return {
-    OR: [
-      { name: { contains: term, mode: 'insensitive' } },
-      { patrimonio: { contains: term, mode: 'insensitive' } },
-      { serialNumber: { contains: term, mode: 'insensitive' } },
-      { user: { fullName: { contains: term, mode: 'insensitive' } } },
-      { user: { email: { contains: term, mode: 'insensitive' } } },
-    ],
-  }
+  const OR: Prisma.TiEquipmentWhereInput[] = [
+    { name: { contains: term, mode: Prisma.QueryMode.insensitive } },
+    { patrimonio: { contains: term, mode: Prisma.QueryMode.insensitive } },
+    { serialNumber: { contains: term, mode: Prisma.QueryMode.insensitive } },
+    { user: { is: { fullName: { contains: term, mode: Prisma.QueryMode.insensitive } } } },
+    { user: { is: { email: { contains: term, mode: Prisma.QueryMode.insensitive } } } },
+  ]
+
+  return { OR }
 }
 
 function mapRow(row: any) {
@@ -220,14 +220,16 @@ export async function POST(req: Request) {
         userId: user.id,
         value: value === null || value === undefined || value === '' ? null : new Prisma.Decimal(value),
         serialNumber: serialNumber ? String(serialNumber).trim() : null,
-        category,
-        status,
+        category: category as any, // se seu Prisma for enum, pode trocar por `category as Prisma.TiEquipmentCategory`
+        status: status as any,     // idem
         observations: observations ? String(observations).trim() : null,
         costCenterIdSnapshot: user.costCenterId ?? null,
       },
       include: {
         user: { select: { id: true, fullName: true, email: true } },
-        costCenterSnapshot: { select: { id: true, description: true, externalCode: true, code: true } },
+        costCenterSnapshot: {
+          select: { id: true, description: true, externalCode: true, code: true },
+        },
       },
     })
 
