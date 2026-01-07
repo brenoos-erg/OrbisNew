@@ -9,7 +9,7 @@ import { Action, ModuleLevel } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature, getUserGroupIds } from '@/lib/permissions'
 export const dynamic = 'force-dynamic'
-export const dynamic = 'force-dynamic'
+
 
 export default async function DashboardLayout({
   children,
