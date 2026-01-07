@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { Action, ModuleLevel } from '@prisma/client'
-import { normalizeModuleLinks, normalizeModules } from '@/lib/normalizeModules'
+import { normalizeModuleKey, normalizeModuleLinks, normalizeModules } from '@/lib/normalizeModules'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 
@@ -17,7 +17,7 @@ const CORE_MODULES = [
 ]
 
 async function ensureCoreModules() {
-   for (const module of CORE_MODULES) {
+  for (const module of CORE_MODULES) {
     // Primeiro tenta o match exato da key para evitar colisões de unique ao normalizar
     const canonical = await prisma.module.findUnique({
       where: { key: module.key },

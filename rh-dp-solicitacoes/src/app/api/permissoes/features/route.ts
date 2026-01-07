@@ -32,25 +32,38 @@ export async function GET(req: NextRequest) {
 
     const normalizedModuleKey = normalizeModuleKey(moduleKey)
 
-    let module = await prisma.module.findFirst({
-      where: { key: { equals: moduleKey, mode: 'insensitive' } },
+    const allModules = await prisma.module.findMany({
       select: { id: true, key: true, name: true },
     })
+    const matchingModules = allModules.filter(
+      (candidate) =>
+        normalizeModuleKey(candidate.key) === normalizedModuleKey ||
+        normalizeModuleKey(candidate.name) === normalizedModuleKey,
+    )
 
-    if (!module) {
-      const allModules = await prisma.module.findMany({
-        select: { id: true, key: true, name: true },
-      })
-      module =
-        allModules.find(
-          (candidate) =>
-            normalizeModuleKey(candidate.key) === normalizedModuleKey ||
-            normalizeModuleKey(candidate.name) === normalizedModuleKey,
-        ) ?? null
-    }
-
-    if (!module) {
+    if (matchingModules.length === 0) {
       return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })
+    }
+    let module =
+      matchingModules.find((candidate) => candidate.key.toLowerCase() === moduleKey.toLowerCase()) ??
+      matchingModules[0]
+
+    if (matchingModules.length > 1) {
+      const featureCounts = await prisma.moduleFeature.groupBy({
+        by: ['moduleId'],
+        where: { moduleId: { in: matchingModules.map((candidate) => candidate.id) } },
+        _count: { _all: true },
+      })
+      const countMap = new Map(featureCounts.map((item) => [item.moduleId, item._count._all]))
+      module = matchingModules.reduce((best, candidate) => {
+        const bestCount = countMap.get(best.id) ?? 0
+        const candidateCount = countMap.get(candidate.id) ?? 0
+        if (candidateCount > bestCount) return candidate
+        if (candidateCount === bestCount && candidate.key.toLowerCase() === moduleKey.toLowerCase()) {
+          return candidate
+        }
+        return best
+      }, module)
     }
 
     const [features, levelGrants] = await Promise.all([
