@@ -137,3 +137,70 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const me = await requireActiveUser()
+    await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+    await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
+
+    const body = await req.json().catch(() => ({}))
+    const moduleId = body.moduleId as string | undefined
+    const userIds = body.userIds as string[] | undefined
+    const rawLevel = body.level as ModuleLevel | null | undefined
+
+    if (!moduleId) {
+      return NextResponse.json({ error: 'Campo "moduleId" é obrigatório.' }, { status: 400 })
+    }
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return NextResponse.json({ error: 'Informe ao menos um usuário para atualizar.' }, { status: 400 })
+    }
+
+    const validLevels: ModuleLevel[] = [ModuleLevel.NIVEL_1, ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3]
+    const level = rawLevel && validLevels.includes(rawLevel) ? rawLevel : null
+
+    if (!level) {
+      await prisma.userModuleAccess.deleteMany({
+        where: {
+          moduleId,
+          userId: { in: userIds },
+        },
+      })
+    } else {
+      await prisma.$transaction(
+        userIds.map((userId) =>
+          prisma.userModuleAccess.upsert({
+            where: {
+              userId_moduleId: {
+                userId,
+                moduleId,
+              },
+            },
+            create: {
+              userId,
+              moduleId,
+              level,
+            },
+            update: {
+              level,
+            },
+          }),
+        ),
+      )
+    }
+
+    return NextResponse.json({ ok: true, updated: userIds.length, level })
+  } catch (e: any) {
+    console.error('PATCH /api/permissoes/modulos error', e)
+
+    if (e instanceof Error && e.message.includes('permissão')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
+
+    return NextResponse.json(
+      { error: e?.message || 'Erro ao atualizar níveis do módulo.' },
+      { status: 500 },
+    )
+  }
+}

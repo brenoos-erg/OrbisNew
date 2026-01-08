@@ -120,6 +120,7 @@ export default function PermissoesClient() {
   const [selectedDepartmentForLevels, setSelectedDepartmentForLevels] = useState<string>('')
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
+  const [bulkLevel, setBulkLevel] = useState<'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'REMOVER' | ''>('')
 
  // ---- Submódulos ----
   const [modulesForFeatures, setModulesForFeatures] = useState<ModuleDTO[]>([])
@@ -562,7 +563,54 @@ export default function PermissoesClient() {
       setSaving(false)
     }
   }
+const updateModuleLevelInBulk = async () => {
+    if (!moduleLevelData || !bulkLevel) return
 
+    const userIds = moduleLevelData.users.map(({ user }) => user.id)
+    if (userIds.length === 0) return
+
+    const level = bulkLevel === 'REMOVER' ? null : bulkLevel
+    const label = bulkLevel === 'REMOVER' ? 'sem acesso' : bulkLevel.replace('NIVEL_', 'nível ')
+
+    if (!confirm(`Aplicar ${label} para ${userIds.length} usuário(s) deste módulo?`)) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const res = await fetch('/api/permissoes/modulos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moduleId: moduleLevelData.module.id,
+          userIds,
+          level,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao atualizar níveis em massa.')
+      }
+
+      setModuleLevelData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          users: prev.users.map((entry) => ({ ...entry, level })),
+        }
+      })
+
+      setSuccess('Nível aplicado em massa.')
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao atualizar níveis em massa.')
+    } finally {
+      setSaving(false)
+    }
+  }
   const updateUserDepartment = async (departmentId: string | null) => {
     if (!userData?.user) return
 
@@ -848,14 +896,41 @@ export default function PermissoesClient() {
 
                 {moduleLevelData && (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">
-                      {moduleLevelData.module.name}
-                      {moduleLevelData.department ? (
-                        <span className="text-xs font-normal text-gray-500">
-                          {' '}
-                          — {moduleLevelData.department.code} - {moduleLevelData.department.name}
-                        </span>
-                      ) : null}
+                     <div className="flex flex-col gap-3 rounded-md border bg-gray-50 px-3 py-3 text-sm md:flex-row md:items-center md:justify-between">
+                      <div className="text-sm font-medium">
+                        {moduleLevelData.module.name}
+                        {moduleLevelData.department ? (
+                          <span className="text-xs font-normal text-gray-500">
+                            {' '}
+                            — {moduleLevelData.department.code} - {moduleLevelData.department.name}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                        <select
+                          className="rounded-md border px-3 py-2 text-xs"
+                          value={bulkLevel}
+                          onChange={(e) =>
+                            setBulkLevel(e.target.value as 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'REMOVER' | '')
+                          }
+                          disabled={saving}
+                        >
+                          <option value="">Aplicar nível em massa</option>
+                          <option value="NIVEL_1">Nível 1</option>
+                          <option value="NIVEL_2">Nível 2</option>
+                          <option value="NIVEL_3">Nível 3</option>
+                          <option value="REMOVER">Sem acesso</option>
+                        </select>
+                        <button
+                          type="button"
+                          className="rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
+                          onClick={updateModuleLevelInBulk}
+                          disabled={saving || !bulkLevel}
+                        >
+                          Aplicar em massa
+                        </button>
+                      </div>
                     </div>
 
                     {moduleLevelData.users.length === 0 ? (
