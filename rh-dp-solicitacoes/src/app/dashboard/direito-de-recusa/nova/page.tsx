@@ -150,8 +150,9 @@ export default function NewRefusalReportPage() {
         <p className="text-sm font-semibold uppercase text-slate-500">Direito de Recusa</p>
         <h1 className="text-2xl font-bold text-slate-900">Registrar recusa de atividade</h1>
         <p className="text-slate-600">
-           Informe a situação de risco observada e os responsáveis diretos. O gestor de contrato (nível 2) e o
-          coordenador geral (nível 3) cadastrados receberão a solicitação para avaliação.
+           Informe a situação de risco observada e os responsáveis diretos. Gestor de contrato são todos que têm
+          acesso nível 2 no módulo de direito de recusa. Coordenador geral são todos que têm nível 3 no módulo de
+          direito de recusa.
         </p>
       </div>
 
@@ -189,7 +190,9 @@ export default function NewRefusalReportPage() {
               <p className="text-xs text-slate-500">Carregando responsáveis...</p>
             ) : null}
             {!loadingResponsibles && contractManagers.length === 0 ? (
-              <p className="text-xs text-slate-500">Nenhum gestor de contrato (nível 2) disponível.</p>
+              <p className="text-xs text-slate-500">
+                Nenhum gestor de contrato (nível 2 no módulo de direito de recusa) disponível.
+              </p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>
@@ -214,7 +217,9 @@ export default function NewRefusalReportPage() {
               ))}
             </select>
             {!loadingResponsibles && availableCoordinators.length === 0 ? (
-              <p className="text-xs text-slate-500">Nenhum coordenador geral (nível 3) disponível.</p>
+              <p className="text-xs text-slate-500">
+                Nenhum coordenador geral (nível 3 no módulo de direito de recusa) disponível.
+              </p>
             ) : null}
             {responsiblesError ? (
               <p className="text-xs text-rose-600">{responsiblesError}</p>
