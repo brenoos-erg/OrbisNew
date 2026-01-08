@@ -647,34 +647,63 @@ const updateModuleLevelInBulk = async () => {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Permissões de Módulos</h1>
 
-      <div className="flex gap-2 border-b pb-2">
-        <button
-          type="button"
-          className={`px-3 py-1 rounded-md text-sm ${
-            activeTab === 'departamentos' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
-          }`}
-          onClick={() => setActiveTab('departamentos')}
-        >
-          Departamentos
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-1 rounded-md text-sm ${
-            activeTab === 'usuarios' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
-          }`}
-          onClick={() => setActiveTab('usuarios')}
-        >
-          Usuários
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-1 rounded-md text-sm ${
-            activeTab === 'submodulos' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
-          }`}
-          onClick={() => setActiveTab('submodulos')}
-        >
-          Submódulos
-        </button>
+       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-md text-sm ${
+              activeTab === 'departamentos' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+            }`}
+            onClick={() => setActiveTab('departamentos')}
+          >
+            Departamentos
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-md text-sm ${
+              activeTab === 'usuarios' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+            }`}
+            onClick={() => setActiveTab('usuarios')}
+          >
+            Usuários
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-md text-sm ${
+              activeTab === 'submodulos' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+            }`}
+            onClick={() => setActiveTab('submodulos')}
+          >
+            Submódulos
+          </button>
+        </div>
+
+        {activeTab === 'departamentos' && moduleLevelData && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              className="rounded-md border px-3 py-2 text-xs"
+              value={bulkLevel}
+              onChange={(e) =>
+                setBulkLevel(e.target.value as 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'REMOVER' | '')
+              }
+              disabled={saving}
+            >
+              <option value="">Aplicar nível em massa</option>
+              <option value="NIVEL_1">Nível 1</option>
+              <option value="NIVEL_2">Nível 2</option>
+              <option value="NIVEL_3">Nível 3</option>
+              <option value="REMOVER">Sem acesso</option>
+            </select>
+            <button
+              type="button"
+              className="rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
+              onClick={updateModuleLevelInBulk}
+              disabled={saving || !bulkLevel}
+            >
+              Aplicar em massa
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-800">{error}</div>}
