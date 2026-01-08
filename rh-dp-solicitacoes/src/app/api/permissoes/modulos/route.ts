@@ -7,6 +7,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
+import { normalizeModules } from '@/lib/normalizeModules'
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,9 +27,8 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const [module, department] = await Promise.all([
-      prisma.module.findUnique({
-        where: { id: moduleId },
+    const [modules, department] = await Promise.all([
+      prisma.module.findMany({
         select: { id: true, key: true, name: true },
       }),
       departmentId
@@ -39,12 +39,22 @@ export async function GET(req: NextRequest) {
         : Promise.resolve(null),
     ])
 
-    if (!module) {
+    const moduleRecord = modules.find((entry) => entry.id === moduleId)
+
+    if (!moduleRecord) {
       return NextResponse.json(
         { error: 'Módulo não encontrado.' },
         { status: 404 },
       )
+      
     }
+    const normalizedModules = normalizeModules(modules)
+    const canonicalId = normalizedModules.idToCanonicalId.get(moduleId) ?? moduleId
+    const module =
+      normalizedModules.modules.find((entry) => entry.id === canonicalId) ?? moduleRecord
+    const relatedModuleIds = modules
+      .filter((entry) => normalizedModules.idToCanonicalId.get(entry.id) === canonicalId)
+      .map((entry) => entry.id)
     if (departmentId && !department) {
       return NextResponse.json(
         { error: 'Departamento não encontrado.' },
@@ -61,7 +71,7 @@ export async function GET(req: NextRequest) {
           email: true,
           department: { select: { id: true, code: true, name: true } },
           moduleAccesses: {
-            where: { moduleId },
+            where: { moduleId: { in: relatedModuleIds } },
             select: { level: true },
           },
         },
@@ -72,7 +82,17 @@ export async function GET(req: NextRequest) {
         module,
         department,
         users: users.map((user) => ({
-          level: user.moduleAccesses[0]?.level ?? null,
+           level:
+            user.moduleAccesses.length === 0
+              ? null
+              : user.moduleAccesses.reduce((acc, access) => {
+                  if (!acc) return access.level
+                  if (access.level === ModuleLevel.NIVEL_3) return access.level
+                  if (access.level === ModuleLevel.NIVEL_2 && acc !== ModuleLevel.NIVEL_3) {
+                    return access.level
+                  }
+                  return acc
+                }, user.moduleAccesses[0]?.level ?? null),
           user: {
             id: user.id,
             fullName: user.fullName,
@@ -90,7 +110,7 @@ export async function GET(req: NextRequest) {
     }
 
      const accesses = await prisma.userModuleAccess.findMany({
-      where: { moduleId, user: { status: UserStatus.ATIVO } },
+      where: { moduleId: { in: relatedModuleIds }, user: { status: UserStatus.ATIVO } },
       select: {
         level: true,
         user: {
@@ -104,25 +124,56 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { user: { fullName: 'asc' } },
     })
+    const merged = new Map<
+      string,
+      {
+        level: ModuleLevel
+        user: {
+          id: string
+          fullName: string
+          email: string
+          department: { id: string; code: string; name: string } | null
+        }
+      }
+    >()
+
+    accesses.forEach((access) => {
+      const existing = merged.get(access.user.id)
+      if (!existing) {
+        merged.set(access.user.id, {
+          level: access.level,
+          user: {
+            id: access.user.id,
+            fullName: access.user.fullName,
+            email: access.user.email,
+            department: access.user.department
+              ? {
+                  id: access.user.department.id,
+                  code: access.user.department.code,
+                  name: access.user.department.name,
+                }
+              : null,
+          },
+        })
+        return
+      }
+
+      if (access.level === ModuleLevel.NIVEL_3) {
+        existing.level = access.level
+      } else if (access.level === ModuleLevel.NIVEL_2 && existing.level !== ModuleLevel.NIVEL_3) {
+        existing.level = access.level
+      }
+    })
+
+    const users = Array.from(merged.values()).sort((a, b) =>
+      a.user.fullName.localeCompare(b.user.fullName),
+    )
+
 
     return NextResponse.json({
       module,
       department: null,
-      users: accesses.map((access) => ({
-        level: access.level,
-        user: {
-          id: access.user.id,
-          fullName: access.user.fullName,
-          email: access.user.email,
-          department: access.user.department
-            ? {
-                id: access.user.department.id,
-                code: access.user.department.code,
-                name: access.user.department.name,
-              }
-            : null,
-        },
-      })),
+      users,
     })
   } catch (e: any) {
     console.error('GET /api/permissoes/modulos error', e)
@@ -156,6 +207,21 @@ export async function PATCH(req: NextRequest) {
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json({ error: 'Informe ao menos um usuário para atualizar.' }, { status: 400 })
     }
+    const modules = await prisma.module.findMany({
+      select: { id: true, key: true, name: true },
+    })
+    const moduleRecord = modules.find((entry) => entry.id === moduleId)
+    if (!moduleRecord) {
+      return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })
+    }
+
+    const normalizedModules = normalizeModules(modules)
+    const canonicalId = normalizedModules.idToCanonicalId.get(moduleId) ?? moduleId
+    const relatedModuleIds = modules
+      .filter((entry) => normalizedModules.idToCanonicalId.get(entry.id) === canonicalId)
+      .map((entry) => entry.id)
+    const otherModuleIds = relatedModuleIds.filter((id) => id !== canonicalId)
+
 
     const validLevels: ModuleLevel[] = [ModuleLevel.NIVEL_1, ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3]
     const level = rawLevel && validLevels.includes(rawLevel) ? rawLevel : null
@@ -163,31 +229,42 @@ export async function PATCH(req: NextRequest) {
     if (!level) {
       await prisma.userModuleAccess.deleteMany({
         where: {
-          moduleId,
+          moduleId: { in: relatedModuleIds },
           userId: { in: userIds },
         },
       })
     } else {
-      await prisma.$transaction(
-        userIds.map((userId) =>
-          prisma.userModuleAccess.upsert({
+      await prisma.$transaction(async (tx) => {
+        if (otherModuleIds.length > 0) {
+          await tx.userModuleAccess.deleteMany({
             where: {
-              userId_moduleId: {
-                userId,
-                moduleId,
+              moduleId: { in: otherModuleIds },
+              userId: { in: userIds },
+            },
+          })
+        }
+
+        await Promise.all(
+          userIds.map((userId) =>
+            tx.userModuleAccess.upsert({
+              where: {
+                userId_moduleId: {
+                  userId,
+                  moduleId: canonicalId,
+                },
               },
-            },
-            create: {
-              userId,
-              moduleId,
-              level,
-            },
-            update: {
-              level,
-            },
-          }),
-        ),
-      )
+              create: {
+                userId,
+                moduleId: canonicalId,
+                level,
+              },
+              update: {
+                level,
+              },
+            }),
+          ),
+        )
+      })
     }
 
     return NextResponse.json({ ok: true, updated: userIds.length, level })

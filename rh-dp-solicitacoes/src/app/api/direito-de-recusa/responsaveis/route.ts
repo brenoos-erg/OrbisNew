@@ -29,14 +29,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
     }
 
-    const departmentFilter = me.departmentId
-      ? { departmentId: me.departmentId }
-      : {}
+    
 
     const contractManagers = await prisma.user.findMany({
       where: {
         status: UserStatus.ATIVO,
-        ...departmentFilter,
         moduleAccesses: {
           some: {
             module: { key: { in: MODULE_KEY_VARIANTS } },
@@ -56,7 +53,6 @@ export async function GET() {
     const coordinators = await prisma.user.findMany({
       where: {
         status: UserStatus.ATIVO,
-        ...departmentFilter,
         moduleAccesses: {
           some: {
             module: { key: { in: MODULE_KEY_VARIANTS } },
