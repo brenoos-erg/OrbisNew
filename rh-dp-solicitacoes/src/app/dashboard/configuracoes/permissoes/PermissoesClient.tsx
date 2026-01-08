@@ -117,7 +117,6 @@ export default function PermissoesClient() {
 
   // ---- Usuários por módulo (visualização) ----
   const [selectedModuleForLevels, setSelectedModuleForLevels] = useState<string>('')
-  const [selectedDepartmentForLevels, setSelectedDepartmentForLevels] = useState<string>('')
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
   const [bulkLevel, setBulkLevel] = useState<'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'REMOVER' | ''>('')
@@ -502,9 +501,6 @@ export default function PermissoesClient() {
       setSuccess(null)
 
       const params = new URLSearchParams({ moduleId: selectedModuleForLevels })
-      if (selectedDepartmentForLevels) {
-        params.set('departmentId', selectedDepartmentForLevels)
-      }
 
       const res = await fetch(`/api/permissoes/modulos?${params.toString()}`, { cache: 'no-store' })
 
@@ -879,7 +875,7 @@ const updateModuleLevelInBulk = async () => {
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Usuários por nível do módulo</p>
                     <p className="text-xs text-gray-500">
-                      Selecione um módulo e clique no botão para ver quais usuários estão em cada nível e setor.
+                      Selecione um módulo e clique no botão para ver quais usuários estão em cada nível.
                     </p>
                   </div>
 
@@ -898,19 +894,6 @@ const updateModuleLevelInBulk = async () => {
                       ))}
                     </select>
 
-                    {/* seletor de departamento */}
-                    <select
-                      className="rounded-md border px-3 py-2 text-sm"
-                      value={selectedDepartmentForLevels}
-                      onChange={(e) => setSelectedDepartmentForLevels(e.target.value)}
-                      disabled={!deptData.departments.length || loadingModuleLevels}
-                    >
-                      {deptData.departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.code} - {dept.name}
-                        </option>
-                      ))}
-                    </select>
 
                     <button
                       type="button"
