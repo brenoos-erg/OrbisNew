@@ -120,6 +120,7 @@ export default function PermissoesClient() {
   const [moduleLevelData, setModuleLevelData] = useState<ModuleLevelPayload | null>(null)
   const [loadingModuleLevels, setLoadingModuleLevels] = useState(false)
   const [bulkLevel, setBulkLevel] = useState<'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3' | 'REMOVER' | ''>('')
+  const [bulkLoginsInput, setBulkLoginsInput] = useState('')
 
  // ---- Submódulos ----
   const [modulesForFeatures, setModulesForFeatures] = useState<ModuleDTO[]>([])
@@ -607,6 +608,87 @@ const updateModuleLevelInBulk = async () => {
       setSaving(false)
     }
   }
+  const updateModuleLevelForLogins = async () => {
+    if (!moduleLevelData || !bulkLevel) return
+
+    const logins = bulkLoginsInput
+      .split(/[;\n,]+/)
+      .map((login) => login.trim().toLowerCase())
+      .filter(Boolean)
+
+    if (logins.length === 0) {
+      setError('Informe ao menos um login para aplicar em massa.')
+      return
+    }
+
+    const usersWithAccess = moduleLevelData.users.map(({ user }) => ({
+      id: user.id,
+      email: user.email.toLowerCase(),
+      login: user.email.split('@')[0]?.toLowerCase(),
+    }))
+
+    const userIds = usersWithAccess
+      .filter((user) => logins.some((login) => (login.includes('@') ? user.email === login : user.login === login)))
+      .map((user) => user.id)
+
+    const missingLogins = logins.filter((login) => {
+      return !usersWithAccess.some((user) =>
+        login.includes('@') ? user.email === login : user.login === login,
+      )
+    })
+
+    if (userIds.length === 0) {
+      setError('Nenhum dos logins informados corresponde aos usuários listados.')
+      return
+    }
+
+    if (missingLogins.length > 0) {
+      setError(`Logins não encontrados: ${missingLogins.join('; ')}`)
+      return
+    }
+
+    const level = bulkLevel === 'REMOVER' ? null : bulkLevel
+    const label = bulkLevel === 'REMOVER' ? 'sem acesso' : bulkLevel.replace('NIVEL_', 'nível ')
+
+    if (!confirm(`Aplicar ${label} para ${userIds.length} usuário(s) informados?`)) {
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const res = await fetch('/api/permissoes/modulos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          moduleId: moduleLevelData.module.id,
+          userIds,
+          level,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao atualizar níveis em massa.')
+      }
+
+      setModuleLevelData((prev) => {
+        if (!prev) return prev
+        const updatedUsers = prev.users.map((entry) =>
+          userIds.includes(entry.user.id) ? { ...entry, level } : entry,
+        )
+        return { ...prev, users: updatedUsers }
+      })
+
+      setSuccess('Nível aplicado para os logins informados.')
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao atualizar níveis em massa.')
+    } finally {
+      setSaving(false)
+    }
+  }
   const updateUserDepartment = async (departmentId: string | null) => {
     if (!userData?.user) return
 
@@ -944,6 +1026,32 @@ const updateModuleLevelInBulk = async () => {
                         </button>
                       </div>
                     </div>
+                     <div className="space-y-2 rounded-md border px-3 py-3 text-sm">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Aplicar nível por logins</p>
+                          <p className="text-xs text-gray-500">
+                            Informe os logins separados por ponto e vírgula. Exemplo: usuario.sobrenome;
+                            outro.usuario
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                          onClick={updateModuleLevelForLogins}
+                          disabled={saving || !bulkLevel || !bulkLoginsInput.trim()}
+                        >
+                          Aplicar para logins
+                        </button>
+                      </div>
+                      <textarea
+                        className="min-h-[80px] w-full rounded-md border px-3 py-2 text-xs"
+                        placeholder="usuario.sobrenome;usuario.sobrenome"
+                        value={bulkLoginsInput}
+                        onChange={(e) => setBulkLoginsInput(e.target.value)}
+                      />
+                    </div>
+
 
                     {moduleLevelData.users.length === 0 ? (
                       <p className="text-sm text-gray-500">Nenhum usuário encontrado para os filtros selecionados.</p>
