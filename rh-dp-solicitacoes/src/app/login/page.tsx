@@ -34,6 +34,7 @@ function LoginPageContent() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
 
 
   // --- Reset de senha (esqueci) ---
@@ -43,6 +44,21 @@ function LoginPageContent() {
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const [resetErr, setResetErr] = useState<string | null>(null)
   const shouldForceSignOut = search.get('logout') === '1'
+  const rateLimitRemaining = rateLimitUntil
+    ? Math.max(0, Math.ceil((rateLimitUntil - Date.now()) / 1000))
+    : 0
+  const isRateLimited = rateLimitRemaining > 0
+
+  function handleRateLimit(message = 'Muitas tentativas em sequência. Aguarde alguns segundos e tente novamente.') {
+    setRateLimitUntil(Date.now() + 30_000)
+    alert(message)
+  }
+
+  function isRateLimitError(error: any) {
+    const status = (error as any)?.status as number | undefined
+    const message = String((error as any)?.message ?? '').toLowerCase()
+    return status === 429 || message.includes('rate limit')
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -114,13 +130,18 @@ function LoginPageContent() {
       `/api/auth/resolve-identifier?identifier=${encodeURIComponent(trimmed)}`,
       { cache: 'no-store' },
     )
-const payload = await res.json().catch(() => null)
+    const payload = await res.json().catch(() => null)
 
     if (res.status === 503 || payload?.dbUnavailable) {
       const error: any = new Error(
         'Serviço indisponível no momento. Tente novamente em instantes ou contate o administrador para conferir a DATABASE_URL no Vercel.',
       )
       error.dbUnavailable = true
+      throw error
+    }
+    if (res.status === 429) {
+      const error: any = new Error('Muitas tentativas em sequência. Aguarde alguns segundos e tente novamente.')
+      error.status = 429
       throw error
     }
 
@@ -135,6 +156,10 @@ const payload = await res.json().catch(() => null)
 
   async function handleLogin() {
     if (loading) return
+    if (isRateLimited) {
+      alert(`Aguarde ${rateLimitRemaining}s para tentar novamente.`)
+      return
+    }
     setLoading(true)
 
     let authenticatedUser: User | null = null
@@ -157,6 +182,10 @@ const payload = await res.json().catch(() => null)
     const { data, error } = await supabase.auth.signInWithPassword({ email: emailToUse, password })
      if (error) {
       setLoading(false)
+      if (isRateLimitError(error)) {
+        handleRateLimit(error.message)
+        return
+      }
       alert(error.message || 'Não foi possível autenticar. Tente novamente.')
       return
     }
@@ -225,6 +254,10 @@ const payload = await res.json().catch(() => null)
   async function handleResetClick() {
     setResetErr(null)
     setResetMsg(null)
+    if (isRateLimited) {
+      setResetErr(`Aguarde ${rateLimitRemaining}s para tentar novamente.`)
+      return
+    }
     setSendingReset(true)
     try {
       let target = resetEmail.trim() || identifier.trim()
@@ -256,7 +289,13 @@ const payload = await res.json().catch(() => null)
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
         redirectTo,
       })
-      if (error) throw error
+      if (error) {
+        if (isRateLimitError(error)) {
+          handleRateLimit(error.message)
+          return
+        }
+        throw error
+      }
 
       setResetMsg('Enviamos um link para o seu e-mail. Abra-o para definir uma nova senha.')
     } catch (err: any) {
@@ -293,7 +332,11 @@ const payload = await res.json().catch(() => null)
             {bootstrapError}
           </div>
         )}
-
+{isRateLimited && (
+          <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
+            Muitas tentativas em sequência. Aguarde {rateLimitRemaining}s e tente novamente.
+          </div>
+        )}
         <div className="mb-8 flex flex-col items-center gap-2 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-orange-300 bg-orange-50">
             <LogIn className="h-6 w-6 text-orange-500" />
@@ -388,7 +431,7 @@ const payload = await res.json().catch(() => null)
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isRateLimited}
             className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-orange-300"
             style={{ boxShadow: '0 0 0 2px rgba(251,146,60,.4) inset' }}
           >
