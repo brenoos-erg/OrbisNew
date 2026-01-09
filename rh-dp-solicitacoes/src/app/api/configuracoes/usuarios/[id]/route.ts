@@ -1,12 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { requireActiveUser } from '@/lib/auth'
+import { assertCanFeature } from '@/lib/permissions'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { Action } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
 /** GET: retorna dados do usuário */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const me = await requireActiveUser()
+    await assertCanFeature(
+      me.id,
+      MODULE_KEYS.CONFIGURACOES,
+      FEATURE_KEYS.CONFIGURACOES.USUARIOS,
+      Action.VIEW,
+    )
     const { id } = params
     const u = await prisma.user.findUnique({
       where: { id },
@@ -28,6 +39,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       costCenterName: u.costCenter?.description ?? null,
     })
   } catch (e) {
+    if (e instanceof Error && e.message.includes('Acesso negado')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
     return NextResponse.json({ error: 'Falha ao carregar usuário.' }, { status: 500 })
   }
 }
@@ -35,6 +49,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /** PATCH: atualiza no Prisma e reflete no Auth (se houver authId) */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const me = await requireActiveUser()
+    await assertCanFeature(
+      me.id,
+      MODULE_KEYS.CONFIGURACOES,
+      FEATURE_KEYS.CONFIGURACOES.USUARIOS,
+      Action.UPDATE,
+    )
     const body = await req.json()
     const id = params.id
 
@@ -98,6 +119,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       costCenterId: updated.costCenterId ?? null,
     })
   } catch (e: any) {
+    if (e instanceof Error && e.message.includes('Acesso negado')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
+
     if (e?.code === 'P2002') {
       return NextResponse.json({ error: 'Violação de UNIQUE (email/login).' }, { status: 409 })
     }
@@ -111,6 +136,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
  */
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const me = await requireActiveUser()
+    await assertCanFeature(
+      me.id,
+      MODULE_KEYS.CONFIGURACOES,
+      FEATURE_KEYS.CONFIGURACOES.USUARIOS,
+      Action.DELETE,
+    )
     const { id } = params
 
     const user = await prisma.user.findUnique({
@@ -212,6 +244,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
+    if (e instanceof Error && e.message.includes('Acesso negado')) {
+      return NextResponse.json({ error: e.message }, { status: 403 })
+    }
     console.error('DELETE /configuracoes/usuarios/[id] error', e)
     return NextResponse.json({ error: 'Erro ao excluir usuário.' }, { status: 500 })
   }
