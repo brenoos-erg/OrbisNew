@@ -95,10 +95,21 @@ async function resolveAppUserFromSessionUser(
   }
 
   if (appUser) {
-    const levelsStartedAt = performance.now()
-    const moduleLevels = await getUserModuleLevels(appUser.id)
-    logTiming('prisma.moduleLevels.load', levelsStartedAt)
-    return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable }
+    try {
+      const levelsStartedAt = performance.now()
+      const moduleLevels = await getUserModuleLevels(appUser.id)
+      logTiming('prisma.moduleLevels.load', levelsStartedAt)
+      return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable }
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Não foi possível conectar ao banco de dados para carregar módulos do usuário', error)
+        dbUnavailable = true
+      } else {
+        console.error('Erro ao carregar módulos do usuário', error)
+      }
+
+      return { appUser: null, session, dbUnavailable }
+    }
   }
 
   return { appUser, session, dbUnavailable }
