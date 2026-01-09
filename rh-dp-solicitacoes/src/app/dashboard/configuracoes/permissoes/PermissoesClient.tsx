@@ -124,7 +124,7 @@ export default function PermissoesClient() {
 
  // ---- Submódulos ----
   const [modulesForFeatures, setModulesForFeatures] = useState<ModuleDTO[]>([])
-  const [selectedFeatureModuleKey, setSelectedFeatureModuleKey] = useState<string>('')
+  const [selectedFeatureModuleId, setSelectedFeatureModuleId] = useState<string>('')
   const [selectedFeatureId, setSelectedFeatureId] = useState<string>('')
   const [featureData, setFeatureData] = useState<FeaturePayload | null>(null)
   const [loadingFeatures, setLoadingFeatures] = useState(false)
@@ -172,10 +172,10 @@ export default function PermissoesClient() {
     if (!deptData) return
     if (modulesForFeatures.length > 0) return
     setModulesForFeatures(deptData.modules)
-    if (!selectedFeatureModuleKey && deptData.modules.length > 0) {
-      setSelectedFeatureModuleKey(deptData.modules[0].key)
+    if (!selectedFeatureModuleId && deptData.modules.length > 0) {
+      setSelectedFeatureModuleId(deptData.modules[0].id)
     }
-  }, [deptData, modulesForFeatures.length, selectedFeatureModuleKey])
+  }, [deptData, modulesForFeatures.length, selectedFeatureModuleId])
   
 
   useEffect(() => {
@@ -200,8 +200,8 @@ export default function PermissoesClient() {
           }
           const json: DepartmentPayload = await res.json()
           setModulesForFeatures(json.modules)
-          if (!selectedFeatureModuleKey && json.modules.length > 0) {
-            setSelectedFeatureModuleKey(json.modules[0].key)
+           if (!selectedFeatureModuleId && json.modules.length > 0) {
+            setSelectedFeatureModuleId(json.modules[0].id)
           }
         } catch (e: any) {
           setError(e?.message || 'Erro ao carregar módulos.')
@@ -213,21 +213,21 @@ export default function PermissoesClient() {
       return
     }
 
-    if (!selectedFeatureModuleKey && modulesForFeatures.length > 0) {
-      setSelectedFeatureModuleKey(modulesForFeatures[0].key)
+    if (!selectedFeatureModuleId && modulesForFeatures.length > 0) {
+      setSelectedFeatureModuleId(modulesForFeatures[0].id)
     }
-  }, [activeTab, modulesForFeatures, selectedFeatureModuleKey])
+  }, [activeTab, modulesForFeatures, selectedFeatureModuleId])
 
   useEffect(() => {
     if (activeTab !== 'submodulos') return
-    if (!selectedFeatureModuleKey) return
+    if (!selectedFeatureModuleId) return
 
     const loadFeatures = async () => {
       try {
         setLoadingFeatures(true)
         setError(null)
 
-        const params = new URLSearchParams({ moduleKey: selectedFeatureModuleKey })
+        const params = new URLSearchParams({ moduleId: selectedFeatureModuleId })
         const res = await fetch(`/api/permissoes/features?${params.toString()}`, { cache: 'no-store' })
         if (!res.ok) {
           const json = await res.json().catch(() => ({}))
@@ -249,7 +249,7 @@ export default function PermissoesClient() {
     }
 
     void loadFeatures()
-  }, [activeTab, selectedFeatureModuleKey, featureReloadKey])
+  }, [activeTab, selectedFeatureModuleId, featureReloadKey])
 
   useEffect(() => {
     if (!featureData?.features.length) return
@@ -1223,16 +1223,16 @@ const updateModuleLevelInBulk = async () => {
               <label className="text-sm font-medium">Módulo</label>
               <select
                 className="w-full rounded-md border px-3 py-2 text-sm"
-                value={selectedFeatureModuleKey}
+                value={selectedFeatureModuleId}
                 onChange={(e) => {
-                  setSelectedFeatureModuleKey(e.target.value)
+                  setSelectedFeatureModuleId(e.target.value)
                   setSelectedFeatureId('')
                   setFeatureData(null)
                 }}
                 disabled={loadingFeatures || modulesForFeatures.length === 0}
               >
                 {modulesForFeatures.map((mod) => (
-                  <option key={mod.id} value={mod.key}>
+                  <option key={mod.id} value={mod.id}>
                     {mod.name}
                   </option>
                 ))}
