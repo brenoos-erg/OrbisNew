@@ -231,22 +231,22 @@ export default function Sidebar({
 
     loadPendingRefusals()
 
-    return () => {
+   return () => {
       active = false
       controller.abort()
     }
   }, [showRefusal, canReviewRefusal, refusalFeatures.pendentes])
   const baseSection =
-    'w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-md transition-colors cursor-pointer'
+     'w-full flex items-center gap-1 px-3 py-2.5 text-sm font-semibold rounded-md transition-colors cursor-pointer'
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
   const submenuItemBase =
-    'group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-2.5 transition-colors'
+    'group flex items-center gap-1 rounded-md text-sm font-medium px-4 py-2.5 transition-colors'
   const badgeBase =
     'ml-auto inline-flex min-w-[1.5rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold'
   const iconBadgeBase =
     'absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white'
-
+    const labelBase = 'flex-1 -ml-0.5'
   return (
     <aside
       className={`min-h-screen bg-[#0f172a] text-slate-200 shadow-xl flex flex-col justify-between transition-all duration-200
@@ -287,7 +287,7 @@ export default function Sidebar({
                     <span className={iconBadgeBase}>{restrictedVehicleCount}</span>
                   )}
                 </span>
-                {!collapsed && <span className="flex-1">Gestão de Frotas</span>}
+                  {!collapsed && <span className={labelBase}>Gestão de Frotas</span>}
               </button>
 
               {openFleet && !collapsed && (
@@ -303,7 +303,7 @@ export default function Sidebar({
                         }`}
                     >
                       <Truck size={16} />
-                      <span className="flex-1">Veículos</span>
+                      <span className={labelBase}>Veículos</span>
                       {!collapsed && restrictedVehicleCount !== null && restrictedVehicleCount > 0 && (
                         <span className={`${badgeBase} bg-red-500 text-white`}>
                           {restrictedVehicleCount}
@@ -322,7 +322,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <ClipboardCheck size={16} /> <span>Check-ins diários</span>
+                         <ClipboardCheck size={16} /> <span className={labelBase}>Check-ins diários</span>
                     </Link>
                   )}
                   {fleetFeatures.deslocamentoCheckin && (
@@ -335,8 +335,8 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Route size={16} /> <span>Check-in de deslocamento</span>
-                    </Link>
+                      <Route size={16} /> <span className={labelBase}>Check-in de deslocamento</span>
+                   </Link>
                   )}
                   {fleetFeatures.deslocamentoPainel && (
                     <Link
@@ -348,7 +348,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <LayoutDashboard size={16} /> <span>Painel deslocamentos</span>
+                      <LayoutDashboard size={16} /> <span className={labelBase}>Painel deslocamentos</span>
                     </Link>
                   )}
                 </div>
@@ -367,7 +367,7 @@ export default function Sidebar({
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <Package className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className="flex-1">Controle de Equipamentos TI</span>}
+                 {!collapsed && <span className={labelBase}>Controle de Equipamentos TI</span>}
               </button>
 
               {openEquipment && !collapsed && (
@@ -382,7 +382,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <ScanLine size={16} /> <span>Atalho rápido</span>
+                      <ScanLine size={16} /> <span className={labelBase}>Atalho rápido</span>
                     </Link>
                   )}
                   {equipmentFeatures.linhaTelefonica && (
@@ -395,7 +395,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Phone size={16} /> <span>Linhas telefônicas</span>
+                      <Phone size={16} /> <span className={labelBase}>Linhas telefônicas</span>
                     </Link>
                   )}
                   {equipmentFeatures.smartphone && (
@@ -408,7 +408,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Smartphone size={16} /> <span>Smartphones</span>
+                       <Smartphone size={16} /> <span className={labelBase}>Smartphones</span>
                     </Link>
                   )}
                   {equipmentFeatures.notebook && (
@@ -421,7 +421,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Laptop size={16} /> <span>Notebooks</span>
+                      <Laptop size={16} /> <span className={labelBase}>Notebooks</span>
                     </Link>
                   )}
                   {equipmentFeatures.desktop && (
@@ -434,7 +434,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Cpu size={16} /> <span>Desktops</span>
+                      <Cpu size={16} /> <span className={labelBase}>Desktops</span>
                     </Link>
                   )}
                   {equipmentFeatures.monitor && (
@@ -447,7 +447,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Monitor size={16} /> <span>Monitores</span>
+                         <Monitor size={16} /> <span className={labelBase}>Monitores</span>
                     </Link>
                   )}
                   {equipmentFeatures.impressora && (
@@ -460,7 +460,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Printer size={16} /> <span>Impressoras</span>
+                      <Printer size={16} /> <span className={labelBase}>Impressoras</span>
                     </Link>
                   )}
                   {equipmentFeatures.tplink && (
@@ -473,7 +473,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Router size={16} /> <span>TP-Link</span>
+                      <Router size={16} /> <span className={labelBase}>TP-Link</span>
                     </Link>
                   )}
                   {equipmentFeatures.outros && (
@@ -486,7 +486,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Package size={16} /> <span>Outros equipamentos</span>
+                        <Package size={16} /> <span className={labelBase}>Outros equipamentos</span>
                     </Link>
                   )}
                 </div>
@@ -505,7 +505,7 @@ export default function Sidebar({
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <ShieldAlert className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className="flex-1">Direito de Recusa</span>}
+                {!collapsed && <span className={labelBase}>Direito de Recusa</span>}
                 {!collapsed && pendingRefusalCount !== null && pendingRefusalCount > 0 && (
                   <span className={`${badgeBase} bg-yellow-400 text-slate-900`}>
                     {pendingRefusalCount}
@@ -525,7 +525,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                       >
-                      <ShieldAlert size={16} /> <span>Painel</span>
+                       <ShieldAlert size={16} /> <span className={labelBase}>Painel</span>
                     </Link>
                   )}
                    {refusalFeatures.minhas && (
@@ -538,7 +538,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <ClipboardList size={16} /> <span>Meus direitos de recusa</span>
+                      <ClipboardList size={16} /> <span className={labelBase}>Meus direitos de recusa</span>
                     </Link>
                   )}
                   {refusalFeatures.nova && (
@@ -551,7 +551,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <ClipboardList size={16} /> <span>Registrar recusa</span>
+                      <ClipboardList size={16} /> <span className={labelBase}>Registrar recusa</span>
                     </Link>
                   )}
                   {canReviewRefusal && refusalFeatures.pendentes && (
@@ -565,7 +565,7 @@ export default function Sidebar({
                         }`}
                     >
                        <CheckCircle2 size={16} />
-                      <span className="flex-1">Pendentes para avaliar</span>
+                      <span className={labelBase}>Pendentes para avaliar</span>
                       {!collapsed && pendingRefusalCount !== null && pendingRefusalCount > 0 && (
                         <span className={`${badgeBase} bg-yellow-400 text-slate-900`}>
                           {pendingRefusalCount}
@@ -590,7 +590,7 @@ export default function Sidebar({
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <ClipboardList className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className="flex-1">Solicitações</span>}
+                {!collapsed && <span className={labelBase}>Solicitações</span>}
                 {!collapsed && receivedSolicitationsCount !== null && receivedSolicitationsCount > 0 && (
                   <span className={`${badgeBase} bg-sky-500 text-white`}>
                     {receivedSolicitationsCount}
@@ -611,7 +611,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Send size={16} /> <span>Solicitações Enviadas</span>
+                       <Send size={16} /> <span className={labelBase}>Solicitações Enviadas</span>
                     </Link>
                   )}
 
@@ -626,7 +626,7 @@ export default function Sidebar({
                         }`}
                     >
                       <Inbox size={16} />
-                      <span className="flex-1">Solicitações Recebidas</span>
+                      <span className={labelBase}>Solicitações Recebidas</span>
                       {!collapsed && receivedSolicitationsCount !== null && receivedSolicitationsCount > 0 && (
                         <span className={`${badgeBase} bg-sky-500 text-white`}>
                           {receivedSolicitationsCount}
@@ -646,7 +646,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <CheckCircle2 size={16} /> <span>Aprovações</span>
+                       <CheckCircle2 size={16} /> <span className={labelBase}>Aprovações</span>
                     </Link>
                   )}
 
@@ -662,7 +662,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <FolderCog size={16} /> <span>Cadastros</span>
+                      <FolderCog size={16} /> <span className={labelBase}>Cadastros</span>
                     </Link>
                   )}
                 </div>
@@ -683,7 +683,7 @@ export default function Sidebar({
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <Settings className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className="flex-1">Configurações</span>}
+                {!collapsed && <span className={labelBase}>Configurações</span>}
               </button>
 
               {/* Submenu */}
@@ -699,7 +699,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Settings size={16} /> <span>Painel</span>
+                       <Settings size={16} /> <span className={labelBase}>Painel</span>
                     </Link>
                   )}
 
@@ -713,7 +713,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Users size={16} /> <span>Usuários</span>
+                      <Users size={16} /> <span className={labelBase}>Usuários</span>
                     </Link>
                   )}
 
@@ -729,7 +729,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Shield size={16} /> <span>Permissões</span>
+                       <Shield size={16} /> <span className={labelBase}>Permissões</span>
                     </Link>
                   )}
 
@@ -745,7 +745,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <FolderCog size={16} /> <span>Centros de Custo</span>
+                      <FolderCog size={16} /> <span className={labelBase}>Centros de Custo</span>
                     </Link>
                   )}
 
@@ -761,7 +761,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <FolderCog size={16} /> <span>Cargos</span>
+                     <FolderCog size={16} /> <span className={labelBase}>Cargos</span>
                     </Link>
                   )}
                 </div>
@@ -775,4 +775,3 @@ export default function Sidebar({
     </aside>
   )
 }
-
