@@ -118,3 +118,64 @@ export async function GET(req: NextRequest) {
     }
   })
 }
+export async function PATCH(req: NextRequest) {
+  return withRequestMetrics('PATCH /api/permissoes/features', async () => {
+    try {
+      const me = await requireActiveUser()
+      await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
+      await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.UPDATE)
+
+      const body = await req.json().catch(() => ({}))
+      const featureKey = typeof body.featureKey === 'string' ? body.featureKey.trim() : ''
+      const level = body.level as ModuleLevel | undefined
+      const actions = normalizeActionList(body.actions)
+
+      const validLevels: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+
+      if (!featureKey || !level || !validLevels.includes(level)) {
+        return NextResponse.json(
+          { error: 'featureKey e level válidos são obrigatórios.' },
+          { status: 400 },
+        )
+      }
+
+      const normalizedFeatureKey = featureKey.toUpperCase()
+
+      const feature = await prisma.moduleFeature.findFirst({
+        where: { key: { equals: normalizedFeatureKey, mode: 'insensitive' } },
+        select: { id: true, key: true },
+      })
+
+      if (!feature) {
+        return NextResponse.json({ error: 'Submódulo não encontrado.' }, { status: 404 })
+      }
+
+      const levelGrant = await prisma.featureLevelGrant.upsert({
+        where: {
+          featureId_level: {
+            featureId: feature.id,
+            level,
+          },
+        },
+        update: { actions },
+        create: {
+          featureId: feature.id,
+          level,
+          actions,
+        },
+        select: { id: true, featureId: true, level: true, actions: true },
+      })
+
+      return NextResponse.json({ ok: true, levelGrant })
+    } catch (e: any) {
+      console.error('PATCH /api/permissoes/features error', e)
+
+      if (e instanceof Error && e.message.includes('Acesso negado')) {
+        return NextResponse.json({ error: e.message }, { status: 403 })
+      }
+
+      return NextResponse.json({ error: 'Erro ao salvar permissões.' }, { status: 500 })
+    }
+  })
+}
+
