@@ -34,6 +34,7 @@ type ApiVehicle = {
 
 type VehicleCheckin = {
   id: string
+  vehicleId?: string | null
   inspectionDate: string
   costCenter?: string | null
   sectorActivity?: string | null
@@ -184,6 +185,7 @@ export default function VehiclesPage() {
   const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
 
   const [selectedVehicle, setSelectedVehicle] = useState<ApiVehicle | null>(null)
+  const [checkinVehicleIds, setCheckinVehicleIds] = useState<string[]>([])
   const [checkins, setCheckins] = useState<VehicleCheckin[]>([])
   const [loadingCheckins, setLoadingCheckins] = useState(false)
   const [checkinsCollapsed, setCheckinsCollapsed] = useState(false)
@@ -337,9 +339,27 @@ const processedVehicles = useMemo(() => {
   }, [permissionsLoading, canViewVehicles])
 
   useEffect(() => {
+    if (checkinVehicleIds.length > 0) {
+      loadCheckinsForVehicles(checkinVehicleIds)
+      return
+    }
     if (selectedVehicle) loadCheckins(selectedVehicle.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVehicle])
+  }, [checkinVehicleIds, selectedVehicle])
+
+  const appliedVehicles = useMemo(() => {
+    if (checkinVehicleIds.length > 0) {
+      return vehicles.filter((vehicle) => checkinVehicleIds.includes(vehicle.id))
+    }
+    return selectedVehicle ? [selectedVehicle] : []
+  }, [checkinVehicleIds, selectedVehicle, vehicles])
+
+  const checkinsScopeLabel = useMemo(() => {
+    if (appliedVehicles.length === 0) return 'Veículos selecionados'
+    if (appliedVehicles.length === 1) return appliedVehicles[0]?.plate || 'Veículo selecionado'
+    if (appliedVehicles.length <= 3) return appliedVehicles.map((vehicle) => vehicle.plate).join(', ')
+    return `${appliedVehicles.length} veículos`
+  }, [appliedVehicles])
 
   const availableDrivers = useMemo(() => {
     const unique = new Set<string>()
@@ -371,7 +391,7 @@ const processedVehicles = useMemo(() => {
   }, [appliedEndDate, appliedStartDate, checkins, driverFilter])
 
   const monthlyDocUrl = useMemo(() => {
-    if (!selectedVehicle) return '#'
+    if (!selectedVehicle || checkinVehicleIds.length > 0) return '#'
 
     const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
     const usingCustomDates = Boolean(customStartDate || customEndDate)
@@ -387,7 +407,7 @@ const processedVehicles = useMemo(() => {
     }
 
     return `/api/fleet/checkins/monthly-sheet?${params.toString()}`
-  }, [customEndDate, customStartDate, dailyOnly, selectedMonth, selectedVehicle, todayISO])
+  }, [checkinVehicleIds.length, customEndDate, customStartDate, dailyOnly, selectedMonth, selectedVehicle, todayISO])
 
   const appliedPeriodLabel = useMemo(() => {
     if (dailyOnly) return 'Hoje'
@@ -397,7 +417,7 @@ const processedVehicles = useMemo(() => {
   }, [appliedEndDate, appliedStartDate, dailyOnly, selectedMonth])
 
   function downloadCheckinsExcel() {
-    if (!selectedVehicle) return
+    if (appliedVehicles.length === 0) return
     if (filteredCheckins.length === 0) {
       alert('Não há check-ins para exportar com os filtros aplicados.')
       return
@@ -419,13 +439,13 @@ const processedVehicles = useMemo(() => {
       ],
       ...filteredCheckins.map((checkin) => [
         formatDateTime(checkin.inspectionDate),
-        checkin.vehiclePlateSnapshot || selectedVehicle.plate,
-        checkin.vehicleTypeSnapshot || selectedVehicle.type || '—',
+         checkin.vehiclePlateSnapshot || appliedVehicles[0]?.plate || '—',
+        checkin.vehicleTypeSnapshot || appliedVehicles[0]?.type || '—',
         formatKm(checkin.kmAtInspection),
         getCheckinDriverLabel(checkin),
         checkin.driver?.email || '—',
         checkin.driverStatus || '—',
-        getStatusInfo(checkin.vehicleStatus || selectedVehicle.status).label,
+        getStatusInfo(checkin.vehicleStatus || appliedVehicles[0]?.status).label,
         checkin.costCenter || '—',
         checkin.sectorActivity || '—',
         checkin.fatigueRisk || '—',
@@ -444,7 +464,9 @@ const processedVehicles = useMemo(() => {
     const blob = new Blob([`\uFEFF${csv}`], { type: 'application/vnd.ms-excel;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    const filename = `checkins-${selectedVehicle.plate}-${appliedPeriodLabel.replace(/\s+/g, '-')}.xls`
+    const filenameLabel =
+      appliedVehicles.length === 1 ? appliedVehicles[0]?.plate || 'veiculo' : `multiveiculos-${appliedVehicles.length}`
+    const filename = `checkins-${filenameLabel}-${appliedPeriodLabel.replace(/\s+/g, '-')}.xls`
 
     link.href = url
     link.download = filename
@@ -504,6 +526,38 @@ const processedVehicles = useMemo(() => {
       setCheckins(
         data.map((item) => ({
           ...item,
+          vehicleId: (item as any).vehicleId || (item as any).vehicle?.id || null,
+          vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
+          vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
+          vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
+        })),
+      )
+    } catch (err) {
+      console.error(err)
+      setCheckins([])
+    } finally {
+      setLoadingCheckins(false)
+    }
+  }
+
+  async function loadCheckinsForVehicles(vehicleIds: string[]) {
+    if (!canViewVehicles) return
+    if (vehicleIds.length === 0) return
+    setLoadingCheckins(true)
+
+    try {
+      const responses = await Promise.all(
+        vehicleIds.map(async (vehicleId) => {
+          const res = await fetch(`/api/fleet/checkins?vehicleId=${vehicleId}`, { cache: 'no-store' })
+          if (!res.ok) throw new Error('Falha ao buscar check-ins')
+          return res.json()
+        }),
+      )
+      const merged = responses.flat() as Array<VehicleCheckin & { vehicleStatus?: string }>
+      setCheckins(
+        merged.map((item) => ({
+          ...item,
+          vehicleId: (item as any).vehicleId || (item as any).vehicle?.id || null,
           vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
           vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
           vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
@@ -728,14 +782,14 @@ const processedVehicles = useMemo(() => {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={loadVehicles}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
-            </button>
+             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={loadVehicles}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
+              </button>
 
             {canManageVehicles && (
               <button
@@ -764,8 +818,15 @@ const processedVehicles = useMemo(() => {
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-                ))}
-              </select>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setFiltersOpen(true)}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              <Filter size={14} /> Filtros de check-ins
+            </button>
             </div>
           </div>
 
@@ -865,7 +926,10 @@ const processedVehicles = useMemo(() => {
                         <td className="px-6 py-4 text-right text-sm text-slate-700">
                           <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => setSelectedVehicle(vehicle)}
+                              onClick={() => {
+                                setSelectedVehicle(vehicle)
+                                setCheckinVehicleIds([])
+                              }}
                               className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 hover:bg-slate-50"
                             >
                               <List size={14} /> Check-ins
@@ -927,27 +991,26 @@ const processedVehicles = useMemo(() => {
           )}
 
           {/* painel de check-ins */}
-          {selectedVehicle && (
+          {(selectedVehicle || checkinVehicleIds.length > 0) && (
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold uppercase text-slate-500">Check-ins do veículo</p>
-                  <h2 className="text-2xl font-bold text-slate-900">{selectedVehicle.plate}</h2>
+                  <p className="text-sm font-semibold uppercase text-slate-500">Check-ins dos veículos</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{checkinsScopeLabel}</h2>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => loadCheckins(selectedVehicle.id)}
+                    onClick={() => {
+                      if (checkinVehicleIds.length > 0) {
+                        loadCheckinsForVehicles(checkinVehicleIds)
+                        return
+                      }
+                      if (selectedVehicle) loadCheckins(selectedVehicle.id)
+                    }}
                     className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
                   >
                     <RefreshCw size={14} /> Atualizar
                   </button>
-                  <button
-                    onClick={() => setFiltersOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
-                  >
-                    <Filter size={14} /> Filtros
-                  </button>
-
 
                   <button
                     onClick={() => setCheckinsCollapsed((prev) => !prev)}
@@ -957,12 +1020,14 @@ const processedVehicles = useMemo(() => {
                     {checkinsCollapsed ? 'Maximizar visão' : 'Minimizar visão'}
                   </button>
 
-                  <a
-                    href={monthlyDocUrl}
-                    className="inline-flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
-                  >
-                    <List size={14} /> Checklist mensal (Word)
-                  </a>
+                  {checkinVehicleIds.length === 0 && selectedVehicle && (
+                    <a
+                      href={monthlyDocUrl}
+                      className="inline-flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
+                    >
+                      <List size={14} /> Checklist mensal (Word)
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -986,7 +1051,9 @@ const processedVehicles = useMemo(() => {
 
                     {!loadingCheckins && checkins.length === 0 && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
-                        Nenhum check-in encontrado para este veículo.
+                         {checkinVehicleIds.length > 0
+                          ? 'Nenhum check-in encontrado para os veículos selecionados.'
+                          : 'Nenhum check-in encontrado para este veículo.'}
                       </div>
                     )}
 
@@ -998,11 +1065,12 @@ const processedVehicles = useMemo(() => {
 
                     {!loadingCheckins &&
                       filteredCheckins.map((checkin) => {
-                        const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle.status)
+                        const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle?.status)
                         const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
                         const checklist = checkin.checklistJson || []
                         const fatigue = checkin.fatigueJson || []
                         const driverNames = extractDriverNames(checkin)
+                        const plateLabel = checkin.vehiclePlateSnapshot || selectedVehicle?.plate
 
                         return (
                           <details key={checkin.id} className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -1047,12 +1115,12 @@ const processedVehicles = useMemo(() => {
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">Placa</dt>
                                       <dd className="font-semibold text-slate-900">
-                                        {checkin.vehiclePlateSnapshot || selectedVehicle.plate}
+                                         {checkin.vehiclePlateSnapshot || selectedVehicle?.plate || '—'}
                                       </dd>
                                     </div>
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">Tipo</dt>
-                                      <dd>{checkin.vehicleTypeSnapshot || selectedVehicle.type || '—'}</dd>
+                                      <dd>{checkin.vehicleTypeSnapshot || selectedVehicle?.type || '—'}</dd>
                                     </div>
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
@@ -1237,7 +1305,7 @@ const processedVehicles = useMemo(() => {
                   <div>
                     <p className="text-xs font-semibold uppercase text-slate-500">Filtros de check-ins</p>
                     <h3 className="text-lg font-semibold text-slate-900">
-                      {selectedVehicle ? `Veículo ${selectedVehicle.plate}` : 'Veículo selecionado'}
+                       {appliedVehicles.length > 0 ? `Veículos ${checkinsScopeLabel}` : 'Selecione os veículos'}
                     </h3>
                   </div>
                   <button
@@ -1246,6 +1314,43 @@ const processedVehicles = useMemo(() => {
                   >
                     <X size={16} />
                   </button>
+                </div>
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Veículos para acompanhamento</p>
+                  <p className="text-xs text-slate-500">
+                    Selecione um ou mais veículos para acompanhar os check-ins em conjunto.
+                  </p>
+                  <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700">
+                    {vehicles.length === 0 && (
+                      <p className="text-xs text-slate-500">Nenhum veículo disponível para seleção.</p>
+                    )}
+                    {vehicles.map((vehicle) => (
+                      <label key={vehicle.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checkinVehicleIds.includes(vehicle.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            setCheckinVehicleIds((prev) => {
+                              const next = checked ? [...prev, vehicle.id] : prev.filter((id) => id !== vehicle.id)
+                              if (next.length === 0) {
+                                setSelectedVehicle(null)
+                              } else if (next.length > 1) {
+                                setSelectedVehicle(null)
+                              } else if (next.length === 1) {
+                                const onlyVehicle = vehicles.find((item) => item.id === next[0]) || null
+                                setSelectedVehicle(onlyVehicle)
+                              }
+                              return next
+                            })
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-semibold text-slate-900">{vehicle.plate}</span>
+                        <span className="text-xs text-slate-500">{vehicle.model || 'Modelo não informado'}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-2">
@@ -1321,6 +1426,7 @@ const processedVehicles = useMemo(() => {
                       setSelectedMonth(currentMonth)
                       setDriverFilter('')
                       setDailyOnly(false)
+                      setCheckinVehicleIds([])
                     }}
                     className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
                   >
