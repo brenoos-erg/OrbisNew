@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { fetchSessionMe } from '@/lib/session-cache'
-import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X, Maximize2, Minimize2 } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X, Maximize2, Minimize2, Filter } from 'lucide-react'
 import { isValidPlate } from '@/lib/plate'
 
 type CostCenterOption = {
@@ -206,6 +206,8 @@ export default function VehiclesPage() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [driverFilter, setDriverFilter] = useState('')
+  const [dailyOnly, setDailyOnly] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
   const [permissionsLoading, setPermissionsLoading] = useState(true)
@@ -278,8 +280,13 @@ const processedVehicles = useMemo(() => {
 
   const monthBoundaries = useMemo(() => getMonthBoundaries(selectedMonth), [selectedMonth])
 
-  const appliedStartDate = customStartDate || monthBoundaries.start
-  const appliedEndDate = customEndDate || monthBoundaries.end
+  const todayISO = useMemo(() => {
+    const now = new Date()
+    const normalized = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    return normalized.toISOString().slice(0, 10)
+  }, [])
+  const appliedStartDate = dailyOnly ? todayISO : customStartDate || monthBoundaries.start
+  const appliedEndDate = dailyOnly ? todayISO : customEndDate || monthBoundaries.end
 
   useEffect(() => {
     setVehiclePage(1)
@@ -369,7 +376,10 @@ const processedVehicles = useMemo(() => {
     const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
     const usingCustomDates = Boolean(customStartDate || customEndDate)
 
-    if (usingCustomDates) {
+   if (dailyOnly) {
+      params.set('startDate', todayISO)
+      params.set('endDate', todayISO)
+    } else if (usingCustomDates) {
       if (customStartDate) params.set('startDate', customStartDate)
       if (customEndDate) params.set('endDate', customEndDate)
     } else {
@@ -377,13 +387,72 @@ const processedVehicles = useMemo(() => {
     }
 
     return `/api/fleet/checkins/monthly-sheet?${params.toString()}`
-  }, [customEndDate, customStartDate, selectedMonth, selectedVehicle])
+  }, [customEndDate, customStartDate, dailyOnly, selectedMonth, selectedVehicle, todayISO])
 
   const appliedPeriodLabel = useMemo(() => {
+    if (dailyOnly) return 'Hoje'
     if (appliedStartDate || appliedEndDate) return `${appliedStartDate || '...'} até ${appliedEndDate || '...'}`
     if (selectedMonth) return `Mês ${selectedMonth}`
     return 'Todos os check-ins'
-  }, [appliedEndDate, appliedStartDate, selectedMonth])
+  }, [appliedEndDate, appliedStartDate, dailyOnly, selectedMonth])
+
+  function downloadCheckinsExcel() {
+    if (!selectedVehicle) return
+    if (filteredCheckins.length === 0) {
+      alert('Não há check-ins para exportar com os filtros aplicados.')
+      return
+    }
+
+    const rows = [
+      [
+        'Data',
+        'Placa',
+        'Tipo',
+        'KM',
+        'Motorista',
+        'E-mail motorista',
+        'Status motorista',
+        'Status veículo',
+        'Centro de custo',
+        'Setor',
+        'Risco fadiga',
+      ],
+      ...filteredCheckins.map((checkin) => [
+        formatDateTime(checkin.inspectionDate),
+        checkin.vehiclePlateSnapshot || selectedVehicle.plate,
+        checkin.vehicleTypeSnapshot || selectedVehicle.type || '—',
+        formatKm(checkin.kmAtInspection),
+        getCheckinDriverLabel(checkin),
+        checkin.driver?.email || '—',
+        checkin.driverStatus || '—',
+        getStatusInfo(checkin.vehicleStatus || selectedVehicle.status).label,
+        checkin.costCenter || '—',
+        checkin.sectorActivity || '—',
+        checkin.fatigueRisk || '—',
+      ]),
+    ]
+
+    const escapeCsv = (value: string) => {
+      const escaped = value.replace(/"/g, '""')
+      return `"${escaped}"`
+    }
+
+    const csv = rows
+      .map((row) => row.map((cell) => escapeCsv(String(cell ?? ''))).join(';'))
+      .join('\n')
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const filename = `checkins-${selectedVehicle.plate}-${appliedPeriodLabel.replace(/\s+/g, '-')}.xls`
+
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
 
   async function loadCostCenters() {
     setLoadingCostCenters(true)
@@ -872,6 +941,13 @@ const processedVehicles = useMemo(() => {
                   >
                     <RefreshCw size={14} /> Atualizar
                   </button>
+                  <button
+                    onClick={() => setFiltersOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+                  >
+                    <Filter size={14} /> Filtros
+                  </button>
+
 
                   <button
                     onClick={() => setCheckinsCollapsed((prev) => !prev)}
@@ -896,66 +972,6 @@ const processedVehicles = useMemo(() => {
                 </div>
               ) : (
                 <>
-                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-5">
-                    <label className="space-y-1 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Filtrar por mês</span>
-                      <input
-                        type="month"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2"
-                      />
-                    </label>
-
-                    <label className="space-y-1 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Data inicial</span>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2"
-                      />
-                    </label>
-
-                    <label className="space-y-1 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Data final</span>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2"
-                      />
-                    </label>
-                     <label className="space-y-1 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Motorista</span>
-                      <select
-                        value={driverFilter}
-                        onChange={(e) => setDriverFilter(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2"
-                      >
-                        <option value="">Todos os motoristas</option>
-                        {availableDrivers.map((driver) => (
-                          <option key={driver} value={driver}>
-                            {driver}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <div className="flex items-end gap-2">
-                      <button
-                        onClick={() => {
-                          setCustomStartDate('')
-                          setCustomEndDate('')
-                          setSelectedMonth(currentMonth)
-                          setDriverFilter('')
-                        }}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
-                      >
-                        <X size={14} /> Limpar filtros
-                      </button>
-                    </div>
-                  </div>
 
                   <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
 
@@ -1207,6 +1223,118 @@ const processedVehicles = useMemo(() => {
                   </div>
                 </>
               )}
+            </div>
+          )}
+          {filtersOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+              <div
+                className="absolute inset-0 bg-slate-900/40"
+                onClick={() => setFiltersOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="relative w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Filtros de check-ins</p>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {selectedVehicle ? `Veículo ${selectedVehicle.plate}` : 'Veículo selecionado'}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setFiltersOpen(false)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={dailyOnly}
+                      onChange={(e) => setDailyOnly(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="font-semibold text-slate-900">Acompanhar check-ins de hoje</span>
+                  </label>
+
+                  <div className="text-xs text-slate-500">
+                    Período aplicado: <span className="font-semibold text-slate-700">{appliedPeriodLabel}</span>
+                  </div>
+
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Filtrar por mês</span>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value || currentMonth)}
+                      disabled={dailyOnly}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Data inicial</span>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      disabled={dailyOnly}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Data final</span>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      disabled={dailyOnly}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+                    />
+                  </label>
+
+                  <label className="space-y-1 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Motorista</span>
+                    <select
+                      value={driverFilter}
+                      onChange={(e) => setDriverFilter(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2"
+                    >
+                      <option value="">Todos os motoristas</option>
+                      {availableDrivers.map((driver) => (
+                        <option key={driver} value={driver}>
+                          {driver}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      setCustomStartDate('')
+                      setCustomEndDate('')
+                      setSelectedMonth(currentMonth)
+                      setDriverFilter('')
+                      setDailyOnly(false)
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                  >
+                    <X size={14} /> Limpar filtros
+                  </button>
+
+                  <button
+                    onClick={downloadCheckinsExcel}
+                    className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+                  >
+                    <List size={14} /> Baixar Excel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>
