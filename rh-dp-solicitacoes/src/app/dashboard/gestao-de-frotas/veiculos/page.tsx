@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { fetchSessionMe } from '@/lib/session-cache'
-import { Loader2, Plus, RefreshCw, Edit3, Trash2, List, X, Maximize2, Minimize2, Filter } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  RefreshCw,
+  Edit3,
+  Trash2,
+  List,
+  X,
+  Maximize2,
+  Minimize2,
+  Filter,
+} from 'lucide-react'
 import { isValidPlate } from '@/lib/plate'
 
 type CostCenterOption = {
@@ -121,20 +132,18 @@ function extractDriverNames(checkin: VehicleCheckin) {
     .map((name) => name.trim())
     .filter((name) => name.length > 0)
 }
+
 function getCheckinDriverLabel(checkin: VehicleCheckin) {
   const names = extractDriverNames(checkin)
-  if (names.length > 0) {
-    return names.join(' • ')
-  }
-
+  if (names.length > 0) return names.join(' • ')
   return checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'
 }
-
 
 function formatKm(km?: number | null) {
   if (typeof km !== 'number') return '—'
   return `${km.toLocaleString('pt-BR')} km`
 }
+
 function getVehicleCostCentersText(vehicle: ApiVehicle) {
   const vehicleCostCenters =
     vehicle.costCenters
@@ -147,6 +156,7 @@ function getVehicleCostCentersText(vehicle: ApiVehicle) {
 
   return vehicleCostCenters.length > 0 ? (vehicleCostCenters as string[]).join(', ') : '—'
 }
+
 function formatDate(date?: string | null) {
   if (!date) return '—'
   const parsed = new Date(date)
@@ -210,6 +220,7 @@ export default function VehiclesPage() {
   const [driverFilter, setDriverFilter] = useState('')
   const [dailyOnly, setDailyOnly] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [vehicleSelectionOpen, setVehicleSelectionOpen] = useState(false)
 
   const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
   const [permissionsLoading, setPermissionsLoading] = useState(true)
@@ -222,6 +233,7 @@ export default function VehiclesPage() {
     kmCurrent: '',
     costCenterIds: [] as string[],
   })
+
   const [vehicleSearch, setVehicleSearch] = useState('')
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState('')
   const [vehiclePage, setVehiclePage] = useState(1)
@@ -229,6 +241,7 @@ export default function VehiclesPage() {
 
   const normalizedPlate = formValues.plate.trim().toUpperCase()
   const isPlateValid = isValidPlate(normalizedPlate)
+
   const canManageVehicles = fleetLevel === 'NIVEL_3'
   const canViewVehicles = fleetLevel === 'NIVEL_2' || canManageVehicles
 
@@ -236,7 +249,8 @@ export default function VehiclesPage() {
     () => vehicles.filter((vehicle) => getStatusInfo(vehicle.status).normalized === 'RESTRITO'),
     [vehicles],
   )
-const processedVehicles = useMemo(() => {
+
+  const processedVehicles = useMemo(() => {
     const term = vehicleSearch.trim().toLowerCase()
     const normalizedStatus = vehicleStatusFilter.trim().toUpperCase()
 
@@ -246,13 +260,10 @@ const processedVehicles = useMemo(() => {
       )
       .filter((vehicle) => {
         if (!term) return true
-
         const statusInfo = getStatusInfo(vehicle.status)
         const haystack = `${vehicle.plate} ${vehicle.type || ''} ${vehicle.model || ''} ${
           vehicle.sector || ''
-        } ${getVehicleCostCentersText(vehicle)} ${statusInfo.label} ${statusInfo.normalized}`
-          .toLowerCase()
-
+        } ${getVehicleCostCentersText(vehicle)} ${statusInfo.label} ${statusInfo.normalized}`.toLowerCase()
         return haystack.includes(term)
       })
       .sort((a, b) => {
@@ -260,7 +271,6 @@ const processedVehicles = useMemo(() => {
           const date = value ? new Date(value).getTime() : 0
           return Number.isNaN(date) ? 0 : date
         }
-
         const recentA = parseDate(a.lastCheckinAt) || parseDate(a.createdAt)
         const recentB = parseDate(b.lastCheckinAt) || parseDate(b.createdAt)
         return recentB - recentA
@@ -269,6 +279,7 @@ const processedVehicles = useMemo(() => {
 
   const totalVehiclePages = Math.max(1, Math.ceil(processedVehicles.length / vehiclesPerPage))
   const safeVehiclePage = Math.min(vehiclePage, totalVehiclePages)
+
   const paginatedVehicles = useMemo(
     () =>
       processedVehicles.slice(
@@ -277,7 +288,9 @@ const processedVehicles = useMemo(() => {
       ),
     [processedVehicles, safeVehiclePage, vehiclesPerPage],
   )
-  const vehiclePageStart = processedVehicles.length === 0 ? 0 : (safeVehiclePage - 1) * vehiclesPerPage + 1
+
+  const vehiclePageStart =
+    processedVehicles.length === 0 ? 0 : (safeVehiclePage - 1) * vehiclesPerPage + 1
   const vehiclePageEnd = Math.min(processedVehicles.length, safeVehiclePage * vehiclesPerPage)
 
   const monthBoundaries = useMemo(() => getMonthBoundaries(selectedMonth), [selectedMonth])
@@ -287,6 +300,7 @@ const processedVehicles = useMemo(() => {
     const normalized = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
     return normalized.toISOString().slice(0, 10)
   }, [])
+
   const appliedStartDate = dailyOnly ? todayISO : customStartDate || monthBoundaries.start
   const appliedEndDate = dailyOnly ? todayISO : customEndDate || monthBoundaries.end
 
@@ -305,6 +319,7 @@ const processedVehicles = useMemo(() => {
       try {
         const data = await fetchSessionMe()
         if (!data) throw new Error('Falha ao carregar permissões do módulo')
+
         const level: FleetLevel | null = (() => {
           const raw =
             data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
@@ -338,28 +353,41 @@ const processedVehicles = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionsLoading, canViewVehicles])
 
+  const checkinScopeIds = useMemo(() => {
+    if (checkinVehicleIds.length > 0) return checkinVehicleIds
+    if (selectedVehicle) return [selectedVehicle.id]
+    return vehicles.map((vehicle) => vehicle.id)
+  }, [checkinVehicleIds, selectedVehicle, vehicles])
+
   useEffect(() => {
-    if (checkinVehicleIds.length > 0) {
-      loadCheckinsForVehicles(checkinVehicleIds)
+    if (checkinScopeIds.length === 0) {
+      setCheckins([])
       return
     }
-    if (selectedVehicle) loadCheckins(selectedVehicle.id)
+    loadCheckinsForVehicles(checkinScopeIds)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkinVehicleIds, selectedVehicle])
+  }, [checkinScopeIds])
 
   const appliedVehicles = useMemo(() => {
     if (checkinVehicleIds.length > 0) {
       return vehicles.filter((vehicle) => checkinVehicleIds.includes(vehicle.id))
     }
-    return selectedVehicle ? [selectedVehicle] : []
+    if (selectedVehicle) return [selectedVehicle]
+    return vehicles
   }, [checkinVehicleIds, selectedVehicle, vehicles])
 
+  const primaryScopeVehicle = useMemo(
+    () => (appliedVehicles.length === 1 ? appliedVehicles[0] : null),
+    [appliedVehicles],
+  )
+
   const checkinsScopeLabel = useMemo(() => {
+    if (!selectedVehicle && checkinVehicleIds.length === 0) return 'Todos os veículos'
     if (appliedVehicles.length === 0) return 'Veículos selecionados'
     if (appliedVehicles.length === 1) return appliedVehicles[0]?.plate || 'Veículo selecionado'
     if (appliedVehicles.length <= 3) return appliedVehicles.map((vehicle) => vehicle.plate).join(', ')
     return `${appliedVehicles.length} veículos`
-  }, [appliedVehicles])
+  }, [appliedVehicles, checkinVehicleIds.length, selectedVehicle])
 
   const availableDrivers = useMemo(() => {
     const unique = new Set<string>()
@@ -381,11 +409,13 @@ const processedVehicles = useMemo(() => {
         if (start && date < start) return false
         if (end && date > end) return false
       }
+
       if (driverTerm) {
         const label = getCheckinDriverLabel(checkin).toLowerCase()
         const email = checkin.driver?.email?.toLowerCase() ?? ''
         if (!label.includes(driverTerm) && !email.includes(driverTerm)) return false
       }
+
       return true
     })
   }, [appliedEndDate, appliedStartDate, checkins, driverFilter])
@@ -396,7 +426,7 @@ const processedVehicles = useMemo(() => {
     const params = new URLSearchParams({ vehicleId: selectedVehicle.id })
     const usingCustomDates = Boolean(customStartDate || customEndDate)
 
-   if (dailyOnly) {
+    if (dailyOnly) {
       params.set('startDate', todayISO)
       params.set('endDate', todayISO)
     } else if (usingCustomDates) {
@@ -407,7 +437,15 @@ const processedVehicles = useMemo(() => {
     }
 
     return `/api/fleet/checkins/monthly-sheet?${params.toString()}`
-  }, [checkinVehicleIds.length, customEndDate, customStartDate, dailyOnly, selectedMonth, selectedVehicle, todayISO])
+  }, [
+    checkinVehicleIds.length,
+    customEndDate,
+    customStartDate,
+    dailyOnly,
+    selectedMonth,
+    selectedVehicle,
+    todayISO,
+  ])
 
   const appliedPeriodLabel = useMemo(() => {
     if (dailyOnly) return 'Hoje'
@@ -439,33 +477,32 @@ const processedVehicles = useMemo(() => {
       ],
       ...filteredCheckins.map((checkin) => [
         formatDateTime(checkin.inspectionDate),
-         checkin.vehiclePlateSnapshot || appliedVehicles[0]?.plate || '—',
-        checkin.vehicleTypeSnapshot || appliedVehicles[0]?.type || '—',
+        checkin.vehiclePlateSnapshot || primaryScopeVehicle?.plate || '—',
+        checkin.vehicleTypeSnapshot || primaryScopeVehicle?.type || '—',
         formatKm(checkin.kmAtInspection),
         getCheckinDriverLabel(checkin),
         checkin.driver?.email || '—',
         checkin.driverStatus || '—',
-        getStatusInfo(checkin.vehicleStatus || appliedVehicles[0]?.status).label,
+        getStatusInfo(checkin.vehicleStatus || primaryScopeVehicle?.status).label,
         checkin.costCenter || '—',
         checkin.sectorActivity || '—',
         checkin.fatigueRisk || '—',
       ]),
     ]
 
-    const escapeCsv = (value: string) => {
-      const escaped = value.replace(/"/g, '""')
-      return `"${escaped}"`
-    }
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
 
-    const csv = rows
-      .map((row) => row.map((cell) => escapeCsv(String(cell ?? ''))).join(';'))
-      .join('\n')
+    const csv = rows.map((row) => row.map((cell) => escapeCsv(String(cell ?? ''))).join(';')).join('\n')
 
     const blob = new Blob([`\uFEFF${csv}`], { type: 'application/vnd.ms-excel;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
+
     const filenameLabel =
-      appliedVehicles.length === 1 ? appliedVehicles[0]?.plate || 'veiculo' : `multiveiculos-${appliedVehicles.length}`
+      appliedVehicles.length === 1
+        ? appliedVehicles[0]?.plate || 'veiculo'
+        : `multiveiculos-${appliedVehicles.length}`
+
     const filename = `checkins-${filenameLabel}-${appliedPeriodLabel.replace(/\s+/g, '-')}.xls`
 
     link.href = url
@@ -497,7 +534,9 @@ const processedVehicles = useMemo(() => {
     try {
       const res = await fetch('/api/fleet/vehicles', { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao buscar veículos')
-     const data: Array<ApiVehicle & { checkins?: Array<{ inspectionDate: string }> }> = await res.json()
+
+      const data: Array<ApiVehicle & { checkins?: Array<{ inspectionDate: string }> }> = await res.json()
+
       setVehicles(
         data.map((vehicle) => ({
           ...vehicle,
@@ -514,37 +553,11 @@ const processedVehicles = useMemo(() => {
     }
   }
 
-  async function loadCheckins(vehicleId: string) {
-    if (!canViewVehicles) return
-    setLoadingCheckins(true)
-
-    try {
-      const res = await fetch(`/api/fleet/checkins?vehicleId=${vehicleId}`, { cache: 'no-store' })
-      if (!res.ok) throw new Error('Falha ao buscar check-ins')
-
-      const data: Array<VehicleCheckin & { vehicleStatus?: string }> = await res.json()
-      setCheckins(
-        data.map((item) => ({
-          ...item,
-          vehicleId: (item as any).vehicleId || (item as any).vehicle?.id || null,
-          vehicleStatus: item.vehicleStatus || (item as any).vehicle?.status,
-          vehiclePlateSnapshot: item.vehiclePlateSnapshot || (item as any).vehicle?.plate,
-          vehicleTypeSnapshot: item.vehicleTypeSnapshot || (item as any).vehicle?.type,
-        })),
-      )
-    } catch (err) {
-      console.error(err)
-      setCheckins([])
-    } finally {
-      setLoadingCheckins(false)
-    }
-  }
-
   async function loadCheckinsForVehicles(vehicleIds: string[]) {
     if (!canViewVehicles) return
     if (vehicleIds.length === 0) return
-    setLoadingCheckins(true)
 
+    setLoadingCheckins(true)
     try {
       const responses = await Promise.all(
         vehicleIds.map(async (vehicleId) => {
@@ -553,7 +566,9 @@ const processedVehicles = useMemo(() => {
           return res.json()
         }),
       )
+
       const merged = responses.flat() as Array<VehicleCheckin & { vehicleStatus?: string }>
+
       setCheckins(
         merged.map((item) => ({
           ...item,
@@ -573,13 +588,13 @@ const processedVehicles = useMemo(() => {
 
   async function loadStatusLogs(vehicleId: string) {
     if (!canManageVehicles) return
+
     setLoadingStatusLogs(true)
     setStatusError(null)
 
     try {
       const res = await fetch(`/api/fleet/vehicles/status?vehicleId=${vehicleId}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('Falha ao carregar histórico de status')
-
       const data: VehicleStatusLog[] = await res.json()
       setStatusLogs(data)
     } catch (err) {
@@ -609,10 +624,12 @@ const processedVehicles = useMemo(() => {
 
   async function submitStatusChange() {
     if (!statusModalVehicle) return
+
     if (!canManageVehicles) {
       setStatusError('Você não tem permissão para alterar o status dos veículos.')
       return
     }
+
     if (viewingLogId) {
       setStatusError('Clique em "Escrever novo motivo" para registrar uma nova alteração.')
       return
@@ -639,8 +656,12 @@ const processedVehicles = useMemo(() => {
 
       const log: VehicleStatusLog = await res.json()
 
-      setVehicles((prev) => prev.map((v) => (v.id === statusModalVehicle.id ? { ...v, status: statusSelection } : v)))
-      setSelectedVehicle((prev) => (prev?.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev))
+      setVehicles((prev) =>
+        prev.map((v) => (v.id === statusModalVehicle.id ? { ...v, status: statusSelection } : v)),
+      )
+      setSelectedVehicle((prev) =>
+        prev?.id === statusModalVehicle.id ? { ...prev, status: statusSelection } : prev,
+      )
       setStatusLogs((prev) => [log, ...prev])
 
       setStatusReason('')
@@ -663,6 +684,7 @@ const processedVehicles = useMemo(() => {
 
   function openEditForm(vehicle: ApiVehicle) {
     if (!canManageVehicles) return
+
     setEditingVehicle(vehicle)
     setFormValues({
       plate: vehicle.plate,
@@ -670,7 +692,8 @@ const processedVehicles = useMemo(() => {
       model: vehicle.model || '',
       sector: vehicle.sector || '',
       kmCurrent: vehicle.kmCurrent?.toString() || '',
-      costCenterIds: vehicle.costCenters?.map((l) => l.costCenter?.id || null).filter((id): id is string => !!id) || [],
+      costCenterIds:
+        vehicle.costCenters?.map((l) => l.costCenter?.id || null).filter((id): id is string => !!id) || [],
     })
     setFormError(null)
     setFormOpen(true)
@@ -735,6 +758,7 @@ const processedVehicles = useMemo(() => {
       alert('Você não tem permissão para excluir veículos.')
       return
     }
+
     const confirmed = window.confirm(`Deseja excluir o veículo ${vehicle.plate}?`)
     if (!confirmed) return
 
@@ -782,14 +806,14 @@ const processedVehicles = useMemo(() => {
             </div>
           )}
 
-             <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={loadVehicles}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
-              >
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
-              </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={loadVehicles}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Recarregar lista
+            </button>
 
             {canManageVehicles && (
               <button
@@ -799,7 +823,8 @@ const processedVehicles = useMemo(() => {
                 <Plus size={16} /> Registrar veículo
               </button>
             )}
-             <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="search"
                 value={vehicleSearch}
@@ -818,15 +843,15 @@ const processedVehicles = useMemo(() => {
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-              ))}
-            </select>
+                ))}
+              </select>
 
-            <button
-              onClick={() => setFiltersOpen(true)}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
-            >
-              <Filter size={14} /> Filtros de check-ins
-            </button>
+              <button
+                onClick={() => setFiltersOpen(true)}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+              >
+                <Filter size={14} /> Filtros de check-ins
+              </button>
             </div>
           </div>
 
@@ -879,7 +904,7 @@ const processedVehicles = useMemo(() => {
                   </tr>
                 )}
 
-                 {!loading && processedVehicles.length === 0 && !error && (
+                {!loading && processedVehicles.length === 0 && !error && (
                   <tr>
                     <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-600">
                       {vehicleSearch || vehicleStatusFilter
@@ -890,7 +915,7 @@ const processedVehicles = useMemo(() => {
                 )}
 
                 {!loading &&
-                   paginatedVehicles.map((vehicle) => {
+                  paginatedVehicles.map((vehicle) => {
                     const vehicleCostCentersText = getVehicleCostCentersText(vehicle)
 
                     return (
@@ -963,6 +988,7 @@ const processedVehicles = useMemo(() => {
               </tbody>
             </table>
           </div>
+
           {processedVehicles.length > 0 && (
             <div className="flex flex-wrap items-center justify-between border border-slate-200 border-t-0 bg-slate-50 px-4 py-3 text-sm text-slate-700">
               <p className="font-medium">
@@ -991,25 +1017,25 @@ const processedVehicles = useMemo(() => {
           )}
 
           {/* painel de check-ins */}
-          {(selectedVehicle || checkinVehicleIds.length > 0) && (
+          {canViewVehicles && (
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold uppercase text-slate-500">Check-ins dos veículos</p>
                   <h2 className="text-2xl font-bold text-slate-900">{checkinsScopeLabel}</h2>
                 </div>
+
                 <div className="flex flex-wrap gap-2">
+                  {/* ✅ AQUI estava o erro de sintaxe no seu paste (faltava fechar }) e > */}
                   <button
                     onClick={() => {
-                      if (checkinVehicleIds.length > 0) {
-                        loadCheckinsForVehicles(checkinVehicleIds)
-                        return
-                      }
-                      if (selectedVehicle) loadCheckins(selectedVehicle.id)
+                      if (checkinScopeIds.length > 0) loadCheckinsForVehicles(checkinScopeIds)
                     }}
-                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"
+                    disabled={loadingCheckins}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
                   >
-                    <RefreshCw size={14} /> Atualizar
+                    {loadingCheckins ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Atualizar
                   </button>
 
                   <button
@@ -1037,7 +1063,6 @@ const processedVehicles = useMemo(() => {
                 </div>
               ) : (
                 <>
-
                   <p className="mt-2 text-sm text-slate-600">Período aplicado: {appliedPeriodLabel}</p>
 
                   <div className="mt-4 space-y-3">
@@ -1051,9 +1076,11 @@ const processedVehicles = useMemo(() => {
 
                     {!loadingCheckins && checkins.length === 0 && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-center text-slate-600">
-                         {checkinVehicleIds.length > 0
+                        {checkinVehicleIds.length > 0
                           ? 'Nenhum check-in encontrado para os veículos selecionados.'
-                          : 'Nenhum check-in encontrado para este veículo.'}
+                          : selectedVehicle
+                            ? 'Nenhum check-in encontrado para este veículo.'
+                            : 'Nenhum check-in encontrado para os veículos cadastrados.'}
                       </div>
                     )}
 
@@ -1065,15 +1092,17 @@ const processedVehicles = useMemo(() => {
 
                     {!loadingCheckins &&
                       filteredCheckins.map((checkin) => {
-                        const statusInfo = getStatusInfo(checkin.vehicleStatus || selectedVehicle?.status)
+                        const statusInfo = getStatusInfo(checkin.vehicleStatus || primaryScopeVehicle?.status)
                         const driverStatusInfo = getDriverStatusInfo(checkin.driverStatus)
                         const checklist = checkin.checklistJson || []
                         const fatigue = checkin.fatigueJson || []
                         const driverNames = extractDriverNames(checkin)
-                        const plateLabel = checkin.vehiclePlateSnapshot || selectedVehicle?.plate
 
                         return (
-                          <details key={checkin.id} className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                          <details
+                            key={checkin.id}
+                            className="group rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                          >
                             <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
                               <div className="space-y-0.5">
                                 <p>
@@ -1115,12 +1144,12 @@ const processedVehicles = useMemo(() => {
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">Placa</dt>
                                       <dd className="font-semibold text-slate-900">
-                                         {checkin.vehiclePlateSnapshot || selectedVehicle?.plate || '—'}
+                                        {checkin.vehiclePlateSnapshot || primaryScopeVehicle?.plate || '—'}
                                       </dd>
                                     </div>
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">Tipo</dt>
-                                      <dd>{checkin.vehicleTypeSnapshot || selectedVehicle?.type || '—'}</dd>
+                                      <dd>{checkin.vehicleTypeSnapshot || primaryScopeVehicle?.type || '—'}</dd>
                                     </div>
                                     <div>
                                       <dt className="text-xs uppercase text-slate-500">KM no check-in</dt>
@@ -1228,7 +1257,9 @@ const processedVehicles = useMemo(() => {
                                     <span className="text-xs uppercase text-slate-500">Itens</span>
                                   </div>
 
-                                  {checklist.length === 0 && <p className="text-xs text-slate-500">Nenhum item registrado.</p>}
+                                  {checklist.length === 0 && (
+                                    <p className="text-xs text-slate-500">Nenhum item registrado.</p>
+                                  )}
 
                                   {checklist.map((item, idx) => (
                                     <div
@@ -1262,10 +1293,13 @@ const processedVehicles = useMemo(() => {
                                   </div>
 
                                   <p className="text-xs text-slate-500">
-                                    Pontuação: <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
+                                    Pontuação:{' '}
+                                    <span className="font-semibold text-slate-800">{checkin.fatigueScore ?? '—'}</span>
                                   </p>
 
-                                  {fatigue.length === 0 && <p className="text-xs text-slate-500">Sem respostas registradas.</p>}
+                                  {fatigue.length === 0 && (
+                                    <p className="text-xs text-slate-500">Sem respostas registradas.</p>
+                                  )}
 
                                   {fatigue.map((item, idx) => (
                                     <div
@@ -1293,6 +1327,8 @@ const processedVehicles = useMemo(() => {
               )}
             </div>
           )}
+
+          {/* Modal filtros */}
           {filtersOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
               <div
@@ -1304,9 +1340,7 @@ const processedVehicles = useMemo(() => {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase text-slate-500">Filtros de check-ins</p>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                       {appliedVehicles.length > 0 ? `Veículos ${checkinsScopeLabel}` : 'Selecione os veículos'}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Veículos: {checkinsScopeLabel}</h3>
                   </div>
                   <button
                     onClick={() => setFiltersOpen(false)}
@@ -1315,41 +1349,26 @@ const processedVehicles = useMemo(() => {
                     <X size={16} />
                   </button>
                 </div>
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-900">Veículos para acompanhamento</p>
-                  <p className="text-xs text-slate-500">
-                    Selecione um ou mais veículos para acompanhar os check-ins em conjunto.
-                  </p>
-                  <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700">
-                    {vehicles.length === 0 && (
-                      <p className="text-xs text-slate-500">Nenhum veículo disponível para seleção.</p>
-                    )}
-                    {vehicles.map((vehicle) => (
-                      <label key={vehicle.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={checkinVehicleIds.includes(vehicle.id)}
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            setCheckinVehicleIds((prev) => {
-                              const next = checked ? [...prev, vehicle.id] : prev.filter((id) => id !== vehicle.id)
-                              if (next.length === 0) {
-                                setSelectedVehicle(null)
-                              } else if (next.length > 1) {
-                                setSelectedVehicle(null)
-                              } else if (next.length === 1) {
-                                const onlyVehicle = vehicles.find((item) => item.id === next[0]) || null
-                                setSelectedVehicle(onlyVehicle)
-                              }
-                              return next
-                            })
-                          }}
-                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-semibold text-slate-900">{vehicle.plate}</span>
-                        <span className="text-xs text-slate-500">{vehicle.model || 'Modelo não informado'}</span>
-                      </label>
-                    ))}
+
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Escopo de veículos</p>
+                      <p className="text-xs text-slate-500">
+                        {checkinVehicleIds.length > 0
+                          ? 'Seleção manual aplicada. Clique para revisar a lista de veículos.'
+                          : selectedVehicle
+                            ? 'Filtrando pelo veículo selecionado na tabela.'
+                            : 'Filtrando todos os veículos cadastrados.'}
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{checkinsScopeLabel}</p>
+                    </div>
+                    <button
+                      onClick={() => setVehicleSelectionOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                    >
+                      Selecionar veículos
+                    </button>
                   </div>
                 </div>
 
@@ -1427,6 +1446,7 @@ const processedVehicles = useMemo(() => {
                       setDriverFilter('')
                       setDailyOnly(false)
                       setCheckinVehicleIds([])
+                      setSelectedVehicle(null)
                     }}
                     className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
                   >
@@ -1438,6 +1458,78 @@ const processedVehicles = useMemo(() => {
                     className="inline-flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
                   >
                     <List size={14} /> Baixar Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal seleção veículos */}
+          {vehicleSelectionOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6">
+              <div
+                className="absolute inset-0 bg-slate-900/40"
+                onClick={() => setVehicleSelectionOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="relative w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Selecionar veículos</p>
+                    <h3 className="text-lg font-semibold text-slate-900">Veículos cadastrados</h3>
+                  </div>
+                  <button
+                    onClick={() => setVehicleSelectionOpen(false)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Marque os veículos que deseja acompanhar em conjunto. Sem seleção, todos os veículos são considerados.
+                </p>
+
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto pr-1 text-sm text-slate-700">
+                  {vehicles.length === 0 && <p className="text-xs text-slate-500">Nenhum veículo disponível para seleção.</p>}
+
+                  {vehicles.map((vehicle) => (
+                    <label key={vehicle.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={checkinVehicleIds.includes(vehicle.id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked
+                          setCheckinVehicleIds((prev) =>
+                            checked ? [...prev, vehicle.id] : prev.filter((id) => id !== vehicle.id),
+                          )
+                          setSelectedVehicle(null)
+                        }}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-semibold text-slate-900">{vehicle.plate}</span>
+                      <span className="text-xs text-slate-500">{vehicle.model || 'Modelo não informado'}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      setCheckinVehicleIds([])
+                      setSelectedVehicle(null)
+                      setVehicleSelectionOpen(false)
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+                  >
+                    Usar todos os veículos
+                  </button>
+
+                  <button
+                    onClick={() => setVehicleSelectionOpen(false)}
+                    className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100"
+                  >
+                    Concluir
                   </button>
                 </div>
               </div>
@@ -1542,7 +1634,9 @@ const processedVehicles = useMemo(() => {
               </div>
 
               {statusError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {statusError}
+                </div>
               )}
 
               <div className="flex justify-end gap-3">
@@ -1589,7 +1683,7 @@ const processedVehicles = useMemo(() => {
                 {statusLogs.map((log) => {
                   const info = getStatusInfo(log.status)
                   const isActive = viewingLogId === log.id
-                  const normalized = statusOptions.some((option) => option.value === info.normalized) ? info.normalized : 'DISPONIVEL'
+                  const normalized = statusOptions.some((o) => o.value === info.normalized) ? info.normalized : 'DISPONIVEL'
 
                   return (
                     <button
@@ -1606,7 +1700,9 @@ const processedVehicles = useMemo(() => {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}>{info.label}</span>
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${info.colorClass}`}>
+                            {info.label}
+                          </span>
                           <p className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</p>
                         </div>
                         {isActive && <span className="text-[11px] font-semibold uppercase text-blue-700">Selecionado</span>}
@@ -1630,9 +1726,7 @@ const processedVehicles = useMemo(() => {
           <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                  {editingVehicle ? 'Editar' : 'Cadastrar'} veículo
-                </p>
+                <p className="text-xs font-semibold uppercase text-slate-500">{editingVehicle ? 'Editar' : 'Cadastrar'} veículo</p>
                 <h2 className="text-2xl font-bold text-slate-900">{editingVehicle ? editingVehicle.plate : 'Novo veículo'}</h2>
               </div>
               <button onClick={() => setFormOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">
