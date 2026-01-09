@@ -1,7 +1,8 @@
-import { Action, ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel, Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { getUserModuleContext } from '@/lib/moduleAccess'
+import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
 
 function normalizeModuleKey(moduleKey: string) {
   return moduleKey.trim().toLowerCase()
@@ -23,6 +24,32 @@ export function mapLevelToDefaultActions(level: ModuleLevel): Action[] {
       return []
   }
 }
+async function loadFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) {
+  const grants = await prisma.featureLevelGrant.findMany({
+    where: {
+      level,
+      feature: {
+        module: { key: { equals: moduleKey, mode: 'insensitive' } },
+      },
+    },
+    select: { actions: true, feature: { select: { key: true } } },
+  })
+
+  const map = new Map<string, Action[]>()
+  for (const grant of grants) {
+    map.set(normalizeFeatureKey(grant.feature.key), grant.actions)
+  }
+
+  return map
+}
+
+async function getFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) {
+  const normalizedModuleKey = normalizeModuleKey(moduleKey)
+  return memoizeRequest(`permissions/grants/${normalizedModuleKey}/${level}`, () =>
+    loadFeatureGrantsForLevel(normalizedModuleKey, level),
+  )
+}
+
 
 export async function getUserModuleLevel(userId: string, moduleKey: string): Promise<ModuleLevel | null> {
   const { levels } = await getUserModuleContext(userId)
@@ -36,29 +63,32 @@ export async function canFeature(
   featureKey: string,
   action: Action,
 ): Promise<boolean> {
-  const normalizedModuleKey = normalizeModuleKey(moduleKey)
-  const normalizedFeatureKey = normalizeFeatureKey(featureKey)
+  return ensureRequestContext('permissions/canFeature', async () => {
+    const normalizedModuleKey = normalizeModuleKey(moduleKey)
+    const normalizedFeatureKey = normalizeFeatureKey(featureKey)
 
-  const level = await getUserModuleLevel(userId, normalizedModuleKey)
-  if (!level) return false
+    try {
+      const level = await getUserModuleLevel(userId, normalizedModuleKey)
+      if (!level) return false
 
-  const levelGrant = await prisma.featureLevelGrant.findFirst({
-    where: {
-      level,
-      feature: {
-        key: { equals: normalizedFeatureKey, mode: 'insensitive' },
-        module: { key: { equals: normalizedModuleKey, mode: 'insensitive' } },
-      },
-    },
-    select: { actions: true },
+      const levelGrants = await getFeatureGrantsForLevel(normalizedModuleKey, level)
+      const grantActions = levelGrants.get(normalizedFeatureKey)
+
+      if (grantActions) {
+        return grantActions.includes(action)
+      }
+
+      const fallbackActions = mapLevelToDefaultActions(level)
+      return fallbackActions.includes(action)
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        console.error('Não foi possível verificar permissões: banco de dados indisponível.', error)
+        return false
+      }
+      console.error('Erro ao verificar permissões.', error)
+      return false
+    }
   })
-
-  if (levelGrant) {
-    return levelGrant.actions.includes(action)
-  }
-
-  const fallbackActions = mapLevelToDefaultActions(level)
-  return fallbackActions.includes(action)
 }
 
 export async function assertCanFeature(

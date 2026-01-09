@@ -120,6 +120,15 @@ function extractDriverNames(checkin: VehicleCheckin) {
     .map((name) => name.trim())
     .filter((name) => name.length > 0)
 }
+function getCheckinDriverLabel(checkin: VehicleCheckin) {
+  const names = extractDriverNames(checkin)
+  if (names.length > 0) {
+    return names.join(' • ')
+  }
+
+  return checkin.driver?.fullName || checkin.driverName || 'Motorista não informado'
+}
+
 
 function formatKm(km?: number | null) {
   if (typeof km !== 'number') return '—'
@@ -196,6 +205,7 @@ export default function VehiclesPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
+  const [driverFilter, setDriverFilter] = useState('')
 
   const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
   const [permissionsLoading, setPermissionsLoading] = useState(true)
@@ -324,19 +334,34 @@ const processedVehicles = useMemo(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicle])
 
+  const availableDrivers = useMemo(() => {
+    const unique = new Set<string>()
+    for (const checkin of checkins) {
+      unique.add(getCheckinDriverLabel(checkin))
+    }
+    return Array.from(unique).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [checkins])
+
   const filteredCheckins = useMemo(() => {
     const start = appliedStartDate ? new Date(`${appliedStartDate}T00:00:00`) : null
     const end = appliedEndDate ? new Date(`${appliedEndDate}T23:59:59`) : null
+    const driverTerm = driverFilter.trim().toLowerCase()
 
     return checkins.filter((checkin) => {
-      if (!start && !end) return true
-      const date = new Date(checkin.inspectionDate)
-      if (Number.isNaN(date.getTime())) return false
-      if (start && date < start) return false
-      if (end && date > end) return false
+      if (start || end) {
+        const date = new Date(checkin.inspectionDate)
+        if (Number.isNaN(date.getTime())) return false
+        if (start && date < start) return false
+        if (end && date > end) return false
+      }
+      if (driverTerm) {
+        const label = getCheckinDriverLabel(checkin).toLowerCase()
+        const email = checkin.driver?.email?.toLowerCase() ?? ''
+        if (!label.includes(driverTerm) && !email.includes(driverTerm)) return false
+      }
       return true
     })
-  }, [appliedEndDate, appliedStartDate, checkins])
+  }, [appliedEndDate, appliedStartDate, checkins, driverFilter])
 
   const monthlyDocUrl = useMemo(() => {
     if (!selectedVehicle) return '#'
@@ -871,7 +896,7 @@ const processedVehicles = useMemo(() => {
                 </div>
               ) : (
                 <>
-                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-5">
                     <label className="space-y-1 text-sm text-slate-700">
                       <span className="font-semibold text-slate-900">Filtrar por mês</span>
                       <input
@@ -901,6 +926,21 @@ const processedVehicles = useMemo(() => {
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
                       />
                     </label>
+                     <label className="space-y-1 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-900">Motorista</span>
+                      <select
+                        value={driverFilter}
+                        onChange={(e) => setDriverFilter(e.target.value)}
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      >
+                        <option value="">Todos os motoristas</option>
+                        {availableDrivers.map((driver) => (
+                          <option key={driver} value={driver}>
+                            {driver}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
                     <div className="flex items-end gap-2">
                       <button
@@ -908,6 +948,7 @@ const processedVehicles = useMemo(() => {
                           setCustomStartDate('')
                           setCustomEndDate('')
                           setSelectedMonth(currentMonth)
+                          setDriverFilter('')
                         }}
                         className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
                       >
