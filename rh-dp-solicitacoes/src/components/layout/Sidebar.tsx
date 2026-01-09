@@ -93,6 +93,9 @@ export default function Sidebar({
   userMenu,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const [restrictedVehicleCount, setRestrictedVehicleCount] = useState<number | null>(null)
+  const [receivedSolicitationsCount, setReceivedSolicitationsCount] = useState<number | null>(null)
+  const [pendingRefusalCount, setPendingRefusalCount] = useState<number | null>(null)
 
   const pathname = usePathname()
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
@@ -150,11 +153,95 @@ export default function Sidebar({
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0')
   }, [collapsed])
+useEffect(() => {
+    if (!showFleet || !fleetFeatures.veiculos) return
 
+    let active = true
+    const controller = new AbortController()
+    const loadRestrictedVehicles = async () => {
+      try {
+        const response = await fetch('/api/fleet/vehicles?status=RESTRITO', {
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active && Array.isArray(data)) {
+          setRestrictedVehicleCount(data.length)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadRestrictedVehicles()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [fleetFeatures.veiculos, showFleet])
+
+  useEffect(() => {
+    if (!showSolic || !solicitacaoFeatures.recebidas) return
+
+    let active = true
+    const controller = new AbortController()
+    const loadReceivedSolicitations = async () => {
+      try {
+        const response = await fetch('/api/solicitacoes/recebidas', {
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active && Array.isArray(data)) {
+          setReceivedSolicitationsCount(data.length)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadReceivedSolicitations()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [showSolic, solicitacaoFeatures.recebidas])
+
+  useEffect(() => {
+    if (!showRefusal || !canReviewRefusal || !refusalFeatures.pendentes) return
+
+    let active = true
+    const controller = new AbortController()
+    const loadPendingRefusals = async () => {
+      try {
+        const response = await fetch('/api/direito-de-recusa?status=PENDENTE', {
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active && Array.isArray(data?.reports)) {
+          setPendingRefusalCount(data.reports.length)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadPendingRefusals()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [showRefusal, canReviewRefusal, refusalFeatures.pendentes])
   const baseSection =
     'w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors cursor-pointer'
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
+  const badgeBase =
+    'ml-auto inline-flex min-w-[1.5rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold'
 
   return (
     <aside
@@ -191,7 +278,7 @@ export default function Sidebar({
                 }`}
               >
                 <Truck className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>Gestão de Frotas</span>}
+                {!collapsed && <span className="flex-1">Gestão de Frotas</span>}
               </button>
 
               {openFleet && !collapsed && (
@@ -206,7 +293,13 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Truck size={16} /> <span>Veículos</span>
+                      <Truck size={16} />
+                      <span className="flex-1">Veículos</span>
+                      {!collapsed && restrictedVehicleCount !== null && restrictedVehicleCount > 0 && (
+                        <span className={`${badgeBase} bg-red-500 text-white`}>
+                          {restrictedVehicleCount}
+                        </span>
+                      )}
                     </Link>
                   )}
 
@@ -399,7 +492,12 @@ export default function Sidebar({
                 }`}
               >
                 <ShieldAlert className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>Direito de Recusa</span>}
+                {!collapsed && <span className="flex-1">Direito de Recusa</span>}
+                {!collapsed && pendingRefusalCount !== null && pendingRefusalCount > 0 && (
+                  <span className={`${badgeBase} bg-yellow-400 text-slate-900`}>
+                    {pendingRefusalCount}
+                  </span>
+                )}
               </button>
 
               {openRefusal && !collapsed && (
@@ -453,7 +551,13 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <CheckCircle2 size={16} /> <span>Pendentes para avaliar</span>
+                       <CheckCircle2 size={16} />
+                      <span className="flex-1">Pendentes para avaliar</span>
+                      {!collapsed && pendingRefusalCount !== null && pendingRefusalCount > 0 && (
+                        <span className={`${badgeBase} bg-yellow-400 text-slate-900`}>
+                          {pendingRefusalCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                 </div>
@@ -471,7 +575,12 @@ export default function Sidebar({
                 }`}
               >
                 <ClipboardList className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>Solicitações</span>}
+                {!collapsed && <span className="flex-1">Solicitações</span>}
+                {!collapsed && receivedSolicitationsCount !== null && receivedSolicitationsCount > 0 && (
+                  <span className={`${badgeBase} bg-sky-500 text-white`}>
+                    {receivedSolicitationsCount}
+                  </span>
+                )}
               </button>
 
               {/* Submenu – só aparece se não estiver colapsado e se estiver "openSolic" */}
@@ -501,7 +610,13 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Inbox size={16} /> <span>Solicitações Recebidas</span>
+                      <Inbox size={16} />
+                      <span className="flex-1">Solicitações Recebidas</span>
+                      {!collapsed && receivedSolicitationsCount !== null && receivedSolicitationsCount > 0 && (
+                        <span className={`${badgeBase} bg-sky-500 text-white`}>
+                          {receivedSolicitationsCount}
+                        </span>
+                      )}
                     </Link>
                   )}
 
