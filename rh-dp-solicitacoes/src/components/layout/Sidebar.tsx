@@ -153,7 +153,7 @@ export default function Sidebar({
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0')
   }, [collapsed])
-useEffect(() => {
+  useEffect(() => {
     if (!showFleet || !fleetFeatures.veiculos) return
 
     let active = true
@@ -237,11 +237,15 @@ useEffect(() => {
     }
   }, [showRefusal, canReviewRefusal, refusalFeatures.pendentes])
   const baseSection =
-    'w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-md transition-colors cursor-pointer'
+    'w-full flex items-center gap-3 px-3 py-2.5 text-sm font-semibold rounded-md transition-colors cursor-pointer'
   const activeSection = 'bg-orange-500 text-white shadow-sm'
   const inactiveSection = 'text-slate-200 hover:bg-white/10'
+  const submenuItemBase =
+    'group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-2.5 transition-colors'
   const badgeBase =
     'ml-auto inline-flex min-w-[1.5rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold'
+  const iconBadgeBase =
+    'absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white'
 
   return (
     <aside
@@ -277,7 +281,12 @@ useEffect(() => {
                   inFleet ? activeSection : inactiveSection
                 }`}
               >
-                <Truck className="h-5 w-5 shrink-0" />
+                <span className="relative flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <Truck className="h-5 w-5 shrink-0" />
+                  {restrictedVehicleCount !== null && restrictedVehicleCount > 0 && (
+                    <span className={iconBadgeBase}>{restrictedVehicleCount}</span>
+                  )}
+                </span>
                 {!collapsed && <span className="flex-1">Gestão de Frotas</span>}
               </button>
 
@@ -286,7 +295,7 @@ useEffect(() => {
                     {fleetFeatures.veiculos && (
                     <Link
                       href="/dashboard/gestao-de-frotas/veiculos"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/gestao-de-frotas/veiculos')
                             ? 'bg-orange-500/90 text-white'
@@ -306,7 +315,7 @@ useEffect(() => {
                   {fleetFeatures.checkins && (
                     <Link
                       href="/dashboard/gestao-de-frotas/checkins"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/gestao-de-frotas/checkins')
                             ? 'bg-orange-500/90 text-white'
@@ -319,7 +328,7 @@ useEffect(() => {
                   {fleetFeatures.deslocamentoCheckin && (
                     <Link
                       href="/dashboard/gestao-de-frotas/deslocamento/checkin"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/checkin')
                             ? 'bg-orange-500/90 text-white'
@@ -332,7 +341,7 @@ useEffect(() => {
                   {fleetFeatures.deslocamentoPainel && (
                     <Link
                       href="/dashboard/gestao-de-frotas/deslocamento/painel"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/gestao-de-frotas/deslocamento/painel')
                             ? 'bg-orange-500/90 text-white'
@@ -355,8 +364,10 @@ useEffect(() => {
                   inEquipment ? activeSection : inactiveSection
                 }`}
               >
-                <Package className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>Controle de Equipamentos TI</span>}
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <Package className="h-5 w-5 shrink-0" />
+                </span>
+                {!collapsed && <span className="flex-1">Controle de Equipamentos TI</span>}
               </button>
 
               {openEquipment && !collapsed && (
@@ -364,7 +375,7 @@ useEffect(() => {
                    {equipmentFeatures.atalho && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/atalho"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                       className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/atalho')
                             ? 'bg-orange-500/90 text-white'
@@ -377,7 +388,7 @@ useEffect(() => {
                   {equipmentFeatures.linhaTelefonica && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/linha-telefonica"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/linha-telefonica')
                             ? 'bg-orange-500/90 text-white'
@@ -390,7 +401,7 @@ useEffect(() => {
                   {equipmentFeatures.smartphone && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/smartphones"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/smartphones')
                             ? 'bg-orange-500/90 text-white'
@@ -403,7 +414,7 @@ useEffect(() => {
                   {equipmentFeatures.notebook && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/notebooks"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/notebooks')
                             ? 'bg-orange-500/90 text-white'
@@ -416,7 +427,7 @@ useEffect(() => {
                   {equipmentFeatures.desktop && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/desktops"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/desktops')
                             ? 'bg-orange-500/90 text-white'
@@ -429,7 +440,7 @@ useEffect(() => {
                   {equipmentFeatures.monitor && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/monitores"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/monitores')
                             ? 'bg-orange-500/90 text-white'
@@ -442,7 +453,7 @@ useEffect(() => {
                   {equipmentFeatures.impressora && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/impressoras"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/impressoras')
                             ? 'bg-orange-500/90 text-white'
@@ -455,7 +466,7 @@ useEffect(() => {
                   {equipmentFeatures.tplink && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/tplink"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/tplink')
                             ? 'bg-orange-500/90 text-white'
@@ -468,7 +479,7 @@ useEffect(() => {
                   {equipmentFeatures.outros && (
                     <Link
                       href="/dashboard/controle-equipamentos-ti/outros"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/outros')
                             ? 'bg-orange-500/90 text-white'
@@ -491,7 +502,9 @@ useEffect(() => {
                   inRefusal ? activeSection : inactiveSection
                 }`}
               >
-                <ShieldAlert className="h-5 w-5 shrink-0" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <ShieldAlert className="h-5 w-5 shrink-0" />
+                </span>
                 {!collapsed && <span className="flex-1">Direito de Recusa</span>}
                 {!collapsed && pendingRefusalCount !== null && pendingRefusalCount > 0 && (
                   <span className={`${badgeBase} bg-yellow-400 text-slate-900`}>
@@ -505,7 +518,7 @@ useEffect(() => {
                   {canAccessRefusalPanel && refusalFeatures.painel && (
                     <Link
                       href="/dashboard/direito-de-recusa"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/direito-de-recusa'
                             ? 'bg-orange-500/90 text-white'
@@ -518,7 +531,7 @@ useEffect(() => {
                    {refusalFeatures.minhas && (
                     <Link
                       href="/dashboard/direito-de-recusa/minhas"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/direito-de-recusa/minhas')
                             ? 'bg-orange-500/90 text-white'
@@ -531,7 +544,7 @@ useEffect(() => {
                   {refusalFeatures.nova && (
                     <Link
                       href="/dashboard/direito-de-recusa/nova"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/direito-de-recusa/nova')
                             ? 'bg-orange-500/90 text-white'
@@ -544,7 +557,7 @@ useEffect(() => {
                   {canReviewRefusal && refusalFeatures.pendentes && (
                     <Link
                       href="/dashboard/direito-de-recusa/pendentes"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/direito-de-recusa/pendentes'
                             ? 'bg-orange-500/90 text-white'
@@ -574,7 +587,9 @@ useEffect(() => {
                   inSolic ? activeSection : inactiveSection
                 }`}
               >
-                <ClipboardList className="h-5 w-5 shrink-0" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <ClipboardList className="h-5 w-5 shrink-0" />
+                </span>
                 {!collapsed && <span className="flex-1">Solicitações</span>}
                 {!collapsed && receivedSolicitationsCount !== null && receivedSolicitationsCount > 0 && (
                   <span className={`${badgeBase} bg-sky-500 text-white`}>
@@ -589,7 +604,7 @@ useEffect(() => {
                   {solicitacaoFeatures.enviadas && (
                     <Link
                       href="/dashboard/solicitacoes/enviadas"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/solicitacoes/enviadas'
                             ? 'bg-orange-500/90 text-white'
@@ -603,7 +618,7 @@ useEffect(() => {
                    {solicitacaoFeatures.recebidas && (
                     <Link
                       href="/dashboard/solicitacoes/recebidas"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/solicitacoes/recebidas'
                             ? 'bg-orange-500/90 text-white'
@@ -624,7 +639,7 @@ useEffect(() => {
                     {canApprove && solicitacaoFeatures.aprovacao && (
                     <Link
                       href="/dashboard/solicitacoes/aprovacao"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/solicitacoes/aprovacao'
                             ? 'bg-orange-500/90 text-white'
@@ -638,7 +653,7 @@ useEffect(() => {
                   {solicitacaoFeatures.cadastros && (
                     <Link
                       href="/dashboard/solicitacoes/cadastros"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith(
                             '/dashboard/solicitacoes/cadastros',
@@ -665,8 +680,10 @@ useEffect(() => {
                   inConfig ? activeSection : inactiveSection
                 }`}
               >
-                <Settings className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>Configurações</span>}
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <Settings className="h-5 w-5 shrink-0" />
+                </span>
+                {!collapsed && <span className="flex-1">Configurações</span>}
               </button>
 
               {/* Submenu */}
@@ -675,7 +692,7 @@ useEffect(() => {
                    {configFeatures.painel && (
                     <Link
                       href="/dashboard/configuracoes"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname === '/dashboard/configuracoes'
                             ? 'bg-orange-500/90 text-white'
@@ -689,7 +706,7 @@ useEffect(() => {
                   {configFeatures.usuarios && (
                     <Link
                       href="/dashboard/configuracoes/usuarios"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/configuracoes/usuarios')
                             ? 'bg-orange-500/90 text-white'
@@ -703,7 +720,7 @@ useEffect(() => {
                   {configFeatures.permissoes && (
                     <Link
                       href="/dashboard/configuracoes/permissoes"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith(
                             '/dashboard/configuracoes/permissoes',
@@ -719,7 +736,7 @@ useEffect(() => {
                   {configFeatures.centros && (
                     <Link
                       href="/dashboard/configuracoes/centros-de-custo"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith(
                             '/dashboard/configuracoes/centros-de-custo',
@@ -735,7 +752,7 @@ useEffect(() => {
                   {configFeatures.cargos && (
                     <Link
                       href="/dashboard/configuracoes/cargos"
-                      className={`group flex items-center gap-3 rounded-md text-sm font-medium px-4 py-3
+                      className={`${submenuItemBase}
                         ${
                           pathname.startsWith(
                             '/dashboard/configuracoes/cargos',
@@ -758,3 +775,4 @@ useEffect(() => {
     </aside>
   )
 }
+
