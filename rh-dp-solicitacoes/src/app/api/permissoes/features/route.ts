@@ -46,15 +46,57 @@ export async function GET(req: NextRequest) {
         if (!module) {
           return NextResponse.json({ error: 'Módulo não encontrado.' }, { status: 404 })
         }
+        const normalizedModuleKey = normalizeModuleKey(module.key || module.name)
+        const allModules = await prisma.module.findMany({
+          select: { id: true, key: true, name: true },
+        })
+
+        const matchingModules = allModules.filter(
+          (candidate) =>
+            normalizeModuleKey(candidate.key) === normalizedModuleKey ||
+            normalizeModuleKey(candidate.name) === normalizedModuleKey,
+        )
+
+        const moduleIds = matchingModules.length > 0 ? matchingModules.map((item) => item.id) : [module.id]
+        let featureModuleId = module.id
+
+        if (moduleIds.length > 1) {
+          const featureCounts = await prisma.moduleFeature.groupBy({
+            by: ['moduleId'],
+            where: { moduleId: { in: moduleIds } },
+            _count: { _all: true },
+          })
+
+          const countMap = new Map(featureCounts.map((item) => [item.moduleId, item._count._all]))
+
+          const preferred = matchingModules.find((candidate) => candidate.id === module.id) ?? matchingModules[0]
+
+          const best = matchingModules.reduce((winner, candidate) => {
+            const winnerCount = countMap.get(winner.id) ?? 0
+            const candidateCount = countMap.get(candidate.id) ?? 0
+
+            if (candidateCount > winnerCount) return candidate
+            if (
+              candidateCount === winnerCount &&
+              candidate.key.toLowerCase() === preferred.key.toLowerCase()
+            ) {
+              return candidate
+            }
+            return winner
+          }, preferred)
+
+          featureModuleId = best.id
+        }
+
 
         const [features, levelGrants] = await Promise.all([
           prisma.moduleFeature.findMany({
-            where: { moduleId: module.id },
+            where: { moduleId: featureModuleId },
             select: { id: true, key: true, name: true },
             orderBy: { name: 'asc' },
           }),
           prisma.featureLevelGrant.findMany({
-            where: { feature: { moduleId: module.id } },
+            where: { feature: { moduleId: featureModuleId } },
             select: { id: true, featureId: true, level: true, actions: true },
           }),
         ])
