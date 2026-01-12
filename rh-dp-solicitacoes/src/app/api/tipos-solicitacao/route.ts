@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -28,44 +29,36 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
 
-    const centroCustoId = searchParams.get('centroCustoId') || undefined
-    const departamentoId = searchParams.get('departamentoId') || undefined
+    const centroCustoId = searchParams.get('centroCustoId')
+    const departamentoId = searchParams.get('departamentoId')
 
-    // 1) Carrega todos os tipos do banco
-    const tipos = await prisma.tipoSolicitacao.findMany()
+    // 1) Carrega os tipos filtrando direto no banco (JSONB)
+    const tipos = await prisma.$queryRaw<
+      {
+        id: string
+        nome: string
+        descricao: string | null
+        schemaJson: SchemaJson | null
+      }[]
+    >(Prisma.sql`
+      SELECT *
+      FROM "TipoSolicitacao"
+      WHERE (
+        ${centroCustoId}::text IS NULL
+        OR ("schemaJson"->'meta'->'centros') IS NULL
+        OR ("schemaJson"->'meta'->'centros') ? ${centroCustoId}
+      )
+      AND (
+        ${departamentoId}::text IS NULL
+        OR ("schemaJson"->'meta'->'departamentos') IS NULL
+        OR ("schemaJson"->'meta'->'departamentos') ? ${departamentoId}
+      )
+    `)
 
-    // 2) Filtra usando meta.centros e meta.departamentos
-    const filtrados = tipos.filter((tipo) => {
-      const schema = tipo.schemaJson as SchemaJson | null
-      const meta = schema?.meta
+    // 2) Resposta limpa para o frontend
+    const resposta = tipos.map((tipo) => {
+      const schema = tipo.schemaJson
 
-      const allowedCentros = meta?.centros
-      const allowedDepartamentos = meta?.departamentos
-
-      // filtra por centro de custo
-      if (
-        centroCustoId &&
-        allowedCentros &&
-        !allowedCentros.includes(centroCustoId)
-      ) {
-        return false
-      }
-
-      // filtra por departamento
-      if (
-        departamentoId &&
-        allowedDepartamentos &&
-        !allowedDepartamentos.includes(departamentoId)
-      ) {
-        return false
-      }
-
-      return true
-    })
-
-    // 3) Resposta limpa para o frontend
-    const resposta = filtrados.map((tipo) => {
-      const schema = tipo.schemaJson as SchemaJson | null
       const campos = schema?.camposEspecificos ?? schema?.campos ?? []
 
       return {

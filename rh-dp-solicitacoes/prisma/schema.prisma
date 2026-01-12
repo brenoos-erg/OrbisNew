@@ -209,6 +209,12 @@ model Solicitation {
   solicitante      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
   tipo             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
   timelines        SolicitationTimeline[]
+
+  @@index([solicitanteId, dataAbertura])
+  @@index([costCenterId, dataAbertura])
+  @@index([departmentId, dataAbertura])
+  @@index([requiresApproval, approvalStatus, dataAbertura])
+  @@index([status, dataAbertura])
 }
 
 model User {

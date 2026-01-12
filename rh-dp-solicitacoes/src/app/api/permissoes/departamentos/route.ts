@@ -18,6 +18,10 @@ const CORE_MODULES = [
   { key: 'controle-equipamentos-ti', name: 'Controle de Equipamentos TI' },
 ]
 
+const CORE_MODULES_TTL_MS = 5 * 60 * 1000
+let coreModulesSyncPromise: Promise<void> | null = null
+let coreModulesExpiresAt = 0
+
 async function ensureCoreModules() {
   for (const module of CORE_MODULES) {
     // Primeiro tenta o match exato da key para evitar colisões de unique ao normalizar
@@ -69,6 +73,23 @@ async function ensureCoreModules() {
   }
 }
 
+function ensureCoreModulesCached() {
+  const now = Date.now()
+
+  if (now < coreModulesExpiresAt) {
+    return coreModulesSyncPromise ?? Promise.resolve()
+  }
+
+  if (!coreModulesSyncPromise) {
+    coreModulesSyncPromise = ensureCoreModules().finally(() => {
+      coreModulesExpiresAt = Date.now() + CORE_MODULES_TTL_MS
+      coreModulesSyncPromise = null
+    })
+  }
+
+  return coreModulesSyncPromise
+}
+
 
 
 /**
@@ -81,13 +102,13 @@ async function ensureCoreModules() {
  * }
  */
 export async function GET(_req: NextRequest) {
- return withRequestMetrics('GET /api/permissoes/departamentos', async () => {
+  return withRequestMetrics('GET /api/permissoes/departamentos', async () => {
     try {
       const me = await requireActiveUser()
       // 🔐 Só NIVEL_3 no módulo "configuracoes" pode mexer nisso
       await assertUserMinLevel(me.id, MODULE_KEYS.CONFIGURACOES, ModuleLevel.NIVEL_3)
       await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
-      await ensureCoreModules()
+      await ensureCoreModulesCached()
 
       const [departments, modules, links] = await Promise.all([
         prisma.department.findMany({
@@ -114,7 +135,7 @@ export async function GET(_req: NextRequest) {
     } catch (e: any) {
       console.error('GET /api/permissoes/departamentos error', e)
 
-     if (e instanceof Error && e.message.includes('permissão')) {
+      if (e instanceof Error && e.message.includes('permissão')) {
         return NextResponse.json({ error: e.message }, { status: 403 })
       }
 
@@ -125,7 +146,6 @@ export async function GET(_req: NextRequest) {
     }
   })
 }
-
 /**
  * POST /api/permissoes/departamentos
  * body: { departmentId: string, moduleId: string, enabled: boolean }
