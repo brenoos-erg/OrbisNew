@@ -13,8 +13,9 @@ import {
   Maximize2,
   Minimize2,
   Filter,
+  Upload,
 } from 'lucide-react'
-import { isValidPlate } from '@/lib/plate'
+import { isValidPlate, normalizePlate } from '@/lib/plate'
 
 type CostCenterOption = {
   id: string
@@ -83,6 +84,12 @@ type VehicleStatusLog = {
 }
 
 type FleetLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
+type BulkResult = {
+  line: number
+  plate: string
+  status: 'success' | 'error'
+  message: string
+}
 
 const statusOptions = [
   { value: 'DISPONIVEL', label: 'Disponível' },
@@ -193,6 +200,11 @@ export default function VehiclesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [editingVehicle, setEditingVehicle] = useState<ApiVehicle | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkInput, setBulkInput] = useState('')
+  const [bulkError, setBulkError] = useState<string | null>(null)
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([])
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
 
   const [selectedVehicle, setSelectedVehicle] = useState<ApiVehicle | null>(null)
   const [checkinVehicleIds, setCheckinVehicleIds] = useState<string[]>([])
@@ -681,6 +693,151 @@ export default function VehiclesPage() {
     setFormError(null)
     setFormOpen(true)
   }
+  function openBulkForm() {
+    if (!canManageVehicles) return
+    setBulkInput('')
+    setBulkError(null)
+    setBulkResults([])
+    setBulkOpen(true)
+  }
+
+  function resolveCostCenterId(value: string) {
+    const normalized = value.trim().toLowerCase()
+    if (!normalized) return null
+
+    const match = costCenters.find((cc) => {
+      const candidates = [cc.code, cc.externalCode, cc.description].filter(Boolean) as string[]
+      return candidates.some((candidate) => candidate.trim().toLowerCase() === normalized)
+    })
+
+    return match || null
+  }
+
+  async function handleBulkSubmit() {
+    if (!canManageVehicles) {
+      setBulkError('Seu acesso permite apenas consulta aos veículos.')
+      return
+    }
+
+    const rawLines = bulkInput.split(/\r?\n/)
+    const normalizedLines = rawLines
+      .map((line, index) => ({ line, number: index + 1 }))
+      .filter((entry) => entry.line.trim().length > 0)
+
+    if (normalizedLines.length === 0) {
+      setBulkError('Informe pelo menos uma linha no formato centrodecusto;placa;modelo;km.')
+      return
+    }
+
+    const firstLine = normalizedLines[0]?.line.toLowerCase()
+    const hasHeader = firstLine?.includes('centrodecusto') && firstLine?.includes('placa')
+
+    const dataLines = hasHeader ? normalizedLines.slice(1) : normalizedLines
+
+    if (dataLines.length === 0) {
+      setBulkError('Adicione linhas com veículos antes de continuar.')
+      return
+    }
+
+    setBulkSubmitting(true)
+    setBulkError(null)
+    setBulkResults([])
+
+    const results: BulkResult[] = []
+
+    for (const item of dataLines) {
+      const parts = item.line.split(';').map((part) => part.trim())
+
+      if (parts.length < 4) {
+        results.push({
+          line: item.number,
+          plate: '',
+          status: 'error',
+          message: 'Linha incompleta. Use centrodecusto;placa;modelo;km.',
+        })
+        continue
+      }
+
+      const [costCenterRaw, plateRaw, modelRaw, kmRaw] = parts
+      const normalizedPlate = normalizePlate(plateRaw)
+
+      if (!isValidPlate(normalizedPlate)) {
+        results.push({
+          line: item.number,
+          plate: plateRaw,
+          status: 'error',
+          message: 'Placa inválida. Use o padrão ABC1A34 ou ABC1234.',
+        })
+        continue
+      }
+
+      const digits = kmRaw.replace(/\D/g, '')
+      if (!digits) {
+        results.push({
+          line: item.number,
+          plate: normalizedPlate,
+          status: 'error',
+          message: 'KM inválido. Informe apenas números.',
+        })
+        continue
+      }
+
+      const costCenterMatch = resolveCostCenterId(costCenterRaw)
+      if (!costCenterMatch) {
+        results.push({
+          line: item.number,
+          plate: normalizedPlate,
+          status: 'error',
+          message: `Centro de custo não encontrado: ${costCenterRaw}.`,
+        })
+        continue
+      }
+
+      try {
+        const res = await fetch('/api/fleet/vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plate: normalizedPlate,
+            type: 'Não informado',
+            model: modelRaw || undefined,
+            kmCurrent: Number(digits),
+            costCenter: costCenterMatch.description || costCenterMatch.code || costCenterMatch.externalCode || undefined,
+            costCenterIds: [costCenterMatch.id],
+          }),
+        })
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Falha ao criar veículo.')
+        }
+
+        results.push({
+          line: item.number,
+          plate: normalizedPlate,
+          status: 'success',
+          message: 'Veículo cadastrado com sucesso.',
+        })
+      } catch (err: any) {
+        console.error(err)
+        results.push({
+          line: item.number,
+          plate: normalizedPlate,
+          status: 'error',
+          message: err.message || 'Erro ao criar veículo.',
+        })
+      }
+    }
+
+    setBulkResults(results)
+
+    if (results.some((result) => result.status === 'success')) {
+      await loadVehicles()
+    }
+
+    setBulkSubmitting(false)
+  }
+
 
   function openEditForm(vehicle: ApiVehicle) {
     if (!canManageVehicles) return
@@ -821,6 +978,14 @@ export default function VehiclesPage() {
                 className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
               >
                 <Plus size={16} /> Registrar veículo
+              </button>
+            )}
+            {canManageVehicles && (
+              <button
+                onClick={openBulkForm}
+                className="inline-flex items-center gap-2 rounded-md border border-blue-200 px-4 py-2 text-blue-700 hover:bg-blue-50"
+              >
+                <Upload size={16} /> Cadastro em massa
               </button>
             )}
 
@@ -1846,6 +2011,85 @@ export default function VehiclesPage() {
               >
                 {submitting && <Loader2 size={16} className="animate-spin" />}
                 {editingVehicle ? 'Salvar alterações' : 'Cadastrar veículo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {bulkOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-500">Cadastro em massa</p>
+                <h2 className="text-2xl font-bold text-slate-900">Importar veículos</h2>
+              </div>
+              <button onClick={() => setBulkOpen(false)} className="text-sm text-slate-500 hover:text-slate-800">
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm text-slate-700">
+              <p>
+                Cole as linhas no formato <span className="font-semibold">centrodecusto;placa;modelo;km</span>. A primeira
+                linha pode ser o cabeçalho.
+              </p>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600">
+                centrodecusto;placa;modelo;km{'\n'}CC01;ABC1A34;Toro;12345
+              </div>
+            </div>
+
+            <textarea
+              value={bulkInput}
+              onChange={(e) => setBulkInput(e.target.value)}
+              className="mt-4 min-h-[200px] w-full rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="centrodecusto;placa;modelo;km"
+            />
+
+            {bulkError && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {bulkError}
+              </div>
+            )}
+
+            {bulkResults.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-semibold text-slate-700">Resultado do processamento</p>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-slate-200 bg-white p-3 text-sm">
+                  {bulkResults.map((result) => (
+                    <div
+                      key={`${result.line}-${result.plate}-${result.status}`}
+                      className={`rounded-md border px-3 py-2 ${
+                        result.status === 'success'
+                          ? 'border-green-200 bg-green-50 text-green-800'
+                          : 'border-red-200 bg-red-50 text-red-800'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold uppercase">Linha {result.line}</p>
+                      <p className="text-sm">{result.plate || '—'}</p>
+                      <p className="text-xs">{result.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setBulkOpen(false)}
+                className="rounded-md border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                disabled={bulkSubmitting}
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={handleBulkSubmit}
+                disabled={bulkSubmitting}
+                className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+              >
+                {bulkSubmitting && <Loader2 size={16} className="animate-spin" />}
+                Processar cadastro
               </button>
             </div>
           </div>
