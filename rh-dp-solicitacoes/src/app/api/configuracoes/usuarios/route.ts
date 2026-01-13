@@ -1,5 +1,6 @@
 // src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { performance } from 'node:perf_hooks'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 
@@ -8,6 +9,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertCanFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { Action } from '@prisma/client'
+import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,11 +38,15 @@ async function findAuthUserIdByEmail(
   let page = 1
   const perPage = 1000
 
+  // Proteção: no máximo 20 páginas (20k usuários). Se seu Auth tiver mais que isso,
+  // o ideal é mudar a estratégia (ex: guardar authId sempre no app DB e usar updateUserById).
   for (let i = 0; i < 20; i++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
     if (error) throw new Error(error.message)
 
-    const found = (data?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === target)
+    const found = (data?.users ?? []).find(
+      (u) => (u.email ?? '').toLowerCase() === target,
+    )
     if (found?.id) return found.id
 
     if (!data?.users || data.users.length < perPage) break
@@ -50,66 +56,117 @@ async function findAuthUserIdByEmail(
   return null
 }
 
-// === GET: listar usuários ===
-export async function GET() {
-  try {
-    const me = await requireActiveUser()
-    await assertCanFeature(
-      me.id,
-      MODULE_KEYS.CONFIGURACOES,
-      FEATURE_KEYS.CONFIGURACOES.USUARIOS,
-      Action.VIEW,
-    )
+export async function GET(req: NextRequest) {
+  return withRequestMetrics('GET /api/configuracoes/usuarios', async () => {
+    try {
+      const me = await requireActiveUser()
+      await assertCanFeature(
+        me.id,
+        MODULE_KEYS.CONFIGURACOES,
+        FEATURE_KEYS.CONFIGURACOES.USUARIOS,
+        Action.VIEW,
+      )
 
-    const rows = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        login: true,
-        phone: true,
-        costCenterId: true,
-        costCenter: {
+      const { searchParams } = new URL(req.url)
+
+      const pageParam = Number.parseInt(searchParams.get('page') ?? '1', 10)
+      const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+
+      const psParam = Number.parseInt(searchParams.get('pageSize') ?? '20', 10)
+      const requestedPageSize = Number.isFinite(psParam) ? psParam : 20
+      const pageSize = Math.min(200, Math.max(1, requestedPageSize))
+
+      const skip = (page - 1) * pageSize
+      const search = (searchParams.get('search') ?? '').trim()
+
+      const where = search
+        ? {
+            OR: [
+              { fullName: { contains: search, mode: 'insensitive' as const } },
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { login: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : undefined
+
+      const listStartedAt = performance.now()
+
+      const [rows, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: pageSize,
           select: {
-            description: true,
-            code: true,
-            externalCode: true,
+            id: true,
+            fullName: true,
+            email: true,
+            login: true,
+            phone: true,
+            costCenterId: true,
+            costCenter: {
+              select: {
+                description: true,
+                code: true,
+                externalCode: true,
+              },
+            },
+          },
+        }),
+        prisma.user.count({ where }),
+      ])
+
+      logTiming('prisma.user.list (/api/configuracoes/usuarios)', listStartedAt)
+
+      const items = rows.map((r) => {
+        const cc = r.costCenter
+        const ccCode = cc?.externalCode || cc?.code || ''
+        const costCenterName = cc
+          ? ccCode
+            ? `${ccCode} - ${cc.description}`
+            : cc.description
+          : null
+
+        return {
+          id: r.id,
+          fullName: r.fullName,
+          email: r.email,
+          login: r.login ?? '',
+          phone: r.phone ?? '',
+          costCenterId: r.costCenterId ?? null,
+          costCenterName,
+        }
+      })
+
+      const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+      return NextResponse.json(
+        {
+          items,
+          page,
+          pageSize,
+          total,
+          totalPages,
+        },
+        {
+          headers: {
+            // Private pq é endpoint autenticado
+            'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
           },
         },
-      },
-    })
-
-    const list = rows.map((r) => {
-      const cc = r.costCenter
-      const ccCode = cc?.externalCode || cc?.code || ''
-      const costCenterName = cc
-        ? ccCode
-          ? `${ccCode} - ${cc.description}`
-          : cc.description
-        : null
-
-      return {
-        id: r.id,
-        fullName: r.fullName,
-        email: r.email,
-        login: r.login ?? '',
-        phone: r.phone ?? '',
-        costCenterId: r.costCenterId ?? null,
-        costCenterName,
+      )
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('Acesso negado')) {
+        return NextResponse.json({ error: e.message }, { status: 403 })
       }
-    })
 
-    return NextResponse.json(list)
-  } catch (e) {
-    if (e instanceof Error && e.message.includes('Acesso negado')) {
-      return NextResponse.json({ error: e.message }, { status: 403 })
+      console.error('GET /api/configuracoes/usuarios error', e)
+      return NextResponse.json(
+        { error: 'Erro ao carregar usuários.' },
+        { status: 500 },
+      )
     }
-
-    console.error('GET /api/configuracoes/usuarios error', e)
-    return NextResponse.json({ error: 'Erro ao carregar usuários.' }, { status: 500 })
-  }
+  })
 }
 
 // === POST: criar usuário (Auth primeiro + Prisma upsert) ===
@@ -142,10 +199,12 @@ export async function POST(req: NextRequest) {
 
     const admin = getSupabaseAdmin()
 
-    // Se não tem admin, não dá pra criar/atualizar Auth -> retorna erro claro
     if (!admin) {
       return NextResponse.json(
-        { error: 'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível criar usuário no Auth.' },
+        {
+          error:
+            'SUPABASE_SERVICE_ROLE_KEY ausente. Não é possível criar usuário no Auth.',
+        },
         { status: 500 },
       )
     }
@@ -165,12 +224,13 @@ export async function POST(req: NextRequest) {
     const effectivePassword =
       rawPassword || `${login || fullName.split(' ')[0] || 'User'}@123`
 
-    const { data: authData, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password: effectivePassword,
-      email_confirm: true,
-      user_metadata: userMetadata,
-    })
+    const { data: authData, error: createErr } =
+      await admin.auth.admin.createUser({
+        email,
+        password: effectivePassword,
+        email_confirm: true,
+        user_metadata: userMetadata,
+      })
 
     if (createErr) {
       const message = createErr.message?.toLowerCase() ?? ''
@@ -265,23 +325,27 @@ export async function POST(req: NextRequest) {
     // 4) Garantir acesso padrão de nível 1 aos módulos básicos (inclui Direito de Recusa)
     await ensureDefaultModuleAccess(appUser.id)
 
-    const responsePayload = {
-      ...appUser,
-      status: authStatus,
-      message:
-        authStatus === 'synced'
-          ? 'Usuário já existia no Auth; dados sincronizados.'
-          : 'Usuário criado no Auth e sincronizado.',
-    }
-
-    return NextResponse.json(responsePayload, { status: 201 })
+    return NextResponse.json(
+      {
+        ...appUser,
+        status: authStatus,
+        message:
+          authStatus === 'synced'
+            ? 'Usuário já existia no Auth; dados sincronizados.'
+            : 'Usuário criado no Auth e sincronizado.',
+      },
+      { status: 201 },
+    )
   } catch (e: any) {
     if (e instanceof Error && e.message.includes('Acesso negado')) {
       return NextResponse.json({ error: e.message }, { status: 403 })
     }
 
     if (e?.code === 'P2002') {
-      return NextResponse.json({ error: 'E-mail ou login já cadastrado.' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'E-mail ou login já cadastrado.' },
+        { status: 409 },
+      )
     }
 
     console.error('POST /api/configuracoes/usuarios error', e)

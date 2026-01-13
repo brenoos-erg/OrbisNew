@@ -15,6 +15,14 @@ type UserRow = {
   costCenterName?: string | null
 }
 
+type UsersResponse = {
+  items: UserRow[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
 type CostCenter = {
   id: string
   description: string
@@ -210,49 +218,26 @@ export default function Page() {
   // filtro de usuários
   const [search, setSearch] = useState('')
   const [userPage, setUserPage] = useState(1)
-  const usersPerPage = 5
+  const [usersPerPage, setUsersPerPage] = useState(20)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [totalUserPages, setTotalUserPages] = useState(1)
 
   // seleção em massa
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkPassword, setBulkPassword] = useState('')
 
-  const filteredRows = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return rows
-
-    return rows.filter((u) => {
-      const costCenter = (u.costCenterName || '').toLowerCase()
-      return (
-        u.fullName.toLowerCase().includes(term) ||
-        u.login.toLowerCase().includes(term) ||
-        u.email.toLowerCase().includes(term) ||
-        costCenter.includes(term)
-      )
-    })
-  }, [rows, search])
-
-  const totalUserPages = Math.max(1, Math.ceil(filteredRows.length / usersPerPage))
   const safeUserPage = Math.min(userPage, totalUserPages)
-  const paginatedRows = useMemo(
-    () =>
-      filteredRows.slice(
-        (safeUserPage - 1) * usersPerPage,
-        safeUserPage * usersPerPage,
-      ),
-    [filteredRows, safeUserPage, usersPerPage],
-  )
   const userPageStart =
-    filteredRows.length === 0 ? 0 : (safeUserPage - 1) * usersPerPage + 1
-  const userPageEnd = Math.min(filteredRows.length, safeUserPage * usersPerPage)
+    totalUsers === 0 ? 0 : (safeUserPage - 1) * usersPerPage + 1
+  const userPageEnd =
+    totalUsers === 0
+      ? 0
+      : Math.min(totalUsers, userPageStart + rows.length - 1)
 
   const selectedCount = selectedIds.length
-  const pageIds = paginatedRows.filter((u) => u.id).map((u) => u.id) as string[]
+  const pageIds = rows.filter((u) => u.id).map((u) => u.id) as string[]
   const pageFullySelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id))
-
-  useEffect(() => {
-    setUserPage(1)
-  }, [search])
 
   useEffect(() => {
     // se a lista mudou, limpa seleções inexistentes
@@ -265,34 +250,60 @@ export default function Page() {
     }
   }, [userPage, totalUserPages])
 
-  async function load() {
+  async function loadUsers() {
     setLoading(true)
     try {
       // usuários (Auth + Prisma)
-      const r = await fetch('/api/configuracoes/usuarios', { cache: 'no-store' })
+      const qs = new URLSearchParams({
+        page: String(userPage),
+        pageSize: String(usersPerPage),
+      })
+      if (search.trim()) {
+        qs.set('search', search.trim())
+      }
+      const r = await fetch(`/api/configuracoes/usuarios?${qs.toString()}`)
       if (!r.ok) {
         const err: any = await r.json().catch(() => ({}))
         throw new Error(err?.error || `GET falhou: ${r.status}`)
       }
-      const list: UserRow[] = await r.json()
-      setRows(list)
-
-      // centros de custo (para selects / combos)
-      const cr = await fetch('/api/cost-centers/select')
-      if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
-      const arr: CostCenter[] = await cr.json()
-      setCostCenters(arr)
+       const payload = (await r.json()) as UsersResponse
+      setRows(payload.items)
+      setTotalUsers(payload.total)
+      setTotalUserPages(payload.totalPages)
+      setUserPage(payload.page)
+      setUsersPerPage(payload.pageSize)
     } catch (e) {
-      console.error('load() error', e)
+      console.error('loadUsers() error', e)
       setRows([])
-      setCostCenters([])
+      setTotalUsers(0)
+      setTotalUserPages(1)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    load()
+    loadUsers()
+  }, [userPage, usersPerPage, search])
+
+  useEffect(() => {
+    let active = true
+    const loadCostCenters = async () => {
+      try {
+        const cr = await fetch('/api/cost-centers/select')
+        if (!cr.ok) throw new Error(`GET /api/cost-centers/select -> ${cr.status}`)
+        const arr: CostCenter[] = await cr.json()
+        if (active) setCostCenters(arr)
+      } catch (e) {
+        console.error('loadCostCenters() error', e)
+        if (active) setCostCenters([])
+      }
+    }
+
+    loadCostCenters()
+    return () => {
+      active = false
+    }
   }, [])
 
   async function onSubmit(e: React.FormEvent) {
@@ -327,7 +338,7 @@ export default function Page() {
       setLogin('')
       setPassword('')
       setFirstAccess(false)
-      await load()
+      await loadUsers()
       alert('Usuário criado com sucesso!')
     } catch (e: any) {
       console.error('onSubmit error', e)
@@ -336,6 +347,7 @@ export default function Page() {
       setSubmitting(false)
     }
   }
+
 
   // ------- edição -------
   const [editing, setEditing] = useState<UserRow | null>(null)
@@ -380,7 +392,7 @@ export default function Page() {
       return
     }
     closeEdit()
-    await load()
+    await loadUsers()
   }
 
   function toggleSelection(id?: string) {
@@ -414,8 +426,8 @@ export default function Page() {
           throw new Error(err?.error || 'Falha ao excluir um dos usuários.')
         }
       }
-      setSelectedIds([])
-      await load()
+       setSelectedIds([])
+      await loadUsers()
     } catch (e: any) {
       alert(e?.message || 'Erro ao excluir selecionados.')
     } finally {
@@ -446,7 +458,7 @@ export default function Page() {
       }
       setBulkPassword('')
       setSelectedIds([])
-      await load()
+      await loadUsers()
     } catch (e: any) {
       alert(e?.message || 'Erro ao atualizar senhas.')
     } finally {
@@ -551,7 +563,7 @@ export default function Page() {
 
     if (results.length > 0 && results.every((r) => r.status !== 'failed')) {
       setBulkText('')
-      await load()
+      await loadUsers()
     }
   }
 
@@ -570,7 +582,7 @@ export default function Page() {
       alert(err?.error || 'Falha ao excluir.')
       return
     }
-    await load()
+    await loadUsers()
   }
 
   return (
@@ -722,11 +734,11 @@ export default function Page() {
               className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
-              {submitting ? 'Registrando…' : 'Registrar Usuário'}
+               {submitting ? 'Registrando…' : 'Registrar Usuário'}
             </button>
             <button
               type="button"
-              onClick={load}
+              onClick={loadUsers}
               disabled={loading}
               className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm hover:bg-slate-50 disabled:opacity-60"
             >
@@ -757,7 +769,10 @@ export default function Page() {
                   className="w-full sm:w-64 rounded-full border border-slate-300 bg-white/90 px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   placeholder="Buscar por nome, login, e-mail..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setUserPage(1)
+                  }}
                 />
               </div>
             </div>
@@ -836,14 +851,14 @@ export default function Page() {
             Carregando…
           </td>
         </tr>
-      ) : filteredRows.length === 0 ? (
+       ) : rows.length === 0 ? (
         <tr>
           <td className="px-4 py-6 text-center text-slate-500" colSpan={5}>
             Nenhum usuário encontrado.
           </td>
         </tr>
       ) : (
-        paginatedRows.map((u) => {
+        rows.map((u) => {
           const isSelected = !!u.id && selectedIds.includes(u.id)
           return (
           <tr
@@ -943,10 +958,10 @@ export default function Page() {
   </table>
 </div>
 
-{filteredRows.length > 0 && (
+{totalUsers > 0 && (
   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
     <p className="font-medium">
-      Exibindo {userPageStart}-{userPageEnd} de {filteredRows.length} usuário(s)
+      Exibindo {userPageStart}-{userPageEnd} de {totalUsers} usuário(s)
     </p>
 
     <div className="flex items-center gap-2">

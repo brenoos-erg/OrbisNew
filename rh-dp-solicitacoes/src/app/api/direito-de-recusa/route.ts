@@ -4,6 +4,8 @@ import { ModuleLevel, RefusalStatus, UserStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { prisma } from '@/lib/prisma'
+import { performance } from 'node:perf_hooks'
+import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +23,11 @@ function normalizeLevel(levels: Record<string, ModuleLevel | undefined>) {
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    const me = await requireActiveUser()
-    const { levels } = await getUserModuleContext(me.id)
-    const level = normalizeLevel(levels)
+  return withRequestMetrics('GET /api/direito-de-recusa', async () => {
+    try {
+      const me = await requireActiveUser()
+      const { levels } = await getUserModuleContext(me.id)
+      const level = normalizeLevel(levels)
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
       return NextResponse.json({ error: 'Usuário não possui acesso a este módulo.' }, { status: 403 })
@@ -46,7 +49,8 @@ export async function GET(req: NextRequest) {
       where.status = statusParam as RefusalStatus
     }
 
-    const reports = await prisma.refusalReport.findMany({
+    const listStartedAt = performance.now()
+      const reports = await prisma.refusalReport.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -66,16 +70,18 @@ export async function GET(req: NextRequest) {
         decidedAt: true,
         decisionLevel: true,
       },
-    })
+     })
+      logTiming('prisma.refusalReport.list (/api/direito-de-recusa)', listStartedAt)
 
-    return NextResponse.json({ reports, canReview })
-  } catch (e) {
-    console.error('GET /api/direito-de-recusa error', e)
-    return NextResponse.json(
-      { error: 'Erro ao carregar os registros de Direito de Recusa.' },
-      { status: 500 },
-    )
-  }
+      return NextResponse.json({ reports, canReview })
+    } catch (e) {
+      console.error('GET /api/direito-de-recusa error', e)
+      return NextResponse.json(
+        { error: 'Erro ao carregar os registros de Direito de Recusa.' },
+        { status: 500 },
+      )
+    }
+  })
 }
 
 export async function POST(req: NextRequest) {

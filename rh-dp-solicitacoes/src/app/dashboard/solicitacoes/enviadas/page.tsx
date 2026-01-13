@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Download, Filter, RefreshCcw, Search, Plus, Info, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import {
   Row,
   SolicitationDetail,
@@ -32,6 +33,7 @@ function escapeCsv(v: string) {
  * ======================================= */
 
 export default function SentRequestsPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
@@ -238,7 +240,7 @@ export default function SentRequestsPage() {
           </button>
 
           <button
-            onClick={() => window.location.assign('/dashboard/solicitacoes/enviadas/nova')}
+            onClick={() => router.push('/dashboard/solicitacoes/enviadas/nova')}
             className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-2 text-sm text-white hover:bg-orange-500"
             title="Nova Solicitação"
           >

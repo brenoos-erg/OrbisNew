@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type TipoCampo = {
     name: string
@@ -39,6 +40,7 @@ type Position = {
 }
 
 export default function NovaSolicitacaoPage() {
+    const router = useRouter()
     // tipos de solicitação
     const [tipos, setTipos] = useState<TipoSolicitacao[]>([])
 
@@ -50,6 +52,7 @@ export default function NovaSolicitacaoPage() {
         tipoId: '',
         autorId: 'meu-user-id-temp', // depois você troca pelo usuário logado
     })
+
 
     // campos dinâmicos (payload)
     const [extras, setExtras] = useState<Record<string, any>>({})
@@ -152,7 +155,7 @@ export default function NovaSolicitacaoPage() {
             }),
         })
 
-        window.location.href = '/solicitacoes'
+        router.push('/solicitacoes')
     }
 
     const tipoSelecionado = tipos.find((t) => t.id === form.tipoId)

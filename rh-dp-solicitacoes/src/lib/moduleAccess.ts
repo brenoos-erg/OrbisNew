@@ -1,4 +1,3 @@
-
 // src/lib/moduleAccess.ts
 import { prisma } from '@/lib/prisma'
 import { ModuleLevel } from '@prisma/client'
@@ -7,6 +6,13 @@ import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
 export type AccessMap = Record<string, ModuleLevel>
 
 const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
+const MODULE_LEVELS_TTL_MS = 60_000
+
+const moduleContextCache = new Map<
+  string,
+  { expiresAt: number; value: Promise<{ levels: AccessMap; departmentCode: string | null }> }
+>()
+
 
 function pickHigherLevel(current: ModuleLevel | undefined, incoming: ModuleLevel) {
   if (!current) return incoming
@@ -81,12 +87,33 @@ async function loadUserModuleContext(
 
   return { levels, departmentCode }
 }
+function getCachedUserModuleContext(userId: string) {
+  const now = Date.now()
+  const cached = moduleContextCache.get(userId)
+
+  if (cached && cached.expiresAt > now) {
+    return cached.value
+  }
+
+  const pending = loadUserModuleContext(userId).catch((error) => {
+    moduleContextCache.delete(userId)
+    throw error
+  })
+
+  moduleContextCache.set(userId, {
+    expiresAt: now + MODULE_LEVELS_TTL_MS,
+    value: pending,
+  })
+
+  return pending
+}
+
 
 export async function getUserModuleContext(
   userId: string,
 ): Promise<{ levels: AccessMap; departmentCode: string | null }> {
   return ensureRequestContext('moduleAccess/context', () =>
-    memoizeRequest(`moduleAccess/context/${userId}`, () => loadUserModuleContext(userId)),
+    memoizeRequest(`moduleAccess/context/${userId}`, () => getCachedUserModuleContext(userId)),
   )
 }
 

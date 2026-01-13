@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { clearSessionMeCache } from '@/lib/session-cache'
 import { supabaseBrowser } from '@/lib/supabase/client'
 import { ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react'
@@ -24,7 +25,7 @@ function initialsFrom(name: string) {
 
 export default function UserMenu({ collapsed, user }: Props) {
   const [open, setOpen] = useState(false)
-
+  const router = useRouter()
 
   const supabase = supabaseBrowser()
 
@@ -91,7 +92,7 @@ export default function UserMenu({ collapsed, user }: Props) {
           <div className="my-2 h-px bg-white/10" />
 
           <button
-            onClick={() => (window.location.href = '/dashboard/perfil')}
+            onClick={() => router.push('/dashboard/perfil')}
             className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-white/10"
           >
             <SettingsIcon size={16} /> Gerenciar perfil

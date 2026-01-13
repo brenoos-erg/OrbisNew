@@ -11,13 +11,13 @@ const isProd = process.env.NODE_ENV === 'production'
 // Remove espaços/quebras de linha acidentais das variáveis de ambiente
 const cleanEnvUrl = (value?: string | null) => value?.trim() || null
 
-const directDatabaseUrl = cleanEnvUrl(process.env.DIRECT_DATABASE_URL)
+const directDatabaseUrl =
+  cleanEnvUrl(process.env.DIRECT_DATABASE_URL) || cleanEnvUrl(process.env.DIRECT_URL)
 const poolDatabaseUrl =
   cleanEnvUrl(process.env.DATABASE_URL) ||
   cleanEnvUrl(process.env.SUPABASE_PRISMA_URL) ||
   cleanEnvUrl(process.env.SUPABASE_POOLER_URL) ||
   null
-
 
 // ✅ Em produção, EXIGIR pooler
 if (isProd && !poolDatabaseUrl) {

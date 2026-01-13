@@ -4,7 +4,8 @@ import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
-import { withRequestMetrics } from '@/lib/request-metrics'
+import { performance } from 'node:perf_hooks'
+import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,7 +159,8 @@ export const GET = withModuleLevel(
           // where.approverId = me.id
         }
 
-       const [solicitations, total] = await Promise.all([
+       const listStartedAt = performance.now()
+        const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
             skip,
@@ -174,6 +176,7 @@ export const GET = withModuleLevel(
           }),
           prisma.solicitation.count({ where }),
         ])
+        logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
 
         const rows = solicitations.map((s) => ({
           id: s.id,

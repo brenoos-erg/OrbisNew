@@ -2,6 +2,7 @@
 export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { performance } from 'node:perf_hooks'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import type { User } from '@supabase/supabase-js'
 import { Prisma } from '@prisma/client'
@@ -11,7 +12,7 @@ import {
   getCurrentAppUserFromSessionUser,
   type SelectedAppUser,
 } from '@/lib/auth'
-import { withRequestMetrics } from '@/lib/request-metrics'
+import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
 
@@ -33,29 +34,37 @@ async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | nul
   const name = ((sessionUser.user_metadata as any)?.name ?? '') as string
 
   try {
+    const lookupStartedAt = performance.now()
     const existing = await prisma.user.findUnique({
       where: { authId },
       select: appUserSelect,
     })
+    logTiming('prisma.user.findUnique (bootstrap)', lookupStartedAt)
 
     if (existing) return existing
 
     if (email) {
+      const byEmailStartedAt = performance.now()
       const byEmail = await prisma.user.findUnique({
         where: { email },
         select: appUserSelect,
       })
+      logTiming('prisma.user.findUnique(email) (bootstrap)', byEmailStartedAt)
 
       if (byEmail) {
-        return prisma.user.update({
+        const updateStartedAt = performance.now()
+        const updated = await prisma.user.update({
           where: { id: byEmail.id },
           data: { authId },
           select: appUserSelect,
         })
+        logTiming('prisma.user.update.authId (bootstrap)', updateStartedAt)
+        return updated
       }
     }
 
-    return prisma.user.create({
+    const createStartedAt = performance.now()
+    const created = await prisma.user.create({
       data: {
         authId,
         email,
@@ -64,6 +73,8 @@ async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | nul
       },
       select: appUserSelect,
     })
+    logTiming('prisma.user.create (bootstrap)', createStartedAt)
+    return created
   } catch (error) {
     if (isDbUnavailableError(error)) {
       console.error(
@@ -83,7 +94,9 @@ export async function GET() {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
+    const authStartedAt = performance.now()
     const { data, error } = await supabase.auth.getUser()
+    logTiming('supabase.auth.getUser (/api/session/bootstrap)', authStartedAt)
 
     if (error || !data?.user) {
       if (error) {
@@ -97,7 +110,7 @@ export async function GET() {
     }
 
     const sessionUser = data.user
-     if (isDbDisabled) {
+    if (isDbDisabled) {
       return NextResponse.json(
         {
           error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
@@ -110,7 +123,9 @@ export async function GET() {
     let syncedUser: SelectedAppUser | null = null
 
     try {
+      const syncStartedAt = performance.now()
       syncedUser = await syncUser(sessionUser)
+      logTiming('prisma.user.sync (/api/session/bootstrap)', syncStartedAt)
     } catch (err) {
       const isDbUnavailable = isDbUnavailableError(err)
       console.error('Erro ao sincronizar usuário no bootstrap', err)
@@ -125,11 +140,13 @@ export async function GET() {
     }
 
     try {
+      const lookupStartedAt = performance.now()
       const { appUser, session, dbUnavailable } = await getCurrentAppUserFromSessionUser(
         sessionUser,
         syncedUser,
       )
- if (!appUser) {
+      logTiming('prisma.user.resolve (/api/session/bootstrap)', lookupStartedAt)
+      if (!appUser) {
         return NextResponse.json(
           {
             error: 'Usuário não encontrado no banco',
@@ -139,11 +156,18 @@ export async function GET() {
         )
       }
 
-      return NextResponse.json({
-        appUser,
-        session,
-        dbUnavailable,
-      })
+      return NextResponse.json(
+        {
+          appUser,
+          session,
+          dbUnavailable,
+        },
+        {
+          headers: {
+            'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
+          },
+        },
+      )
     } catch (err) {
       const isDbUnavailable = isDbUnavailableError(err)
       console.error('Erro ao carregar appUser a partir da sessão', err)
