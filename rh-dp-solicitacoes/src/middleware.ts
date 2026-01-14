@@ -1,6 +1,17 @@
 // src/middleware.ts
 import { NextResponse, type NextRequest } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+
+const SUPABASE_COOKIE_RE = /^sb-.*-(auth|refresh)-token(\..+)?$/
+const SUPABASE_COOKIE_NAMES = new Set([
+  'sb-access-token',
+  'sb-refresh-token',
+  'supabase-auth-token',
+])
+
+function hasSupabaseSessionCookie(req: NextRequest) {
+  const cookies = req.cookies.getAll()
+  return cookies.some(({ name }) => SUPABASE_COOKIE_RE.test(name) || SUPABASE_COOKIE_NAMES.has(name))
+}
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl
@@ -23,25 +34,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!hasSupabaseSessionCookie(req)) {
     const loginUrl = new URL('/login', url.origin)
     loginUrl.searchParams.set('next', path + url.search)
     return NextResponse.redirect(loginUrl)
   }
 
-  const must = (user.user_metadata as any)?.mustChangePassword === true
-  const isFirstAccessPage = path.startsWith('/primeiro-acesso')
-  if (must && !isFirstAccessPage) {
-    const fa = new URL('/primeiro-acesso', url.origin)
-    fa.searchParams.set('next', path + url.search)
-    return NextResponse.redirect(fa)
-  }
-
-  return res
+  return NextResponse.next()
 }
 
 export const config = {

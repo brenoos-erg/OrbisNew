@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { fetchSessionMe } from '@/lib/session-cache'
+import { useSessionMe } from '@/components/session/SessionProvider'
 import { ShieldAlert } from 'lucide-react'
 
 type FleetLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
@@ -22,6 +22,7 @@ type DisplacementCheckin = {
 }
 
 export default function DisplacementPanelPage() {
+  const { data: sessionData, loading: sessionLoading } = useSessionMe()
   const [checkins, setCheckins] = useState<DisplacementCheckin[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,31 +43,27 @@ export default function DisplacementPanelPage() {
   )
 
   useEffect(() => {
-    async function loadPermissions() {
-      setPermissionsLoading(true)
-      setPermissionError(null)
-      try {
-        const data = await fetchSessionMe()
-        const rawLevel =
-          data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
-          data?.appUser?.moduleLevels?.gestao_frotas
-        const level: FleetLevel | null =
-          rawLevel === 'NIVEL_1' || rawLevel === 'NIVEL_2' || rawLevel === 'NIVEL_3'
-            ? rawLevel
-            : null
+    if (sessionLoading) return
+    setPermissionsLoading(true)
+    setPermissionError(null)
+    try {
+      const rawLevel =
+        sessionData?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
+        sessionData?.appUser?.moduleLevels?.gestao_frotas
+      const level: FleetLevel | null =
+        rawLevel === 'NIVEL_1' || rawLevel === 'NIVEL_2' || rawLevel === 'NIVEL_3'
+          ? rawLevel
+          : null
 
-        setFleetLevel(level)
-      } catch (err) {
-        console.error(err)
-        setPermissionError('Não foi possível verificar suas permissões no momento.')
-        setFleetLevel(null)
-      } finally {
-        setPermissionsLoading(false)
-      }
+      setFleetLevel(level)
+    } catch (err) {
+      console.error(err)
+      setPermissionError('Não foi possível verificar suas permissões no momento.')
+      setFleetLevel(null)
+    } finally {
+      setPermissionsLoading(false)
     }
-
-    loadPermissions()
-  }, [])
+  }, [sessionData, sessionLoading])
 
   const canViewPanel = fleetLevel === 'NIVEL_2' || fleetLevel === 'NIVEL_3'
 

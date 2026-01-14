@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { fetchSessionMe } from '@/lib/session-cache'
+import { useSessionMe } from '@/components/session/SessionProvider'
 import {
   Loader2,
   Plus,
@@ -192,6 +192,7 @@ function getMonthBoundaries(month?: string | null) {
 }
 
 export default function VehiclesPage() {
+  const { data: sessionData, loading: sessionLoading } = useSessionMe()
   const [vehicles, setVehicles] = useState<ApiVehicle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -327,29 +328,24 @@ export default function VehiclesPage() {
   }, [vehiclePage, totalVehiclePages])
 
   useEffect(() => {
-    async function loadPermissions() {
-      try {
-        const data = await fetchSessionMe()
-        if (!data) throw new Error('Falha ao carregar permissões do módulo')
+    if (sessionLoading) return
 
-        const level: FleetLevel | null = (() => {
-          const raw =
-            data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
-            data?.appUser?.moduleLevels?.['gestao_frotas']
-          return raw === 'NIVEL_1' || raw === 'NIVEL_2' || raw === 'NIVEL_3' ? raw : null
-        })()
+    try {
+      const level: FleetLevel | null = (() => {
+        const raw =
+          sessionData?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
+          sessionData?.appUser?.moduleLevels?.['gestao_frotas']
+        return raw === 'NIVEL_1' || raw === 'NIVEL_2' || raw === 'NIVEL_3' ? raw : null
+      })()
 
-        setFleetLevel(level)
-      } catch (err) {
-        console.error(err)
-        setFleetLevel(null)
-      } finally {
-        setPermissionsLoading(false)
-      }
+      setFleetLevel(level)
+    } catch (err) {
+      console.error(err)
+      setFleetLevel(null)
+    } finally {
+      setPermissionsLoading(false)
     }
-
-    loadPermissions()
-  }, [])
+  }, [sessionData, sessionLoading])
 
   useEffect(() => {
     if (permissionsLoading) return

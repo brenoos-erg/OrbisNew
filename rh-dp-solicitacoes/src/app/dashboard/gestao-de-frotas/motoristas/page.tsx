@@ -9,7 +9,7 @@ import {
   SlidersHorizontal,
   UserRound,
 } from 'lucide-react'
-import { fetchSessionMe } from '@/lib/session-cache'
+import { useSessionMe } from '@/components/session/SessionProvider'
 
 
 type CostCenter = {
@@ -193,6 +193,7 @@ function getDayScore(dayAnswers: Record<string, 'SIM' | 'NAO'> | undefined) {
 }
 
 export default function DriversPage() {
+  const { data: sessionData, loading: sessionLoading } = useSessionMe()
   const [fleetLevel, setFleetLevel] = useState<FleetLevel | null>(null)
   const [loadingAccess, setLoadingAccess] = useState(true)
   const [accessError, setAccessError] = useState<string | null>(null)
@@ -212,35 +213,27 @@ export default function DriversPage() {
   const canAccess = fleetLevel === 'NIVEL_3'
 
   useEffect(() => {
-    async function loadAccessLevel() {
-      setLoadingAccess(true)
-      setAccessError(null)
+    if (sessionLoading) return
+    setLoadingAccess(true)
+    setAccessError(null)
 
-      try {
-        const data = await fetchSessionMe()
-        if (!data) {
-          throw new Error('Não foi possível carregar dados da sessão.')
-        }
+    try {
+      const rawLevel =
+        sessionData?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
+        sessionData?.appUser?.moduleLevels?.gestao_frotas
 
-        const rawLevel =
-          data?.appUser?.moduleLevels?.['gestao-de-frotas'] ||
-          data?.appUser?.moduleLevels?.gestao_frotas
+      const level: FleetLevel | null =
+        rawLevel === 'NIVEL_1' || rawLevel === 'NIVEL_2' || rawLevel === 'NIVEL_3' ? rawLevel : null
 
-        const level: FleetLevel | null =
-          rawLevel === 'NIVEL_1' || rawLevel === 'NIVEL_2' || rawLevel === 'NIVEL_3' ? rawLevel : null
-
-        setFleetLevel(level)
-      } catch (err) {
-        console.error(err)
-        setAccessError('Não foi possível verificar suas permissões no momento.')
-        setFleetLevel(null)
-      } finally {
-        setLoadingAccess(false)
-      }
+      setFleetLevel(level)
+    } catch (err) {
+      console.error(err)
+      setAccessError('Não foi possível verificar suas permissões no momento.')
+      setFleetLevel(null)
+    } finally {
+      setLoadingAccess(false)
     }
-
-    loadAccessLevel()
-  }, [])
+  }, [sessionData, sessionLoading])
 
 
   const filteredDrivers = useMemo(

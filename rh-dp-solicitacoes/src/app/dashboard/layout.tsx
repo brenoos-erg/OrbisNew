@@ -8,6 +8,7 @@ import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
 import { Action, ModuleLevel } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
+import { SessionProvider } from '@/components/session/SessionProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -281,31 +282,33 @@ let showSolic = false
   }
 
   return (
-    <div className="dashboard-shell min-h-screen flex">
-      <Sidebar
-        showSolic={showSolic}
-        showConfig={showConfig}
-        showFleet={showFleet}
-        showRefusal={showRefusal}
-        showEquipments={showEquipments}
-        canApprove={canApprove}
-        canReviewRefusal={canReviewRefusal}
-        canAccessRefusalPanel={canAccessRefusalPanel}
-        configFeatures={configFeatures}
-        solicitacaoFeatures={solicitacaoFeatures}
-        fleetFeatures={fleetFeatures}
-        refusalFeatures={refusalFeatures}
-        equipmentFeatures={equipmentFeatures}
-        userMenu={<UserMenu collapsed={false} user={appUser} />}
-      />
+    <SessionProvider>
+      <div className="dashboard-shell min-h-screen flex">
+        <Sidebar
+          showSolic={showSolic}
+          showConfig={showConfig}
+          showFleet={showFleet}
+          showRefusal={showRefusal}
+          showEquipments={showEquipments}
+          canApprove={canApprove}
+          canReviewRefusal={canReviewRefusal}
+          canAccessRefusalPanel={canAccessRefusalPanel}
+          configFeatures={configFeatures}
+          solicitacaoFeatures={solicitacaoFeatures}
+          fleetFeatures={fleetFeatures}
+          refusalFeatures={refusalFeatures}
+          equipmentFeatures={equipmentFeatures}
+          userMenu={<UserMenu collapsed={false} user={appUser} />}
+        />
 
-      {/* conteúdo */}
-      <main className="flex-1 flex flex-col">
-        <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
-          Sistema de Gestão Integrada
-        </div>
-        <div className="p-6 flex-1 overflow-auto">{children}</div>
-      </main>
-    </div>
+        {/* conteúdo */}
+        <main className="flex-1 flex flex-col">
+          <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
+            Sistema de Gestão Integrada
+          </div>
+          <div className="p-6 flex-1 overflow-auto">{children}</div>
+        </main>
+      </div>
+    </SessionProvider>
   )
 }

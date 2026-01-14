@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { fetchSessionMe } from '@/lib/session-cache'
+import { useSessionMe } from '@/components/session/SessionProvider'
 import { isValidPlate } from '@/lib/plate'
 
 type ChecklistItem = {
@@ -118,6 +118,7 @@ type SubmissionResult = {
 }
 
 export default function VehicleCheckinPage() {
+  const { data: sessionData, loading: sessionLoading } = useSessionMe()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<SubmissionResult | null>(null)
@@ -269,18 +270,9 @@ export default function VehicleCheckinPage() {
   }, [plateInput])
 
   useEffect(() => {
-    async function loadDriver() {
-      try {
-         const data = await fetchSessionMe()
-        if (!data) return
-        setDriverName(data?.appUser?.fullName ?? '')
-      } catch (err) {
-        console.error(err)
-      }
-    }
-
-    loadDriver()
-  }, [])
+     if (sessionLoading) return
+    setDriverName(sessionData?.appUser?.fullName ?? '')
+  }, [sessionData, sessionLoading])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
