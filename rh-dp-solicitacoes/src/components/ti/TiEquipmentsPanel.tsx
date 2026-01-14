@@ -378,19 +378,24 @@ function handleScanSubmit(value: string) {
   }
 
   useEffect(() => {
-    if (!userSearch) {
-      setUserOptions([])
-      return
-    }
+     if (!formOpen) return
+
+    const term = userSearch.trim()
 
     if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current)
-    userSearchTimeout.current = setTimeout(async () => {
+
+    const fetchUsers = async (searchTerm: string) => {
       setSearchingUsers(true)
       try {
-        const r = await fetch(
-          `/api/ti/equipamentos/users?search=${encodeURIComponent(userSearch)}`,
-          { cache: 'no-store' },
-        )
+        const params = new URLSearchParams()
+        if (searchTerm) {
+          params.set('search', searchTerm)
+        } else {
+          params.set('limit', '20')
+        }
+        const r = await fetch(`/api/ti/equipamentos/users?${params.toString()}`, {
+          cache: 'no-store',
+        })
         if (!r.ok) {
           throw new Error('Erro ao buscar usuários.')
         }
@@ -402,12 +407,21 @@ function handleScanSubmit(value: string) {
       } finally {
         setSearchingUsers(false)
       }
-    }, 300)
+      }
+
+    if (!term) {
+      fetchUsers('')
+      return
+    }
+
+    userSearchTimeout.current = setTimeout(() => {
+      fetchUsers(term)
+     }, 300)
 
     return () => {
       if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current)
     }
-  }, [userSearch])
+  }, [formOpen, userSearch])
 
   async function saveForm(e: React.FormEvent) {
     e.preventDefault()

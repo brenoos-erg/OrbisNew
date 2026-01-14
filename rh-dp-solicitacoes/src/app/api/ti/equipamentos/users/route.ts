@@ -32,17 +32,19 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search')?.trim() ?? ''
-
-  if (!search) {
-    return NextResponse.json([])
-  }
+  const limitParam = Number.parseInt(searchParams.get('limit') ?? '10', 10)
+  const limit = Number.isFinite(limitParam) ? Math.min(50, Math.max(5, limitParam)) : 10
 
   const users = await prisma.user.findMany({
     where: {
-      OR: [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ],
+      ...(search
+        ? {
+            OR: [
+              { fullName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
       status: 'ATIVO',
     },
     select: {
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
       costCenter: { select: { id: true, description: true, externalCode: true, code: true } },
     },
     orderBy: { fullName: 'asc' },
-    take: 10,
+    take: limit,
   })
 
   return NextResponse.json(users)
