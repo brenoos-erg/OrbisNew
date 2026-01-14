@@ -46,11 +46,15 @@ export async function GET(request: Request) {
       WHERE (
         ${centroCustoId}::text IS NULL
         OR ("schemaJson"->'meta'->'centros') IS NULL
+         OR jsonb_typeof(("schemaJson"->'meta'->'centros')) <> 'array'
+        OR jsonb_array_length(("schemaJson"->'meta'->'centros')) = 0
         OR ("schemaJson"->'meta'->'centros') ? ${centroCustoId}
       )
       AND (
         ${departamentoId}::text IS NULL
         OR ("schemaJson"->'meta'->'departamentos') IS NULL
+        OR jsonb_typeof(("schemaJson"->'meta'->'departamentos')) <> 'array'
+        OR jsonb_array_length(("schemaJson"->'meta'->'departamentos')) = 0
         OR ("schemaJson"->'meta'->'departamentos') ? ${departamentoId}
       )
     `)

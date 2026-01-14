@@ -1,6 +1,6 @@
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel } from '@prisma/client'
+import { ModuleLevel, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -311,6 +311,15 @@ export const POST = withModuleLevel(
         const protocolo = generateProtocolo()
         const titulo = tipo.nome
         const descricao = null
+        const tipoMeta = (tipo.schemaJson as {
+          meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number }
+        } | null)?.meta
+        const prioridade = tipoMeta?.defaultPrioridade
+        const dataPrevista =
+          typeof tipoMeta?.defaultSlaHours === 'number' &&
+          Number.isFinite(tipoMeta.defaultSlaHours)
+            ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
+            : undefined
 
         // monta o payload com dados do solicitante + campos do formulário
         const payload: any = await buildPayload(solicitanteId, campos)
@@ -325,6 +334,8 @@ export const POST = withModuleLevel(
             solicitanteId,
             titulo,
             descricao,
+            prioridade,
+            dataPrevista,
             payload,
           },
         })
