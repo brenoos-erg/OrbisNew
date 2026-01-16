@@ -70,52 +70,57 @@ function LoginPageContent() {
     let active = true
     // derruba a sessão apenas quando solicitado explicitamente e tenta reaproveitar sessões já válidas
     ;(async () => {
-      if (shouldForceSignOut) {
-        try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
-        try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
-        clearSessionMeCache()
-      }
+       try {
+        if (shouldForceSignOut) {
+          try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
+          try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
+          clearSessionMeCache()
+        }
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!active) return
+       const { data: { user } } = await supabase.auth.getUser()
+        if (!active) return
 
-      if (user) {
-        try {
-          const me = await fetchSessionMe()
-          if (!active) return
-          if (me?.appUser?.status === 'INATIVO') {
-            await supabase.auth.signOut({ scope: 'global' })
-            router.replace('/login?inactive=1')
-            router.refresh()
-            return
-          }
-          if (me?.appUser) {
-            router.replace(nextUrl)
-            router.refresh()
-            return
-          }
-          if (me?.dbUnavailable) {
-            router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
-            router.refresh()
-            return
-          }
-        } catch (err: any) {
-          if (!active) return
+        if (user) {
+          try {
+            const me = await fetchSessionMe()
+            if (!active) return
+            if (me?.appUser?.status === 'INATIVO') {
+              await supabase.auth.signOut({ scope: 'global' })
+              router.replace('/login?inactive=1')
+              router.refresh()
+              return
+            }
+            if (me?.appUser) {
+              router.replace(nextUrl)
+              router.refresh()
+              return
+            }
+            if (me?.dbUnavailable) {
+              router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+              router.refresh()
+              return
+            }
+          } catch (err: any) {
+            if (!active) return
 
-          const status = (err as any)?.status as number | undefined
-          const payload = (err as any)?.payload as any
-          if (payload?.dbUnavailable) {
-            router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
-            router.refresh()
-            return
-          }
-          if (status && status !== 401) {
-            setBootstrapError(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
+            const status = (err as any)?.status as number | undefined
+            const payload = (err as any)?.payload as any
+            if (payload?.dbUnavailable) {
+              router.replace(`/login?db-unavailable=1&next=${encodeURIComponent(nextUrl)}`)
+              router.refresh()
+              return
+            }
+            if (status && status !== 401) {
+              setBootstrapError(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
+            }
           }
         }
+      } catch (err: any) {
+        if (!active) return
+        setBootstrapError(err?.message || 'Falha ao inicializar sessão. Tente novamente.')
+      } finally {
+        if (active) setLoadingSession(false)
       }
-
-      if (active) setLoadingSession(false)
     })()
 
     return () => {
