@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 
 import { getCurrentAppUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 const allowedStatuses = ['DISPONIVEL', 'EM_USO', 'RESERVADO', 'EM_MANUTENCAO', 'RESTRITO']
 

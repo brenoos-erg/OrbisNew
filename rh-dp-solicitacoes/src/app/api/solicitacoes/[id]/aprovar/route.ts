@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 
-export const dynamic = 'force-dynamic'
 
 export async function POST(
   req: NextRequest,

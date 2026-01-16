@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { Action, ModuleLevel } from '@prisma/client'
 
@@ -9,7 +12,6 @@ import { assertCanFeature, mapLevelToDefaultActions } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
-export const dynamic = 'force-dynamic'
 
 function normalizeActionList(actions: unknown): Action[] {
   if (!Array.isArray(actions)) return []

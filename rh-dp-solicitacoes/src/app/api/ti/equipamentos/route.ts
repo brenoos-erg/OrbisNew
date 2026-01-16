@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import { Action, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -12,7 +15,6 @@ import {
 } from '@/lib/tiEquipment'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 async function getAllowedCategories(userId: string, action: Action) {
   const checks = await Promise.all(

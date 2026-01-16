@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/configuracoes/permissoes/usuarios/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -6,7 +9,6 @@ import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 
-export const dynamic = 'force-dynamic'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {

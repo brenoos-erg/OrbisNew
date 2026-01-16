@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/health/route.ts
 // Endpoint simples para diagnosticar conectividade com Supabase e o banco (Prisma)
 // Útil para ambientes como Vercel quando o login falhar por falta de variáveis ou

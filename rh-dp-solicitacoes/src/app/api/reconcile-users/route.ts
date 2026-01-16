@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -5,7 +8,7 @@ import { withModuleLevel } from '@/lib/access'
 import { ensureDefaultModuleAccess } from '@/lib/defaultModuleAccess'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
-export const dynamic = 'force-dynamic'
+
 
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 200

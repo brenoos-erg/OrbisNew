@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/permissoes/usuarios/[userId]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth' // se você já usa isso em outras rotas
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
-export const dynamic = 'force-dynamic'
 
 type RouteParams = {
   params: { userId: string }

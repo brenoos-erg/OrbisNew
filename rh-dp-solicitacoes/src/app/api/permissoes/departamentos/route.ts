@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/permissoes/departamentos/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -9,7 +12,6 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { withRequestMetrics } from '@/lib/request-metrics'
 
-export const dynamic = 'force-dynamic'
 const CORE_MODULES = [
   { key: 'solicitacoes', name: 'Solicitações' },
   { key: 'configuracoes', name: 'Configurações' },

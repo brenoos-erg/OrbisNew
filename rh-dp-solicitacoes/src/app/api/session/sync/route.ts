@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/session/sync/route.ts
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'

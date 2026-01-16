@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, RefusalStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
 
 const MODULE_KEY = 'direito-de-recusa'
 const LEVEL_ORDER: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']

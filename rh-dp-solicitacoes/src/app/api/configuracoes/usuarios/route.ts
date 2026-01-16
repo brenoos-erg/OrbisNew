@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/configuracoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { performance } from 'node:perf_hooks'
@@ -10,8 +13,6 @@ import { assertCanFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { Action } from '@prisma/client'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
-
-export const dynamic = 'force-dynamic'
 
 // Admin client (Service Role) – só no servidor. Retorna null se não houver credenciais.
 function getSupabaseAdmin() {

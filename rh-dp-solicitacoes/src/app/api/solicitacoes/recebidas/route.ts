@@ -1,9 +1,11 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // rh-dp-solicitacoes/src/app/api/solicitacoes/recebidas/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {

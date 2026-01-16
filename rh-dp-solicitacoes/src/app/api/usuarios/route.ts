@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/permissoes/usuarios/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -6,7 +9,6 @@ import { assertUserMinLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/permissoes/usuarios?email=...

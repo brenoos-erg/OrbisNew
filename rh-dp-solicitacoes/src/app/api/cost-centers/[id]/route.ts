@@ -1,8 +1,10 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/configuracoes/centros-de-custo/[id]/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
 
 // PATCH: edita
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, SolicitationPriority } from '@prisma/client'
@@ -7,7 +10,6 @@ import { withModuleLevel } from '@/lib/access'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * Gera um código de protocolo simples, ex: RQ2502-0001

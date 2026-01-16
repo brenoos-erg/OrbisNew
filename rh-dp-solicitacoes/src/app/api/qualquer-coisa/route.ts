@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/qualquer-coisa/route.ts
 import { requireActiveUser } from '@/lib/guards'
 import { NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const g = await requireActiveUser()

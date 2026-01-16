@@ -1,12 +1,13 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { sendMail } from '@/lib/mailer'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+
 
 export async function GET() {
-  const result = await sendMail({
-    to: ['brenoos@ergengenharia.com.br'],
-    subject: 'Teste de e-mail - Orbis',
-    text: 'Se chegou, o Resend está configurado corretamente.',
-  })
-
-  return NextResponse.json(result)
+  const supabase = createRouteHandlerClient({ cookies })
+  const { data } = await supabase.auth.getUser()
+  return NextResponse.json({ hasSession: !!data.user, user: data.user })
 }

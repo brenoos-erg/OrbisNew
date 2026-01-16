@@ -1,4 +1,7 @@
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, RefusalStatus, UserStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
@@ -6,8 +9,6 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { prisma } from '@/lib/prisma'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
-
-export const dynamic = 'force-dynamic'
 
 const MODULE_KEY = 'direito-de-recusa'
 const MODULE_KEY_VARIANTS = ['DIREITO-DE-RECUSA', 'direito-de-recusa', 'direito_de_recusa']

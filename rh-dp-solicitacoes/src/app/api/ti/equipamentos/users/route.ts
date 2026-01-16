@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -7,7 +10,6 @@ import { canFeature } from '@/lib/permissions'
 import { TI_EQUIPMENT_CATEGORIES } from '@/lib/tiEquipment'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 async function canViewAnyCategory(userId: string) {
   const checks = await Promise.all(

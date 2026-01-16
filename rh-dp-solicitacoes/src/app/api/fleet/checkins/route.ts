@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -5,7 +8,6 @@ import { getCurrentAppUser } from '@/lib/auth'
 import { sendMail } from '@/lib/mailer'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 const fatiguePoints: Record<string, number> = {
   '31': 5,

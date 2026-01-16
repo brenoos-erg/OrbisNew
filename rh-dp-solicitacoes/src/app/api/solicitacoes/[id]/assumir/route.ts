@@ -1,10 +1,11 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/solicitacoes/[id]/assumir/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
-
-export const dynamic = 'force-dynamic'
 
 export async function POST(
   _req: NextRequest,

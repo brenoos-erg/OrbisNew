@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import {
   AlignmentType,
@@ -20,7 +23,6 @@ import { promises as fs } from 'fs'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 type ChecklistItem = {
   name?: string

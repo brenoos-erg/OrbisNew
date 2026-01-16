@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/configuracoes/permissoes/usuarios/route.ts
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 
-export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const me = await requireActiveUser()

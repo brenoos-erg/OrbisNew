@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { Prisma } from '@prisma/client'
@@ -5,7 +8,6 @@ import { prisma } from '@/lib/prisma'
 import { getSupabaseServerClient } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 
-export const dynamic = 'force-dynamic'
 
 const ATTACHMENTS_BUCKET =
   process.env.SUPABASE_ATTACHMENTS_BUCKET || 'attachments'

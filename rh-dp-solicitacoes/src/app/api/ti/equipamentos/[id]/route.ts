@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import { Action, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -7,7 +10,6 @@ import { canFeature } from '@/lib/permissions'
 import { TI_EQUIPMENT_CATEGORIES, TI_EQUIPMENT_STATUSES } from '@/lib/tiEquipment'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 function mapRow(row: any) {
   return {

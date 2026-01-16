@@ -1,8 +1,10 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { buildReconcileResponse, reconcileAuthUsers } from '@/lib/reconcile-auth-users'
 
-export const dynamic = 'force-dynamic'
 
 function isAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -11,7 +13,6 @@ function isAuthorized(req: NextRequest) {
 
   return !!secret && token === secret
 }
-
 async function handler(req: NextRequest) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json(

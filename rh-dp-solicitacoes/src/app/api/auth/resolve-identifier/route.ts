@@ -1,10 +1,12 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { isDbUnavailableError } from '@/lib/db-unavailable'
 
-export const dynamic = 'force-dynamic'
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
 export async function GET(req: NextRequest) {
   try {

@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { Action } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -7,7 +10,6 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 
 function parseDate(value?: string | null) {

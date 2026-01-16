@@ -1,8 +1,10 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withRequestMetrics } from "@/lib/request-metrics"
 
-export const revalidate = 300
 
 // GET /api/positions?pageSize=200
 export async function GET(req: Request) {

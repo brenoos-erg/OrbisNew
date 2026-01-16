@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import {
@@ -16,7 +19,6 @@ import {
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 function formatDateLabel(date?: Date | null) {
   if (!date) return '—'

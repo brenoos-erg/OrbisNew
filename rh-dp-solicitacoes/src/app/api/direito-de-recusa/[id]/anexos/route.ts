@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
@@ -7,7 +10,6 @@ import { getSupabaseServerClient } from '@/lib/supabase'
 import { ModuleLevel } from '@prisma/client'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 
-export const dynamic = 'force-dynamic'
 
 const ATTACHMENTS_BUCKET = process.env.SUPABASE_ATTACHMENTS_BUCKET || 'attachments'
 const MAX_SIZE = 10 * 1024 * 1024 // 10 MB

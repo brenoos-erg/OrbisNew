@@ -1,11 +1,11 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 
-export const dynamic = 'force-dynamic'
-
-// Reaproveita o mesmo formato de protocolo da rota principal
 function generateProtocolo() {
   const now = new Date()
   const yy = now.getFullYear().toString().slice(-2)

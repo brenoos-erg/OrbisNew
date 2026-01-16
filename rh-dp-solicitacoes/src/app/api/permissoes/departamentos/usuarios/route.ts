@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextRequest, NextResponse } from 'next/server'
 
 import { Action, ModuleLevel } from '@prisma/client'
@@ -9,7 +12,6 @@ import { assertCanFeature } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
 import { ensureUserDepartmentLink, removeUserDepartmentLink } from '@/lib/userDepartments'
 
-export const dynamic = 'force-dynamic'
 
 type UserSummary = {
   id: string

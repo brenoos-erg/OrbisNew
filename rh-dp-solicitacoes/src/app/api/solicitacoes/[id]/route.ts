@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // src/app/api/solicitacoes/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -5,8 +8,6 @@ import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
-
-export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/solicitacoes/[id]

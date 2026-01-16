@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
@@ -5,8 +8,6 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertCanFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { Action } from '@prisma/client'
-
-export const dynamic = 'force-dynamic'
 
 /** GET: retorna dados do usuário */
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {

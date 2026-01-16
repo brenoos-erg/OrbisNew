@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { performance } from 'node:perf_hooks'
