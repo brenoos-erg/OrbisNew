@@ -5,12 +5,18 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import UserMenu from '@/components/layout/userMenu'
 import { userHasDepartmentOrCostCenter } from '@/lib/moduleAccess'
-import { Action, ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel, Prisma } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { SessionProvider } from '@/components/session/SessionProvider'
 
 export const dynamic = 'force-dynamic'
+
+const isDatabaseUnavailableError = (error: unknown) =>
+  error instanceof Prisma.PrismaClientInitializationError ||
+  error instanceof Prisma.PrismaClientKnownRequestError ||
+  error instanceof Prisma.PrismaClientRustPanicError ||
+  error instanceof Prisma.PrismaClientUnknownRequestError
 
 
 export default async function DashboardLayout({
@@ -19,33 +25,56 @@ export default async function DashboardLayout({
   children: ReactNode
 }) {
   const { appUser, dbUnavailable, session } = await getCurrentAppUser()
+  const renderServiceUnavailable = (requestId?: string) => (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
+      <p className="text-xl font-semibold">Serviço temporariamente indisponível</p>
+      <p className="max-w-xl text-sm text-slate-600">
+        Não foi possível acessar o banco de dados para carregar seus dados. Tente novamente em alguns minutos
+        ou contate o suporte se o problema persistir.
+      </p>
+      {requestId ? (
+        <p className="text-xs text-slate-500">ID da requisição: {requestId}</p>
+      ) : null}
+      <div className="flex items-center gap-3">
+        <a
+          href="/login?logout=1"
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-950"
+        >
+          Sair e tentar novamente
+        </a>
+        <a
+          href="/dashboard"
+          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
+        >
+          Recarregar
+        </a>
+      </div>
+    </div>
+  )
+
+  const renderDashboardError = (requestId: string) => (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
+      <p className="text-xl font-semibold">Não foi possível carregar o dashboard</p>
+      <p className="max-w-xl text-sm text-slate-600">
+        Ocorreu um erro inesperado ao preparar os seus dados. Tente novamente ou contate o suporte se o problema
+        persistir.
+      </p>
+      <p className="text-xs text-slate-500">ID da requisição: {requestId}</p>
+      <div className="flex items-center gap-3">
+        <a
+          href="/dashboard"
+          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
+        >
+          Recarregar
+        </a>
+      </div>
+    </div>
+  )
 
   // se não tiver usuário logado, manda pro login
   if (!appUser) {
       if (dbUnavailable && session) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
-          <p className="text-xl font-semibold">Serviço temporariamente indisponível</p>
-          <p className="max-w-xl text-sm text-slate-600">
-            Não foi possível acessar o banco de dados para carregar seus dados. Tente novamente em alguns minutos
-            ou contate o suporte se o problema persistir.
-          </p>
-          <div className="flex items-center gap-3">
-            <a
-              href="/login?logout=1"
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-950"
-            >
-              Sair e tentar novamente
-            </a>
-            <a
-              href="/dashboard"
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
-            >
-              Recarregar
-            </a>
-          </div>
-        </div>
-      )
+      return renderServiceUnavailable()
     }
     if (dbUnavailable) {
       const params = new URLSearchParams({ 'db-unavailable': '1', next: '/dashboard' })
@@ -65,8 +94,8 @@ export default async function DashboardLayout({
     return current >= order.indexOf(min)
   }
 
-  // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
-let showSolic = false
+   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
+  let showSolic = false
   let showConfig = false
   let canApprove = false
   let showFleet = false
@@ -112,173 +141,195 @@ let showSolic = false
   }
 
   if (appUser.id) {
-    const levels = appUser.moduleLevels ?? {}
-    const hasStructure = await userHasDepartmentOrCostCenter(
-      appUser.id,
-      appUser.costCenterId,
-      appUser.departmentId,
-    )
+     try {
+      const levels = appUser.moduleLevels ?? {}
+      const hasStructure = await userHasDepartmentOrCostCenter(
+        appUser.id,
+        appUser.costCenterId,
+        appUser.departmentId,
+      )
 
-    const solicitLevel = levels[MODULE_KEYS.SOLICITACOES]
-    const configLevel = levels[MODULE_KEYS.CONFIGURACOES]
-    const fleetLevel = levels[MODULE_KEYS.FROTAS] ?? levels['gestao_frotas']
-    const refusalLevel = levels[MODULE_KEYS.RECUSA] ?? levels['direito_de_recusa']
-    const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
+      const solicitLevel = levels[MODULE_KEYS.SOLICITACOES]
+      const configLevel = levels[MODULE_KEYS.CONFIGURACOES]
+      const fleetLevel = levels[MODULE_KEYS.FROTAS]
+      const refusalLevel = levels[MODULE_KEYS.RECUSA]
+      const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
 
-    const [
-      canViewConfigPainel,
-      canViewConfigUsuarios,
-      canViewConfigPermissoes,
-      canViewConfigCentros,
-      canViewConfigCargos,
-      canViewSolicEnviadas,
-      canViewSolicRecebidas,
-      canViewSolicAprovacao,
-      canViewSolicCadastros,
-      canViewFleetVeiculos,
-      canViewFleetCheckins,
-      canViewFleetDeslocamentoCheckin,
-      canViewFleetDeslocamentoPainel,
-      canViewRecusaPainel,
-      canViewRecusaMinhas,
-      canViewRecusaNova,
-      canViewRecusaPendentes,
-      canViewEquipAtalho,
-      canViewEquipLinhaTelefonica,
-      canViewEquipSmartphone,
-      canViewEquipNotebook,
-      canViewEquipDesktop,
-      canViewEquipMonitor,
-      canViewEquipImpressora,
-      canViewEquipTplink,
-      canViewEquipOutros,
-    ] = await Promise.all([
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PAINEL, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
-      canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.ATALHO,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.LINHA_TELEFONICA,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.SMARTPHONE,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.NOTEBOOK,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.DESKTOP,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.MONITOR,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.IMPRESSORA,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.TPLINK,
-        Action.VIEW,
-      ),
-      canFeature(
-        appUser.id,
-        MODULE_KEYS.EQUIPAMENTOS_TI,
-        FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS,
-        Action.VIEW,
-      ),
-    ])
+     const [
+        canViewConfigPainel,
+        canViewConfigUsuarios,
+        canViewConfigPermissoes,
+        canViewConfigCentros,
+        canViewConfigCargos,
+        canViewSolicEnviadas,
+        canViewSolicRecebidas,
+        canViewSolicAprovacao,
+        canViewSolicCadastros,
+        canViewFleetVeiculos,
+        canViewFleetCheckins,
+        canViewFleetDeslocamentoCheckin,
+        canViewFleetDeslocamentoPainel,
+        canViewRecusaPainel,
+        canViewRecusaMinhas,
+        canViewRecusaNova,
+        canViewRecusaPendentes,
+        canViewEquipAtalho,
+        canViewEquipLinhaTelefonica,
+        canViewEquipSmartphone,
+        canViewEquipNotebook,
+        canViewEquipDesktop,
+        canViewEquipMonitor,
+        canViewEquipImpressora,
+        canViewEquipTplink,
+        canViewEquipOutros,
+      ] = await Promise.all([
+        canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PAINEL, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PAINEL, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.ATALHO,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.LINHA_TELEFONICA,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.SMARTPHONE,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.NOTEBOOK,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.DESKTOP,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.MONITOR,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.IMPRESSORA,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.TPLINK,
+          Action.VIEW,
+        ),
+        canFeature(
+          appUser.id,
+          MODULE_KEYS.EQUIPAMENTOS_TI,
+          FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS,
+          Action.VIEW,
+        ),
+      ])
 
-    configFeatures = {
-      painel: canViewConfigPainel,
-      usuarios: canViewConfigUsuarios,
-      permissoes: canViewConfigPermissoes,
-      centros: canViewConfigCentros,
-      cargos: canViewConfigCargos,
+      configFeatures = {
+        painel: canViewConfigPainel,
+        usuarios: canViewConfigUsuarios,
+        permissoes: canViewConfigPermissoes,
+        centros: canViewConfigCentros,
+        cargos: canViewConfigCargos,
+      }
+
+      solicitacaoFeatures = {
+        enviadas: canViewSolicEnviadas,
+        recebidas: canViewSolicRecebidas,
+        aprovacao: canViewSolicAprovacao,
+        cadastros: canViewSolicCadastros,
+      }
+
+      fleetFeatures = {
+        veiculos: canViewFleetVeiculos,
+        checkins: canViewFleetCheckins,
+        deslocamentoCheckin: canViewFleetDeslocamentoCheckin,
+        deslocamentoPainel: canViewFleetDeslocamentoPainel,
+      }
+
+      refusalFeatures = {
+        painel: canViewRecusaPainel,
+        minhas: canViewRecusaMinhas,
+        nova: canViewRecusaNova,
+        pendentes: canViewRecusaPendentes,
+      }
+      equipmentFeatures = {
+        atalho: canViewEquipAtalho,
+        linhaTelefonica: canViewEquipLinhaTelefonica,
+        smartphone: canViewEquipSmartphone,
+        notebook: canViewEquipNotebook,
+        desktop: canViewEquipDesktop,
+        monitor: canViewEquipMonitor,
+        impressora: canViewEquipImpressora,
+        tplink: canViewEquipTplink,
+        outros: canViewEquipOutros,
+      }
+
+      showSolic =
+        hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) &&
+        hasStructure &&
+        Object.values(solicitacaoFeatures).some(Boolean)
+      showConfig = hasMinLevel(configLevel, ModuleLevel.NIVEL_1) && Object.values(configFeatures).some(Boolean)
+      showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1) && Object.values(fleetFeatures).some(Boolean)
+      showRefusal =
+        hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) &&
+        hasStructure &&
+        Object.values(refusalFeatures).some(Boolean)
+      showEquipments =
+        hasMinLevel(equipmentLevel, ModuleLevel.NIVEL_1) && Object.values(equipmentFeatures).some(Boolean)
+      canApprove =
+        hasStructure &&
+        (await canFeature(
+          appUser.id,
+          MODULE_KEYS.SOLICITACOES,
+          FEATURE_KEYS.SOLICITACOES.APROVACAO,
+          Action.APPROVE,
+        ))
+      canReviewRefusal =
+        hasStructure &&
+        (await canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.APPROVE))
+      canAccessRefusalPanel = refusalFeatures.painel
+    } catch (error) {
+      const requestId = crypto.randomUUID()
+      console.error('Erro ao carregar dados do dashboard.', { requestId, error })
+
+      if (isDatabaseUnavailableError(error)) {
+        return renderServiceUnavailable(requestId)
+      }
+
+      return renderDashboardError(requestId)
     }
-
-    solicitacaoFeatures = {
-      enviadas: canViewSolicEnviadas,
-      recebidas: canViewSolicRecebidas,
-      aprovacao: canViewSolicAprovacao,
-      cadastros: canViewSolicCadastros,
-    }
-
-    fleetFeatures = {
-      veiculos: canViewFleetVeiculos,
-      checkins: canViewFleetCheckins,
-      deslocamentoCheckin: canViewFleetDeslocamentoCheckin,
-      deslocamentoPainel: canViewFleetDeslocamentoPainel,
-    }
-
-    refusalFeatures = {
-      painel: canViewRecusaPainel,
-      minhas: canViewRecusaMinhas,
-      nova: canViewRecusaNova,
-      pendentes: canViewRecusaPendentes,
-    }
-    equipmentFeatures = {
-      atalho: canViewEquipAtalho,
-      linhaTelefonica: canViewEquipLinhaTelefonica,
-      smartphone: canViewEquipSmartphone,
-      notebook: canViewEquipNotebook,
-      desktop: canViewEquipDesktop,
-      monitor: canViewEquipMonitor,
-      impressora: canViewEquipImpressora,
-      tplink: canViewEquipTplink,
-      outros: canViewEquipOutros,
-    }
-
-    showSolic = hasMinLevel(solicitLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(solicitacaoFeatures).some(Boolean)
-    showConfig = hasMinLevel(configLevel, ModuleLevel.NIVEL_1) && Object.values(configFeatures).some(Boolean)
-    showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1) && Object.values(fleetFeatures).some(Boolean)
-    showRefusal = hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) && hasStructure && Object.values(refusalFeatures).some(Boolean)
-    showEquipments =
-      hasMinLevel(equipmentLevel, ModuleLevel.NIVEL_1) && Object.values(equipmentFeatures).some(Boolean)
-    canApprove =
-      hasStructure &&
-      (await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.APPROVE))
-    canReviewRefusal =
-      hasStructure &&
-      (await canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.APPROVE))
-    canAccessRefusalPanel = refusalFeatures.painel
   }
 
   return (

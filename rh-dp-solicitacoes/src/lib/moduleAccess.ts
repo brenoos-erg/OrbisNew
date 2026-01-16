@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma'
 import { ModuleLevel } from '@prisma/client'
 import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
+import { normalizeModuleKey } from '@/lib/moduleKey'
 
 export type AccessMap = Record<string, ModuleLevel>
 
@@ -69,14 +70,14 @@ async function loadUserModuleContext(
 
   for (const dept of departments) {
     for (const deptModule of dept?.modules ?? []) {
-      const key = deptModule.module.key.toLowerCase()
+      const key = normalizeModuleKey(deptModule.module.key)
       levels[key] = ModuleLevel.NIVEL_1
     }
   }
 
   // Sobrescritas individuais (UserModuleAccess) podem elevar o nível (ex.: aprovador NIVEL_3)
   for (const access of user?.moduleAccesses ?? []) {
-    const key = access.module.key.toLowerCase()
+    const key = normalizeModuleKey(access.module.key)
     levels[key] = pickHigherLevel(levels[key], access.level)
   }
 

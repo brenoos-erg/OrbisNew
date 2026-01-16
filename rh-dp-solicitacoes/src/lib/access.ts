@@ -2,6 +2,7 @@
 import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
+import { getModuleKeyAliases, normalizeModuleKey } from '@/lib/moduleKey'
 
 export type AuthenticatedUser = Awaited<ReturnType<typeof requireActiveUser>>
 
@@ -14,8 +15,27 @@ export async function getUserModuleLevel(
   moduleKey: string,
 ): Promise<ModuleLevel | null> {
   const { levels } = await getUserModuleContext(userId)
+  const normalizedKey = normalizeModuleKey(moduleKey)
 
-  return levels[moduleKey.toLowerCase()] ?? null
+  const directLevel = levels[normalizedKey]
+  if (directLevel) {
+    return directLevel
+  }
+
+  const aliases = getModuleKeyAliases(moduleKey).filter((alias) => alias !== normalizedKey)
+  for (const alias of aliases) {
+    const level = levels[alias]
+    if (level) {
+      console.warn('Module key alias aplicado para acesso.', {
+        moduleKey,
+        normalizedKey,
+        aliasUsed: alias,
+      })
+      return level
+    }
+  }
+
+  return null
 }
 
 /**
@@ -29,8 +49,23 @@ export async function assertUserMinLevel(
   minLevel: ModuleLevel,
 ) {
   const { levels } = await getUserModuleContext(userId)
-  const normalizedKey = moduleKey.toLowerCase()
-  const level = levels[normalizedKey]
+  const normalizedKey = normalizeModuleKey(moduleKey)
+  let level = levels[normalizedKey]
+
+  if (!level) {
+    const aliases = getModuleKeyAliases(moduleKey).filter((alias) => alias !== normalizedKey)
+    for (const alias of aliases) {
+      if (levels[alias]) {
+        level = levels[alias]
+        console.warn('Module key alias aplicado ao validar nível mínimo.', {
+          moduleKey,
+          normalizedKey,
+          aliasUsed: alias,
+        })
+        break
+      }
+    }
+  }
 
   if (!level) {
     throw new Error('Usuário não possui acesso a este módulo.')

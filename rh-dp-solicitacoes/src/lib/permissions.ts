@@ -3,14 +3,7 @@ import { Action, ModuleLevel, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
-
-function normalizeModuleKey(moduleKey: string) {
-  return moduleKey.trim().toLowerCase()
-}
-
-function normalizeFeatureKey(featureKey: string) {
-  return featureKey.trim().toUpperCase()
-}
+import { getModuleKeyAliases, normalizeModuleKey } from '@/lib/moduleKey'
 
 export function mapLevelToDefaultActions(level: ModuleLevel): Action[] {
   switch (level) {
@@ -54,7 +47,25 @@ async function getFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) {
 export async function getUserModuleLevel(userId: string, moduleKey: string): Promise<ModuleLevel | null> {
   const { levels } = await getUserModuleContext(userId)
   const normalizedKey = normalizeModuleKey(moduleKey)
-  return levels[normalizedKey] ?? null
+  const directLevel = levels[normalizedKey]
+  if (directLevel) {
+    return directLevel
+  }
+
+  const aliases = getModuleKeyAliases(moduleKey).filter((alias) => alias !== normalizedKey)
+  for (const alias of aliases) {
+    const level = levels[alias]
+    if (level) {
+      console.warn('Module key alias aplicado para permissões.', {
+        moduleKey,
+        normalizedKey,
+        aliasUsed: alias,
+      })
+      return level
+    }
+  }
+
+  return null
 }
 
 export async function canFeature(
