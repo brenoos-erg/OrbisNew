@@ -34,6 +34,7 @@ function LoginPageContent() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+   const [loginError, setLoginError] = useState<string | null>(null)
   const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
 
 
@@ -157,10 +158,11 @@ function LoginPageContent() {
   async function handleLogin() {
     if (loading) return
     if (isRateLimited) {
-      alert(`Aguarde ${rateLimitRemaining}s para tentar novamente.`)
+      setLoginError(`Aguarde ${rateLimitRemaining}s para tentar novamente.`)
       return
     }
     setLoading(true)
+    setLoginError(null)
 
     let authenticatedUser: User | null = null
 
@@ -174,7 +176,7 @@ function LoginPageContent() {
         router.refresh()
         return
       }
-      alert(err?.message || 'Não foi possível localizar seu acesso. Tente novamente.')
+      setLoginError(err?.message || 'Não foi possível localizar seu acesso. Tente novamente.')
       return
     }
 
@@ -186,7 +188,7 @@ function LoginPageContent() {
         handleRateLimit(error.message)
         return
       }
-      alert(error.message || 'Não foi possível autenticar. Tente novamente.')
+      setLoginError(error.message || 'Não foi possível autenticar. Tente novamente.')
       return
     }
     authenticatedUser = data.user
@@ -200,13 +202,13 @@ function LoginPageContent() {
       }
       if (!bootstrapDbUnavailable && !me?.appUser) {
         setLoading(false)
-        alert(me?.error || 'Não foi possível carregar seus dados agora. Tente novamente.')
+        setLoginError(me?.error || 'Não foi possível carregar seus dados agora. Tente novamente.')
         return
       }
       if (me?.appUser?.status === 'INATIVO') {
         await supabase.auth.signOut({ scope: 'global' })
         setLoading(false)
-        alert('Seu usuário está INATIVO. Fale com o administrador.')
+        setLoginError('Seu usuário está INATIVO. Fale com o administrador.')
         router.replace('/login?inactive=1')
         router.refresh()
         return
@@ -221,9 +223,9 @@ function LoginPageContent() {
         setLoading(false)
 
         if (status === 401) {
-          alert('Sessão expirada. Faça login novamente.')
+          setLoginError('Sessão expirada. Faça login novamente.')
         } else {
-          alert(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
+          setLoginError(err?.message || 'Falha ao carregar seus dados. Tente novamente.')
         }
         return
       }
@@ -231,7 +233,7 @@ function LoginPageContent() {
 
     if (bootstrapDbUnavailable) {
       // mostra aviso mas mantém sessão já autenticada
-      alert('Não foi possível verificar seus dados agora. Vamos continuar assim mesmo.')
+      setLoginError('Não foi possível verificar seus dados agora. Vamos continuar assim mesmo.')
     }
     // 3️⃣ Se for primeiro acesso (mustChangePasswor
     if (!authenticatedUser) {
@@ -332,7 +334,12 @@ function LoginPageContent() {
             {bootstrapError}
           </div>
         )}
-{isRateLimited && (
+ {loginError && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            {loginError}
+          </div>
+        )}
+        {isRateLimited && (
           <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
             Muitas tentativas em sequência. Aguarde {rateLimitRemaining}s e tente novamente.
           </div>
@@ -359,7 +366,10 @@ function LoginPageContent() {
               required
               placeholder="Ex: joao.silva"
               value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              onChange={(e) => {
+                setIdentifier(e.target.value)
+                if (loginError) setLoginError(null)
+              }}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
             />
           </div>
@@ -388,7 +398,10 @@ function LoginPageContent() {
               required
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                if (loginError) setLoginError(null)
+              }}
               className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
             />
           </div>
