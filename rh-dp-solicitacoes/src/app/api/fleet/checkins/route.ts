@@ -2,10 +2,13 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { sendMail } from '@/lib/mailer'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
+import { jsonApiError } from '@/lib/api-error'
 
 export const runtime = 'nodejs'
 
@@ -170,21 +173,35 @@ function buildEmailContent({
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const vehicleId = searchParams.get('vehicleId') ?? undefined
+  try {
+    const { searchParams } = new URL(req.url)
+    const vehicleId = searchParams.get('vehicleId') ?? undefined
 
-  const checkins = await prisma.vehicleCheckin.findMany({
-    where: {
-      ...(vehicleId ? { vehicleId } : {}),
-    },
-    include: {
-      vehicle: { select: { plate: true, type: true, status: true } },
-      driver: { select: { fullName: true, email: true } },
-    },
-    orderBy: { inspectionDate: 'desc' },
-  })
+    const checkins = await prisma.vehicleCheckin.findMany({
+      where: {
+        ...(vehicleId ? { vehicleId } : {}),
+      },
+      include: {
+        vehicle: { select: { plate: true, type: true, status: true } },
+        driver: { select: { fullName: true, email: true } },
+      },
+      orderBy: { inspectionDate: 'desc' },
+    })
 
-  return NextResponse.json(checkins)
+    return NextResponse.json(checkins)
+  } catch (error) {
+    const dbUnavailable = isDbUnavailableError(error)
+    const requestId = crypto.randomUUID()
+    console.error('Erro ao buscar check-ins de veículo', { requestId, error })
+    return jsonApiError({
+      status: dbUnavailable ? 503 : 500,
+      message: dbUnavailable
+        ? 'Banco de dados indisponível. Tente novamente em instantes.'
+        : 'Erro ao buscar check-ins de veículo.',
+      dbUnavailable,
+      requestId,
+    })
+  }
 }
 
 export async function POST(req: Request) {
@@ -359,7 +376,16 @@ export async function POST(req: Request) {
       fatigueRisk,
     })
   } catch (error) {
-    console.error('Erro ao registrar check-in de veículo', error)
-    return NextResponse.json({ error: 'Erro ao registrar check-in' }, { status: 500 })
+    const dbUnavailable = isDbUnavailableError(error)
+    const requestId = crypto.randomUUID()
+    console.error('Erro ao registrar check-in de veículo', { requestId, error })
+    return jsonApiError({
+      status: dbUnavailable ? 503 : 500,
+      message: dbUnavailable
+        ? 'Banco de dados indisponível. Tente novamente em instantes.'
+        : 'Erro ao registrar check-in',
+      dbUnavailable,
+      requestId,
+    })
   }
 }

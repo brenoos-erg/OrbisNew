@@ -3,11 +3,14 @@ export const revalidate = 0
 
 import { Action } from '@prisma/client'
 import { NextResponse } from 'next/server'
+import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { getCurrentAppUser } from '@/lib/auth'
 import { isValidPlate, normalizePlate } from '@/lib/plate'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
+import { jsonApiError } from '@/lib/api-error'
 
 export const runtime = 'nodejs'
 
@@ -19,36 +22,53 @@ function parseDate(value?: string | null) {
 }
 
 export async function GET(req: Request) {
-  const { appUser } = await getCurrentAppUser()
+  try {
+    const { appUser } = await getCurrentAppUser()
 
-  if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    if (!appUser) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
+
+    const canViewDisplacementPanel = await canFeature(
+      appUser.id,
+      MODULE_KEYS.FROTAS,
+      FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL,
+      Action.VIEW,
+    )
+    if (!canViewDisplacementPanel) {
+      return NextResponse.json(
+        { error: 'O painel de deslocamentos requer permissão de visualização.' },
+        { status: 403 },
+      )
+    }
+
+const { searchParams } = new URL(req.url)
+    const vehicleId = searchParams.get('vehicleId') ?? undefined
+
+    const checkins = await prisma.vehicleDisplacementCheckin.findMany({
+      where: { ...(vehicleId ? { vehicleId } : {}) },
+      include: {
+        vehicle: { select: { plate: true, type: true, model: true } },
+        driver: { select: { fullName: true } },
+        costCenter: { select: { description: true, externalCode: true } },
+      },
+      orderBy: { tripDate: 'desc' },
+    })
+
+    return NextResponse.json(checkins)
+  } catch (error) {
+    const dbUnavailable = isDbUnavailableError(error)
+    const requestId = crypto.randomUUID()
+    console.error('Erro ao buscar deslocamentos', { requestId, error })
+    return jsonApiError({
+      status: dbUnavailable ? 503 : 500,
+      message: dbUnavailable
+        ? 'Banco de dados indisponível. Tente novamente em instantes.'
+        : 'Erro ao buscar deslocamentos.',
+      dbUnavailable,
+      requestId,
+    })
   }
-
-  const canViewDisplacementPanel = await canFeature(
-    appUser.id,
-    MODULE_KEYS.FROTAS,
-    FEATURE_KEYS.FROTAS.DESLOCAMENTO_PAINEL,
-    Action.VIEW,
-  )
-  if (!canViewDisplacementPanel) {
-    return NextResponse.json({ error: 'O painel de deslocamentos requer permissão de visualização.' }, { status: 403 })
-  }
-
-  const { searchParams } = new URL(req.url)
-  const vehicleId = searchParams.get('vehicleId') ?? undefined
-
-  const checkins = await prisma.vehicleDisplacementCheckin.findMany({
-    where: { ...(vehicleId ? { vehicleId } : {}) },
-    include: {
-      vehicle: { select: { plate: true, type: true, model: true } },
-      driver: { select: { fullName: true } },
-      costCenter: { select: { description: true, externalCode: true } },
-    },
-    orderBy: { tripDate: 'desc' },
-  })
-
-  return NextResponse.json(checkins)
 }
 
 export async function POST(req: Request) {
@@ -161,10 +181,16 @@ export async function POST(req: Request) {
 
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
-    console.error('Erro ao registrar deslocamento', error)
-    return NextResponse.json(
-      { error: 'Erro ao registrar deslocamento. Tente novamente.' },
-      { status: 500 },
-    )
+    const dbUnavailable = isDbUnavailableError(error)
+    const requestId = crypto.randomUUID()
+    console.error('Erro ao registrar deslocamento', { requestId, error })
+    return jsonApiError({
+      status: dbUnavailable ? 503 : 500,
+      message: dbUnavailable
+        ? 'Banco de dados indisponível. Tente novamente em instantes.'
+        : 'Erro ao registrar deslocamento. Tente novamente.',
+      dbUnavailable,
+      requestId,
+    })
   }
 }

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
 import { isDbUnavailableError } from '@/lib/db-unavailable'
+import { jsonApiError } from '@/lib/api-error'
 
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
 export async function GET(req: NextRequest) {
@@ -24,14 +25,12 @@ export async function GET(req: NextRequest) {
     if (isDbDisabled) {
       const requestId = crypto.randomUUID()
       console.warn('Banco de dados desabilitado ao resolver login', { requestId })
-      return NextResponse.json(
-        {
-          error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
-          dbUnavailable: true,
-          requestId,
-        },
-        { status: 503 },
-      )
+      return jsonApiError({
+        status: 503,
+        message: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
+        dbUnavailable: true,
+        requestId,
+      })
     }
     const user = await prisma.user.findFirst({
       where: {
@@ -60,9 +59,11 @@ export async function GET(req: NextRequest) {
 
     console.error('Error resolving identifier', { requestId, error })
 
-    return NextResponse.json(
-      { error: message, dbUnavailable, requestId },
-      { status: dbUnavailable ? 503 : 500 },
-    )
+    return jsonApiError({
+      status: dbUnavailable ? 503 : 500,
+      message,
+      dbUnavailable,
+      requestId,
+    })
   }
 }

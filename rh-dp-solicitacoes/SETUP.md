@@ -75,6 +75,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 > 💡 Observação: a senha contém `!`, que foi escapado para `%21`.
 > Em produção (Vercel) use a URL de *pooling* (`aws-0-...pooler.supabase.net`) para evitar falhas de conexão em ambientes sem IPv6.
+> Garanta que a `DATABASE_URL` inclua `pgbouncer=true`, `sslmode=require` e `connection_limit=1` (pooler).
+> Use `DIRECT_DATABASE_URL` (ou `DIRECT_URL`) apontando para a conexão direta na porta 5432 apenas para migrações.
 
 ---
 

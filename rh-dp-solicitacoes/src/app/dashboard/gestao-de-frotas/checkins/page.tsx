@@ -422,6 +422,15 @@ const vehicleKmRaw = formData.get('vehicleKm')
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+         const dbUnavailable = res.status === 503 || data.dbUnavailable === true
+        if (dbUnavailable) {
+          const requestId =
+            typeof data.requestId === 'string' && data.requestId.length > 0 ? data.requestId : null
+          const requestIdSuffix = requestId ? ` (ID: ${requestId})` : ''
+          throw new Error(
+            `Banco de dados indisponível no momento. Tente novamente em instantes.${requestIdSuffix}`,
+          )
+        }
         throw new Error(data.error || 'Não foi possível enviar o check-in')
       }
 

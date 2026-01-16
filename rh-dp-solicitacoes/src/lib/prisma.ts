@@ -18,6 +18,33 @@ const poolDatabaseUrl =
   cleanEnvUrl(process.env.SUPABASE_PRISMA_URL) ||
   cleanEnvUrl(process.env.SUPABASE_POOLER_URL) ||
   null
+  const warnMissingPoolerParams = (urlValue?: string | null) => {
+  if (!urlValue) return
+  try {
+    const parsedUrl = new URL(urlValue)
+    const params = parsedUrl.searchParams
+    const missing: string[] = []
+
+    if (params.get('pgbouncer') !== 'true') {
+      missing.push('pgbouncer=true')
+    }
+    if (params.get('sslmode') !== 'require') {
+      missing.push('sslmode=require')
+    }
+
+    if (missing.length > 0) {
+      console.warn('[prisma] DATABASE_URL sem parâmetros recomendados', {
+        missing: missing.join(', '),
+      })
+    }
+  } catch (error) {
+    console.warn('[prisma] DATABASE_URL inválida, não foi possível validar parâmetros.', {
+      error,
+    })
+  }
+}
+
+warnMissingPoolerParams(cleanEnvUrl(process.env.DATABASE_URL))
 
 // ✅ Em produção, EXIGIR pooler
 if (isProd && !poolDatabaseUrl) {
