@@ -326,7 +326,17 @@ function LoginPageContent() {
         )}
         {isDbUnavailable && (
           <div className="mb-4 rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-800">
-            Não foi possível conectar ao banco de dados. Tente novamente em alguns minutos ou contate o suporte.
+              <p>Não foi possível conectar ao banco de dados. Tente novamente em alguns minutos ou contate o suporte.</p>
+            <button
+              type="button"
+              onClick={() => {
+                router.replace(`/login?next=${encodeURIComponent(nextUrl)}`)
+                router.refresh()
+              }}
+              className="mt-2 inline-flex items-center rounded-md border border-orange-300 bg-white px-2.5 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
+            >
+              Tentar novamente
+            </button>
           </div>
         )}
         {bootstrapError && (
