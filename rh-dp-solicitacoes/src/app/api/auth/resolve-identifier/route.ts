@@ -39,10 +39,13 @@ export async function GET(req: NextRequest) {
     }
 
 
-    const user = await prisma.user.findFirst({
+   const user = await prisma.user.findFirst({
       where: {
         status: 'ATIVO',
-        OR: [{ login: identifier }, { email: identifier }],
+        OR: [
+          { login: { equals: identifier, mode: 'insensitive' } },
+          { email: { equals: identifier, mode: 'insensitive' } },
+        ],
       },
       select: {
         email: true,
