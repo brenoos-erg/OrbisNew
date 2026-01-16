@@ -298,18 +298,21 @@ async function main() {
   const configModule = await ensureModule(MODULE_KEYS.CONFIGURACOES, 'Configurações')
   const fleetModule = await ensureModule(MODULE_KEYS.FROTAS, 'Gestão de Frotas')
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
+  const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',
   )
 
-  const allModules = [
+ const allModules = [
     solicitacoesModule,
     configModule,
     fleetModule,
     refusalModule,
+    celularModule,
     equipmentsModule,
   ]
+
 
   const adminGroup = await prisma.accessGroup.upsert({
     where: { name: 'Administradores' },

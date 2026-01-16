@@ -14,6 +14,7 @@ const CORE_MODULES = [
   { key: 'gestao-de-frotas', name: 'Gestão de Frotas' },
   { key: 'direito-de-recusa', name: 'Direito de Recusa' },
   { key: 'controle-equipamentos-ti', name: 'Controle de Equipamentos TI' },
+  { key: 'celular', name: 'Celular' },
 ]
 
 async function ensureCoreModules() {

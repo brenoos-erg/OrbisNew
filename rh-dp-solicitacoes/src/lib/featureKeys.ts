@@ -6,6 +6,7 @@ export const MODULE_KEYS = {
   FROTAS: 'gestao-de-frotas',
   RECUSA: 'direito-de-recusa',
   EQUIPAMENTOS_TI: 'controle-equipamentos-ti',
+  CELULAR: 'celular',
 } as const
 
 export const FEATURE_KEYS = {
