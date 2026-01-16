@@ -5,6 +5,10 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
 import { getModuleKeyAliases, normalizeModuleKey } from '@/lib/moduleKey'
 
+function normalizeFeatureKey(featureKey: string) {
+  return featureKey.trim().toLowerCase().replace(/_/g, '-')
+}
+
 export function mapLevelToDefaultActions(level: ModuleLevel): Action[] {
   switch (level) {
     case 'NIVEL_1':
