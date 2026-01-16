@@ -5,20 +5,11 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
 
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
-
-function isDbUnavailableError(error: unknown) {
-  return (
-    isDbDisabled ||
-    error instanceof Prisma.PrismaClientInitializationError ||
-    (error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === 'P1001' || error.code === 'P1002'))
-  )
-}
 
 export async function GET() {
   const supabaseUrl =

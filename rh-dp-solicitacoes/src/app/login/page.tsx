@@ -132,6 +132,10 @@ function LoginPageContent() {
       { cache: 'no-store' },
     )
     const payload = await res.json().catch(() => null)
+    // Ajuda o suporte a correlacionar falhas do backend.
+    const requestId = payload?.requestId as string | undefined
+    const withRequestId = (message: string) =>
+      requestId ? `${message} (ID: ${requestId}). Tente novamente.` : `${message} Tente novamente.`
 
     if (res.status === 503 || payload?.dbUnavailable) {
       const error: any = new Error(
@@ -146,7 +150,24 @@ function LoginPageContent() {
       throw error
     }
 
-    if (!res.ok) throw new Error('Login não encontrado. Verifique e tente novamente.')
+    if (res.status >= 500) {
+      const message = payload?.error
+        ? String(payload.error)
+        : 'Falha no serviço.'
+      throw new Error(withRequestId(message))
+    }
+
+    if (res.status === 400) {
+      throw new Error(payload?.error || 'Identificador inválido. Verifique e tente novamente.')
+    }
+
+    if (res.status === 404) {
+      throw new Error('Login não encontrado. Verifique e tente novamente.')
+    }
+
+    if (!res.ok) {
+      throw new Error(payload?.error || 'Login não encontrado. Verifique e tente novamente.')
+    }
 
     const data = payload
     if (!data?.email) throw new Error('Login não encontrado. Verifique e tente novamente.')

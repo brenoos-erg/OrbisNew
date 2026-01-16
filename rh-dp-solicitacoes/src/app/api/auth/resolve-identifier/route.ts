@@ -1,36 +1,11 @@
 export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
+import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
 
 export const dynamic = 'force-dynamic'
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
-const dbUnavailableCodes = new Set([
-  'P1000',
-  'P1001',
-  'P1002',
-  'P1003',
-  'P1008',
-  'P1009',
-  'P1011',
-  'P1012',
-  'P1013',
-  'P1017',
-  'P2024',
-])
-
-function isDbUnavailableError(error: unknown) {
-  return (
-    isDbDisabled ||
-    error instanceof Prisma.PrismaClientInitializationError ||
-    error instanceof Prisma.PrismaClientRustPanicError ||
-    error instanceof Prisma.PrismaClientUnknownRequestError ||
-    (error instanceof Prisma.PrismaClientKnownRequestError &&
-      dbUnavailableCodes.has(error.code))
-  )
-}
-
-
 export async function GET(req: NextRequest) {
   try {
     const identifierParam = req.nextUrl.searchParams.get('identifier')
@@ -45,10 +20,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Identifier is required' }, { status: 400 })
     }
     if (isDbDisabled) {
+      const requestId = crypto.randomUUID()
+      console.warn('Banco de dados desabilitado ao resolver login', { requestId })
       return NextResponse.json(
         {
           error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
           dbUnavailable: true,
+          requestId,
         },
         { status: 503 },
       )
@@ -76,9 +54,13 @@ export async function GET(req: NextRequest) {
     const message = dbUnavailable
       ? 'Banco de dados indisponível. Confira DATABASE_URL no Vercel ou tente novamente em instantes.'
       : 'Internal server error'
+    const requestId = crypto.randomUUID()
 
-    console.error('Error resolving identifier', error)
+    console.error('Error resolving identifier', { requestId, error })
 
-    return NextResponse.json({ error: message, dbUnavailable }, { status: dbUnavailable ? 503 : 500 })
+    return NextResponse.json(
+      { error: message, dbUnavailable, requestId },
+      { status: dbUnavailable ? 503 : 500 },
+    )
   }
 }

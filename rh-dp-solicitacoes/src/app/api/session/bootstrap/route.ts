@@ -2,30 +2,20 @@
 export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import crypto from 'node:crypto'
 import { performance } from 'node:perf_hooks'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import type { User } from '@supabase/supabase-js'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   appUserSelect,
   getCurrentAppUserFromSessionUser,
   type SelectedAppUser,
 } from '@/lib/auth'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
-
-function isDbUnavailableError(error: unknown) {
-  return (
-    isDbDisabled ||
-    error instanceof Prisma.PrismaClientInitializationError ||
-    (error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === 'P1001' || error.code === 'P1002'))
-  )
-}
-
-
 async function syncUser(sessionUser: User | null): Promise<SelectedAppUser | null> {
   if (!sessionUser) return null
 
@@ -111,10 +101,13 @@ export async function GET() {
 
     const sessionUser = data.user
     if (isDbDisabled) {
+      const requestId = crypto.randomUUID()
+      console.warn('Banco de dados desabilitado no bootstrap', { requestId })
       return NextResponse.json(
         {
           error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
           dbUnavailable: true,
+          requestId,
         },
         { status: 503 },
       )
@@ -128,17 +121,18 @@ export async function GET() {
       logTiming('prisma.user.sync (/api/session/bootstrap)', syncStartedAt)
     } catch (err) {
       const isDbUnavailable = isDbUnavailableError(err)
-      console.error('Erro ao sincronizar usuário no bootstrap', err)
+      const requestId = crypto.randomUUID()
+      console.error('Erro ao sincronizar usuário no bootstrap', { requestId, err })
 
       return NextResponse.json(
         {
           error: 'Falha ao sincronizar usuário',
           dbUnavailable: isDbUnavailable,
+          requestId,
         },
         { status: isDbUnavailable ? 503 : 500 },
       )
     }
-
     try {
       const lookupStartedAt = performance.now()
       const { appUser, session, dbUnavailable } = await getCurrentAppUserFromSessionUser(
@@ -170,12 +164,14 @@ export async function GET() {
       )
     } catch (err) {
       const isDbUnavailable = isDbUnavailableError(err)
-      console.error('Erro ao carregar appUser a partir da sessão', err)
+      const requestId = crypto.randomUUID()
+      console.error('Erro ao carregar appUser a partir da sessão', { requestId, err })
 
       return NextResponse.json(
         {
           error: 'Erro ao carregar usuário autenticado',
           dbUnavailable: isDbUnavailable,
+          requestId,
         },
         { status: isDbUnavailable ? 503 : 500 },
       )
