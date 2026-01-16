@@ -2,10 +2,18 @@ import { NextResponse } from 'next/server'
 
 const notFoundPayload = { error: 'Rota indisponível.' }
 
-export function GET() {
+function notFoundResponse() {
   return NextResponse.json(notFoundPayload, { status: 404 })
 }
 
+export function GET() {
+  return notFoundResponse()
+}
+
 export function POST() {
-  return NextResponse.json(notFoundPayload, { status: 404 })
+  return notFoundResponse()
+}
+
+export function OPTIONS() {
+  return notFoundResponse()
 }
