@@ -5,15 +5,31 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
+const dbUnavailableCodes = new Set([
+  'P1000',
+  'P1001',
+  'P1002',
+  'P1003',
+  'P1008',
+  'P1009',
+  'P1011',
+  'P1012',
+  'P1013',
+  'P1017',
+  'P2024',
+])
 
 function isDbUnavailableError(error: unknown) {
   return (
     isDbDisabled ||
     error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientRustPanicError ||
+    error instanceof Prisma.PrismaClientUnknownRequestError ||
     (error instanceof Prisma.PrismaClientKnownRequestError &&
-      (error.code === 'P1001' || error.code === 'P1002'))
+      dbUnavailableCodes.has(error.code))
   )
 }
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +44,7 @@ export async function GET(req: NextRequest) {
     if (!identifier) {
       return NextResponse.json({ error: 'Identifier is required' }, { status: 400 })
     }
-     if (isDbDisabled) {
+    if (isDbDisabled) {
       return NextResponse.json(
         {
           error: 'Banco de dados desabilitado neste ambiente (SKIP_PRISMA_DB=true).',
@@ -37,9 +53,7 @@ export async function GET(req: NextRequest) {
         { status: 503 },
       )
     }
-
-
-   const user = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
         status: 'ATIVO',
         OR: [
