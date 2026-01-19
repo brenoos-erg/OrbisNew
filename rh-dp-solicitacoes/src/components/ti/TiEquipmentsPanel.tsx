@@ -10,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   ScanLine,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   TI_EQUIPMENT_CATEGORIES,
@@ -151,6 +152,127 @@ function getUserLabel(category: TiEquipmentCategory) {
 function getCategoryFieldConfig(category: TiEquipmentCategory) {
   return categoryFieldConfig[category]
 }
+function normalizeKey(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[\s-_]/g, '')
+    .trim()
+}
+
+function resolveCategory(value: string) {
+  const normalized = normalizeKey(value)
+  return (
+    TI_EQUIPMENT_CATEGORIES.find((category) => {
+      const candidates = [category.value, category.label, category.slug].map((item) =>
+        normalizeKey(item),
+      )
+      return candidates.includes(normalized)
+    })?.value ?? null
+  )
+}
+
+const statusKeywords: Array<{ value: TiEquipmentStatus; labels: string[] }> = [
+  { value: 'IN_STOCK', labels: ['emestoque', 'estoque'] },
+  { value: 'ASSIGNED', labels: ['emuso', 'uso', 'alocado'] },
+  { value: 'MAINTENANCE', labels: ['emmanutencao', 'manutencao'] },
+  { value: 'RETIRED', labels: ['baixado', 'baixados'] },
+]
+
+function resolveStatus(value: string | undefined) {
+  if (!value) return 'IN_STOCK' as TiEquipmentStatus
+  const normalized = normalizeKey(value)
+  const exactStatus = statusKeywords.find(
+    (status) => normalizeKey(status.value) === normalized,
+  )
+  if (exactStatus) {
+    return exactStatus.value
+  }
+  const match = statusKeywords.find((status) => status.labels.includes(normalized))
+  return match?.value ?? null
+}
+
+type BulkParsedRow = {
+  line: number
+  name: string
+  patrimonio: string
+  userEmail: string
+  category: TiEquipmentCategory
+  status: TiEquipmentStatus
+  identifier: string
+  value: string
+}
+
+function normalizeValue(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (trimmed.includes(',') && trimmed.includes('.')) {
+    return trimmed.replace(/\./g, '').replace(',', '.')
+  }
+  return trimmed.replace(',', '.')
+}
+
+function parseBulkInput(raw: string) {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (!lines.length) {
+    return { rows: [] as BulkParsedRow[], errors: [] as string[] }
+  }
+
+  const delimiter = lines[0].includes(';')
+    ? ';'
+    : lines[0].includes('\t')
+      ? '\t'
+      : ','
+
+  const headerTokens = lines[0].split(delimiter).map((token) => normalizeKey(token))
+  const hasHeader = headerTokens.includes('nome') && headerTokens.includes('patrimonio')
+
+  const rows: BulkParsedRow[] = []
+  const errors: string[] = []
+  const contentLines = hasHeader ? lines.slice(1) : lines
+
+  contentLines.forEach((line, index) => {
+    const tokens = line.split(delimiter).map((token) => token.trim())
+    const lineNumber = index + 1 + (hasHeader ? 1 : 0)
+    const [name, patrimonio, userEmail, categoryRaw, statusRaw, identifier, value] = tokens
+
+    if (!name || !patrimonio || !userEmail || !categoryRaw) {
+      errors.push(`Linha ${lineNumber}: informe nome, patrimônio, e-mail e categoria.`)
+      return
+    }
+
+    const category = resolveCategory(categoryRaw)
+    if (!category) {
+      errors.push(`Linha ${lineNumber}: categoria inválida (${categoryRaw}).`)
+      return
+    }
+
+    const status = resolveStatus(statusRaw)
+    if (!status) {
+      errors.push(`Linha ${lineNumber}: status inválido (${statusRaw}).`)
+      return
+    }
+
+    rows.push({
+      line: lineNumber,
+      name,
+      patrimonio,
+      userEmail,
+      category,
+      status,
+      identifier: identifier ?? '',
+      value: value ?? '',
+    })
+  })
+
+  return { rows, errors }
+}
+
 
 type TiEquipmentsPanelProps = {
   initialCategory?: TiEquipmentCategory | 'ALL'
@@ -202,6 +324,15 @@ export default function TiEquipmentsPanel({
   const [scanValue, setScanValue] = useState('')
   const [scanMatch, setScanMatch] = useState<EquipmentRow | null>(null)
   const scanInputRef = useRef<HTMLInputElement | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkInput, setBulkInput] = useState('')
+  const [bulkErrors, setBulkErrors] = useState<string[]>([])
+  const [bulkSummary, setBulkSummary] = useState<{
+    total: number
+    created: number
+    failed: number
+  } | null>(null)
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
 
   const [formValues, setFormValues] = useState<{
     name: string
@@ -238,6 +369,118 @@ export default function TiEquipmentsPanel({
     () => Math.max(1, Math.ceil(total / pageSize)),
     [total, pageSize],
   )
+const bulkPreview = useMemo(() => parseBulkInput(bulkInput), [bulkInput])
+
+  const openBulk = () => {
+    setBulkOpen(true)
+    setBulkErrors([])
+    setBulkSummary(null)
+  }
+
+  const closeBulk = () => {
+    setBulkOpen(false)
+    setBulkErrors([])
+    setBulkSummary(null)
+    setBulkSubmitting(false)
+  }
+
+  const resolveUserIdByEmail = async (email: string) => {
+    const response = await fetch(
+      `/api/ti/equipamentos/users?search=${encodeURIComponent(email)}&limit=10`,
+    )
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err?.error || 'Falha ao buscar usuários.')
+    }
+    const users: UserOption[] = await response.json()
+    const match = users.find((user) => user.email.toLowerCase() === email.toLowerCase())
+    return match?.id ?? null
+  }
+
+  const handleBulkSubmit = async () => {
+    const parsed = parseBulkInput(bulkInput)
+    if (parsed.errors.length) {
+      setBulkErrors(parsed.errors)
+      setBulkSummary(null)
+      return
+    }
+    if (!parsed.rows.length) {
+      setBulkErrors(['Informe ao menos um equipamento.'])
+      setBulkSummary(null)
+      return
+    }
+
+    setBulkSubmitting(true)
+    setBulkErrors([])
+    setBulkSummary(null)
+
+    const failures: string[] = []
+    let created = 0
+
+    for (const row of parsed.rows) {
+      try {
+        const userId = await resolveUserIdByEmail(row.userEmail)
+        if (!userId) {
+          failures.push(`Linha ${row.line}: usuário não encontrado (${row.userEmail}).`)
+          continue
+        }
+
+        const categoryField = getCategoryFieldConfig(row.category)
+        const payload: Record<string, string | null> = {
+          name: row.name,
+          patrimonio: row.patrimonio,
+          userId,
+          category: row.category,
+          status: row.status,
+        }
+
+        const identifier = row.identifier?.trim()
+        if (identifier) {
+          if (categoryField.source === 'serialNumber') {
+            payload.serialNumber = identifier
+          } else {
+            payload.observations = identifier
+          }
+        }
+
+        const normalizedValue = normalizeValue(row.value)
+        if (normalizedValue) {
+          payload.value = normalizedValue
+        }
+
+        const response = await fetch('/api/ti/equipamentos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          failures.push(
+            `Linha ${row.line}: ${err?.error || 'Falha ao cadastrar equipamento.'}`,
+          )
+          continue
+        }
+
+        created += 1
+      } catch (err: any) {
+        failures.push(
+          `Linha ${row.line}: ${err?.message || 'Falha ao cadastrar equipamento.'}`,
+        )
+      }
+    }
+
+    setBulkSubmitting(false)
+    setBulkErrors(failures)
+    setBulkSummary({
+      total: parsed.rows.length,
+      created,
+      failed: failures.length,
+    })
+    if (created > 0) {
+      load()
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -494,11 +737,12 @@ function handleScanSubmit(value: string) {
       ? 'Todos'
       : getTiEquipmentCategoryLabel(categoryFilter) || categoryFilter
 
-    const tableExtraLabel =
+const tableExtraLabel =
     categoryFilter === 'ALL'
       ? 'Identificação'
       : getCategoryFieldConfig(categoryFilter).label
-      if (shortcutMode) {
+
+  if (shortcutMode) {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -516,6 +760,13 @@ function handleScanSubmit(value: string) {
           >
             <Plus className="h-4 w-4" />
             Novo
+          </button>
+          <button
+            onClick={openBulk}
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Registro em massa
           </button>
           <button
             type="button"
@@ -536,6 +787,93 @@ function handleScanSubmit(value: string) {
             Excluir
           </button>
         </div>
+ {bulkOpen && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Registro em massa</h3>
+                  <p className="text-sm text-slate-500">
+                    Cole uma planilha com todos os equipamentos da TI para cadastrar tudo de uma vez.
+                  </p>
+                </div>
+                <button
+                  onClick={closeBulk}
+                  className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-700">Formato esperado (separado por ;):</p>
+                <p className="mt-1">
+                  Nome; Patrimônio; Email do usuário; Categoria; Status; Identificação; Valor
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  A coluna &quot;Identificação&quot; vira IMEI/Nº de série ou observações dependendo
+                  da categoria. O status pode ser &quot;Em estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
+                  ou &quot;Baixado&quot;.
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-xs font-semibold uppercase text-slate-600">
+                  Dados para importação
+                </label>
+                <textarea
+                  className={`${INPUT} min-h-[180px] font-mono`}
+                  placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Em estoque; SN123; 4500,00"
+                  value={bulkInput}
+                  onChange={(e) => setBulkInput(e.target.value)}
+                />
+              </div>
+
+              {bulkSummary && (
+                <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  Registro concluído: {bulkSummary.created} de {bulkSummary.total} itens cadastrados.
+                </div>
+              )}
+
+              {bulkErrors.length > 0 && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <p className="font-semibold">Erros encontrados:</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {bulkErrors.map((message, index) => (
+                      <li key={`${message}-${index}`}>{message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-slate-500">
+                  {bulkPreview.rows.length
+                    ? `${bulkPreview.rows.length} linha(s) pronta(s) para importação.`
+                    : 'Nenhuma linha para importar.'}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={closeBulk}
+                    className="rounded-md border px-4 py-2 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkSubmit}
+                    className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-70"
+                    disabled={bulkSubmitting}
+                  >
+                    {bulkSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Registrar em massa
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -940,6 +1278,13 @@ function handleScanSubmit(value: string) {
           >
             <Plus className="h-4 w-4" />
             Novo
+          </button>
+          <button
+            onClick={openBulk}
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Registro em massa
           </button>
         </div>
       </div>
@@ -1510,6 +1855,94 @@ function handleScanSubmit(value: string) {
           </div>
         </div>
       )}
+      {bulkOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Registro em massa</h3>
+                <p className="text-sm text-slate-500">
+                  Cole uma planilha com todos os equipamentos da TI para cadastrar tudo de uma vez.
+                </p>
+              </div>
+              <button
+                onClick={closeBulk}
+                className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-700">Formato esperado (separado por ;):</p>
+              <p className="mt-1">
+                Nome; Patrimônio; Email do usuário; Categoria; Status; Identificação; Valor
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                A coluna &quot;Identificação&quot; vira IMEI/Nº de série ou observações dependendo
+                da categoria. O status pode ser &quot;Em estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
+                ou &quot;Baixado&quot;.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-xs font-semibold uppercase text-slate-600">
+                Dados para importação
+              </label>
+              <textarea
+                className={`${INPUT} min-h-[180px] font-mono`}
+                placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Em estoque; SN123; 4500,00"
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+              />
+            </div>
+
+            {bulkSummary && (
+              <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                Registro concluído: {bulkSummary.created} de {bulkSummary.total} itens cadastrados.
+              </div>
+            )}
+
+            {bulkErrors.length > 0 && (
+              <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <p className="font-semibold">Erros encontrados:</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {bulkErrors.map((message, index) => (
+                    <li key={`${message}-${index}`}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-slate-500">
+                {bulkPreview.rows.length
+                  ? `${bulkPreview.rows.length} linha(s) pronta(s) para importação.`
+                  : 'Nenhuma linha para importar.'}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeBulk}
+                  className="rounded-md border px-4 py-2 text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkSubmit}
+                  className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-70"
+                  disabled={bulkSubmitting}
+                >
+                  {bulkSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Registrar em massa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {error && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
