@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { ModuleLevel, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
+import { isDbUnavailableError } from '@/lib/db-unavailable'
 import {
   ensureRequestContext,
   logTiming,
@@ -84,7 +85,7 @@ export async function resolveAppUserFromSessionUser(
       }
     }
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (isDbUnavailableError(error)) {
       console.error('Não foi possível conectar ao banco de dados para buscar usuário', error)
       dbUnavailable = true
     } else {
@@ -101,7 +102,7 @@ export async function resolveAppUserFromSessionUser(
       logTiming('prisma.moduleLevels.load', levelsStartedAt)
       return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable }
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientInitializationError) {
+      if (isDbUnavailableError(error)) {
         console.error('Não foi possível conectar ao banco de dados para carregar módulos do usuário', error)
         dbUnavailable = true
       } else {

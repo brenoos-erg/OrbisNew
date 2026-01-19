@@ -22,10 +22,16 @@ async function canViewAnyCategory(userId: string) {
 }
 
 export async function GET(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[ti/equipamentos/users][GET] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 

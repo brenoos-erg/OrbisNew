@@ -13,10 +13,16 @@ export const runtime = 'nodejs'
 
 
 export async function GET(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/vehicles][GET] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
@@ -97,10 +103,16 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/vehicles][POST] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
@@ -205,10 +217,16 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/vehicles][PATCH] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
@@ -291,10 +309,16 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/vehicles][DELETE] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 

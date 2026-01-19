@@ -20,10 +20,16 @@ function parseDate(value?: string | null) {
 }
 
 export async function GET(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/displacement-checkins][GET] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
@@ -70,10 +76,16 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[fleet/displacement-checkins][POST] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 

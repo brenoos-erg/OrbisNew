@@ -27,10 +27,16 @@ function mapRow(row: any) {
 }
 
 export async function PUT(req: Request, context: { params: { id: string } }) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[ti/equipamentos][PUT] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
@@ -151,10 +157,16 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
 }
 
 export async function DELETE(_req: Request, context: { params: { id: string } }) {
-  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+  const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
     console.warn('[ti/equipamentos][DELETE] Não autenticado', { requestId })
+    if (dbUnavailable) {
+      return NextResponse.json(
+        { error: 'Banco de dados indisponível no momento.', dbUnavailable: true, requestId },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
