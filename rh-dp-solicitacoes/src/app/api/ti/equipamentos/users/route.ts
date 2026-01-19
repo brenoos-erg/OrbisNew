@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { TI_EQUIPMENT_CATEGORIES } from '@/lib/tiEquipment'
@@ -22,14 +22,18 @@ async function canViewAnyCategory(userId: string) {
 }
 
 export async function GET(req: Request) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[ti/equipamentos/users][GET] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   if (!(await canViewAnyCategory(appUser.id))) {
-    return NextResponse.json({ error: 'Acesso negado aos equipamentos TI.' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Acesso negado aos equipamentos TI.', requestId },
+      { status: 403 },
+    )
   }
 
   const { searchParams } = new URL(req.url)

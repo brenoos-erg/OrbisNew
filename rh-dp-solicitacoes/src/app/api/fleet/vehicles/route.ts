@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { normalizePlate, isValidPlate } from '@/lib/plate'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
@@ -13,10 +13,11 @@ export const runtime = 'nodejs'
 
 
 export async function GET(req: Request) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[fleet/vehicles][GET] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   const canViewVehicles = await canFeature(
@@ -26,7 +27,10 @@ export async function GET(req: Request) {
     Action.VIEW,
   )
   if (!canViewVehicles) {
-    return NextResponse.json({ error: 'Acesso negado ao módulo de frotas.' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Acesso negado ao módulo de frotas.', requestId },
+      { status: 403 },
+    )
   }
 
   const { searchParams } = new URL(req.url)
@@ -41,7 +45,10 @@ export async function GET(req: Request) {
 
   if (!canListVehicles && !plate) {
     return NextResponse.json(
-      { error: 'Consulte veículos individualmente ou solicite acesso de nível 2 para listar.' },
+      {
+        error: 'Consulte veículos individualmente ou solicite acesso de nível 2 para listar.',
+        requestId,
+      },
       { status: 403 },
     )
   }
@@ -90,13 +97,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/vehicles][POST] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-     const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
     const canCreateVehicles = await canFeature(
       appUser.id,
       MODULE_KEYS.FROTAS,
@@ -104,7 +112,10 @@ export async function POST(req: Request) {
       Action.CREATE,
     )
     if (!canCreateVehicles) {
-      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para gerenciar veículos.', requestId },
+        { status: 403 },
+      )
     }
 
     const body = await req.json()
@@ -121,7 +132,7 @@ export async function POST(req: Request) {
 
     if (!plate) {
       return NextResponse.json(
-        { error: 'Placa é obrigatória' },
+        { error: 'Placa é obrigatória', requestId },
         { status: 400 }
       )
     }
@@ -129,7 +140,10 @@ export async function POST(req: Request) {
     const normalizedPlate = normalizePlate(String(plate))
     if (!isValidPlate(normalizedPlate)) {
       return NextResponse.json(
-         { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul) ou ABC1234 (antiga).' },
+         {
+           error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul) ou ABC1234 (antiga).',
+           requestId,
+         },
         { status: 400 }
       )
     }
@@ -141,10 +155,11 @@ export async function POST(req: Request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Já existe um veículo com esta placa' },
+        { error: 'Já existe um veículo com esta placa', requestId },
         { status: 409 }
       )
     }
+
 
     const costCenterIdsArray = Array.isArray(costCenterIds)
       ? [...new Set(costCenterIds.filter((id: unknown) => typeof id === 'string'))]
@@ -181,22 +196,23 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
-    console.error('Erro ao criar veículo', error)
+  console.error('Erro ao criar veículo', { requestId, error })
     return NextResponse.json(
-      { error: 'Erro ao criar veículo' },
+      { error: 'Erro ao criar veículo', requestId },
       { status: 500 }
     )
   }
 }
 
 export async function PATCH(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/vehicles][PATCH] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-    const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
     const canUpdateVehicles = await canFeature(
       appUser.id,
       MODULE_KEYS.FROTAS,
@@ -204,7 +220,10 @@ export async function PATCH(req: Request) {
       Action.UPDATE,
     )
     if (!canUpdateVehicles) {
-      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para gerenciar veículos.', requestId },
+        { status: 403 },
+      )
     }
 
     const { searchParams } = new URL(req.url)
@@ -212,11 +231,10 @@ export async function PATCH(req: Request) {
 
     if (!id) {
       return NextResponse.json(
-        { error: 'ID do veículo é obrigatório' },
+        { error: 'ID do veículo é obrigatório', requestId },
         { status: 400 }
       )
     }
-
     const body = await req.json()
     const { type, model, costCenter, sector, kmCurrent, status, costCenterIds } = body ?? {}
 
@@ -264,22 +282,23 @@ export async function PATCH(req: Request) {
 
     return NextResponse.json(vehicle)
   } catch (error) {
-    console.error('Erro ao atualizar veículo', error)
+    console.error('Erro ao atualizar veículo', { requestId, error })
     return NextResponse.json(
-      { error: 'Erro ao atualizar veículo' },
+      { error: 'Erro ao atualizar veículo', requestId },
       { status: 500 }
     )
   }
 }
 
 export async function DELETE(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/vehicles][DELETE] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-    const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
     const canDeleteVehicles = await canFeature(
       appUser.id,
       MODULE_KEYS.FROTAS,
@@ -287,14 +306,17 @@ export async function DELETE(req: Request) {
       Action.DELETE,
     )
     if (!canDeleteVehicles) {
-      return NextResponse.json({ error: 'Sem permissão para gerenciar veículos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para gerenciar veículos.', requestId },
+        { status: 403 },
+      )
     }
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
     if (!id) {
       return NextResponse.json(
-        { error: 'ID do veículo é obrigatório' },
+        { error: 'ID do veículo é obrigatório', requestId },
         { status: 400 }
       )
     }
@@ -303,9 +325,9 @@ export async function DELETE(req: Request) {
     await prisma.vehicle.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Erro ao excluir veículo', error)
+     console.error('Erro ao excluir veículo', { requestId, error })
     return NextResponse.json(
-      { error: 'Erro ao excluir veículo' },
+      { error: 'Erro ao excluir veículo', requestId },
       { status: 500 }
     )
   }

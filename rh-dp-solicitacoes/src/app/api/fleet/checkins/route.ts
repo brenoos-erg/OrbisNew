@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { ModuleLevel, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { sendMail } from '@/lib/mailer'
 import { isDbUnavailableError } from '@/lib/db-unavailable'
 import { jsonApiError } from '@/lib/api-error'
@@ -205,13 +205,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/checkins][POST] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-    const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
     const body = await req.json()
 
     const {
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
 
     if (!inspectionDate || !vehiclePlate || typeof vehicleKm !== 'number') {
       return NextResponse.json(
-        { error: 'Dados obrigatórios ausentes (data, placa ou quilometragem).' },
+        { error: 'Dados obrigatórios ausentes (data, placa ou quilometragem).', requestId },
         { status: 400 },
       )
     }
@@ -262,14 +263,17 @@ export async function POST(req: Request) {
 
     if (!vehicle) {
       return NextResponse.json(
-        { error: 'Placa não cadastrada. Cadastre o veículo antes do check-in.' },
+         { error: 'Placa não cadastrada. Cadastre o veículo antes do check-in.', requestId },
         { status: 400 },
       )
     }
 
     if (typeof vehicleKm === 'number' && vehicleKm < vehicle.kmCurrent) {
       return NextResponse.json(
-        { error: 'A quilometragem informada é inferior ao último registro do veículo.' },
+        {
+          error: 'A quilometragem informada é inferior ao último registro do veículo.',
+          requestId,
+        },
         { status: 400 },
       )
     }
@@ -287,6 +291,7 @@ export async function POST(req: Request) {
           {
             error:
               'Veículo restrito requer tratativa: informe ações e data de tratativa para liberar o veículo.',
+              requestId,
           },
           { status: 400 },
         )
@@ -377,7 +382,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     const dbUnavailable = isDbUnavailableError(error)
-    const requestId = crypto.randomUUID()
     console.error('Erro ao registrar check-in de veículo', { requestId, error })
     return jsonApiError({
       status: dbUnavailable ? 503 : 500,

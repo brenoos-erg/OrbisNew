@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSessionMe } from '@/components/session/SessionProvider'
 import { ShieldAlert } from 'lucide-react'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 
 type FleetLevel = 'NIVEL_1' | 'NIVEL_2' | 'NIVEL_3'
 
@@ -80,6 +81,7 @@ export default function DisplacementPanelPage() {
       setError(null)
       try {
         const res = await fetch('/api/fleet/displacement-checkins', { cache: 'no-store' })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Não foi possível carregar os check-ins.')

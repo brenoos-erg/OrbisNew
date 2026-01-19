@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useSessionMe } from '@/components/session/SessionProvider'
 import { isValidPlate } from '@/lib/plate'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 
 type ChecklistItem = {
   name: string
@@ -216,6 +217,7 @@ export default function VehicleCheckinPage() {
         const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, {
           cache: 'no-store',
         })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) throw new Error('Erro ao buscar veículo')
 
         const vehicles: Array<{
@@ -419,7 +421,7 @@ const vehicleKmRaw = formData.get('vehicleKm')
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
          const dbUnavailable = res.status === 503 || data.dbUnavailable === true

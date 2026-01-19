@@ -3,11 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { isValidPlate } from '@/lib/plate'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 type CostCenterOption = {
   id: string
   label: string
 }
-
 
 type QuickEntry = {
   id: string
@@ -70,6 +70,7 @@ export default function QuickCheckinPage() {
 
       try {
         const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, { cache: 'no-store' })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) throw new Error('Erro ao buscar veículo')
         const vehicles: Array<{ plate: string; kmCurrent?: number }> = await res.json()
         const found = vehicles.find((v) => v.plate.toUpperCase() === plate)
@@ -151,7 +152,7 @@ async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Não foi possível enviar o check-in')

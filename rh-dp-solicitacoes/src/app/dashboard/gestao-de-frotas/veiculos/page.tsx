@@ -16,6 +16,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { isValidPlate, normalizePlate } from '@/lib/plate'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 
 type CostCenterOption = {
   id: string
@@ -541,6 +542,7 @@ export default function VehiclesPage() {
     setError(null)
     try {
       const res = await fetch('/api/fleet/vehicles', { cache: 'no-store' })
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) throw new Error('Falha ao buscar veículos')
 
       const data: Array<ApiVehicle & { checkins?: Array<{ inspectionDate: string }> }> = await res.json()
@@ -570,6 +572,7 @@ export default function VehiclesPage() {
       const responses = await Promise.all(
         vehicleIds.map(async (vehicleId) => {
           const res = await fetch(`/api/fleet/checkins?vehicleId=${vehicleId}`, { cache: 'no-store' })
+          if (handleFleetUnauthorized(res)) return []
           if (!res.ok) throw new Error('Falha ao buscar check-ins')
           return res.json()
         }),
@@ -602,6 +605,7 @@ export default function VehiclesPage() {
 
     try {
       const res = await fetch(`/api/fleet/vehicles/status?vehicleId=${vehicleId}`, { cache: 'no-store' })
+       if (handleFleetUnauthorized(res)) return
       if (!res.ok) throw new Error('Falha ao carregar histórico de status')
       const data: VehicleStatusLog[] = await res.json()
       setStatusLogs(data)
@@ -656,7 +660,7 @@ export default function VehiclesPage() {
           reason: statusReason.trim(),
         }),
       })
-
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Falha ao alterar status do veículo')
@@ -802,7 +806,7 @@ export default function VehiclesPage() {
             costCenterIds: [costCenterMatch.id],
           }),
         })
-
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Falha ao criar veículo.')
@@ -883,6 +887,7 @@ export default function VehiclesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) throw new Error('Falha ao atualizar veículo')
       } else {
         const res = await fetch('/api/fleet/vehicles', {
@@ -890,6 +895,7 @@ export default function VehiclesPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Falha ao criar veículo')
@@ -917,6 +923,7 @@ export default function VehiclesPage() {
 
     try {
       const res = await fetch(`/api/fleet/vehicles?id=${vehicle.id}`, { method: 'DELETE' })
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) throw new Error('Falha ao excluir veículo')
 
       if (selectedVehicle?.id === vehicle.id) {

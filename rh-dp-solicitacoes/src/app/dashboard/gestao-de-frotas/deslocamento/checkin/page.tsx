@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { isValidPlate } from '@/lib/plate'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 
 type VehicleOption = {
   id: string
@@ -64,6 +65,7 @@ export default function DisplacementCheckinPage() {
         const res = await fetch(`/api/fleet/vehicles?plate=${encodeURIComponent(plate)}`, {
           cache: 'no-store',
         })
+        if (handleFleetUnauthorized(res)) return
         if (!res.ok) throw new Error('Erro ao buscar veículo')
         const data: VehicleOption[] = await res.json()
         const found = data.find((item) => item.plate.toUpperCase() === plate)
@@ -184,7 +186,7 @@ export default function DisplacementCheckinPage() {
           destination: destination.trim(),
         }),
       })
-
+      if (handleFleetUnauthorized(res)) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Não foi possível registrar o deslocamento.')

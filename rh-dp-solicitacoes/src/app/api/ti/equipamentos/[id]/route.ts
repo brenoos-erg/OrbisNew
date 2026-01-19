@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { Action, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { TI_EQUIPMENT_CATEGORIES, TI_EQUIPMENT_STATUSES } from '@/lib/tiEquipment'
@@ -27,10 +27,11 @@ function mapRow(row: any) {
 }
 
 export async function PUT(req: Request, context: { params: { id: string } }) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[ti/equipamentos][PUT] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   const id = context.params.id
@@ -57,17 +58,20 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     })
 
     if (!existing) {
-      return NextResponse.json({ error: 'Equipamento não encontrado.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Equipamento não encontrado.', requestId },
+        { status: 404 },
+      )
     }
 
     const targetCategory = category ?? existing.category
 
     if (!TI_EQUIPMENT_CATEGORIES.some((cat) => cat.value === targetCategory)) {
-      return NextResponse.json({ error: 'Categoria inválida.' }, { status: 400 })
+      return NextResponse.json({ error: 'Categoria inválida.', requestId }, { status: 400 })
     }
 
     if (status && !TI_EQUIPMENT_STATUSES.includes(status)) {
-      return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Status inválido.', requestId }, { status: 400 })
     }
 
     const canUpdate = await canFeature(
@@ -78,12 +82,15 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     )
 
     if (!canUpdate) {
-      return NextResponse.json({ error: 'Sem permissão para editar equipamentos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para editar equipamentos.', requestId },
+        { status: 403 },
+      )
     }
 
     if (!name || !patrimonio || !userId) {
       return NextResponse.json(
-        { error: 'Nome, patrimônio e usuário são obrigatórios.' },
+        { error: 'Nome, patrimônio e usuário são obrigatórios.', requestId },
         { status: 400 },
       )
     }
@@ -100,7 +107,7 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+      return NextResponse.json({ error: 'Usuário não encontrado.', requestId }, { status: 404 })
     }
 
     const updated = await prisma.tiEquipment.update({
@@ -130,21 +137,25 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json(
-        { error: 'Já existe um equipamento com o mesmo patrimônio ou série.' },
+        { error: 'Já existe um equipamento com o mesmo patrimônio ou série.', requestId },
         { status: 409 },
       )
     }
 
-    console.error('Erro ao atualizar equipamento', error)
-    return NextResponse.json({ error: 'Erro ao atualizar equipamento.' }, { status: 500 })
+    console.error('Erro ao atualizar equipamento', { requestId, error })
+    return NextResponse.json(
+      { error: 'Erro ao atualizar equipamento.', requestId },
+      { status: 500 },
+    )
   }
 }
 
 export async function DELETE(_req: Request, context: { params: { id: string } }) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[ti/equipamentos][DELETE] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   const id = context.params.id
@@ -153,7 +164,10 @@ export async function DELETE(_req: Request, context: { params: { id: string } })
     const existing = await prisma.tiEquipment.findUnique({ where: { id } })
 
     if (!existing) {
-      return NextResponse.json({ error: 'Equipamento não encontrado.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Equipamento não encontrado.', requestId },
+        { status: 404 },
+      )
     }
 
     const canDelete = await canFeature(
@@ -164,14 +178,20 @@ export async function DELETE(_req: Request, context: { params: { id: string } })
     )
 
     if (!canDelete) {
-      return NextResponse.json({ error: 'Sem permissão para excluir equipamentos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para excluir equipamentos.', requestId },
+        { status: 403 },
+      )
     }
 
     await prisma.tiEquipment.delete({ where: { id } })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Erro ao excluir equipamento', error)
-    return NextResponse.json({ error: 'Erro ao excluir equipamento.' }, { status: 500 })
+    console.error('Erro ao excluir equipamento', { requestId, error })
+    return NextResponse.json(
+      { error: 'Erro ao excluir equipamento.', requestId },
+      { status: 500 },
+    )
   }
 }

@@ -38,7 +38,7 @@ export type CurrentAppUserResult = {
   dbUnavailable: boolean
 }
 
-async function resolveAppUserFromSessionUser(
+export async function resolveAppUserFromSessionUser(
   sessionUser: User | null,
   seedUser?: SelectedAppUser | null,
 ): Promise<CurrentAppUserResult> {

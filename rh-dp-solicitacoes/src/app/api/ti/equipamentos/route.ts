@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { Action, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import {
@@ -64,16 +64,20 @@ function mapRow(row: any) {
 }
 
 export async function GET(req: Request) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[ti/equipamentos][GET] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   const allowedCategories = await getAllowedCategories(appUser.id, Action.VIEW)
 
   if (allowedCategories.length === 0) {
-    return NextResponse.json({ error: 'Acesso negado aos equipamentos TI.' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Acesso negado aos equipamentos TI.', requestId },
+      { status: 403 },
+    )
   }
 
   const { searchParams } = new URL(req.url)
@@ -88,15 +92,18 @@ export async function GET(req: Request) {
     : 10
 
   if (category && !TI_EQUIPMENT_CATEGORIES.some((cat) => cat.value === category)) {
-    return NextResponse.json({ error: 'Categoria inválida.' }, { status: 400 })
+    return NextResponse.json({ error: 'Categoria inválida.', requestId }, { status: 400 })
   }
 
   if (status && !TI_EQUIPMENT_STATUSES.includes(status as TiEquipmentStatus)) {
-    return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
+    return NextResponse.json({ error: 'Status inválido.', requestId }, { status: 400 })
   }
 
   if (category && !allowedCategories.includes(category as TiEquipmentCategory)) {
-    return NextResponse.json({ error: 'Acesso negado à categoria solicitada.' }, { status: 403 })
+    return NextResponse.json(
+      { error: 'Acesso negado à categoria solicitada.', requestId },
+      { status: 403 },
+    )
   }
 
   const categoryValue = category ? (category as TiEquipmentCategory) : null
@@ -155,10 +162,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { appUser } = await getCurrentAppUser()
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
-    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    console.warn('[ti/equipamentos][POST] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
   try {
@@ -176,17 +184,17 @@ export async function POST(req: Request) {
 
     if (!name || !patrimonio || !userId) {
       return NextResponse.json(
-        { error: 'Nome, patrimônio e usuário são obrigatórios.' },
+        { error: 'Nome, patrimônio e usuário são obrigatórios.', requestId },
         { status: 400 },
       )
     }
 
     if (!category || !TI_EQUIPMENT_CATEGORIES.some((cat) => cat.value === category)) {
-      return NextResponse.json({ error: 'Categoria inválida.' }, { status: 400 })
+      return NextResponse.json({ error: 'Categoria inválida.', requestId }, { status: 400 })
     }
 
     if (status && !TI_EQUIPMENT_STATUSES.includes(status)) {
-      return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Status inválido.', requestId }, { status: 400 })
     }
 
     const canCreate = await canFeature(
@@ -197,7 +205,10 @@ export async function POST(req: Request) {
     )
 
     if (!canCreate) {
-      return NextResponse.json({ error: 'Sem permissão para criar equipamentos.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para criar equipamentos.', requestId },
+        { status: 403 },
+      )
     }
 
     const user = await prisma.user.findUnique({
@@ -212,7 +223,7 @@ export async function POST(req: Request) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
+      return NextResponse.json({ error: 'Usuário não encontrado.', requestId }, { status: 404 })
     }
 
     const created = await prisma.tiEquipment.create({
@@ -243,12 +254,15 @@ export async function POST(req: Request) {
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json(
-        { error: 'Já existe um equipamento com o mesmo patrimônio ou série.' },
+        { error: 'Já existe um equipamento com o mesmo patrimônio ou série.', requestId },
         { status: 409 },
       )
     }
 
-    console.error('Erro ao criar equipamento', error)
-    return NextResponse.json({ error: 'Erro ao criar equipamento.' }, { status: 500 })
+    console.error('Erro ao criar equipamento', { requestId, error })
+    return NextResponse.json(
+      { error: 'Erro ao criar equipamento.', requestId },
+      { status: 500 },
+    )
   }
 }

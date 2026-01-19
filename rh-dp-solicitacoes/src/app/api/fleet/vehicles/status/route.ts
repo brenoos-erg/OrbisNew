@@ -3,7 +3,7 @@ export const revalidate = 0
 
 import { NextResponse } from 'next/server'
 
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -28,18 +28,20 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  try {
-    const { appUser } = await getCurrentAppUser()
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
 
+  if (!appUser) {
+    console.warn('[fleet/vehicles/status][POST] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
+  try {
     const body = await req.json()
     const { vehicleId, status, reason } = body ?? {}
 
     if (!vehicleId || !status || typeof reason !== 'string') {
       return NextResponse.json(
-        { error: 'Dados obrigatórios ausentes: veículo, status ou motivo.' },
+        { error: 'Dados obrigatórios ausentes: veículo, status ou motivo.', requestId },
         { status: 400 }
       )
     }
@@ -47,17 +49,20 @@ export async function POST(req: Request) {
     const normalizedStatus = String(status).toUpperCase()
 
     if (!allowedStatuses.includes(normalizedStatus)) {
-      return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
+      return NextResponse.json({ error: 'Status inválido.', requestId }, { status: 400 })
     }
 
     const trimmedReason = reason.trim()
     if (trimmedReason.length === 0) {
-      return NextResponse.json({ error: 'Informe o motivo para alterar o status.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Informe o motivo para alterar o status.', requestId },
+        { status: 400 },
+      )
     }
 
     const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     if (!vehicle) {
-      return NextResponse.json({ error: 'Veículo não encontrado.' }, { status: 404 })
+      return NextResponse.json({ error: 'Veículo não encontrado.', requestId }, { status: 404 })
     }
 
     const log = await prisma.$transaction(async (tx) => {
@@ -76,7 +81,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json(log, { status: 201 })
   } catch (error) {
-    console.error('Erro ao alterar status do veículo', error)
-    return NextResponse.json({ error: 'Erro ao alterar status do veículo.' }, { status: 500 })
+    console.error('Erro ao alterar status do veículo', { requestId, error })
+    return NextResponse.json(
+      { error: 'Erro ao alterar status do veículo.', requestId },
+      { status: 500 },
+    )
   }
 }

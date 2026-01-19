@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const runtime = 'nodejs'
 
 // src/app/api/session/sync/route.ts
 import { NextResponse } from 'next/server'

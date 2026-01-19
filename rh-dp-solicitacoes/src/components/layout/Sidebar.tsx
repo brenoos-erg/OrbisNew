@@ -28,6 +28,7 @@ import {
   ScanLine,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 
 type Props = {
   showSolic: boolean
@@ -163,6 +164,7 @@ export default function Sidebar({
         const response = await fetch('/api/fleet/vehicles?status=RESTRITO', {
           signal: controller.signal,
         })
+        if (handleFleetUnauthorized(response)) return
         if (!response.ok) return
         const data = await response.json()
         if (active && Array.isArray(data)) {

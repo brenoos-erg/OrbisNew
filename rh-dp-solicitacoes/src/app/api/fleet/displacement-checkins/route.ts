@@ -3,9 +3,8 @@ export const revalidate = 0
 
 import { Action } from '@prisma/client'
 import { NextResponse } from 'next/server'
-import crypto from 'node:crypto'
 import { prisma } from '@/lib/prisma'
-import { getCurrentAppUser } from '@/lib/auth'
+import { getCurrentAppUserFromRouteHandler } from '@/lib/auth-route'
 import { isValidPlate, normalizePlate } from '@/lib/plate'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
@@ -14,7 +13,6 @@ import { jsonApiError } from '@/lib/api-error'
 
 export const runtime = 'nodejs'
 
-
 function parseDate(value?: string | null) {
   if (!value) return null
   const date = new Date(value)
@@ -22,13 +20,14 @@ function parseDate(value?: string | null) {
 }
 
 export async function GET(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/displacement-checkins][GET] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-    const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
     const canViewDisplacementPanel = await canFeature(
       appUser.id,
       MODULE_KEYS.FROTAS,
@@ -37,12 +36,12 @@ export async function GET(req: Request) {
     )
     if (!canViewDisplacementPanel) {
       return NextResponse.json(
-        { error: 'O painel de deslocamentos requer permissão de visualização.' },
+        { error: 'O painel de deslocamentos requer permissão de visualização.', requestId },
         { status: 403 },
       )
     }
 
-const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(req.url)
     const vehicleId = searchParams.get('vehicleId') ?? undefined
 
     const checkins = await prisma.vehicleDisplacementCheckin.findMany({
@@ -58,7 +57,6 @@ const { searchParams } = new URL(req.url)
     return NextResponse.json(checkins)
   } catch (error) {
     const dbUnavailable = isDbUnavailableError(error)
-    const requestId = crypto.randomUUID()
     console.error('Erro ao buscar deslocamentos', { requestId, error })
     return jsonApiError({
       status: dbUnavailable ? 503 : 500,
@@ -72,21 +70,25 @@ const { searchParams } = new URL(req.url)
 }
 
 export async function POST(req: Request) {
+  const { appUser, requestId } = await getCurrentAppUserFromRouteHandler()
+
+  if (!appUser) {
+    console.warn('[fleet/displacement-checkins][POST] Não autenticado', { requestId })
+    return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
+  }
+
   try {
-    const { appUser } = await getCurrentAppUser()
-
-    if (!appUser) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-    }
-
-     const canCreateDisplacement = await canFeature(
+    const canCreateDisplacement = await canFeature(
       appUser.id,
       MODULE_KEYS.FROTAS,
       FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN,
       Action.CREATE,
     )
     if (!canCreateDisplacement) {
-      return NextResponse.json({ error: 'Sem permissão para registrar deslocamento.' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Sem permissão para registrar deslocamento.', requestId },
+        { status: 403 },
+      )
     }
 
     const body = await req.json()
@@ -94,22 +96,34 @@ export async function POST(req: Request) {
 
     const tripDateValue = parseDate(tripDate)
     if (!tripDateValue) {
-      return NextResponse.json({ error: 'Data do deslocamento inválida.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Data do deslocamento inválida.', requestId },
+        { status: 400 },
+      )
     }
 
     if (!origin || !destination) {
-      return NextResponse.json({ error: 'Origem e destino são obrigatórios.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Origem e destino são obrigatórios.', requestId },
+        { status: 400 },
+      )
     }
 
     if (!vehiclePlate || typeof vehiclePlate !== 'string') {
-      return NextResponse.json({ error: 'Informe a placa do veículo.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Informe a placa do veículo.', requestId },
+        { status: 400 },
+      )
     }
     const vehicleKmValue =
       vehicleKm === null || vehicleKm === undefined ? null : Number.parseInt(vehicleKm, 10)
 
     if (vehicleKmValue !== null && (!Number.isFinite(vehicleKmValue) || vehicleKmValue < 0)) {
       return NextResponse.json(
-        { error: 'Informe uma quilometragem válida para o veículo ou deixe em branco.' },
+        {
+          error: 'Informe uma quilometragem válida para o veículo ou deixe em branco.',
+          requestId,
+        },
         { status: 400 },
       )
     }
@@ -118,7 +132,7 @@ export async function POST(req: Request) {
     const normalizedPlate = normalizePlate(vehiclePlate)
     if (!isValidPlate(normalizedPlate)) {
       return NextResponse.json(
-        { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul) ou ABC1234 (antiga).' },
+        { error: 'Placa inválida. Use o padrão ABC1A34 (Mercosul) ou ABC1234 (antiga).', requestId },
         { status: 400 },
       )
     }
@@ -131,7 +145,7 @@ export async function POST(req: Request) {
     })
 
     if (!vehicle) {
-      return NextResponse.json({ error: 'Veículo não cadastrado.' }, { status: 400 })
+      return NextResponse.json({ error: 'Veículo não cadastrado.', requestId }, { status: 400 })
     }
     if (vehicleKmValue !== null && typeof vehicle.kmCurrent === 'number' && vehicle.kmCurrent > 0) {
       if (vehicleKmValue < vehicle.kmCurrent) {
@@ -142,6 +156,7 @@ export async function POST(req: Request) {
             )}) é menor que a última registrada para o veículo (${vehicle.kmCurrent.toLocaleString(
               'pt-BR',
             )}).`,
+            requestId,
           },
           { status: 400 },
         )
@@ -154,7 +169,7 @@ export async function POST(req: Request) {
 
     if (costCenterId && !costCenterIdToSave) {
       return NextResponse.json(
-        { error: 'Selecione um centro de custo vinculado ao veículo.' },
+        { error: 'Selecione um centro de custo vinculado ao veículo.', requestId },
         { status: 400 },
       )
     }
@@ -182,7 +197,6 @@ export async function POST(req: Request) {
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     const dbUnavailable = isDbUnavailableError(error)
-    const requestId = crypto.randomUUID()
     console.error('Erro ao registrar deslocamento', { requestId, error })
     return jsonApiError({
       status: dbUnavailable ? 503 : 500,
