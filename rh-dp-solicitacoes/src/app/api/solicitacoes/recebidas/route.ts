@@ -2,20 +2,31 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // rh-dp-solicitacoes/src/app/api/solicitacoes/recebidas/route.ts
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const me = await requireActiveUser()
+    await requireActiveUser()
+
+    const { searchParams } = new URL(req.url)
+    const departmentId = searchParams.get('departmentId')?.trim()
+    const costCenterId = searchParams.get('costCenterId')?.trim()
+
+    if (!departmentId) {
+      return NextResponse.json(
+        { error: 'departmentId é obrigatório' },
+        { status: 400 },
+      )
+    }
 
     // Aqui você pode manter os filtros que já tinha (por CC, depto, etc.)
     const solicitacoes = await prisma.solicitation.findMany({
       where: {
-        // exemplo genérico: recebidas para centros vinculados ao usuário
-        // costCenterId: { in: me.costCentersIds }  <-- adapte
+        departmentId,
+        ...(costCenterId ? { costCenterId } : {}),
       },
       include: {
         costCenter: true,

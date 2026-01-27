@@ -16,6 +16,18 @@ type ApiResponse = {
   rows: Row[]
   total: number
 }
+type DepartmentOption = {
+  id: string
+  label: string
+  description?: string | null
+}
+
+type CostCenterOption = {
+  id: string
+  description: string
+  code?: string | null
+}
+
 
 /** ===== CONSTANTES ===== */
 
@@ -37,15 +49,18 @@ export default function SentRequestsPage() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
+  const [departments, setDepartments] = useState<DepartmentOption[]>([])
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
 
   // paginação
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   // filtros
+  const [departmentId, setDepartmentId] = useState<string>('')
   const [dateStart, setDateStart] = useState<string>('')
   const [dateEnd, setDateEnd] = useState<string>('')
-  const [centerId, setCenterId] = useState<string>('') // centro responsável
+  const [costCenterId, setCostCenterId] = useState<string>('') // centro responsável
   const [tipoId, setTipoId] = useState<string>('') // solicitação (tipo)
   const [categoriaId, setCategoriaId] = useState<string>('') // se usar categoria
   const [protocolo, setProtocolo] = useState<string>('')
@@ -60,15 +75,16 @@ export default function SentRequestsPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
-  // combos mockados (trocar depois)
-  const centros = useMemo(
-    () => [
-      { id: '', nome: 'Selecione uma opção' },
-      { id: 'ti', nome: 'Tecnologia da Informação' },
-      { id: 'rh', nome: 'Recursos Humanos' },
-    ],
-    [],
-  )
+   const departmentsLabel = useMemo(() => {
+    return [{ id: '', label: 'Selecione um departamento' }, ...departments]
+  }, [departments])
+
+  const costCentersLabel = useMemo(() => {
+    return [
+      { id: '', description: 'Todos os centros de custo' },
+      ...costCenters,
+    ]
+  }, [costCenters])
   const tipos = useMemo(
     () => [
       { id: '', nome: 'Selecione uma opção' },
@@ -94,16 +110,59 @@ export default function SentRequestsPage() {
     ],
     [],
   )
+  useEffect(() => {
+    let active = true
+    const controller = new AbortController()
+    const loadFilters = async () => {
+      try {
+        const [departmentsRes, costCentersRes] = await Promise.all([
+          fetch('/api/departments', { signal: controller.signal }),
+          fetch('/api/cost-centers/select', { signal: controller.signal }),
+        ])
 
-  function buildQuery() {
+        if (!departmentsRes.ok || !costCentersRes.ok) {
+          throw new Error('Erro ao carregar filtros.')
+        }
+
+        const departmentsData =
+          (await departmentsRes.json()) as DepartmentOption[]
+        const costCentersData =
+          (await costCentersRes.json()) as CostCenterOption[]
+
+        if (active) {
+          setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
+          setCostCenters(
+            Array.isArray(costCentersData) ? costCentersData : [],
+          )
+        }
+      } catch (err) {
+        console.error('Erro ao carregar filtros de solicitações', err)
+        if (active) {
+          setDepartments([])
+          setCostCenters([])
+        }
+      }
+    }
+
+    loadFilters()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [])
+
+
+ function buildQuery() {
     const qs = new URLSearchParams()
     qs.set('page', String(page))
     qs.set('pageSize', String(pageSize))
     // neste módulo usamos sempre as ENVIADAS pelo usuário logado
     qs.set('scope', 'sent')
+    qs.set('departmentId', departmentId)
     if (dateStart) qs.set('dateStart', dateStart)
     if (dateEnd) qs.set('dateEnd', dateEnd)
-    if (centerId) qs.set('centerId', centerId)
+    if (costCenterId) qs.set('costCenterId', costCenterId)
     if (tipoId) qs.set('tipoId', tipoId)
     if (categoriaId) qs.set('categoriaId', categoriaId)
     if (protocolo) qs.set('protocolo', protocolo)
@@ -114,6 +173,13 @@ export default function SentRequestsPage() {
   }
 
   async function load() {
+    if (!departmentId) {
+      setData([])
+      setTotal(0)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const qs = buildQuery()
@@ -137,9 +203,10 @@ export default function SentRequestsPage() {
   }, [
     page,
     pageSize,
+    departmentId,
     dateStart,
     dateEnd,
-    centerId,
+    costCenterId,
     tipoId,
     categoriaId,
     protocolo,
@@ -183,6 +250,7 @@ export default function SentRequestsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const missingDepartment = !departmentId
 
   /** ===== DETALHE ===== */
 
@@ -219,7 +287,7 @@ export default function SentRequestsPage() {
   return (
     <div className="space-y-4">
       {/* Título + Ações */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-800">Solicitações Enviadas</h1>
           <p className="text-sm text-slate-500">
@@ -229,10 +297,10 @@ export default function SentRequestsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <button
             onClick={onSearch}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
             title="Pesquisar"
           >
             <Filter size={16} />
@@ -241,7 +309,7 @@ export default function SentRequestsPage() {
 
           <button
             onClick={() => router.push('/dashboard/solicitacoes/enviadas/nova')}
-            className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-2 text-sm text-white hover:bg-orange-500"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-orange-600 px-3 py-2 text-sm text-white hover:bg-orange-500 sm:w-auto"
             title="Nova Solicitação"
           >
             <Plus size={16} />
@@ -256,7 +324,7 @@ export default function SentRequestsPage() {
                 openDetail(selectedRow)
               }
             }}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
             title="Detalhes da Solicitação"
           >
             <Info size={16} />
@@ -265,7 +333,7 @@ export default function SentRequestsPage() {
 
           <button
             onClick={() => alert('Cancelar a solicitação selecionada')}
-            className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50 sm:w-auto"
             title="Cancelar Solicitação"
           >
             <XCircle size={16} />
@@ -274,7 +342,7 @@ export default function SentRequestsPage() {
 
           <button
             onClick={exportCsv}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
             title="Exportar Excel"
           >
             <Download size={16} />
@@ -283,7 +351,7 @@ export default function SentRequestsPage() {
 
           <button
             onClick={load}
-            className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 sm:w-auto"
             title="Atualizar"
           >
             <RefreshCcw size={16} />
@@ -294,8 +362,46 @@ export default function SentRequestsPage() {
 
       {/* Filtros */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid grid-cols-12 gap-3">
-          <div className="col-span-12 md:col-span-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Departamento
+            </label>
+            <select
+              value={departmentId}
+              onChange={(e) => {
+                setDepartmentId(e.target.value)
+                setPage(1)
+              }}
+              className="mt-1 w-full rounded-md border border-blue-600 text-[15px] py-2.5 shadow-sm transition-all duration-150 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 bg-white"
+            >
+              {departmentsLabel.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.description ? `${d.description} - ${d.label}` : d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-black tracking-wide">
+              Centro de Custo
+            </label>
+            <select
+              value={costCenterId}
+              onChange={(e) => {
+                setCostCenterId(e.target.value)
+                setPage(1)
+              }}
+              className="mt-1 w-full rounded-md border border-blue-600 text-[15px] py-2.5 shadow-sm transition-all duration-150 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 bg-white"
+            >
+              {costCentersLabel.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code ? `${c.code} - ${c.description}` : c.description}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Data Inicial
             </label>
@@ -306,7 +412,7 @@ export default function SentRequestsPage() {
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
             />
           </div>
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Data Fim
             </label>
@@ -317,23 +423,7 @@ export default function SentRequestsPage() {
               className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
             />
           </div>
-          <div className="col-span-12 md:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">
-              Centro Responsável
-            </label>
-            <select
-              value={centerId}
-              onChange={(e) => setCenterId(e.target.value)}
-              className="mt-1 w-full rounded-md border border-blue-600 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 text-[15px] py-2.5 bg-white shadow-sm transition-all duration-150"
-            >
-              {centros.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Categoria
             </label>
@@ -350,7 +440,7 @@ export default function SentRequestsPage() {
             </select>
           </div>
 
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Solicitação
             </label>
@@ -367,7 +457,7 @@ export default function SentRequestsPage() {
             </select>
           </div>
 
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Protocolo
             </label>
@@ -379,7 +469,7 @@ export default function SentRequestsPage() {
             />
           </div>
 
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Solicitante
             </label>
@@ -391,7 +481,7 @@ export default function SentRequestsPage() {
             />
           </div>
 
-          <div className="col-span-12 md:col-span-3">
+          <div>
             <label className="block text-xs font-semibold text-black tracking-wide">
               Status
             </label>
@@ -408,7 +498,7 @@ export default function SentRequestsPage() {
             </select>
           </div>
 
-          <div className="col-span-12">
+          <div className="sm:col-span-2 lg:col-span-3">
             <label className="block text-xs font-semibold text-black tracking-wide">
               Texto no Formulário
             </label>
@@ -427,56 +517,66 @@ export default function SentRequestsPage() {
 
       {/* Tabela (sem timeline em cima!) */}
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="max-h-[60vh] overflow-auto">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-slate-600">
-              <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left">
-                <th>Status</th>
-                <th>Protocolo</th>
-                <th>Data Abertura</th>
-                <th>Solicitação</th>
-                <th>SLA</th>
-                <th>Centro Responsável</th>
-                <th>Atendente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
-                    Carregando...
-                  </td>
+        <div className="overflow-x-auto">
+          <div className="max-h-[60vh] overflow-y-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left">
+                  <th>Status</th>
+                  <th>Protocolo</th>
+                  <th>Data Abertura</th>
+                  <th>Solicitação</th>
+                  <th>SLA</th>
+                  <th>Centro Responsável</th>
+                  <th>Atendente</th>
                 </tr>
-              )}
-              {!loading && data.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                    Nenhuma solicitação encontrada
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                data.map((r) => (
-                  <tr
-                    key={r.id}
-                    className={`hover:bg-slate-50 cursor-pointer ${
-                      selectedRow?.id === r.id ? 'bg-slate-50' : ''
-                    }`}
-                    onClick={() => openDetail(r)} // 👉 abre o modal com os dados
-                  >
-                    <td className="px-3 py-2">{r.status}</td>
-                    <td className="px-3 py-2">{r.protocolo ?? '-'}</td>
-                    <td className="px-3 py-2">
-                      {r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : '-'}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {missingDepartment && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                      Selecione um departamento para carregar as solicitações.
                     </td>
-                    <td className="px-3 py-2">{r.titulo ?? r.tipo?.nome ?? '-'}</td>
-                    <td className="px-3 py-2">{r.sla ?? '-'}</td>
-                    <td className="px-3 py-2">{r.setorDestino ?? '-'}</td>
-                    <td className="px-3 py-2">{r.responsavel?.fullName ?? '-'}</td>
                   </tr>
-                ))}
-            </tbody>
-          </table>
+                )}
+                {loading && !missingDepartment && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                      Carregando...
+                    </td>
+                  </tr>
+                )}
+                {!loading && !missingDepartment && data.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                      Nenhuma solicitação encontrada
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  !missingDepartment &&
+                  data.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={`hover:bg-slate-50 cursor-pointer ${
+                        selectedRow?.id === r.id ? 'bg-slate-50' : ''
+                      }`}
+                      onClick={() => openDetail(r)} // 👉 abre o modal com os dados
+                    >
+                      <td className="px-3 py-2">{r.status}</td>
+                      <td className="px-3 py-2">{r.protocolo ?? '-'}</td>
+                      <td className="px-3 py-2">
+                        {r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : '-'}
+                      </td>
+                      <td className="px-3 py-2">{r.titulo ?? r.tipo?.nome ?? '-'}</td>
+                      <td className="px-3 py-2">{r.sla ?? '-'}</td>
+                      <td className="px-3 py-2">{r.setorDestino ?? '-'}</td>
+                      <td className="px-3 py-2">{r.responsavel?.fullName ?? '-'}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* paginação */}

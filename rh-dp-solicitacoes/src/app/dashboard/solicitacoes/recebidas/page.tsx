@@ -162,7 +162,7 @@ export default function ReceivedRequestsPage() {
       </div>
 
       {/* Filtros principais */}
-      <div className="grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Protocolo */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
@@ -202,7 +202,7 @@ export default function ReceivedRequestsPage() {
         </div>
 
         {/* Texto livre */}
-        <div className="md:col-span-2">
+        <div className="sm:col-span-2 lg:col-span-3">
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
             Texto no formulário
           </label>
@@ -234,64 +234,66 @@ export default function ReceivedRequestsPage() {
           <div className="p-4 text-sm text-red-600">{error}</div>
         )}
 
-        <div className="max-h-[60vh] overflow-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Protocolo</th>
-                <th className="px-4 py-2">Data Abertura</th>
-                <th className="px-4 py-2">Solicitação</th>
-                <th className="px-4 py-2">Centro Responsável</th>
-                <th className="px-4 py-2">Atendente</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && !loading && (
+       <div className="overflow-x-auto">
+          <div className="max-h-[60vh] overflow-y-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-4 text-center text-sm text-slate-500"
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Protocolo</th>
+                  <th className="px-4 py-2">Data Abertura</th>
+                  <th className="px-4 py-2">Solicitação</th>
+                  <th className="px-4 py-2">Centro Responsável</th>
+                  <th className="px-4 py-2">Atendente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 && !loading && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-4 text-center text-sm text-slate-500"
+                    >
+                      Nenhuma solicitação recebida encontrada.
+                    </td>
+                  </tr>
+                )}
+
+                {rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                    onClick={() => fetchDetail(row)}
                   >
-                    Nenhuma solicitação recebida encontrada.
-                  </td>
-                </tr>
-              )}
+                    <td className="px-4 py-2 text-xs font-semibold">
+                      {mapStatusLabel(row.status)}
+                    </td>
+                    <td className="px-4 py-2 text-xs">{row.protocolo}</td>
+                    <td className="px-4 py-2 text-xs">
+                      {row.createdAt
+                        ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm')
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      {row.tipo?.nome ?? row.titulo}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      {row.setorDestino ?? '-'}
+                    </td>
 
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
-                  onClick={() => fetchDetail(row)}
-                >
-                  <td className="px-4 py-2 text-xs font-semibold">
-                    {mapStatusLabel(row.status)}
-                  </td>
-                  <td className="px-4 py-2 text-xs">{row.protocolo}</td>
-                  <td className="px-4 py-2 text-xs">
-                    {row.createdAt
-                      ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm')
-                      : '-'}
-                  </td>
-                  <td className="px-4 py-2 text-xs">
-                    {row.tipo?.nome ?? row.titulo}
-                  </td>
-                  <td className="px-4 py-2 text-xs">
-                    {row.setorDestino ?? '-'}
-                  </td>
-
-                  {/* 🔥 Regras do ATENDENTE:
-                      - Se status = ABERTA (AGUARDANDO ATENDIMENTO), nunca mostra atendente
-                      - Caso contrário, mostra somente o responsavel se existir */}
-                  <td className="px-4 py-2 text-xs">
-                    {row.status === 'ABERTA'
-                      ? '-'
-                      : row.responsavel?.fullName ?? '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    {/* 🔥 Regras do ATENDENTE:
+                        - Se status = ABERTA (AGUARDANDO ATENDIMENTO), nunca mostra atendente
+                        - Caso contrário, mostra somente o responsavel se existir */}
+                    <td className="px-4 py-2 text-xs">
+                      {row.status === 'ABERTA'
+                        ? '-'
+                        : row.responsavel?.fullName ?? '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Rodapé com total */}

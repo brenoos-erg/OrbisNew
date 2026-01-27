@@ -34,12 +34,13 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const dateStart = searchParams.get('dateStart')
   const dateEnd = searchParams.get('dateEnd')
   const centerId = searchParams.get('centerId')
+  const costCenterId = searchParams.get('costCenterId') ?? centerId
+  const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
   const protocolo = searchParams.get('protocolo')
   const solicitante = searchParams.get('solicitante')
   const status = searchParams.get('status')
   const text = searchParams.get('text')
-
   if (dateStart || dateEnd) {
     where.dataAbertura = {}
     if (dateStart) {
@@ -51,7 +52,8 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     }
   }
 
-  if (centerId) where.costCenterId = centerId
+  if (departmentId) where.departmentId = departmentId
+  if (costCenterId) where.costCenterId = costCenterId
   if (tipoId) where.tipoId = tipoId
   if (status) where.status = status
 
@@ -138,6 +140,10 @@ export const GET = withModuleLevel(
 
           if (ccIds.size === 0) {
             where.id = '__never__' as any
+          } else if (where.costCenterId) {
+            if (!ccIds.has(where.costCenterId)) {
+              where.id = '__never__' as any
+            }
           } else {
             where.costCenterId = { in: [...ccIds] }
           }

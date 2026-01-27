@@ -97,6 +97,8 @@ export default function Sidebar({
   const [restrictedVehicleCount, setRestrictedVehicleCount] = useState<number | null>(null)
   const [receivedSolicitationsCount, setReceivedSolicitationsCount] = useState<number | null>(null)
   const [pendingRefusalCount, setPendingRefusalCount] = useState<number | null>(null)
+  const [departmentId, setDepartmentId] = useState<string | null>(null)
+
 
   const pathname = usePathname()
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
@@ -188,11 +190,45 @@ export default function Sidebar({
 
     let active = true
     const controller = new AbortController()
-    const loadReceivedSolicitations = async () => {
+    const loadDepartment = async () => {
       try {
-        const response = await fetch('/api/solicitacoes/recebidas', {
+        const response = await fetch('/api/me', {
           signal: controller.signal,
         })
+        if (!response.ok) return
+        const data = await response.json()
+        if (active) {
+          setDepartmentId(data?.departmentId ?? null)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    loadDepartment()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [showSolic, solicitacaoFeatures.recebidas])
+
+  useEffect(() => {
+    if (!showSolic || !solicitacaoFeatures.recebidas) return
+    if (!departmentId) return
+
+    let active = true
+    const controller = new AbortController()
+    const loadReceivedSolicitations = async () => {
+      try {
+        const response = await fetch(
+          `/api/solicitacoes/recebidas?departmentId=${encodeURIComponent(
+            departmentId,
+          )}`,
+          {
+            signal: controller.signal,
+          },
+        )
         if (!response.ok) return
         const data = await response.json()
         if (active && Array.isArray(data)) {
@@ -209,7 +245,7 @@ export default function Sidebar({
       active = false
       controller.abort()
     }
-  }, [showSolic, solicitacaoFeatures.recebidas])
+  }, [showSolic, solicitacaoFeatures.recebidas, departmentId])
 
   useEffect(() => {
     if (!showRefusal || !canReviewRefusal || !refusalFeatures.pendentes) return
