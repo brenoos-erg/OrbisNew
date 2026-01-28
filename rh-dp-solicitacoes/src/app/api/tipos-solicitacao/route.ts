@@ -14,6 +14,8 @@ type CampoEspecifico = {
   required?: boolean
   options?: string[]
   defaultValue?: string
+  section?: string
+  stage?: string
 }
 
 type TipoMeta = {

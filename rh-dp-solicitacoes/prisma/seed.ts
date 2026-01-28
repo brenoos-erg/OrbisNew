@@ -266,6 +266,195 @@ async function main() {
       },
     })
     console.log('✅ Tipo "Solicitação de Admissão" ok.')
+    const desligamentoSchema = {
+      meta: {
+        departamentos: [dpDepartment.id],
+        fluxo: {
+          rhApproval: true,
+          rhToDp: true,
+          dpDepartmentCode: '08',
+        },
+      },
+      camposEspecificos: [
+        {
+          name: 'gestorNome',
+          label: 'Nome do gestor solicitante',
+          type: 'text',
+          required: true,
+          stage: 'solicitante',
+          section: 'Dados do gestor solicitante',
+        },
+        {
+          name: 'gestorCargo',
+          label: 'Cargo do gestor solicitante',
+          type: 'text',
+          required: true,
+          stage: 'solicitante',
+          section: 'Dados do gestor solicitante',
+        },
+        {
+          name: 'gestorData',
+          label: 'Data',
+          type: 'date',
+          required: true,
+          stage: 'solicitante',
+          section: 'Dados do gestor solicitante',
+        },
+        {
+          name: 'motivoPedidoDemissao',
+          label: 'Pedido de demissão',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'motivoSemJustaCausa',
+          label: 'Sem justa causa',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'motivoJustaCausa',
+          label: 'Justa causa',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'motivoTerminoExperiencia',
+          label: 'Término de experiência',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'justificativaGestor',
+          label: 'Justificativa do gestor (para sem/justa causa)',
+          type: 'textarea',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'dataFimExperiencia',
+          label: 'Data fim experiência',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Motivo do desligamento',
+        },
+        {
+          name: 'funcionarioNome',
+          label: 'Nome do funcionário',
+          type: 'text',
+          required: true,
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'funcionarioCargo',
+          label: 'Cargo',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'funcionarioSetor',
+          label: 'Setor',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'funcionarioCentroCusto',
+          label: 'Centro de custo (texto)',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'dataSugeridaUltimoDia',
+          label: 'Data sugerida do último dia',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'cumpriraAviso',
+          label: 'Funcionário cumprirá aviso?',
+          type: 'select',
+          options: ['Sim', 'Não'],
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'posicaoSubstituida',
+          label: 'Posição vaga será substituída?',
+          type: 'select',
+          options: ['Sim', 'Não'],
+          stage: 'solicitante',
+          section: 'Dados do funcionário',
+        },
+        {
+          name: 'rhDataExameDemissional',
+          label: 'Data exame demissional',
+          type: 'date',
+          stage: 'rh',
+          section: 'Informações gerais RH (preenchimento RH)',
+        },
+        {
+          name: 'rhDataLiberacaoPpp',
+          label: 'Data liberação PPP',
+          type: 'date',
+          stage: 'rh',
+          section: 'Informações gerais RH (preenchimento RH)',
+        },
+        {
+          name: 'rhConsideracoes',
+          label: 'Considerações',
+          type: 'textarea',
+          stage: 'rh',
+          section: 'Informações gerais RH (preenchimento RH)',
+        },
+        {
+          name: 'dpDataDemissao',
+          label: 'Data demissão',
+          type: 'date',
+          stage: 'dp',
+          section: 'Informações gerais DP (preenchimento DP)',
+        },
+        {
+          name: 'dpDataPrevistaAcerto',
+          label: 'Data prevista acerto',
+          type: 'date',
+          stage: 'dp',
+          section: 'Informações gerais DP (preenchimento DP)',
+        },
+        {
+          name: 'dpConsideracoes',
+          label: 'Considerações',
+          type: 'textarea',
+          stage: 'dp',
+          section: 'Informações gerais DP (preenchimento DP)',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL' },
+      update: {
+        descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
+        schemaJson: desligamentoSchema,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_247',
+        nome: 'RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL',
+        descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
+        schemaJson: desligamentoSchema,
+        updatedAt: new Date(),
+      },
+    })
+    console.log('✅ Tipo "RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL" ok.')
   }
 
   /* =========================

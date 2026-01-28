@@ -45,8 +45,9 @@ type CampoEspecifico = {
   type?: string;
   required?: boolean;
   options?: string[];
-    defaultValue?: string;
-  
+  defaultValue?: string;
+  section?: string;
+  stage?: string;
 };
 
 type TipoSolicitacao = {
@@ -229,6 +230,9 @@ export default function NovaSolicitacaoPage() {
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
 
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
+  const camposSolicitante = camposEspecificos.filter(
+    (campo) => !campo.stage || campo.stage === 'solicitante',
+  );
 
   useEffect(() => {
     if (!isAbonoEducacional) {
@@ -416,7 +420,7 @@ export default function NovaSolicitacaoPage() {
 
         campos = { ...abonoCampos };
       } else {
-        const obrigatorios = camposEspecificos
+        const obrigatorios = camposSolicitante
           .filter((c) => c.required)
           .map((c) => c.name);
 
@@ -427,7 +431,7 @@ export default function NovaSolicitacaoPage() {
           return;
         }
 
-        campos = camposEspecificos.reduce<Record<string, string>>(
+        campos = camposSolicitante.reduce<Record<string, string>>(
           (acc, campo) => {
             acc[campo.name] = extras[campo.name] ?? '';
             return acc;
@@ -513,17 +517,18 @@ export default function NovaSolicitacaoPage() {
           </div>
 
           {/* TOPO: CABEÇALHO + SOLICITANTE */}
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
             {/* ESQUERDA – Centro / Depto / Tipo */}
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
               <h2 className="mb-2 text-sm font-semibold text-slate-800">
                 Dados da solicitação
               </h2>
 
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className={labelClass}>
-                     CENTRO DE CUSTO
+                    CENTRO DE CUSTO{' '}
+                    <span className="text-slate-400">(opcional)</span>
                   </label>
                   <select
                     className={selectClass}
@@ -543,7 +548,7 @@ export default function NovaSolicitacaoPage() {
                   </select>
                 </div>
 
-                <div>
+                <div className="lg:col-span-1">
                   <label className={labelClass}>
                     DEPARTAMENTO <span className="text-red-500">*</span>
                   </label>
@@ -565,7 +570,7 @@ export default function NovaSolicitacaoPage() {
                   </select>
                 </div>
 
-                <div>
+                <div className="sm:col-span-2 lg:col-span-1">
                   <label className={labelClass}>
                     TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
@@ -605,7 +610,7 @@ export default function NovaSolicitacaoPage() {
               )}
 
               {me && (
-                <div className="mt-3 grid grid-cols-1 gap-2">
+                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <input
                     className={inputClass}
                     placeholder="Nome"
@@ -1618,22 +1623,26 @@ export default function NovaSolicitacaoPage() {
             )}
 
             {/* =================== FORM GENÉRICO (camposEspecíficos) =================== */}
-          {selectedTipo && !isRQ063 && !isAbonoEducacional && (
-            <>
-              <h2 className="text-sm font-semibold mb-4">{selectedTipo.nome}</h2>
+           {selectedTipo && !isRQ063 && !isAbonoEducacional && (
+              <>
+                <h2 className="text-sm font-semibold mb-4">
+                  {selectedTipo.nome}
+                </h2>
 
-              {camposEspecificos.length === 0 && (
-                <p className="text-xs text-gray-500">
-                  Este tipo de solicitação não possui campos configurados.
-                </p>
-              )}
+                {camposSolicitante.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    Este tipo de solicitação não possui campos configurados.
+                  </p>
+                )}
 
-              {camposEspecificos.length > 0 && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {camposEspecificos.map((campo) => {
+                {camposSolicitante.length > 0 && (() => {
+                  const hasSections = camposSolicitante.some(
+                    (campo) => campo.section,
+                  );
+
+                  const renderCampo = (campo: CampoEspecifico) => {
                     const value = extras[campo.name] ?? '';
 
-                    // ----- CHECKBOX EM LINHA INTEIRA (RESPONSIVO) -----
                     if (campo.type === 'checkbox') {
                       return (
                         <div key={campo.name} className="md:col-span-2">
@@ -1660,8 +1669,7 @@ export default function NovaSolicitacaoPage() {
                       );
                     }
 
-                    // ----- CAMPOS NORMAIS (TEXT / NUMBER / DATE / SELECT / TEXTAREA) -----
-                    const commonProps = {
+                      const commonProps = {
                       id: campo.name,
                       name: campo.name,
                       required: campo.required,
@@ -1686,7 +1694,6 @@ export default function NovaSolicitacaoPage() {
                             )}
                           </span>
 
-                          {/* TEXTAREA */}
                           {campo.type === 'textarea' && (
                             <textarea
                               {...commonProps}
@@ -1694,7 +1701,6 @@ export default function NovaSolicitacaoPage() {
                             />
                           )}
 
-                          {/* SELECT */}
                           {campo.type === 'select' && campo.options && (
                             <select {...(commonProps as any)}>
                               <option value="">Selecione...</option>
@@ -1706,12 +1712,8 @@ export default function NovaSolicitacaoPage() {
                             </select>
                           )}
 
-                          {/* INPUT TEXT PADRÃO (quando não vem type) */}
-                          {!campo.type && (
-                            <input type="text" {...commonProps} />
-                          )}
+                           {!campo.type && <input type="text" {...commonProps} />}
 
-                          {/* INPUT COM TYPE ESPECÍFICO (text, number, date, etc) */}
                           {campo.type &&
                             campo.type !== 'textarea' &&
                             campo.type !== 'select' && (
@@ -1720,11 +1722,41 @@ export default function NovaSolicitacaoPage() {
                         </label>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </>
-          )}
+                  };
+
+                  if (!hasSections) {
+                    return (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {camposSolicitante.map(renderCampo)}
+                      </div>
+                    );
+                  }
+
+                  const grouped = camposSolicitante.reduce<
+                    Record<string, CampoEspecifico[]>
+                  >((acc, campo) => {
+                    const key = campo.section ?? 'Outros';
+                    acc[key] = acc[key] ? [...acc[key], campo] : [campo];
+                    return acc;
+                  }, {});
+
+                  return (
+                    <div className="space-y-6">
+                      {Object.entries(grouped).map(([section, campos]) => (
+                        <section key={section} className="space-y-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            {section}
+                          </h3>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {campos.map(renderCampo)}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
           </div>
         </form>
       </div>

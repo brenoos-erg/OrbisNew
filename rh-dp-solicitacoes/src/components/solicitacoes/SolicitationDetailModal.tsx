@@ -34,6 +34,8 @@ type CampoEspecifico = {
   required?: boolean
   options?: string[]
   defaultValue?: string
+  section?: string
+  stage?: string
 }
 
 type SchemaJson = {
@@ -115,6 +117,11 @@ export type SolicitationDetail = {
     description: string
     code?: string | null
     externalCode?: string | null
+  } | null
+   department?: {
+    id: string
+    name: string
+    code?: string | null
   } | null
   payload?: Payload
   anexos?: Attachment[]
@@ -311,6 +318,12 @@ export function SolicitationDetailModal({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [rhDataExameDemissional, setRhDataExameDemissional] = useState('')
+  const [rhDataLiberacaoPpp, setRhDataLiberacaoPpp] = useState('')
+  const [rhConsideracoes, setRhConsideracoes] = useState('')
+  const [dpDataDemissao, setDpDataDemissao] = useState('')
+  const [dpDataPrevistaAcerto, setDpDataPrevistaAcerto] = useState('')
+  const [dpConsideracoes, setDpConsideracoes] = useState('')
 
   const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
@@ -369,6 +382,14 @@ export function SolicitationDetailModal({
         ? String(payloadCampos.valorMensal)
         : '',
     )
+    setRhDataExameDemissional(
+      (payloadCampos.rhDataExameDemissional as string) || '',
+    )
+    setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
+    setRhConsideracoes((payloadCampos.rhConsideracoes as string) || '')
+    setDpDataDemissao((payloadCampos.dpDataDemissao as string) || '')
+    setDpDataPrevistaAcerto((payloadCampos.dpDataPrevistaAcerto as string) || '')
+    setDpConsideracoes((payloadCampos.dpConsideracoes as string) || '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
 
@@ -380,11 +401,20 @@ export function SolicitationDetailModal({
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+  const isSolicitacaoDesligamento = detail?.tipo?.id === 'RQ_247'
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
   const isDpDestino = !!(
     detail?.costCenter?.externalCode === '590' ||
-    detail?.costCenter?.description?.toLowerCase().includes('pessoal')
+    detail?.costCenter?.description?.toLowerCase().includes('pessoal') ||
+    detail?.department?.code === '08'
+  )
+  const isRhDestino = !!(
+    detail?.department?.code === '17' ||
+    detail?.costCenter?.description
+      ?.toLowerCase()
+      .includes('recursos humanos') ||
+    detail?.costCenter?.code?.toLowerCase().includes('rh')
   )
 
   const duracaoNumber = Number.parseFloat(
@@ -399,7 +429,10 @@ export function SolicitationDetailModal({
       : null
 
   const followsRhFinalizationFlow =
-    isSolicitacaoPessoal || isSolicitacaoIncentivo || isDpChildFromRh
+    isSolicitacaoPessoal ||
+    isSolicitacaoIncentivo ||
+    isSolicitacaoDesligamento ||
+    isDpChildFromRh
 
   const isFinalizadaOuCancelada =
     effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
@@ -411,9 +444,13 @@ export function SolicitationDetailModal({
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
   const finalizarLabel = isDpDestino
     ? 'Finalizar chamado'
-    : isSolicitacaoPessoal
+    : isSolicitacaoPessoal || isSolicitacaoDesligamento
       ? 'Enviar para o DP'
       : 'Finalizar no RH'
+  const canEditRhSection =
+    isSolicitacaoDesligamento && isRhDestino && !isFinalizadaOuCancelada
+  const canEditDpSection =
+    isSolicitacaoDesligamento && isDpDestino && !isFinalizadaOuCancelada
 
   // Se for tela de aprovação não mostramos ações de gestão;
   // se canManage=false (Solicitações Enviadas) também não.
@@ -522,6 +559,31 @@ export function SolicitationDetailModal({
         (payloadCampos.cpf as string) ||
         (payloadCampos.documento as string) ||
         undefined
+        const buildOptionalValue = (value: string) =>
+        value && value.trim().length > 0 ? value : undefined
+
+      const desligamentoInfos = isSolicitacaoDesligamento
+        ? {
+            ...(buildOptionalValue(rhDataExameDemissional)
+              ? { rhDataExameDemissional }
+              : {}),
+            ...(buildOptionalValue(rhDataLiberacaoPpp)
+              ? { rhDataLiberacaoPpp }
+              : {}),
+            ...(buildOptionalValue(rhConsideracoes)
+              ? { rhConsideracoes }
+              : {}),
+            ...(buildOptionalValue(dpDataDemissao)
+              ? { dpDataDemissao }
+              : {}),
+            ...(buildOptionalValue(dpDataPrevistaAcerto)
+              ? { dpDataPrevistaAcerto }
+              : {}),
+            ...(buildOptionalValue(dpConsideracoes)
+              ? { dpConsideracoes }
+              : {}),
+          }
+        : {}
 
       const res = await fetch(
         `/api/solicitacoes/${solicitationId}/finalizar-rh`,
@@ -542,6 +604,7 @@ export function SolicitationDetailModal({
               ...(valorTotalCurso !== null
                 ? { valorTotalCalculado: valorTotalCurso }
                 : {}),
+                ...desligamentoInfos,
             },
           }),
         },
@@ -557,7 +620,9 @@ export function SolicitationDetailModal({
       setCloseSuccess(
         isSolicitacaoPessoal
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
-          : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
+          : isSolicitacaoDesligamento && isDpDestino
+            ? 'Solicitação finalizada pelo DP.'
+            : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
       )
     } catch (err: any) {
       console.error('Erro ao finalizar RH', err)
@@ -689,7 +754,7 @@ export function SolicitationDetailModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
         {/* Cabeçalho */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-800">
               Detalhes da Solicitação
@@ -702,7 +767,7 @@ export function SolicitationDetailModal({
             )}
           </div>
 
-           <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+          <div className="flex items-center gap-2">
             {/* Modo de aprovação (tela do gestor) */}
             {isApprovalMode && (
               <>
@@ -826,10 +891,10 @@ export function SolicitationDetailModal({
         )}
 
         {/* CONTEÚDO */}
-         <div className="space-y-5 px-5 py-4 text-sm">
+        <div className="space-y-5 px-5 py-4 text-sm">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
-            <div className="flex flex-wrap gap-4">
+            <div className="flex gap-4">
               {timelineSteps.map((step, index) => {
                 const isActive = index === currentIndex
                 const isDone = index < currentIndex
@@ -1052,6 +1117,26 @@ export function SolicitationDetailModal({
               {/* Formulário do tipo de solicitação */}
               {isSolicitacaoPessoal ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
+                ) : isSolicitacaoDesligamento ? (
+                <RQ247ResumoCampos
+                  payloadCampos={payloadCampos}
+                  rhDataExameDemissional={rhDataExameDemissional}
+                  rhDataLiberacaoPpp={rhDataLiberacaoPpp}
+                  rhConsideracoes={rhConsideracoes}
+                  dpDataDemissao={dpDataDemissao}
+                  dpDataPrevistaAcerto={dpDataPrevistaAcerto}
+                  dpConsideracoes={dpConsideracoes}
+                  onRhDataExameDemissionalChange={
+                    setRhDataExameDemissional
+                  }
+                  onRhDataLiberacaoPppChange={setRhDataLiberacaoPpp}
+                  onRhConsideracoesChange={setRhConsideracoes}
+                  onDpDataDemissaoChange={setDpDataDemissao}
+                  onDpDataPrevistaAcertoChange={setDpDataPrevistaAcerto}
+                  onDpConsideracoesChange={setDpConsideracoes}
+                  rhEditable={canEditRhSection}
+                  dpEditable={canEditDpSection}
+                />
               ) : (
                 camposSchema.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
@@ -1591,6 +1676,312 @@ function RQ063ResumoCampos({
             readOnly
             value={get('observacoesRh')}
           />
+        </div>
+      </section>
+    </div>
+  )
+}
+function RQ247ResumoCampos({
+  payloadCampos,
+  rhDataExameDemissional,
+  rhDataLiberacaoPpp,
+  rhConsideracoes,
+  dpDataDemissao,
+  dpDataPrevistaAcerto,
+  dpConsideracoes,
+  onRhDataExameDemissionalChange,
+  onRhDataLiberacaoPppChange,
+  onRhConsideracoesChange,
+  onDpDataDemissaoChange,
+  onDpDataPrevistaAcertoChange,
+  onDpConsideracoesChange,
+  rhEditable,
+  dpEditable,
+}: {
+  payloadCampos: Record<string, any>
+  rhDataExameDemissional: string
+  rhDataLiberacaoPpp: string
+  rhConsideracoes: string
+  dpDataDemissao: string
+  dpDataPrevistaAcerto: string
+  dpConsideracoes: string
+  onRhDataExameDemissionalChange: (value: string) => void
+  onRhDataLiberacaoPppChange: (value: string) => void
+  onRhConsideracoesChange: (value: string) => void
+  onDpDataDemissaoChange: (value: string) => void
+  onDpDataPrevistaAcertoChange: (value: string) => void
+  onDpConsideracoesChange: (value: string) => void
+  rhEditable: boolean
+  dpEditable: boolean
+}) {
+  const get = (key: string) =>
+    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+
+  const joinIfTrue = (entries: [string, string][]) =>
+    entries
+      .filter(
+        ([k]) =>
+          (payloadCampos[k] ?? '').toString().toLowerCase() === 'true',
+      )
+      .map(([, label]) => label)
+      .join(', ')
+
+  const motivos = joinIfTrue([
+    ['motivoPedidoDemissao', 'Pedido de demissão'],
+    ['motivoSemJustaCausa', 'Sem justa causa'],
+    ['motivoJustaCausa', 'Justa causa'],
+    ['motivoTerminoExperiencia', 'Término de experiência'],
+  ])
+
+  const rhDataExameValue = rhEditable
+    ? rhDataExameDemissional
+    : get('rhDataExameDemissional')
+  const rhDataLiberacaoValue = rhEditable
+    ? rhDataLiberacaoPpp
+    : get('rhDataLiberacaoPpp')
+  const rhConsideracoesValue = rhEditable
+    ? rhConsideracoes
+    : get('rhConsideracoes')
+
+  const dpDataDemissaoValue = dpEditable
+    ? dpDataDemissao
+    : get('dpDataDemissao')
+  const dpDataPrevistaValue = dpEditable
+    ? dpDataPrevistaAcerto
+    : get('dpDataPrevistaAcerto')
+  const dpConsideracoesValue = dpEditable
+    ? dpConsideracoes
+    : get('dpConsideracoes')
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+        RQ.247 Solicitação de Desligamento de Pessoal
+      </p>
+
+      <section className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Dados do gestor solicitante
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Nome</label>
+            <input className={INPUT_RO} readOnly value={get('gestorNome')} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Cargo</label>
+            <input className={INPUT_RO} readOnly value={get('gestorCargo')} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Data</label>
+            <input className={INPUT_RO} readOnly value={get('gestorData')} />
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Motivo do desligamento
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Motivos selecionados</label>
+            <input className={INPUT_RO} readOnly value={motivos || '-'} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>
+              Data fim experiência (se aplicável)
+            </label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('dataFimExperiencia')}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className={LABEL_RO}>
+              Justificativa do gestor (para sem/justa causa)
+            </label>
+            <textarea
+              className={`${INPUT_RO} min-h-[70px]`}
+              readOnly
+              value={get('justificativaGestor')}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Dados do funcionário
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Nome</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('funcionarioNome')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Cargo</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('funcionarioCargo')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Setor</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('funcionarioSetor')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Centro de custo</label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('funcionarioCentroCusto')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>
+              Data sugerida do último dia
+            </label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('dataSugeridaUltimoDia')}
+            />
+          </div>
+          <div>
+            <label className={LABEL_RO}>Funcionário cumprirá aviso?</label>
+            <input className={INPUT_RO} readOnly value={get('cumpriraAviso')} />
+          </div>
+          <div>
+            <label className={LABEL_RO}>
+              Posição vaga será substituída?
+            </label>
+            <input
+              className={INPUT_RO}
+              readOnly
+              value={get('posicaoSubstituida')}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-4">
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Informações gerais RH (preenchimento RH)
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Data exame demissional</label>
+            {rhEditable ? (
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={rhDataExameValue}
+                onChange={(e) =>
+                  onRhDataExameDemissionalChange(e.target.value)
+                }
+              />
+            ) : (
+              <input className={INPUT_RO} readOnly value={rhDataExameValue} />
+            )}
+          </div>
+          <div>
+            <label className={LABEL_RO}>Data liberação PPP</label>
+            {rhEditable ? (
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={rhDataLiberacaoValue}
+                onChange={(e) => onRhDataLiberacaoPppChange(e.target.value)}
+              />
+            ) : (
+              <input
+                className={INPUT_RO}
+                readOnly
+                value={rhDataLiberacaoValue}
+              />
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className={LABEL_RO}>Considerações</label>
+            {rhEditable ? (
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[70px]"
+                value={rhConsideracoesValue}
+                onChange={(e) => onRhConsideracoesChange(e.target.value)}
+              />
+            ) : (
+              <textarea
+                className={`${INPUT_RO} min-h-[70px]`}
+                readOnly
+                value={rhConsideracoesValue}
+              />
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+          Informações gerais DP (preenchimento DP)
+        </p>
+        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+          <div>
+            <label className={LABEL_RO}>Data demissão</label>
+            {dpEditable ? (
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={dpDataDemissaoValue}
+                onChange={(e) => onDpDataDemissaoChange(e.target.value)}
+              />
+            ) : (
+              <input className={INPUT_RO} readOnly value={dpDataDemissaoValue} />
+            )}
+          </div>
+          <div>
+            <label className={LABEL_RO}>Data prevista acerto</label>
+            {dpEditable ? (
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={dpDataPrevistaValue}
+                onChange={(e) => onDpDataPrevistaAcertoChange(e.target.value)}
+              />
+            ) : (
+              <input
+                className={INPUT_RO}
+                readOnly
+                value={dpDataPrevistaValue}
+              />
+            )}
+          </div>
+          <div className="md:col-span-2">
+            <label className={LABEL_RO}>Considerações</label>
+            {dpEditable ? (
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[70px]"
+                value={dpConsideracoesValue}
+                onChange={(e) => onDpConsideracoesChange(e.target.value)}
+              />
+            ) : (
+              <textarea
+                className={`${INPUT_RO} min-h-[70px]`}
+                readOnly
+                value={dpConsideracoesValue}
+              />
+            )}
+          </div>
         </div>
       </section>
     </div>

@@ -69,6 +69,7 @@ export async function POST(
       solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+    const isSolicitacaoDesligamento = solicitation.tipo?.id === 'RQ_247'
     const isAdmissaoGerada =
       solicitation.tipo?.nome === 'Solicitação de Admissão'
 
@@ -77,11 +78,16 @@ export async function POST(
     const solicitanteOrigem = payloadOrigem.solicitante ?? {}
     const vemDeRh = Boolean(payloadOrigem?.origem?.rhSolicitationId)
 
-    if (!isSolicitacaoPessoal && !isSolicitacaoIncentivo && !isAdmissaoGerada) {
+    if (
+      !isSolicitacaoPessoal &&
+      !isSolicitacaoIncentivo &&
+      !isAdmissaoGerada &&
+      !isSolicitacaoDesligamento
+    ) {
       return NextResponse.json(
         {
           error:
-            'Esta rota só pode ser usada para RQ_063, RQ_091 ou solicitações de admissão oriundas do RH.',
+            'Esta rota só pode ser usada para RQ_063, RQ_091, RQ_247 ou solicitações de admissão oriundas do RH.',
         },
         { status: 400 },
       )
@@ -161,6 +167,43 @@ export async function POST(
 
       return NextResponse.json({ dp: updated }, { status: 200 })
     }
+    if (isSolicitacaoDesligamento && vemDeRh) {
+      const agora = new Date()
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+          payload: {
+            ...payloadOrigem,
+            campos: {
+              ...camposOrigem,
+              ...(outrasInfos ?? {}),
+            },
+          },
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: `Solicitação finalizada pelo DP em ${agora.toLocaleDateString('pt-BR')}.`,
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_DP',
+        },
+      })
+
+      return NextResponse.json({ dp: updated }, { status: 200 })
+    }
+
 
     if (isSolicitacaoIncentivo && vemDeRh) {
       const agora = new Date()
@@ -311,6 +354,8 @@ export async function POST(
             ? `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`
            : isSolicitacaoIncentivo
               ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
+              : isSolicitacaoDesligamento
+                ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
               : `Finalizada no RH por ${me.fullName ?? me.id}.`,
         },
       })
@@ -569,6 +614,71 @@ export async function POST(
           })
         }
       }
+      if (isSolicitacaoDesligamento) {
+        const deptDp = await tx.department.findUnique({
+          where: { code: '08' },
+        })
+
+        dpSolicitation = await tx.solicitation.create({
+          data: {
+            protocolo: generateProtocolo(),
+            tipoId: solicitation.tipoId,
+            costCenterId: null,
+            departmentId: deptDp?.id ?? solicitation.departmentId,
+            solicitanteId: solicitation.solicitanteId,
+            parentId: solicitation.id,
+            titulo: solicitation.titulo,
+            descricao: `Solicitação encaminhada pelo RH para o DP a partir da ${solicitation.protocolo}.`,
+            requiresApproval: false,
+            approvalStatus: 'APROVADO',
+            status: 'ABERTA',
+            payload: {
+              origem: {
+                rhSolicitationId: solicitation.id,
+                rhProtocolo: solicitation.protocolo,
+              },
+              campos: {
+                ...camposOrigem,
+                ...(outrasInfos ?? {}),
+              },
+              solicitante: solicitanteOrigem,
+            },
+          },
+        })
+
+        await tx.solicitationTimeline.create({
+          data: {
+            solicitationId: dpSolicitation.id,
+            status: 'AGUARDANDO_ATENDIMENTO',
+            message:
+              `Solicitação de desligamento encaminhada para o DP a partir da ${solicitation.protocolo} e aguardando atendimento.`,
+          },
+        })
+
+        await tx.event.create({
+          data: {
+            id: randomUUID(),
+            solicitationId: dpSolicitation.id,
+            actorId: me.id,
+            tipo: 'CRIACAO_AUTOMATICA_DESLIGAMENTO',
+          },
+        })
+
+        if (solicitation.anexos && solicitation.anexos.length > 0) {
+          await tx.attachment.createMany({
+            data: solicitation.anexos.map((a) => ({
+              id: randomUUID(),
+              solicitationId: dpSolicitation.id,
+              filename: a.filename,
+              url: a.url,
+              mimeType: a.mimeType,
+              sizeBytes: a.sizeBytes,
+              createdAt: a.createdAt,
+            })),
+          })
+        }
+      }
+
 
       return {
         rh: updatedRh,

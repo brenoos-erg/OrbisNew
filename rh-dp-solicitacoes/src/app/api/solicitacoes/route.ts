@@ -3,7 +3,7 @@ export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
+import { ModuleLevel, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -95,13 +95,6 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 
   return where
 }
-function isSolicitationCostCenterNullable() {
-  const model = Prisma.dmmf.datamodel.models.find(
-    (item) => item.name === 'Solicitation',
-  )
-  const field = model?.fields.find((item) => item.name === 'costCenterId')
-  return field ? !field.isRequired : false
-}
 
 /**
  * GET /api/solicitacoes
@@ -145,14 +138,43 @@ export const GET = withModuleLevel(
             ccIds.add(l.costCenterId)
           }
 
-          if (ccIds.size === 0) {
-            where.id = '__never__' as any
-          } else if (where.costCenterId) {
+          const dpDepartment = await prisma.department.findUnique({
+            where: { code: '08' },
+            select: { id: true },
+          })
+
+          const isDpUser =
+            me.department?.code === '08' ||
+            Boolean(
+              await prisma.userDepartment.findFirst({
+                where: {
+                  userId: me.id,
+                  department: { code: '08' },
+                },
+                select: { id: true },
+              }),
+            )
+
+          const dpFilters =
+            isDpUser && dpDepartment
+              ? [{ costCenterId: null, departmentId: dpDepartment.id }]
+              : []
+
+          if (where.costCenterId) {
             if (!ccIds.has(where.costCenterId)) {
               where.id = '__never__' as any
             }
           } else {
-            where.costCenterId = { in: [...ccIds] }
+             const receivedFilters = [
+              ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
+              ...dpFilters,
+            ]
+
+            if (receivedFilters.length === 0) {
+              where.id = '__never__' as any
+            } else {
+              where.AND = [...(where.AND ?? []), { OR: receivedFilters }]
+            }
           }
           // RQ_063 só deve chegar na fila após aprovação (nível 3)
           where.AND = [
@@ -162,7 +184,12 @@ export const GET = withModuleLevel(
                 AND: [
                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
-                  { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                  {
+                    OR: [
+                      { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                      { tipo: { id: 'RQ_247' } },
+                    ],
+                  },
                 ],
               },
             },
@@ -174,7 +201,7 @@ export const GET = withModuleLevel(
           // where.approverId = me.id
         }
 
-       const listStartedAt = performance.now()
+        const listStartedAt = performance.now()
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
@@ -295,18 +322,16 @@ export const POST = withModuleLevel(
           )
         }
 
-     const tipoId = body.tipoId as string | undefined
+        const tipoId = body.tipoId as string | undefined
         const costCenterId = body.costCenterId as string | null | undefined
         const departmentId = body.departmentId as string | undefined
         const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
 
-
-   if (!tipoId || !departmentId) {
+        if (!tipoId || !departmentId) {
           return NextResponse.json(
             {
-              error:
-                'Tipo e departamento são obrigatórios.',
+              error: 'Tipo e departamento são obrigatórios.',
             },
             { status: 400 },
           )
@@ -335,32 +360,7 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
-            const costCenterIsNullable = isSolicitationCostCenterNullable()
-        let resolvedCostCenterId = costCenterId ?? null
-
-        if (!resolvedCostCenterId && !costCenterIsNullable) {
-          // Fallback seguro: usa o centro de custo do usuário logado ou,
-          // como último recurso, o primeiro centro de custo ordenado pelo código.
-          if (me.costCenterId) {
-            resolvedCostCenterId = me.costCenterId
-          } else {
-            const fallbackCostCenter = await prisma.costCenter.findFirst({
-              orderBy: { code: 'asc' },
-              select: { id: true },
-            })
-            resolvedCostCenterId = fallbackCostCenter?.id ?? null
-          }
-
-          if (!resolvedCostCenterId) {
-            return NextResponse.json(
-              {
-                error:
-                  'Centro de custo obrigatório não encontrado para registrar a solicitação.',
-              },
-              { status: 400 },
-            )
-          }
-        }
+            const resolvedCostCenterId = costCenterId ?? null
 
 
         // monta o payload com dados do solicitante + campos do formulário
@@ -396,6 +396,7 @@ export const POST = withModuleLevel(
           tipo.nome === 'RQ_063 - Solicitação de Pessoal'
         const isSolicitacaoIncentivo =
           tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+        const isSolicitacaoDesligamento = tipo.id === 'RQ_247'
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
 
@@ -561,6 +562,46 @@ export const POST = withModuleLevel(
 
        return NextResponse.json(updated, { status: 201 })
         }
+        /* =====================================================================
+          4.1) RQ_247 - Solicitação de Desligamento de Pessoal
+           ===================================================================== */
+        if (isSolicitacaoDesligamento) {
+          const approver = await findLevel3ApproverForCostCenter(
+            resolvedCostCenterId,
+          )
+          const approverId = approver?.id ?? null
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_APROVACAO',
+              message:
+                'Solicitação enviada para aprovação do RH antes de seguir para o DP.',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
+
 
          /* =====================================================================
            5) Solicitação de Abono Educacional

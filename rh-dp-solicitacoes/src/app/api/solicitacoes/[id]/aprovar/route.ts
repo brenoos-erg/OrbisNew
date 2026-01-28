@@ -46,6 +46,7 @@ export async function POST(
       solic.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+      const isSolicitacaoDesligamento = solic.tipo?.id === 'RQ_247'
 
     if (isSolicitacaoIncentivo) {
       const allowedCostCenters = new Set<string>()
@@ -76,7 +77,7 @@ export async function POST(
 
     let rhCostCenter = null
 
-    if (isSolicitacaoPessoal) {
+    if (isSolicitacaoPessoal || isSolicitacaoDesligamento) {
       rhCostCenter = await prisma.costCenter.findFirst({
         where: {
           OR: [

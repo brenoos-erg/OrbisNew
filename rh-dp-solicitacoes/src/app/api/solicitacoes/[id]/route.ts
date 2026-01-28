@@ -23,6 +23,7 @@ export async function GET(
       include: {
         tipo: true,
         costCenter: true,
+        department: { select: { id: true, name: true, code: true } },
         comentarios: {
           include: {
             autor: {
@@ -100,6 +101,13 @@ export async function GET(
             description: item.costCenter.description,
             code: item.costCenter.code,
             externalCode: item.costCenter.externalCode,
+          }
+        : null,
+        department: item.department
+        ? {
+            id: item.department.id,
+            name: item.department.name,
+            code: item.department.code,
           }
         : null,
       payload: item.payload as any,
