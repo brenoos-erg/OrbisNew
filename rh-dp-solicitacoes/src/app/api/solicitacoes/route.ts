@@ -3,7 +3,7 @@ export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, SolicitationPriority } from '@prisma/client'
+import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -94,6 +94,13 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   }
 
   return where
+}
+function isSolicitationCostCenterNullable() {
+  const model = Prisma.dmmf.datamodel.models.find(
+    (item) => item.name === 'Solicitation',
+  )
+  const field = model?.fields.find((item) => item.name === 'costCenterId')
+  return field ? !field.isRequired : false
 }
 
 /**
@@ -289,17 +296,17 @@ export const POST = withModuleLevel(
         }
 
      const tipoId = body.tipoId as string | undefined
-        const costCenterId = body.costCenterId as string | undefined
+        const costCenterId = body.costCenterId as string | null | undefined
         const departmentId = body.departmentId as string | undefined
         const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
 
 
-   if (!tipoId || !costCenterId || !departmentId) {
+   if (!tipoId || !departmentId) {
           return NextResponse.json(
             {
               error:
-                'Tipo, centro de custo e departamento são obrigatórios.',
+                'Tipo e departamento são obrigatórios.',
             },
             { status: 400 },
           )
@@ -328,6 +335,33 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
+            const costCenterIsNullable = isSolicitationCostCenterNullable()
+        let resolvedCostCenterId = costCenterId ?? null
+
+        if (!resolvedCostCenterId && !costCenterIsNullable) {
+          // Fallback seguro: usa o centro de custo do usuário logado ou,
+          // como último recurso, o primeiro centro de custo ordenado pelo código.
+          if (me.costCenterId) {
+            resolvedCostCenterId = me.costCenterId
+          } else {
+            const fallbackCostCenter = await prisma.costCenter.findFirst({
+              orderBy: { code: 'asc' },
+              select: { id: true },
+            })
+            resolvedCostCenterId = fallbackCostCenter?.id ?? null
+          }
+
+          if (!resolvedCostCenterId) {
+            return NextResponse.json(
+              {
+                error:
+                  'Centro de custo obrigatório não encontrado para registrar a solicitação.',
+              },
+              { status: 400 },
+            )
+          }
+        }
+
 
         // monta o payload com dados do solicitante + campos do formulário
         const payload: any = await buildPayload(solicitanteId, campos)
@@ -337,7 +371,7 @@ export const POST = withModuleLevel(
           data: {
             protocolo,
             tipoId,
-            costCenterId,
+            costCenterId: resolvedCostCenterId,
             departmentId,
             solicitanteId,
             titulo,
@@ -454,7 +488,9 @@ export const POST = withModuleLevel(
           }
 
           // qualquer coisa diferente de SIM exige aprovação
-          const approver = await findLevel3ApproverForCostCenter(costCenterId)
+          const approver = await findLevel3ApproverForCostCenter(
+            resolvedCostCenterId,
+          )
           const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({
@@ -530,7 +566,9 @@ export const POST = withModuleLevel(
            5) Solicitação de Abono Educacional
            ===================================================================== */
         if (isAbonoEducacional) {
-          const approver = await findLevel3ApproverForCostCenter(costCenterId)
+          const approver = await findLevel3ApproverForCostCenter(
+            resolvedCostCenterId,
+          )
           const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({

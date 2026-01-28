@@ -186,7 +186,7 @@ export default function NovaSolicitacaoPage() {
    3) /api/tipos-solicitacao?centroCustoId=&departamentoId=
   ============================================================ */
   useEffect(() => {
-    if (!centroId || !departamentoId) {
+    if (!departamentoId) {
       setTipos([]);
       setTipoId('');
       return;
@@ -194,10 +194,10 @@ export default function NovaSolicitacaoPage() {
 
     async function loadTipos() {
       try {
-        const params = new URLSearchParams({
-          centroCustoId: centroId,
-          departamentoId,
-        });
+        const params = new URLSearchParams({ departamentoId });
+        if (centroId) {
+          params.set('centroCustoId', centroId);
+        }
 
         const res = await fetch(`/api/tipos-solicitacao?${params}`);
         if (!res.ok) throw new Error('Erro ao buscar tipos de solicitação');
@@ -438,7 +438,7 @@ export default function NovaSolicitacaoPage() {
 
       const body = {
         solicitanteId: me?.id ?? null,
-        costCenterId: centroId,
+        costCenterId: centroId || null,
         departmentId: departamentoId,
         tipoId,
         campos,
@@ -523,13 +523,15 @@ export default function NovaSolicitacaoPage() {
               <div className="space-y-3">
                 <div>
                   <label className={labelClass}>
-                    CENTRO DE CUSTO <span className="text-red-500">*</span>
+                     CENTRO DE CUSTO
                   </label>
                   <select
                     className={selectClass}
                     value={centroId}
-                    onChange={(e: SelectChange) => setCentroId(e.target.value)}
-                    required
+                    onChange={(e: SelectChange) => {
+                      setCentroId(e.target.value);
+                      setTipoId('');
+                    }}
                   >
                     <option value="">Selecione...</option>
                     {centros.map((c) => (
@@ -548,9 +550,10 @@ export default function NovaSolicitacaoPage() {
                   <select
                     className={selectClass}
                     value={departamentoId}
-                    onChange={(e: SelectChange) =>
-                      setDepartamentoId(e.target.value)
-                    }
+                    onChange={(e: SelectChange) => {
+                      setDepartamentoId(e.target.value);
+                      setTipoId('');
+                    }}
                     required
                   >
                     <option value="">Selecione...</option>
@@ -571,7 +574,7 @@ export default function NovaSolicitacaoPage() {
                     className={selectClass}
                     value={tipoId}
                     onChange={(e: SelectChange) => setTipoId(e.target.value)}
-                    disabled={!centroId || !departamentoId}
+                    disabled={!departamentoId}
                     required
                   >
                     <option value="">Selecione...</option>

@@ -689,7 +689,7 @@ export function SolicitationDetailModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-800">
               Detalhes da Solicitação
@@ -702,7 +702,7 @@ export function SolicitationDetailModal({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+           <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
             {/* Modo de aprovação (tela do gestor) */}
             {isApprovalMode && (
               <>
@@ -826,10 +826,10 @@ export function SolicitationDetailModal({
         )}
 
         {/* CONTEÚDO */}
-        <div className="space-y-5 px-5 py-4 text-sm">
+         <div className="space-y-5 px-5 py-4 text-sm">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               {timelineSteps.map((step, index) => {
                 const isActive = index === currentIndex
                 const isDone = index < currentIndex
