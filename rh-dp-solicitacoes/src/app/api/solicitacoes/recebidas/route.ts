@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    const items = solicitacoes.map((s) => ({
+  const items = solicitacoes.map((s) => ({
       id: s.id,
       protocolo: s.protocolo,
       status: s.status,
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       titulo: s.titulo,
       solicitanteNome:
         s.solicitante.fullName || s.solicitante.email || '—',
-      centroCustoNome: s.costCenter.description,
+      centroCustoNome: s.costCenter?.description ?? '—',
       // ✅ ATENDENTE: SOMENTE quem assumiu
       atendenteNome: s.assumidaPor
         ? s.assumidaPor.fullName || s.assumidaPor.email

@@ -348,7 +348,7 @@ export const POST = withModuleLevel(
           )
         }
 
-        const protocolo = generateProtocolo()
+         const protocolo = generateProtocolo()
         const titulo = tipo.nome
         const descricao = null
         const tipoMeta = (tipo.schemaJson as {
@@ -360,7 +360,14 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
-            const resolvedCostCenterId = costCenterId ?? null
+        const resolvedCostCenterId = costCenterId ?? me.costCenterId ?? null
+
+        if (!resolvedCostCenterId) {
+          return NextResponse.json(
+            { error: 'Centro de custo é obrigatório.' },
+            { status: 400 },
+          )
+        }
 
 
         // monta o payload com dados do solicitante + campos do formulário
