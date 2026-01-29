@@ -446,7 +446,7 @@ export default function NovaSolicitacaoPage() {
         departmentId: departamentoId,
         tipoId,
         campos,
-      };
+       };
 
       const res = await fetch('/api/solicitacoes', {
         method: 'POST',
@@ -470,7 +470,14 @@ export default function NovaSolicitacaoPage() {
       const data = await res.json();
       console.log('Solicitação criada:', data);
 
-      router.push('/dashboard/solicitacoes/enviadas');
+      const query = new URLSearchParams();
+      if (departamentoId) {
+        query.set('departmentId', departamentoId);
+      }
+      const nextUrl = query.toString()
+        ? `/dashboard/solicitacoes/enviadas?${query.toString()}`
+        : '/dashboard/solicitacoes/enviadas';
+      router.push(nextUrl);
     } catch (err: any) {
       console.error('Erro ao enviar solicitação', err);
       setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');

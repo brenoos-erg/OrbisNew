@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Download, Filter, RefreshCcw, Search, Plus, Info, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Row,
   SolicitationDetail,
@@ -46,6 +46,8 @@ function escapeCsv(v: string) {
 
 export default function SentRequestsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const queryDepartmentId = searchParams.get('departmentId') ?? ''
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
@@ -57,7 +59,7 @@ export default function SentRequestsPage() {
   const [pageSize, setPageSize] = useState(10)
 
   // filtros
-  const [departmentId, setDepartmentId] = useState<string>('')
+  const [departmentId, setDepartmentId] = useState<string>(queryDepartmentId)
   const [dateStart, setDateStart] = useState<string>('')
   const [dateEnd, setDateEnd] = useState<string>('')
   const [costCenterId, setCostCenterId] = useState<string>('') // centro responsável
@@ -151,6 +153,11 @@ export default function SentRequestsPage() {
       controller.abort()
     }
   }, [])
+  useEffect(() => {
+    if (!queryDepartmentId || queryDepartmentId === departmentId) return
+    setDepartmentId(queryDepartmentId)
+    setPage(1)
+  }, [queryDepartmentId, departmentId])
 
 
  function buildQuery() {

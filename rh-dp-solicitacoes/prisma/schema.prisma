@@ -200,7 +200,7 @@ model Solicitation {
   anexos           Attachment[]
   comentarios      Comment[]
   eventos          Event[]
-approver         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  approver         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
   assumidaPor      User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
   costCenter       CostCenter?            @relation(fields: [costCenterId], references: [id])
   department       Department             @relation(fields: [departmentId], references: [id])
