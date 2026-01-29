@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { formatCostCenterLabel } from '@/lib/costCenter'
 
 
 export async function GET(req: NextRequest) {
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
       titulo: s.titulo,
       solicitanteNome:
         s.solicitante.fullName || s.solicitante.email || '—',
-      centroCustoNome: s.costCenter?.description ?? '—',
+      centroCustoNome: formatCostCenterLabel(s.costCenter),
       // ✅ ATENDENTE: SOMENTE quem assumiu
       atendenteNome: s.assumidaPor
         ? s.assumidaPor.fullName || s.assumidaPor.email

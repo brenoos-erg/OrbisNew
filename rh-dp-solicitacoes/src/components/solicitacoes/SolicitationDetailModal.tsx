@@ -3,6 +3,8 @@
 
 import { format } from 'date-fns'
 import React, { useEffect, useState } from 'react'
+import { formatCostCenterLabel } from '@/lib/costCenter'
+import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
 
 const LABEL_RO =
   'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
@@ -401,7 +403,7 @@ export function SolicitationDetailModal({
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-  const isSolicitacaoDesligamento = detail?.tipo?.id === 'RQ_247'
+  const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
   const isDpDestino = !!(
@@ -431,7 +433,7 @@ export function SolicitationDetailModal({
   const followsRhFinalizationFlow =
     isSolicitacaoPessoal ||
     isSolicitacaoIncentivo ||
-    isSolicitacaoDesligamento ||
+    isDesligamento ||
     isDpChildFromRh
 
   const isFinalizadaOuCancelada =
@@ -444,13 +446,13 @@ export function SolicitationDetailModal({
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
   const finalizarLabel = isDpDestino
     ? 'Finalizar chamado'
-    : isSolicitacaoPessoal || isSolicitacaoDesligamento
+    : isSolicitacaoPessoal || isDesligamento
       ? 'Enviar para o DP'
       : 'Finalizar no RH'
   const canEditRhSection =
-    isSolicitacaoDesligamento && isRhDestino && !isFinalizadaOuCancelada
+    isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
-    isSolicitacaoDesligamento && isDpDestino && !isFinalizadaOuCancelada
+    isDesligamento && isDpDestino && !isFinalizadaOuCancelada
 
   // Se for tela de aprovação não mostramos ações de gestão;
   // se canManage=false (Solicitações Enviadas) também não.
@@ -562,7 +564,7 @@ export function SolicitationDetailModal({
         const buildOptionalValue = (value: string) =>
         value && value.trim().length > 0 ? value : undefined
 
-      const desligamentoInfos = isSolicitacaoDesligamento
+      const desligamentoInfos = isDesligamento
         ? {
             ...(buildOptionalValue(rhDataExameDemissional)
               ? { rhDataExameDemissional }
@@ -620,7 +622,7 @@ export function SolicitationDetailModal({
       setCloseSuccess(
         isSolicitacaoPessoal
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
-          : isSolicitacaoDesligamento && isDpDestino
+          : isDesligamento && isDpDestino
             ? 'Solicitação finalizada pelo DP.'
             : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
       )
@@ -981,8 +983,8 @@ export function SolicitationDetailModal({
                     readOnly
                     value={
                       row.setorDestino ??
-                      detail.costCenter?.description ??
-                      ''
+                       formatCostCenterLabel(detail.costCenter, '')
+
                     }
                   />
                 </div>
@@ -1117,7 +1119,7 @@ export function SolicitationDetailModal({
               {/* Formulário do tipo de solicitação */}
               {isSolicitacaoPessoal ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
-                ) : isSolicitacaoDesligamento ? (
+                 ) : isDesligamento ? (
                 <RQ247ResumoCampos
                   payloadCampos={payloadCampos}
                   rhDataExameDemissional={rhDataExameDemissional}

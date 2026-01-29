@@ -10,6 +10,7 @@ import {
   SolicitationDetail,
   SolicitationDetailModal,
 } from '@/components/solicitacoes/SolicitationDetailModal'
+import { formatCostCenterLabel } from '@/lib/costCenter'
 export const dynamic = 'force-dynamic'
 
 type ApiResponse = {
@@ -26,6 +27,7 @@ type CostCenterOption = {
   id: string
   description: string
   code?: string | null
+  externalCode?: string | null
 }
 
 
@@ -77,8 +79,8 @@ export default function SentRequestsPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
-   const departmentsLabel = useMemo(() => {
-    return [{ id: '', label: 'Selecione um departamento' }, ...departments]
+  const departmentsLabel = useMemo(() => {
+    return [{ id: '', label: 'Todos os departamentos' }, ...departments]
   }, [departments])
 
   const costCentersLabel = useMemo(() => {
@@ -166,7 +168,7 @@ export default function SentRequestsPage() {
     qs.set('pageSize', String(pageSize))
     // neste módulo usamos sempre as ENVIADAS pelo usuário logado
     qs.set('scope', 'sent')
-    qs.set('departmentId', departmentId)
+    if (departmentId) qs.set('departmentId', departmentId)
     if (dateStart) qs.set('dateStart', dateStart)
     if (dateEnd) qs.set('dateEnd', dateEnd)
     if (costCenterId) qs.set('costCenterId', costCenterId)
@@ -180,12 +182,6 @@ export default function SentRequestsPage() {
   }
 
   async function load() {
-    if (!departmentId) {
-      setData([])
-      setTotal(0)
-      setLoading(false)
-      return
-    }
 
     setLoading(true)
     try {
@@ -257,7 +253,6 @@ export default function SentRequestsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const missingDepartment = !departmentId
 
   /** ===== DETALHE ===== */
 
@@ -401,11 +396,11 @@ export default function SentRequestsPage() {
               }}
               className="mt-1 w-full rounded-md border border-blue-600 text-[15px] py-2.5 shadow-sm transition-all duration-150 focus:border-blue-700 focus:ring-2 focus:ring-blue-300 bg-white"
             >
-              {costCentersLabel.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code ? `${c.code} - ${c.description}` : c.description}
-                </option>
-              ))}
+                  {costCentersLabel.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {formatCostCenterLabel(c)}
+                    </option>
+                  ))}
             </select>
           </div>
           <div>
@@ -539,21 +534,14 @@ export default function SentRequestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {missingDepartment && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
-                      Selecione um departamento para carregar as solicitações.
-                    </td>
-                  </tr>
-                )}
-                {loading && !missingDepartment && (
-                  <tr>
+                {loading && (
+                    <tr>
                     <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                       Carregando...
                     </td>
                   </tr>
                 )}
-                {!loading && !missingDepartment && data.length === 0 && (
+                {!loading && data.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                       Nenhuma solicitação encontrada
@@ -561,7 +549,6 @@ export default function SentRequestsPage() {
                   </tr>
                 )}
                 {!loading &&
-                  !missingDepartment &&
                   data.map((r) => (
                     <tr
                       key={r.id}

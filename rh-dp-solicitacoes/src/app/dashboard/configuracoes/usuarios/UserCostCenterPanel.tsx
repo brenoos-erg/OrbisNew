@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatCostCenterLabel } from '@/lib/costCenter'
 
 type CentroCusto = {
   id: string
@@ -38,12 +39,13 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
         const json: {
           id: string
           code: string | null
+          externalCode?: string | null
           description: string
         }[] = await res.json()
 
         const mapped: CentroCusto[] = json.map((c) => ({
           id: c.id,
-          nome: c.code ? `${c.code} - ${c.description}` : c.description,
+          nome: formatCostCenterLabel(c),
         }))
 
         setTodosCC(mapped)
@@ -81,16 +83,16 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
           costCenter: {
             id: string
             code: string | null
+            externalCode?: string | null
             description: string
           }
         }[] = await res.json()
 
         const mapped: CentroCusto[] = json.map((link) => ({
           id: link.costCenter.id,
-          nome: link.costCenter.code
-            ? `${link.costCenter.code} - ${link.costCenter.description}`
-            : link.costCenter.description,
+          nome: formatCostCenterLabel(link.costCenter),
         }))
+
 
         setVinculados(mapped)
       } catch (err) {
@@ -127,14 +129,18 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
         cache: 'no-store',
       })
       const json: {
-        costCenter: { id: string; code: string | null; description: string }
+        costCenter: {
+          id: string
+          code: string | null
+          externalCode?: string | null
+          description: string
+        }
       }[] = await reload.json()
 
       const mapped: CentroCusto[] = json.map((link) => ({
         id: link.costCenter.id,
-        nome: link.costCenter.code
-          ? `${link.costCenter.code} - ${link.costCenter.description}`
-          : link.costCenter.description,
+        nome: formatCostCenterLabel(link.costCenter),
+
       }))
 
       setVinculados(mapped)

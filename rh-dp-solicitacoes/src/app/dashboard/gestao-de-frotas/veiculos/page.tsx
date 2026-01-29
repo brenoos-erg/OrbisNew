@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { isValidPlate, normalizePlate } from '@/lib/plate'
 import { handleFleetUnauthorized } from '@/lib/fleet-auth'
+import { formatCostCenterLabel } from '@/lib/costCenter'
 
 type CostCenterOption = {
   id: string
@@ -158,7 +159,7 @@ function getVehicleCostCentersText(vehicle: ApiVehicle) {
       ?.map((link) => {
         const cc = link.costCenter
         if (!cc) return null
-        return cc.description || cc.code || cc.externalCode || null
+        return formatCostCenterLabel(cc, '')
       })
       .filter(Boolean) || []
 
@@ -802,7 +803,7 @@ export default function VehiclesPage() {
             type: 'Não informado',
             model: modelRaw || undefined,
             kmCurrent: Number(digits),
-            costCenter: costCenterMatch.description || costCenterMatch.code || costCenterMatch.externalCode || undefined,
+             costCenter: formatCostCenterLabel(costCenterMatch, '') || undefined,
             costCenterIds: [costCenterMatch.id],
           }),
         })
@@ -1954,7 +1955,7 @@ export default function VehiclesPage() {
                   )}
 
                   {costCenters.map((cc) => {
-                    const label = cc.description || cc.code || cc.externalCode || 'Centro de custo'
+                    const label = formatCostCenterLabel(cc, 'Centro de custo')
                     return (
                       <label key={cc.id} className="flex items-center gap-2 text-slate-700">
                         <input

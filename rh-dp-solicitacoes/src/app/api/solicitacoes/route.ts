@@ -9,6 +9,8 @@ import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
+import { formatCostCenterLabel } from '@/lib/costCenter'
+import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
 
 
 /**
@@ -176,7 +178,7 @@ export const GET = withModuleLevel(
               where.AND = [...(where.AND ?? []), { OR: receivedFilters }]
             }
           }
-          // RQ_063 só deve chegar na fila após aprovação (nível 3)
+          // RQ_063/RQ_247 só devem chegar na fila após aprovação (nível 3)
           where.AND = [
             ...(where.AND ?? []),
             {
@@ -188,6 +190,11 @@ export const GET = withModuleLevel(
                     OR: [
                       { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
                       { tipo: { id: 'RQ_247' } },
+                      {
+                        tipo: {
+                          nome: { contains: 'desligamento', mode: 'insensitive' },
+                        },
+                      },
                     ],
                   },
                 ],
@@ -211,6 +218,7 @@ export const GET = withModuleLevel(
             include: {
               tipo: { select: { nome: true } },
               department: { select: { name: true } },
+              costCenter: { select: { description: true, externalCode: true, code: true } },
               approver: { select: { id: true, fullName: true } },
               assumidaPor: { select: { id: true, fullName: true } },
               solicitante: { select: { id: true, fullName: true } },
@@ -236,7 +244,8 @@ export const GET = withModuleLevel(
           autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
           sla: null,
-          setorDestino: s.department?.name ?? null,
+          setorDestino:
+            formatCostCenterLabel(s.costCenter, '') || s.department?.name ?? null,
 
           requiresApproval: s.requiresApproval,
           approvalStatus: s.approvalStatus,
@@ -294,9 +303,7 @@ async function buildPayload(
       login: user?.login ?? '',
       phone: user?.phone ?? '',
       costCenterText: user?.costCenter
-        ? `${user.costCenter.code ? user.costCenter.code + ' - ' : ''}${
-            user.costCenter.description
-          }`
+        ? formatCostCenterLabel(user.costCenter, '')
         : '',
     },
     campos,
@@ -403,7 +410,7 @@ export const POST = withModuleLevel(
           tipo.nome === 'RQ_063 - Solicitação de Pessoal'
         const isSolicitacaoIncentivo =
           tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-        const isSolicitacaoDesligamento = tipo.id === 'RQ_247'
+        const isDesligamento = isSolicitacaoDesligamento(tipo)
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
 
@@ -572,7 +579,7 @@ export const POST = withModuleLevel(
         /* =====================================================================
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
            ===================================================================== */
-        if (isSolicitacaoDesligamento) {
+        if (isDesligamento) {
           const approver = await findLevel3ApproverForCostCenter(
             resolvedCostCenterId,
           )

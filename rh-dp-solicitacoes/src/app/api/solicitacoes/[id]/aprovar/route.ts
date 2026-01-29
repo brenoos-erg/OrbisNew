@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
+import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
 
 
 export async function POST(
@@ -46,7 +47,7 @@ export async function POST(
       solic.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-      const isSolicitacaoDesligamento = solic.tipo?.id === 'RQ_247'
+      const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
 
     if (isSolicitacaoIncentivo) {
       const allowedCostCenters = new Set<string>()
@@ -77,7 +78,7 @@ export async function POST(
 
     let rhCostCenter = null
 
-    if (isSolicitacaoPessoal || isSolicitacaoDesligamento) {
+    if (isSolicitacaoPessoal || isDesligamento) {
       rhCostCenter = await prisma.costCenter.findFirst({
         where: {
           OR: [

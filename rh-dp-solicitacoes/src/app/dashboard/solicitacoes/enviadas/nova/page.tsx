@@ -9,8 +9,8 @@ import {
   ChangeEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
-
 /* ================================================================
    TYPES
 ================================================================ */
@@ -30,6 +30,7 @@ type UserMe = {
 type CostCenter = {
   id: string;
   code: string | null;
+  externalCode?: string | null;
   description: string;
 };
 
@@ -548,8 +549,7 @@ export default function NovaSolicitacaoPage() {
                     <option value="">Selecione...</option>
                     {centros.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.code ? `${c.code} - ` : ''}
-                        {c.description}
+                        {formatCostCenterLabel(c)}
                       </option>
                     ))}
                   </select>

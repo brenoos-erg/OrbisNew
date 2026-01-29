@@ -18,6 +18,7 @@ import {
   type TiEquipmentStatus,
   getTiEquipmentCategoryLabel,
 } from '@/lib/tiEquipment'
+import { formatCostCenterLabel } from '@/lib/costCenter'
 
 type EquipmentRow = {
   id: string
@@ -136,9 +137,8 @@ function formatDate(value?: string) {
 function formatCostCenter(
   cc?: { description: string | null; externalCode: string | null; code: string | null } | null,
 ) {
-  if (!cc?.description && !cc?.externalCode && !cc?.code) return '—'
-  const code = cc.externalCode || cc.code
-  return code ? `${cc.description ?? ''} (${code})`.trim() : cc.description ?? '—'
+  return formatCostCenterLabel(cc)
+
 }
 
 function statusLabel(status: string) {

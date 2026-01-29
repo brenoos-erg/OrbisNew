@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
+import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
 
 function generateProtocolo() {
   const now = new Date()
@@ -69,7 +70,7 @@ export async function POST(
       solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
     const isSolicitacaoIncentivo =
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-    const isSolicitacaoDesligamento = solicitation.tipo?.id === 'RQ_247'
+    const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
     const isAdmissaoGerada =
       solicitation.tipo?.nome === 'Solicitação de Admissão'
 
@@ -82,7 +83,7 @@ export async function POST(
       !isSolicitacaoPessoal &&
       !isSolicitacaoIncentivo &&
       !isAdmissaoGerada &&
-      !isSolicitacaoDesligamento
+      !isDesligamento
     ) {
       return NextResponse.json(
         {
@@ -167,7 +168,7 @@ export async function POST(
 
       return NextResponse.json({ dp: updated }, { status: 200 })
     }
-    if (isSolicitacaoDesligamento && vemDeRh) {
+    if (isDesligamento && vemDeRh) {
       const agora = new Date()
       const updated = await prisma.solicitation.update({
         where: { id: solicitation.id },
@@ -354,7 +355,7 @@ export async function POST(
             ? `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`
            : isSolicitacaoIncentivo
               ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
-              : isSolicitacaoDesligamento
+              : isDesligamento
                 ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
               : `Finalizada no RH por ${me.fullName ?? me.id}.`,
         },
@@ -614,7 +615,16 @@ export async function POST(
           })
         }
       }
-      if (isSolicitacaoDesligamento) {
+       if (isDesligamento) {
+        const ccDp = await tx.costCenter.findFirst({
+          where: { externalCode: '590' },
+        })
+
+        if (!ccDp) {
+          throw new Error(
+            'Centro de custo do DP (externalCode = 590) não encontrado.',
+          )
+        }
         const deptDp = await tx.department.findUnique({
           where: { code: '08' },
         })
@@ -623,7 +633,7 @@ export async function POST(
           data: {
             protocolo: generateProtocolo(),
             tipoId: solicitation.tipoId,
-            costCenterId: null,
+            costCenterId: ccDp.id,
             departmentId: deptDp?.id ?? solicitation.departmentId,
             solicitanteId: solicitation.solicitanteId,
             parentId: solicitation.id,
