@@ -270,6 +270,7 @@ type Props = {
   error: string | null
   mode?: 'default' | 'approval'
   onActionCompleted?: (action: 'APROVAR' | 'REPROVAR') => void
+  onFinalized?: () => void
   /**
    * Se false, esconde ações de assumir/finalizar (modo consulta).
    * Na tela de "Solicitações Enviadas" usar canManage={false}.
@@ -286,6 +287,7 @@ export function SolicitationDetailModal({
   error,
   mode = 'default',
   onActionCompleted,
+  onFinalized,
   canManage = true,
 }: Props) {
   if (!isOpen || !row) return null
@@ -626,6 +628,7 @@ export function SolicitationDetailModal({
             ? 'Solicitação finalizada pelo DP.'
             : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
       )
+      onFinalized?.()
     } catch (err: any) {
       console.error('Erro ao finalizar RH', err)
       setCloseError(err?.message ?? 'Erro ao finalizar solicitação.')

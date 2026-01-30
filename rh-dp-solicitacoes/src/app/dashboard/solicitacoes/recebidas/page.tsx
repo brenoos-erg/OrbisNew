@@ -312,6 +312,13 @@ export default function ReceivedRequestsPage() {
           setDetail(null)
           setSelectedRow(null)
         }}
+        onFinalized={() => {
+          setDetailOpen(false)
+          setDetail(null)
+          setSelectedRow(null)
+          setDetailMode('default')
+          void fetchList()
+        }}
         row={selectedRow}
         detail={detail}
         loading={detailLoading}
