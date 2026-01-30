@@ -229,28 +229,26 @@ export const GET = withModuleLevel(
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
 
         const rows = solicitations.map((s) => ({
-          id: s.id,
-          titulo: s.titulo,
-          status: s.status,
-          protocolo: s.protocolo,
-          createdAt: s.dataAbertura.toISOString(),
-          tipo: s.tipo ? { nome: s.tipo.nome } : null,
+  id: s.id,
+  titulo: s.titulo,
+  status: s.status,
+  protocolo: s.protocolo,
+  createdAt: s.dataAbertura.toISOString(),
+  tipo: s.tipo ? { nome: s.tipo.nome } : null,
 
-          responsavelId: s.assumidaPor?.id ?? null,
-          responsavel: s.assumidaPor
-            ? { fullName: s.assumidaPor.fullName }
-            : null,
+  responsavelId: s.assumidaPor?.id ?? null,
+  responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
 
-          autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+  autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
-          sla: null,
-          setorDestino:
-            formatCostCenterLabel(s.costCenter, '') || s.department?.name ?? null,
+  sla: null,
 
-          requiresApproval: s.requiresApproval,
-          approvalStatus: s.approvalStatus,
-        }))
+  setorDestino:
+    formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
 
+  requiresApproval: s.requiresApproval,
+  approvalStatus: s.approvalStatus,
+}))
         return NextResponse.json({ rows, total })
       } catch (e) {
         console.error('GET /api/solicitacoes error', e)
