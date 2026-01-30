@@ -530,7 +530,7 @@ export async function POST(
             solicitanteId: solicitation.solicitanteId,
             parentId: solicitation.id,
             titulo: 'RQ_091 - Solicitação de Incentivo à Educação',
-            descricao: `Solicitação encaminhada pelo RH para o DP a partir da ${solicitation.protocolo}.`,
+            descricao: ` ${solicitation.protocolo}.`,
             requiresApproval: false,
             approvalStatus: 'APROVADO',
             status: 'ABERTA',

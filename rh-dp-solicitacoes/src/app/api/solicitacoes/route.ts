@@ -126,9 +126,14 @@ export const GET = withModuleLevel(
           where.solicitanteId = me.id
         } else if (scope === 'received') {
           const ccIds = new Set<string>()
+          const deptIds = new Set<string>()
 
           if (me.costCenterId) {
             ccIds.add(me.costCenterId)
+          }
+
+          if (me.departmentId) {
+            deptIds.add(me.departmentId)
           }
 
           const links = await prisma.userCostCenter.findMany({
@@ -140,26 +145,31 @@ export const GET = withModuleLevel(
             ccIds.add(l.costCenterId)
           }
 
-          const dpDepartment = await prisma.department.findUnique({
-            where: { code: '08' },
-            select: { id: true },
+          const departmentLinks = await prisma.userDepartment.findMany({
+            where: { userId: me.id },
+            select: {
+              departmentId: true,
+              department: { select: { code: true } },
+            },
           })
+
+          for (const link of departmentLinks) {
+            deptIds.add(link.departmentId)
+          }
 
           const isDpUser =
             me.department?.code === '08' ||
-            Boolean(
-              await prisma.userDepartment.findFirst({
-                where: {
-                  userId: me.id,
-                  department: { code: '08' },
-                },
-                select: { id: true },
-              }),
-            )
+            departmentLinks.some((link) => link.department?.code === '08')
+
+          const dpDepartmentId =
+            me.department?.code === '08'
+              ? me.departmentId
+              : departmentLinks.find((link) => link.department?.code === '08')
+                  ?.departmentId
 
           const dpFilters =
-            isDpUser && dpDepartment
-              ? [{ costCenterId: null, departmentId: dpDepartment.id }]
+            isDpUser && dpDepartmentId
+              ? [{ costCenterId: null, departmentId: dpDepartmentId }]
               : []
 
           if (where.costCenterId) {
@@ -167,8 +177,11 @@ export const GET = withModuleLevel(
               where.id = '__never__' as any
             }
           } else {
-             const receivedFilters = [
+            const receivedFilters = [
               ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
+              ...(deptIds.size > 0
+                ? [{ departmentId: { in: [...deptIds] } }]
+                : []),
               ...dpFilters,
             ]
 
@@ -178,7 +191,7 @@ export const GET = withModuleLevel(
               where.AND = [...(where.AND ?? []), { OR: receivedFilters }]
             }
           }
-          // RQ_063/RQ_247 só devem chegar na fila após aprovação (nível 3)
+           // RQ_063 só deve chegar na fila após aprovação (nível 3)
           where.AND = [
             ...(where.AND ?? []),
             {
@@ -189,12 +202,6 @@ export const GET = withModuleLevel(
                   {
                     OR: [
                       { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
-                      { tipo: { id: 'RQ_247' } },
-                      {
-                        tipo: {
-                          nome: { contains: 'desligamento', mode: 'insensitive' },
-                        },
-                      },
                     ],
                   },
                 ],
@@ -578,18 +585,14 @@ export const POST = withModuleLevel(
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
            ===================================================================== */
         if (isDesligamento) {
-          const approver = await findLevel3ApproverForCostCenter(
-            resolvedCostCenterId,
-          )
-          const approverId = approver?.id ?? null
-
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              requiresApproval: true,
-              approvalStatus: 'PENDENTE',
-              approverId,
-              status: 'AGUARDANDO_APROVACAO',
+              requiresApproval: false,
+              approvalStatus: 'APROVADO',
+              approvalAt: new Date(),
+              approverId: null,
+              status: 'ABERTA',
             },
           })
 
@@ -597,20 +600,19 @@ export const POST = withModuleLevel(
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
-              actorId: approverId ?? solicitanteId,
-              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+              actorId: solicitanteId,
+              tipo: 'APROVACAO_AUTOMATICA',
             },
           })
 
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO',
+              status: 'AGUARDANDO_ATENDIMENTO',
               message:
-                'Solicitação enviada para aprovação do RH antes de seguir para o DP.',
+                'Solicitação aprovada automaticamente e enviada ao centro de custo responsável.',
             },
           })
-
           return NextResponse.json(updated, { status: 201 })
         }
 
