@@ -73,6 +73,11 @@ export async function POST(
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
     const isAdmissaoGerada =
       solicitation.tipo?.nome === 'Solicitação de Admissão'
+      const isDpDestino = Boolean(
+      solicitation.costCenter?.externalCode === '590' ||
+        solicitation.costCenter?.description?.toLowerCase().includes('pessoal') ||
+        solicitation.department?.code === '08',
+    )
 
     const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
@@ -168,7 +173,7 @@ export async function POST(
 
       return NextResponse.json({ dp: updated }, { status: 200 })
     }
-    if (isDesligamento && vemDeRh) {
+     if (isDesligamento && (vemDeRh || isDpDestino)) {
       const agora = new Date()
       const updated = await prisma.solicitation.update({
         where: { id: solicitation.id },

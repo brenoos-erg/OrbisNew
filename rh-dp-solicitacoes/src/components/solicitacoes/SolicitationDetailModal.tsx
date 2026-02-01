@@ -4,7 +4,10 @@
 import { format } from 'date-fns'
 import React, { useEffect, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
+import {
+  isSolicitacaoDesligamento,
+  isSolicitacaoNadaConsta,
+} from '@/lib/solicitationTypes'
 
 const LABEL_RO =
   'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
@@ -294,10 +297,18 @@ export function SolicitationDetailModal({
 
   const isApprovalMode = mode === 'approval'
   const [detail, setDetail] = useState<SolicitationDetail | null>(detailProp)
+  const [detailStack, setDetailStack] = useState<SolicitationDetail[]>([])
+  const [nadaConstaCampos, setNadaConstaCampos] = useState<
+    Record<string, string>
+  >({})
+  const [nadaConstaError, setNadaConstaError] = useState<string | null>(null)
+  const [savingNadaConsta, setSavingNadaConsta] = useState(false)
+  const [loadingChild, setLoadingChild] = useState(false)
 
   useEffect(() => {
     setDetail(detailProp)
-  }, [detailProp])
+    setDetailStack([])
+  }, [detailProp?.id])
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -406,7 +417,23 @@ export function SolicitationDetailModal({
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
+  const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+
+  const nadaConstaStage = (() => {
+    const deptName = detail?.department?.name?.toLowerCase() ?? ''
+    if (deptName.includes('pessoal')) return 'dp'
+    if (deptName.includes('informação') || deptName.includes('informacao'))
+      return 'ti'
+    if (deptName.includes('ti')) return 'ti'
+    if (deptName.includes('almox')) return 'almox'
+    if (deptName.includes('logística') || deptName.includes('logistica'))
+      return 'logistica'
+    if (deptName.includes('sst')) return 'sst'
+    if (deptName.includes('financeiro')) return 'financeiro'
+    if (deptName.includes('fiscal')) return 'fiscal'
+    return null
+  })()
 
   const isDpDestino = !!(
     detail?.costCenter?.externalCode === '590' ||
@@ -440,6 +467,12 @@ export function SolicitationDetailModal({
 
   const isFinalizadaOuCancelada =
     effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
+      const camposNadaConstaSolicitante = camposSchema.filter(
+    (campo) => campo.stage === 'solicitante',
+  )
+  const camposNadaConstaSetor = nadaConstaStage
+    ? camposSchema.filter((campo) => campo.stage === nadaConstaStage)
+    : []
 
   // pode assumir se não estiver concluída/cancelada
   const canAssumir = !isFinalizadaOuCancelada
@@ -455,12 +488,58 @@ export function SolicitationDetailModal({
     isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
     isDesligamento && isDpDestino && !isFinalizadaOuCancelada
+    const setoresNadaConsta = (() => {
+    if (!isNadaConsta || !detail) return []
+    const setores = [
+      {
+        id: detail.id,
+        label: detail.department?.name ?? 'Departamento Pessoal',
+        status: detail.status,
+        isParent: true,
+      },
+    ]
+
+    detail.children?.forEach((child) => {
+      setores.push({
+        id: child.id,
+        label: child.setorDestino ?? child.tipo?.nome ?? 'Setor',
+        status: child.status,
+        isParent: false,
+      })
+    })
+
+    return setores
+  })()
+
+  useEffect(() => {
+    if (!isNadaConsta) return
+
+    const nextCampos = camposSchema.reduce<Record<string, string>>(
+      (acc, campo) => {
+        const rawValue = payloadCampos[campo.name]
+        acc[campo.name] =
+          rawValue === undefined || rawValue === null ? '' : String(rawValue)
+        return acc
+      },
+      {},
+    )
+
+    setNadaConstaCampos(nextCampos)
+  }, [camposSchema, isNadaConsta, payloadCampos, detail?.id])
+
 
   // Se for tela de aprovação não mostramos ações de gestão;
   // se canManage=false (Solicitações Enviadas) também não.
   const showManagementActions = !isApprovalMode && canManage
 
   // ===== AÇÕES =====
+  const handleNadaConstaChange = (name: string, value: string) => {
+    setNadaConstaCampos((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
   async function refreshDetailFromServer() {
     const id = detail?.id ?? row?.id
     if (!id) return
@@ -475,6 +554,159 @@ export function SolicitationDetailModal({
       console.error('Erro ao atualizar detalhes após ação', err)
     }
   }
+   async function handleOpenChildDetail(childId: string) {
+    if (!childId) return
+    setLoadingChild(true)
+    setNadaConstaError(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${childId}`)
+      if (!res.ok) {
+        throw new Error('Erro ao carregar detalhes do setor.')
+      }
+
+      const json = (await res.json()) as SolicitationDetail
+      if (detail) {
+        setDetailStack((prev) => [...prev, detail])
+      }
+      setDetail(json)
+    } catch (err: any) {
+      setNadaConstaError(err?.message ?? 'Erro ao carregar detalhes do setor.')
+    } finally {
+      setLoadingChild(false)
+    }
+  }
+
+  function handleReturnToParent() {
+    setDetailStack((prev) => {
+      if (prev.length === 0) return prev
+      const next = [...prev]
+      const previousDetail = next.pop() ?? null
+      setDetail(previousDetail)
+      return next
+    })
+  }
+
+  async function handleSalvarNadaConsta(finalizar: boolean) {
+    if (!detail?.id) return
+    if (camposNadaConstaSetor.length === 0) return
+
+    setSavingNadaConsta(true)
+    setNadaConstaError(null)
+
+    const camposPayload = camposNadaConstaSetor.reduce<Record<string, string>>(
+      (acc, campo) => {
+        acc[campo.name] = nadaConstaCampos[campo.name] ?? ''
+        return acc
+      },
+      {},
+    )
+
+    try {
+      const res = await fetch(
+        `/api/solicitacoes/${detail.id}/atualizar-campos`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            campos: camposPayload,
+            finalizar,
+          }),
+        },
+      )
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao salvar campos.')
+      }
+
+      await refreshDetailFromServer()
+      if (finalizar) {
+        setCloseSuccess('Seção finalizada com sucesso.')
+      }
+    } catch (err: any) {
+      setNadaConstaError(err?.message ?? 'Erro ao salvar campos.')
+    } finally {
+      setSavingNadaConsta(false)
+    }
+  }
+
+  const renderNadaConstaCampo = (campo: CampoEspecifico) => {
+    const value = nadaConstaCampos[campo.name] ?? ''
+    const baseClass =
+      'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm'
+
+    if (campo.type === 'checkbox') {
+      return (
+        <label
+          key={campo.name}
+          className="flex items-start gap-2 text-xs text-slate-700"
+        >
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={value === 'true'}
+            onChange={(e) =>
+              handleNadaConstaChange(
+                campo.name,
+                e.target.checked ? 'true' : 'false',
+              )
+            }
+            disabled={isFinalizadaOuCancelada}
+          />
+          <span>{campo.label}</span>
+        </label>
+      )
+    }
+
+    if (campo.type === 'textarea') {
+      return (
+        <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+          <span className="font-semibold">{campo.label}</span>
+          <textarea
+            className={`${baseClass} min-h-[90px]`}
+            value={value}
+            onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
+            disabled={isFinalizadaOuCancelada}
+          />
+        </label>
+      )
+    }
+
+    if (campo.type === 'select') {
+      return (
+        <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+          <span className="font-semibold">{campo.label}</span>
+          <select
+            className={baseClass}
+            value={value}
+            onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
+            disabled={isFinalizadaOuCancelada}
+          >
+            <option value="">Selecione...</option>
+            {(campo.options ?? []).map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+
+    return (
+      <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+        <span className="font-semibold">{campo.label}</span>
+        <input
+          className={baseClass}
+          value={value}
+          onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
+          disabled={isFinalizadaOuCancelada}
+        />
+      </label>
+    )
+  }
+
 
   async function handleUploadAnexos() {
     const solicitationId = detail?.id ?? row?.id
@@ -773,6 +1005,14 @@ export function SolicitationDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
+          {detailStack.length > 0 && (
+              <button
+                onClick={handleReturnToParent}
+                className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+              >
+                Voltar
+              </button>
+            )}
             {/* Modo de aprovação (tela do gestor) */}
             {isApprovalMode && (
               <>
@@ -1120,9 +1360,131 @@ export function SolicitationDetailModal({
               </div>
 
               {/* Formulário do tipo de solicitação */}
-              {isSolicitacaoPessoal ? (
+               {isNadaConsta ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    Nada Consta
+                  </p>
+
+                  {nadaConstaError && (
+                    <p className="mb-3 text-xs text-red-600">
+                      {nadaConstaError}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr,2fr]">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                        Dados do colaborador
+                      </p>
+                      {camposNadaConstaSolicitante.length > 0 ? (
+                        <div className="space-y-2 text-xs text-slate-700">
+                          {camposNadaConstaSolicitante.map((campo) => (
+                            <div key={campo.name}>
+                              <label className={LABEL_RO}>
+                                {campo.label}
+                              </label>
+                              <input
+                                className={INPUT_RO}
+                                readOnly
+                                value={
+                                  payloadCampos[campo.name] !== undefined
+                                    ? String(payloadCampos[campo.name])
+                                    : ''
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Nenhum dado informado pelo solicitante.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                        Setores responsáveis
+                      </p>
+                      <div className="space-y-2 text-xs">
+                        {setoresNadaConsta.map((setor) => {
+                          const isConcluida = setor.status === 'CONCLUIDA'
+                          const isCurrent = detail?.id === setor.id
+                          const badgeClass = isConcluida
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+
+                          return (
+                            <button
+                              key={setor.id}
+                              type="button"
+                              onClick={() =>
+                                !isCurrent && handleOpenChildDetail(setor.id)
+                              }
+                              disabled={isCurrent}
+                              className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold ${badgeClass} ${
+                                isCurrent
+                                  ? 'cursor-default opacity-80'
+                                  : 'hover:bg-white'
+                              }`}
+                            >
+                              <span className="truncate">{setor.label}</span>
+                              <span className="text-[10px] uppercase tracking-wide">
+                                {isConcluida ? 'Preenchido' : 'Pendente'}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {loadingChild && (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Carregando setor...
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                        Dados do setor
+                      </p>
+                      {camposNadaConstaSetor.length > 0 ? (
+                        <div className="space-y-3 text-xs text-slate-700">
+                          {camposNadaConstaSetor.map(renderNadaConstaCampo)}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Selecione um setor para preencher os dados.
+                        </p>
+                      )}
+
+                      {camposNadaConstaSetor.length > 0 &&
+                        !isFinalizadaOuCancelada && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSalvarNadaConsta(false)}
+                              disabled={savingNadaConsta}
+                              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                              {savingNadaConsta ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSalvarNadaConsta(true)}
+                              disabled={savingNadaConsta}
+                              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                              Salvar e concluir
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              ) : isSolicitacaoPessoal ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
-                 ) : isDesligamento ? (
+                  ) : isDesligamento ? (
                 <RQ247ResumoCampos
                   payloadCampos={payloadCampos}
                   rhDataExameDemissional={rhDataExameDemissional}
@@ -1131,9 +1493,7 @@ export function SolicitationDetailModal({
                   dpDataDemissao={dpDataDemissao}
                   dpDataPrevistaAcerto={dpDataPrevistaAcerto}
                   dpConsideracoes={dpConsideracoes}
-                  onRhDataExameDemissionalChange={
-                    setRhDataExameDemissional
-                  }
+                  onRhDataExameDemissionalChange={setRhDataExameDemissional}
                   onRhDataLiberacaoPppChange={setRhDataLiberacaoPpp}
                   onRhConsideracoesChange={setRhConsideracoes}
                   onDpDataDemissaoChange={setDpDataDemissao}

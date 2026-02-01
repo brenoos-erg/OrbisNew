@@ -10,7 +10,10 @@ import { withModuleLevel } from '@/lib/access'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
+import {
+  isSolicitacaoDesligamento,
+  isSolicitacaoNadaConsta,
+} from '@/lib/solicitationTypes'
 
 
 /**
@@ -416,6 +419,7 @@ export const POST = withModuleLevel(
         const isSolicitacaoIncentivo =
           tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
         const isDesligamento = isSolicitacaoDesligamento(tipo)
+        const isNadaConsta = isSolicitacaoNadaConsta(tipo)
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
 
@@ -615,6 +619,64 @@ export const POST = withModuleLevel(
           })
           return NextResponse.json(updated, { status: 201 })
         }
+        /* =====================================================================
+           4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
+           ===================================================================== */
+        if (isNadaConsta) {
+          const departamentosAlvo = await prisma.department.findMany({
+            where: {
+              OR: [
+                { name: { contains: 'Tecnologia', mode: 'insensitive' } },
+                { name: { contains: 'Informação', mode: 'insensitive' } },
+                { name: { contains: 'TI', mode: 'insensitive' } },
+                { name: { contains: 'Almoxarifado', mode: 'insensitive' } },
+                { name: { contains: 'Logística', mode: 'insensitive' } },
+                { name: { contains: 'Logistica', mode: 'insensitive' } },
+                { name: { contains: 'SST', mode: 'insensitive' } },
+                { name: { contains: 'Financeiro', mode: 'insensitive' } },
+                { name: { contains: 'Fiscal', mode: 'insensitive' } },
+              ],
+            },
+          })
+
+          const departamentosFilhos = departamentosAlvo.filter(
+            (dept) => dept.id !== departmentId,
+          )
+
+          if (departamentosFilhos.length > 0) {
+            await prisma.$transaction(
+              departamentosFilhos.map((dept) =>
+                prisma.solicitation.create({
+                  data: {
+                    protocolo: generateProtocolo(),
+                    tipoId,
+                    costCenterId: resolvedCostCenterId,
+                    departmentId: dept.id,
+                    solicitanteId,
+                    titulo,
+                    descricao,
+                    prioridade,
+                    dataPrevista,
+                    payload,
+                    parentId: created.id,
+                  },
+                }),
+              ),
+            )
+          }
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message:
+                'Solicitação criada e encaminhada automaticamente para os setores responsáveis.',
+            },
+          })
+
+          return NextResponse.json(created, { status: 201 })
+        }
+
 
 
          /* =====================================================================

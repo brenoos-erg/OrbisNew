@@ -10,3 +10,11 @@ export function isSolicitacaoDesligamento(tipo?: TipoSolicitacaoLike | null) {
   const nome = tipo.nome?.trim().toUpperCase() ?? ''
   return nome.includes('DESLIGAMENTO')
 }
+
+export function isSolicitacaoNadaConsta(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === 'RQ_300') return true
+  const nome = tipo.nome?.trim().toUpperCase() ?? ''
+  return nome.includes('NADA CONSTA')
+}
