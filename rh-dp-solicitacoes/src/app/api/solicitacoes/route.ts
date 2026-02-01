@@ -13,6 +13,8 @@ import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
+  NADA_CONSTA_SETORES,
+  resolveNadaConstaSetorByDepartment,
 } from '@/lib/solicitationTypes'
 
 
@@ -152,13 +154,38 @@ export const GET = withModuleLevel(
             where: { userId: me.id },
             select: {
               departmentId: true,
-              department: { select: { code: true } },
+              department: { select: { code: true, name: true } },
             },
           })
 
           for (const link of departmentLinks) {
             deptIds.add(link.departmentId)
           }
+
+          const setorKeys = new Set<string>()
+          const primarySetor = resolveNadaConstaSetorByDepartment(me.department)
+          if (primarySetor) {
+            setorKeys.add(primarySetor)
+          }
+
+          for (const link of departmentLinks) {
+            const setor = resolveNadaConstaSetorByDepartment(link.department)
+            if (setor) {
+              setorKeys.add(setor)
+            }
+          }
+
+          const setorFilters =
+            setorKeys.size > 0
+              ? [
+                  {
+                    solicitacaoSetores: {
+                      some: { setor: { in: [...setorKeys] } },
+                    },
+                  },
+                ]
+              : []
+
 
           const isDpUser =
             me.department?.code === '08' ||
@@ -176,8 +203,17 @@ export const GET = withModuleLevel(
               : []
 
           if (where.costCenterId) {
-            if (!ccIds.has(where.costCenterId)) {
+            const receivedFilters = ccIds.has(where.costCenterId)
+              ? [{ costCenterId: where.costCenterId }]
+              : []
+
+            if (receivedFilters.length === 0 && setorFilters.length === 0) {
               where.id = '__never__' as any
+            } else {
+              where.AND = [
+                ...(where.AND ?? []),
+                { OR: [...receivedFilters, ...setorFilters] },
+              ]
             }
           } else {
             const receivedFilters = [
@@ -188,10 +224,13 @@ export const GET = withModuleLevel(
               ...dpFilters,
             ]
 
-            if (receivedFilters.length === 0) {
+            if (receivedFilters.length === 0 && setorFilters.length === 0) {
               where.id = '__never__' as any
             } else {
-              where.AND = [...(where.AND ?? []), { OR: receivedFilters }]
+              where.AND = [
+                ...(where.AND ?? []),
+                { OR: [...receivedFilters, ...setorFilters] },
+              ]
             }
           }
            // RQ_063 só deve chegar na fila após aprovação (nível 3)
@@ -623,47 +662,13 @@ export const POST = withModuleLevel(
            4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
            ===================================================================== */
         if (isNadaConsta) {
-          const departamentosAlvo = await prisma.department.findMany({
-            where: {
-              OR: [
-                { name: { contains: 'Tecnologia', mode: 'insensitive' } },
-                { name: { contains: 'Informação', mode: 'insensitive' } },
-                { name: { contains: 'TI', mode: 'insensitive' } },
-                { name: { contains: 'Almoxarifado', mode: 'insensitive' } },
-                { name: { contains: 'Logística', mode: 'insensitive' } },
-                { name: { contains: 'Logistica', mode: 'insensitive' } },
-                { name: { contains: 'SST', mode: 'insensitive' } },
-                { name: { contains: 'Financeiro', mode: 'insensitive' } },
-                { name: { contains: 'Fiscal', mode: 'insensitive' } },
-              ],
-            },
+          await prisma.solicitacaoSetor.createMany({
+            data: NADA_CONSTA_SETORES.map((setor) => ({
+              solicitacaoId: created.id,
+              setor: setor.key,
+              status: 'PENDENTE',
+            })),
           })
-
-          const departamentosFilhos = departamentosAlvo.filter(
-            (dept) => dept.id !== departmentId,
-          )
-
-          if (departamentosFilhos.length > 0) {
-            await prisma.$transaction(
-              departamentosFilhos.map((dept) =>
-                prisma.solicitation.create({
-                  data: {
-                    protocolo: generateProtocolo(),
-                    tipoId,
-                    costCenterId: resolvedCostCenterId,
-                    departmentId: dept.id,
-                    solicitanteId,
-                    titulo,
-                    descricao,
-                    prioridade,
-                    dataPrevista,
-                    payload,
-                    parentId: created.id,
-                  },
-                }),
-              ),
-            )
-          }
 
           await prisma.solicitationTimeline.create({
             data: {

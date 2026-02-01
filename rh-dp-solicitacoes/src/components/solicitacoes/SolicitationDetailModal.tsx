@@ -2,11 +2,14 @@
 'use client'
 
 import { format } from 'date-fns'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
+  NADA_CONSTA_SETORES,
+  type NadaConstaSetorKey,
+  resolveNadaConstaSetorByDepartment,
 } from '@/lib/solicitationTypes'
 
 const LABEL_RO =
@@ -90,6 +93,24 @@ type ChildSolicitation = {
   tipo?: { nome: string } | null
   setorDestino?: string | null
 }
+type SolicitacaoSetor = {
+  id: string
+  setor: string
+  status: string
+  constaFlag?: string | null
+  campos?: Record<string, any> | null
+  finalizadoEm?: string | null
+  finalizadoPor?: string | null
+}
+
+type CurrentUser = {
+  id: string
+  role?: string | null
+  departmentCode?: string | null
+  departmentName?: string | null
+  departments?: { code?: string | null; name?: string | null }[]
+}
+
 
 // ===== Status / Aprovação =====
 
@@ -132,6 +153,7 @@ export type SolicitationDetail = {
   anexos?: Attachment[]
   comentarios?: Comment[]
   children?: ChildSolicitation[]
+  solicitacaoSetores?: SolicitacaoSetor[]
 }
 
 // ===== Timeline =====
@@ -297,18 +319,43 @@ export function SolicitationDetailModal({
 
   const isApprovalMode = mode === 'approval'
   const [detail, setDetail] = useState<SolicitationDetail | null>(detailProp)
-  const [detailStack, setDetailStack] = useState<SolicitationDetail[]>([])
   const [nadaConstaCampos, setNadaConstaCampos] = useState<
     Record<string, string>
   >({})
   const [nadaConstaError, setNadaConstaError] = useState<string | null>(null)
   const [savingNadaConsta, setSavingNadaConsta] = useState(false)
-  const [loadingChild, setLoadingChild] = useState(false)
+  const [selectedSetor, setSelectedSetor] =
+    useState<NadaConstaSetorKey | null>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
     setDetail(detailProp)
-    setDetailStack([])
+    setSelectedSetor(null)
   }, [detailProp?.id])
+
+  useEffect(() => {
+    if (!isOpen) return
+    let alive = true
+
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch('/api/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = (await res.json()) as CurrentUser
+        if (alive) {
+          setCurrentUser(json)
+        }
+      } catch (err) {
+        console.error('Erro ao carregar usuário atual', err)
+      }
+    }
+
+    loadCurrentUser()
+
+    return () => {
+      alive = false
+    }
+  }, [isOpen])
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -420,20 +467,6 @@ export function SolicitationDetailModal({
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
-  const nadaConstaStage = (() => {
-    const deptName = detail?.department?.name?.toLowerCase() ?? ''
-    if (deptName.includes('pessoal')) return 'dp'
-    if (deptName.includes('informação') || deptName.includes('informacao'))
-      return 'ti'
-    if (deptName.includes('ti')) return 'ti'
-    if (deptName.includes('almox')) return 'almox'
-    if (deptName.includes('logística') || deptName.includes('logistica'))
-      return 'logistica'
-    if (deptName.includes('sst')) return 'sst'
-    if (deptName.includes('financeiro')) return 'financeiro'
-    if (deptName.includes('fiscal')) return 'fiscal'
-    return null
-  })()
 
   const isDpDestino = !!(
     detail?.costCenter?.externalCode === '590' ||
@@ -470,9 +503,54 @@ export function SolicitationDetailModal({
       const camposNadaConstaSolicitante = camposSchema.filter(
     (campo) => campo.stage === 'solicitante',
   )
-  const camposNadaConstaSetor = nadaConstaStage
-    ? camposSchema.filter((campo) => campo.stage === nadaConstaStage)
+  const setorMeta = selectedSetor
+    ? NADA_CONSTA_SETORES.find((setor) => setor.key === selectedSetor)
+    : null
+  const camposNadaConstaSetor = setorMeta
+    ? camposSchema.filter((campo) => campo.stage === setorMeta.stage)
     : []
+  const selectedSetorRegistro = selectedSetor
+    ? detail?.solicitacaoSetores?.find(
+        (setor) => setor.setor === selectedSetor,
+      )
+    : null
+  const isSetorConcluido = selectedSetorRegistro?.status === 'CONCLUIDO'
+
+  const userSetores = useMemo(() => {
+    const setores = new Set<NadaConstaSetorKey>()
+    if (!currentUser) return setores
+
+    const mainDept = {
+      code: currentUser.departmentCode ?? null,
+      name: currentUser.departmentName ?? null,
+    }
+
+    const allDepartments = [mainDept, ...(currentUser.departments ?? [])]
+    for (const dept of allDepartments) {
+      const resolved = resolveNadaConstaSetorByDepartment(dept)
+      if (resolved) {
+        setores.add(resolved)
+      }
+    }
+
+    if (currentUser.role === 'DP') {
+      setores.add('DP')
+    }
+
+    return setores
+  }, [currentUser])
+
+  const isDpOrAdmin =
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.role === 'DP' ||
+    currentUser?.departmentCode === '08' ||
+    (currentUser?.departments ?? []).some((dept) => dept.code === '08')
+
+  const canEditNadaConstaSetor =
+    Boolean(selectedSetor) &&
+    (isDpOrAdmin || userSetores.has(selectedSetor as NadaConstaSetorKey)) &&
+    !isFinalizadaOuCancelada &&
+    !isSetorConcluido
 
   // pode assumir se não estiver concluída/cancelada
   const canAssumir = !isFinalizadaOuCancelada
@@ -490,42 +568,54 @@ export function SolicitationDetailModal({
     isDesligamento && isDpDestino && !isFinalizadaOuCancelada
     const setoresNadaConsta = (() => {
     if (!isNadaConsta || !detail) return []
-    const setores = [
-      {
-        id: detail.id,
-        label: detail.department?.name ?? 'Departamento Pessoal',
-        status: detail.status,
-        isParent: true,
-      },
-    ]
+    const setoresMap = new Map(
+      (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
+    )
 
-    detail.children?.forEach((child) => {
-      setores.push({
-        id: child.id,
-        label: child.setorDestino ?? child.tipo?.nome ?? 'Setor',
-        status: child.status,
-        isParent: false,
-      })
+    return NADA_CONSTA_SETORES.map((setor) => {
+      const registro = setoresMap.get(setor.key)
+      return {
+        key: setor.key,
+        label: setor.label,
+        status: registro?.status ?? 'PENDENTE',
+      }
     })
-
-    return setores
   })()
 
   useEffect(() => {
     if (!isNadaConsta) return
 
-    const nextCampos = camposSchema.reduce<Record<string, string>>(
+    const defaultSetor = NADA_CONSTA_SETORES[0]?.key ?? null
+    if (!selectedSetor) {
+      setSelectedSetor(defaultSetor)
+      return
+    }
+
+    const exists = NADA_CONSTA_SETORES.some(
+      (setor) => setor.key === selectedSetor,
+    )
+    if (!exists) {
+      setSelectedSetor(defaultSetor)
+    }
+  }, [detail?.id, isNadaConsta, selectedSetor])
+
+  useEffect(() => {
+    if (!isNadaConsta || !selectedSetor) return
+    const registro = detail?.solicitacaoSetores?.find(
+      (setor) => setor.setor === selectedSetor,
+    )
+    const storedCampos = (registro?.campos ?? {}) as Record<string, any>
+    const nextCampos = camposNadaConstaSetor.reduce<Record<string, string>>(
       (acc, campo) => {
-        const rawValue = payloadCampos[campo.name]
+          const rawValue = storedCampos[campo.name]
         acc[campo.name] =
           rawValue === undefined || rawValue === null ? '' : String(rawValue)
         return acc
       },
       {},
     )
-
     setNadaConstaCampos(nextCampos)
-  }, [camposSchema, isNadaConsta, payloadCampos, detail?.id])
+  }, [camposNadaConstaSetor, detail?.id, isNadaConsta, selectedSetor])
 
 
   // Se for tela de aprovação não mostramos ações de gestão;
@@ -554,42 +644,12 @@ export function SolicitationDetailModal({
       console.error('Erro ao atualizar detalhes após ação', err)
     }
   }
-   async function handleOpenChildDetail(childId: string) {
-    if (!childId) return
-    setLoadingChild(true)
-    setNadaConstaError(null)
-
-    try {
-      const res = await fetch(`/api/solicitacoes/${childId}`)
-      if (!res.ok) {
-        throw new Error('Erro ao carregar detalhes do setor.')
-      }
-
-      const json = (await res.json()) as SolicitationDetail
-      if (detail) {
-        setDetailStack((prev) => [...prev, detail])
-      }
-      setDetail(json)
-    } catch (err: any) {
-      setNadaConstaError(err?.message ?? 'Erro ao carregar detalhes do setor.')
-    } finally {
-      setLoadingChild(false)
-    }
-  }
-
-  function handleReturnToParent() {
-    setDetailStack((prev) => {
-      if (prev.length === 0) return prev
-      const next = [...prev]
-      const previousDetail = next.pop() ?? null
-      setDetail(previousDetail)
-      return next
-    })
-  }
 
   async function handleSalvarNadaConsta(finalizar: boolean) {
     if (!detail?.id) return
     if (camposNadaConstaSetor.length === 0) return
+    if (!selectedSetor) return
+    if (!canEditNadaConstaSetor) return
 
     setSavingNadaConsta(true)
     setNadaConstaError(null)
@@ -609,8 +669,9 @@ export function SolicitationDetailModal({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            setor: selectedSetor,
             campos: camposPayload,
-            finalizar,
+            finalizarSetor: finalizar,
           }),
         },
       )
@@ -635,6 +696,7 @@ export function SolicitationDetailModal({
     const value = nadaConstaCampos[campo.name] ?? ''
     const baseClass =
       'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm'
+      const isDisabled = !canEditNadaConstaSetor
 
     if (campo.type === 'checkbox') {
       return (
@@ -652,7 +714,7 @@ export function SolicitationDetailModal({
                 e.target.checked ? 'true' : 'false',
               )
             }
-            disabled={isFinalizadaOuCancelada}
+           disabled={isDisabled}
           />
           <span>{campo.label}</span>
         </label>
@@ -667,7 +729,7 @@ export function SolicitationDetailModal({
             className={`${baseClass} min-h-[90px]`}
             value={value}
             onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
-            disabled={isFinalizadaOuCancelada}
+            disabled={isDisabled}
           />
         </label>
       )
@@ -681,7 +743,7 @@ export function SolicitationDetailModal({
             className={baseClass}
             value={value}
             onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
-            disabled={isFinalizadaOuCancelada}
+            disabled={isDisabled}
           >
             <option value="">Selecione...</option>
             {(campo.options ?? []).map((opt) => (
@@ -701,7 +763,7 @@ export function SolicitationDetailModal({
           className={baseClass}
           value={value}
           onChange={(e) => handleNadaConstaChange(campo.name, e.target.value)}
-          disabled={isFinalizadaOuCancelada}
+          disabled={isDisabled}
         />
       </label>
     )
@@ -1005,14 +1067,6 @@ export function SolicitationDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
-          {detailStack.length > 0 && (
-              <button
-                onClick={handleReturnToParent}
-                className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                Voltar
-              </button>
-            )}
             {/* Modo de aprovação (tela do gestor) */}
             {isApprovalMode && (
               <>
@@ -1409,19 +1463,17 @@ export function SolicitationDetailModal({
                       </p>
                       <div className="space-y-2 text-xs">
                         {setoresNadaConsta.map((setor) => {
-                          const isConcluida = setor.status === 'CONCLUIDA'
-                          const isCurrent = detail?.id === setor.id
+                           const isConcluida = setor.status === 'CONCLUIDO'
+                          const isCurrent = selectedSetor === setor.key
                           const badgeClass = isConcluida
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                             : 'border-yellow-200 bg-yellow-50 text-yellow-700'
 
                           return (
                             <button
-                              key={setor.id}
+                              key={setor.key}
                               type="button"
-                              onClick={() =>
-                                !isCurrent && handleOpenChildDetail(setor.id)
-                              }
+                              onClick={() => setSelectedSetor(setor.key)}
                               disabled={isCurrent}
                               className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold ${badgeClass} ${
                                 isCurrent
@@ -1431,17 +1483,12 @@ export function SolicitationDetailModal({
                             >
                               <span className="truncate">{setor.label}</span>
                               <span className="text-[10px] uppercase tracking-wide">
-                                {isConcluida ? 'Preenchido' : 'Pendente'}
+                                {isConcluida ? 'Concluído' : 'Pendente'}
                               </span>
                             </button>
                           )
                         })}
                       </div>
-                      {loadingChild && (
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          Carregando setor...
-                        </p>
-                      )}
                     </div>
 
                     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -1459,7 +1506,7 @@ export function SolicitationDetailModal({
                       )}
 
                       {camposNadaConstaSetor.length > 0 &&
-                        !isFinalizadaOuCancelada && (
+                         canEditNadaConstaSetor && (
                           <div className="mt-4 flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -1475,7 +1522,7 @@ export function SolicitationDetailModal({
                               disabled={savingNadaConsta}
                               className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                             >
-                              Salvar e concluir
+                              Finalizar setor
                             </button>
                           </div>
                         )}

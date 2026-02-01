@@ -209,12 +209,29 @@ model Solicitation {
   solicitante      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
   tipo             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
   timelines        SolicitationTimeline[]
+  solicitacaoSetores SolicitacaoSetor[]
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
   @@index([departmentId, dataAbertura])
   @@index([requiresApproval, approvalStatus, dataAbertura])
   @@index([status, dataAbertura])
 }
+
+model SolicitacaoSetor {
+  id            String       @id @default(cuid())
+  solicitacaoId String
+  setor         String
+  status        String       @default("PENDENTE")
+  constaFlag    String?
+  campos        Json?
+  finalizadoEm  DateTime?
+  finalizadoPor String?
+  solicitacao   Solicitation @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([solicitacaoId, setor])
+  @@index([setor, status])
+}
+
 
 model User {
   id                                         String                       @id @default(dbgenerated("(gen_random_uuid())::text"))

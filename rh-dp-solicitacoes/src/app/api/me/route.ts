@@ -41,10 +41,11 @@ export async function GET() {
       fullName: true,
       login: true,
       phone: true,
+      role: true,
       positionId: true,
       position: { select: { name: true } },
       departmentId: true,
-      department: { select: { name: true } },
+      department: { select: { name: true, code: true } },
       costCenterId: true,
       costCenter: { select: { code: true, description: true } },
       leaderId: true,
@@ -80,6 +81,13 @@ export async function GET() {
     const levelsStartedAt = performance.now()
     const moduleLevels = await getUserModuleLevels(dbUser.id)
     logTiming('prisma.moduleLevels.load (/api/me)', levelsStartedAt)
+     const departmentsLinks = await prisma.userDepartment.findMany({
+      where: { userId: dbUser.id },
+      select: {
+        department: { select: { id: true, name: true, code: true } },
+      },
+    })
+
 
     const responseBody = {
       id: dbUser.id,
@@ -87,12 +95,19 @@ export async function GET() {
       fullName: dbUser.fullName,
       login: dbUser.login,
       phone: dbUser.phone,
+      role: dbUser.role,
 
       positionId: dbUser.positionId,
       positionName: dbUser.position?.name ?? null,
 
       departmentId: dbUser.departmentId,
       departmentName: dbUser.department?.name ?? null,
+      departmentCode: dbUser.department?.code ?? null,
+      departments: departmentsLinks.map((link) => ({
+        id: link.department.id,
+        name: link.department.name,
+        code: link.department.code,
+      })),
 
       costCenterId: dbUser.costCenterId,
       costCenterName: dbUser.costCenter

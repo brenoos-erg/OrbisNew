@@ -40,6 +40,9 @@ export async function GET(
         timelines: {
           orderBy: { createdAt: 'asc' },
         },
+        solicitacaoSetores: {
+          orderBy: { setor: 'asc' },
+        },
         // 👇 filhos vinculados
         children: {
           include: {
@@ -142,6 +145,15 @@ export async function GET(
         status: t.status,
         message: t.message,
         createdAt: t.createdAt.toISOString(),
+      })),
+      solicitacaoSetores: item.solicitacaoSetores.map((setor) => ({
+        id: setor.id,
+        setor: setor.setor,
+        status: setor.status,
+        constaFlag: setor.constaFlag,
+        campos: setor.campos as any,
+        finalizadoEm: setor.finalizadoEm?.toISOString() ?? null,
+        finalizadoPor: setor.finalizadoPor ?? null,
       })),
       // 👇 filhos simplificados para o modal
       children: item.children.map((child) => ({
