@@ -66,10 +66,12 @@ export const NADA_CONSTA_SETORES_KEYS = NADA_CONSTA_SETORES.map(
   (setor) => setor.key,
 )
 
-export function resolveNadaConstaSetorByDepartment(dept?: {
-  code?: string | null
-  name?: string | null
-}): NadaConstaSetorKey | null {
+export function resolveNadaConstaSetorByDepartment(
+  dept?: {
+    code?: string | null
+    name?: string | null
+  } | null,
+): NadaConstaSetorKey | null {
   if (!dept) return null
   const code = dept.code?.trim()
   if (code === '08') return 'DP'
