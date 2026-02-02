@@ -223,6 +223,7 @@ export async function GET(req: NextRequest) {
       titulo: s.titulo,
       status: s.status,
       protocolo: s.protocolo,
+      createdAt: s.dataAbertura ? s.dataAbertura.toISOString() : null,
       createdAt: s.dataAbertura.toISOString(),
       tipo: s.tipo ? { nome: s.tipo.nome } : null,
       responsavelId: s.assumidaPor?.id ?? null,

@@ -23,7 +23,7 @@ export type Row = {
   titulo: string
   status: string
   protocolo?: string
-  createdAt: string
+  createdAt?: string | null
   tipo?: { nome: string } | null
   responsavel?: { fullName: string } | null
   responsavelId?: string | null
@@ -34,6 +34,7 @@ export type Row = {
   approvalStatus?: string | null
   costCenterId?: string | null
 }
+
 
 type CampoEspecifico = {
   name: string
