@@ -1596,9 +1596,10 @@ export function SolicitationDetailModal({
                                 disabled={isCurrent}
                                 className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold ${badgeClass} ${
                                   isCurrent
-                                    ? 'cursor-default opacity-80'
+                                    ? 'cursor-default opacity-90 ring-2 ring-sky-400 ring-offset-1'
                                     : 'hover:bg-white'
                                 }`}
+                                aria-pressed={isCurrent}
                               >
                                 <span className="truncate">{setor.label}</span>
                                 <span className="text-[10px] uppercase tracking-wide">
