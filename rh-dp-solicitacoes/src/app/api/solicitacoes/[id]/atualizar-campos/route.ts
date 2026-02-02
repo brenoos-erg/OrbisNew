@@ -173,8 +173,6 @@ export async function POST(
     })
 
     return NextResponse.json(updated)
-
-    return NextResponse.json(updated)
   } catch (error) {
     console.error('POST /api/solicitacoes/[id]/atualizar-campos error', error)
     return NextResponse.json(

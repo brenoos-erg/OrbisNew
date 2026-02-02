@@ -115,6 +115,34 @@ type CurrentUser = {
   departmentName?: string | null
   departments?: { code?: string | null; name?: string | null }[]
 }
+const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
+  if (!user) return []
+
+  const sectors = new Set<NadaConstaSetorKey>()
+  const departments = [
+    { code: user.departmentCode ?? null, name: user.departmentName ?? null },
+    ...(user.departments ?? []),
+  ]
+
+  for (const dept of departments) {
+    const resolved = resolveNadaConstaSetorByDepartment(dept)
+    if (resolved) {
+      sectors.add(resolved)
+    }
+  }
+
+  return Array.from(sectors)
+}
+
+const getUserIsDpOrAdmin = (user: CurrentUser | null) => {
+  if (!user) return false
+  return (
+    user.role === 'ADMIN' ||
+    user.role === 'DP' ||
+    user.departmentCode === '08' ||
+    (user.departments ?? []).some((dept) => dept.code === '08')
+  )
+}
 
 
 // ===== Status / Aprovação =====
@@ -342,15 +370,16 @@ export function SolicitationDetailModal({
   >({})
   const [nadaConstaError, setNadaConstaError] = useState<string | null>(null)
   const [savingNadaConsta, setSavingNadaConsta] = useState(false)
-  const [selectedSetor, setSelectedSetor] =
+  const [activeSector, setActiveSector] =
     useState<NadaConstaSetorKey | null>(null)
   const [isNadaConstaSetorOpen, setIsNadaConstaSetorOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
     setDetail(detailProp)
-    setSelectedSetor(null)
+    setActiveSector(null)
   }, [detailProp?.id])
+
 
   useEffect(() => {
     if (!isOpen) return
@@ -522,8 +551,8 @@ export function SolicitationDetailModal({
       const camposNadaConstaSolicitante = camposSchema.filter(
     (campo) => campo.stage === 'solicitante',
   )
-  const setorMeta = selectedSetor
-    ? NADA_CONSTA_SETORES.find((setor) => setor.key === selectedSetor)
+   const setorMeta = activeSector
+    ? NADA_CONSTA_SETORES.find((setor) => setor.key === activeSector)
     : null
   const camposNadaConstaSetor = useMemo(() => {
     if (!setorMeta) return []
@@ -554,47 +583,31 @@ export function SolicitationDetailModal({
     )
     return [...merged, ...missingDefaults]
   }, [camposSchema, setorMeta])
-  const selectedSetorRegistro = selectedSetor
+  const selectedSetorRegistro = activeSector
     ? detail?.solicitacaoSetores?.find(
-        (setor) => setor.setor === selectedSetor,
+        (setor) => setor.setor === activeSector,
       )
     : null
   const isSetorConcluido = selectedSetorRegistro?.status === 'CONCLUIDO'
   const constaFieldName = setorMeta?.constaField ?? null
 
-  const userSetores = useMemo(() => {
-    const setores = new Set<NadaConstaSetorKey>()
-    if (!currentUser) return setores
-
-    const mainDept = {
-      code: currentUser.departmentCode ?? null,
-      name: currentUser.departmentName ?? null,
-    }
-
-    const allDepartments = [mainDept, ...(currentUser.departments ?? [])]
-    for (const dept of allDepartments) {
-      const resolved = resolveNadaConstaSetorByDepartment(dept)
-      if (resolved) {
-        setores.add(resolved)
-      }
-    }
-
-    if (currentUser.role === 'DP') {
-      setores.add('DP')
-    }
-
-    return setores
-  }, [currentUser])
-
-  const isDpOrAdmin =
-    currentUser?.role === 'ADMIN' ||
-    currentUser?.role === 'DP' ||
-    currentUser?.departmentCode === '08' ||
-    (currentUser?.departments ?? []).some((dept) => dept.code === '08')
+  const userSectors = useMemo(
+    () => getUserSectors(currentUser),
+    [currentUser],
+  )
+  const userSectorKeys = useMemo(
+    () => new Set(userSectors),
+    [userSectors],
+  )
+  const userIsDpOrAdmin = useMemo(
+    () => getUserIsDpOrAdmin(currentUser),
+    [currentUser],
+  )
 
   const canEditNadaConstaSetor =
-    Boolean(selectedSetor) &&
-    (isDpOrAdmin || userSetores.has(selectedSetor as NadaConstaSetorKey)) &&
+    Boolean(activeSector) &&
+    (userIsDpOrAdmin ||
+      userSectorKeys.has(activeSector as NadaConstaSetorKey)) &&
     !isFinalizadaOuCancelada &&
     !isSetorConcluido
 
@@ -620,9 +633,9 @@ export function SolicitationDetailModal({
     )
 
     const allowedSetores =
-      currentUser?.role === 'ADMIN'
+       userIsDpOrAdmin
         ? new Set(NADA_CONSTA_SETORES.map((setor) => setor.key))
-        : userSetores
+        : userSectorKeys
 
     return NADA_CONSTA_SETORES.filter((setor) =>
       allowedSetores.has(setor.key),
@@ -637,31 +650,42 @@ export function SolicitationDetailModal({
   })()
 
   const selectedSetorLabel = useMemo(() => {
-    if (!selectedSetor) return null
-    const setor = setoresNadaConsta.find((item) => item.key === selectedSetor)
-    return setor?.label ?? selectedSetor
-  }, [selectedSetor, setoresNadaConsta])
+    if (!activeSector) return null
+    const setor = setoresNadaConsta.find((item) => item.key === activeSector)
+    return setor?.label ?? activeSector
+  }, [activeSector, setoresNadaConsta])
 
   useEffect(() => {
     if (!isNadaConsta) return
 
-     const defaultSetor = setoresNadaConsta[0]?.key ?? null
-    if (!selectedSetor) {
-      setSelectedSetor(defaultSetor)
+    const defaultSetor = userIsDpOrAdmin
+      ? (setoresNadaConsta.find((setor) => setor.key === 'DP')?.key ??
+          setoresNadaConsta[0]?.key ??
+          null)
+      : (userSectors[0] ?? setoresNadaConsta[0]?.key ?? null)
+    if (!activeSector) {
+      setActiveSector(defaultSetor)
       return
     }
 
-    const exists = setoresNadaConsta.some((setor) => setor.key === selectedSetor)
+     const exists = setoresNadaConsta.some((setor) => setor.key === activeSector)
     if (!exists) {
-      setSelectedSetor(defaultSetor)
+      setActiveSector(defaultSetor)
     }
-  }, [detail?.id, isNadaConsta, selectedSetor, setoresNadaConsta])
+  }, [
+    activeSector,
+    detail?.id,
+    isNadaConsta,
+    setoresNadaConsta,
+    userIsDpOrAdmin,
+    userSectors,
+  ])
 
 
   useEffect(() => {
-    if (!isNadaConsta || !selectedSetor) return
+    if (!isNadaConsta || !activeSector) return
     const registro = detail?.solicitacaoSetores?.find(
-      (setor) => setor.setor === selectedSetor,
+      (setor) => setor.setor === activeSector,
     )
     const storedCampos = (registro?.campos ?? {}) as Record<string, any>
     const nextCampos = camposNadaConstaSetor.reduce<Record<string, string>>(
@@ -685,7 +709,7 @@ export function SolicitationDetailModal({
     constaFieldName,
     detail?.id,
     isNadaConsta,
-    selectedSetor,
+    activeSector,
   ])
   useEffect(() => {
     if (!isNadaConsta || camposNadaConstaSetor.length === 0) {
@@ -724,7 +748,7 @@ export function SolicitationDetailModal({
   async function handleSalvarNadaConsta(finalizar: boolean) {
     if (!detail?.id) return
     if (camposNadaConstaSetor.length === 0) return
-    if (!selectedSetor) return
+    if (!activeSector) return
     if (!canEditNadaConstaSetor) return
 
     setSavingNadaConsta(true)
@@ -745,7 +769,7 @@ export function SolicitationDetailModal({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            setor: selectedSetor,
+            setor: activeSector,
             campos: camposPayload,
             action: finalizar ? 'FINALIZAR' : 'SALVAR',
           }),
@@ -1567,7 +1591,7 @@ export function SolicitationDetailModal({
                       <div className="space-y-2 text-xs">
                         {setoresNadaConsta.map((setor) => {
                            const isConcluida = setor.status === 'CONCLUIDO'
-                          const isCurrent = selectedSetor === setor.key
+                          const isCurrent = activeSector === setor.key
                           const badgeClass = isConcluida
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                             : 'border-yellow-200 bg-yellow-50 text-yellow-700'
@@ -1576,7 +1600,7 @@ export function SolicitationDetailModal({
                             <button
                               key={setor.key}
                               type="button"
-                              onClick={() => setSelectedSetor(setor.key)}
+                              onClick={() => setActiveSector(setor.key)}
                               disabled={isCurrent}
                               className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold ${badgeClass} ${
                                 isCurrent
