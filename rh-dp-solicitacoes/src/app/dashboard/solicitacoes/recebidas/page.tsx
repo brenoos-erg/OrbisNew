@@ -73,10 +73,14 @@ export default function ReceivedRequestsPage() {
       if (filters.status) params.set('status', filters.status)
       if (filters.text) params.set('text', filters.text)
 
-      const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`, {
-      })
+      const res = await fetch(
+        `/api/solicitacoes/recebidas?${params.toString()}`,
+      )
       if (!res.ok) {
-        throw new Error('Erro ao buscar solicitações recebidas.')
+        const errorPayload = await res.json().catch(() => null)
+        throw new Error(
+          errorPayload?.error ?? 'Erro ao buscar solicitações recebidas.',
+        )
       }
 
       const json = (await res.json()) as ListResponse
