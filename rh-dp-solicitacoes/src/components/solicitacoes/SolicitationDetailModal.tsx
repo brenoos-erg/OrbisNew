@@ -115,7 +115,7 @@ type CurrentUser = {
   departmentName?: string | null
   departments?: { code?: string | null; name?: string | null }[]
 }
-onst getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
+const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
   if (!user) return []
 
   const sectors = new Set<NadaConstaSetorKey>()
@@ -635,10 +635,7 @@ export function SolicitationDetailModal({
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
     )
 
-    const allowedSetores =
-       userIsDpOrAdmin
-        ? new Set(NADA_CONSTA_SETORES.map((setor) => setor.key))
-        : userSectorKeys
+    const allowedSetores = userSectorKeys
 
     return NADA_CONSTA_SETORES.filter((setor) =>
       allowedSetores.has(setor.key),
@@ -659,15 +656,8 @@ export function SolicitationDetailModal({
   }, [activeSector, setoresNadaConsta])
   const defaultActiveSector = useMemo(() => {
     if (!isNadaConsta) return null
-    if (userIsDpOrAdmin) {
-      return (
-        setoresNadaConsta.find((setor) => setor.key === 'DP')?.key ??
-        setoresNadaConsta[0]?.key ??
-        null
-      )
-    }
-    return userSectors[0] ?? null
-  }, [isNadaConsta, setoresNadaConsta, userIsDpOrAdmin, userSectors])
+    return setoresNadaConsta[0]?.key ?? userSectors[0] ?? null
+  }, [isNadaConsta, setoresNadaConsta, userSectors])
 
 
   useEffect(() => {
