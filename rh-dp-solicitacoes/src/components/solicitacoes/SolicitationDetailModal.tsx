@@ -327,6 +327,7 @@ export function SolicitationDetailModal({
   const [savingNadaConsta, setSavingNadaConsta] = useState(false)
   const [selectedSetor, setSelectedSetor] =
     useState<NadaConstaSetorKey | null>(null)
+  const [isNadaConstaSetorOpen, setIsNadaConstaSetorOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
@@ -583,6 +584,12 @@ export function SolicitationDetailModal({
     })
   })()
 
+  const selectedSetorLabel = useMemo(() => {
+    if (!selectedSetor) return null
+    const setor = setoresNadaConsta.find((item) => item.key === selectedSetor)
+    return setor?.label ?? selectedSetor
+  }, [selectedSetor, setoresNadaConsta])
+
   useEffect(() => {
     if (!isNadaConsta) return
 
@@ -617,6 +624,11 @@ export function SolicitationDetailModal({
     )
     setNadaConstaCampos(nextCampos)
   }, [camposNadaConstaSetor, detail?.id, isNadaConsta, selectedSetor])
+  useEffect(() => {
+    if (!isNadaConsta || camposNadaConstaSetor.length === 0) {
+      setIsNadaConstaSetorOpen(false)
+    }
+  }, [camposNadaConstaSetor.length, isNadaConsta])
 
 
   // Se for tela de aprovação não mostramos ações de gestão;
@@ -1427,7 +1439,7 @@ export function SolicitationDetailModal({
                     </p>
                   )}
 
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr,2fr]">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 bg-white p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                         Dados do colaborador
@@ -1492,43 +1504,106 @@ export function SolicitationDetailModal({
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                        Dados do setor
-                      </p>
-                      {camposNadaConstaSetor.length > 0 ? (
-                        <div className="space-y-3 text-xs text-slate-700">
-                          {camposNadaConstaSetor.map(renderNadaConstaCampo)}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-500">
-                          Selecione um setor para preencher os dados.
-                        </p>
-                      )}
+                      </div>
 
-                      {camposNadaConstaSetor.length > 0 &&
-                         canEditNadaConstaSetor && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleSalvarNadaConsta(false)}
-                              disabled={savingNadaConsta}
-                              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                            >
-                              {savingNadaConsta ? 'Salvando...' : 'Salvar'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSalvarNadaConsta(true)}
-                              disabled={savingNadaConsta}
-                              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                            >
-                              Finalizar setor
-                            </button>
-                          </div>
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                          Dados do setor
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Os campos do setor ficam em uma janela separada para
+                          facilitar o preenchimento.
+                        </p>
+                        {selectedSetorLabel && (
+                          <p className="mt-2 text-xs font-semibold text-slate-700">
+                            Setor selecionado: {selectedSetorLabel}
+                          </p>
                         )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsNadaConstaSetorOpen(true)}
+                        disabled={camposNadaConstaSetor.length === 0}
+                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Abrir janela do setor
+                      </button>
                     </div>
+                    {camposNadaConstaSetor.length === 0 && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Selecione um setor para liberar os campos.
+                      </p>
+                    )}
                   </div>
+
+                  {isNadaConstaSetorOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                      <div
+                        className="absolute inset-0 bg-slate-900/40"
+                        onClick={() => setIsNadaConstaSetorOpen(false)}
+                        aria-hidden="true"
+                      />
+                      <div className="relative z-10 w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                              Dados do setor
+                            </p>
+                            {selectedSetorLabel && (
+                              <p className="text-sm font-semibold text-slate-700">
+                                {selectedSetorLabel}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsNadaConstaSetorOpen(false)}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Fechar
+                          </button>
+                        </div>
+
+                        <div className="mt-4">
+                          {camposNadaConstaSetor.length > 0 ? (
+                            <div className="space-y-3 text-xs text-slate-700">
+                              {camposNadaConstaSetor.map(renderNadaConstaCampo)}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500">
+                              Selecione um setor para preencher os dados.
+                            </p>
+                          )}
+
+                          {camposNadaConstaSetor.length > 0 &&
+                            canEditNadaConstaSetor && (
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSalvarNadaConsta(false)}
+                                  disabled={savingNadaConsta}
+                                  className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                >
+                                  {savingNadaConsta
+                                    ? 'Salvando...'
+                                    : 'Salvar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSalvarNadaConsta(true)}
+                                  disabled={savingNadaConsta}
+                                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                                >
+                                  Finalizar setor
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : isSolicitacaoPessoal ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
