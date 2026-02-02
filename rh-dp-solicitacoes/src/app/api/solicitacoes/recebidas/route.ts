@@ -3,6 +3,7 @@ export const revalidate = 0
 
 // rh-dp-solicitacoes/src/app/api/solicitacoes/recebidas/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
@@ -239,6 +240,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ rows, total })
   } catch (err) {
     console.error('GET /api/solicitacoes/recebidas error', err)
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2021' &&
+      err.meta?.table === 'public.SolicitacaoSetor'
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Erro de configuração: tabela SolicitacaoSetor ausente. Execute as migrations do Prisma.',
+        },
+        { status: 503 },
+      )
+    }
     return NextResponse.json(
       { error: 'Erro ao buscar solicitações recebidas.' },
       { status: 500 },
