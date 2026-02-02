@@ -501,7 +501,7 @@ export const POST = withModuleLevel(
               approvalStatus: 'APROVADO',
               approvalAt: new Date(),
               approverId: null,
-              status: 'EM_ATENDIMENTO',
+              status: 'ABERTA',
               costCenterId: created.costCenterId,
               departmentId: dpDepartment?.id ?? departmentId,
             },
