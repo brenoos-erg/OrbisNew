@@ -61,7 +61,6 @@ export default function ReceivedRequestsPage() {
 
     try {
       const params = new URLSearchParams()
-      params.set('scope', 'received') // 👈 escopo "recebidas"
       params.set('page', String(filters.page))
       params.set('pageSize', String(filters.pageSize))
 
@@ -74,8 +73,7 @@ export default function ReceivedRequestsPage() {
       if (filters.status) params.set('status', filters.status)
       if (filters.text) params.set('text', filters.text)
 
-      const res = await fetch(`/api/solicitacoes?${params.toString()}`, {
-        cache: 'no-store',
+      const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`, {
       })
       if (!res.ok) {
         throw new Error('Erro ao buscar solicitações recebidas.')
