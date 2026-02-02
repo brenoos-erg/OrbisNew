@@ -635,11 +635,7 @@ export function SolicitationDetailModal({
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
     )
 
-    const allowedSetores = userSectorKeys
-
-    return NADA_CONSTA_SETORES.filter((setor) =>
-      allowedSetores.has(setor.key),
-    ).map((setor) => {
+    return NADA_CONSTA_SETORES.map((setor) => {
       const registro = setoresMap.get(setor.key)
       return {
         key: setor.key,
@@ -1172,7 +1168,7 @@ export function SolicitationDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <div>
@@ -1311,7 +1307,8 @@ export function SolicitationDetailModal({
         )}
 
         {/* CONTEÚDO */}
-        <div className="space-y-5 px-5 py-4 text-sm">
+        <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
+          <div className="space-y-5">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
             <div className="flex gap-4">
@@ -2003,6 +2000,7 @@ export function SolicitationDetailModal({
               )}
             </>
           )}
+           </div>
         </div>
 
         {/* Rodapé */}
