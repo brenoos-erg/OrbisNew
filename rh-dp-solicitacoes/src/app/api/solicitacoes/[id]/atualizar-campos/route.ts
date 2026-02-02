@@ -25,11 +25,12 @@ export async function POST(
       )
     }
 
-    const { campos, finalizar, finalizarSetor, setor } = body as {
+    const { campos, finalizar, finalizarSetor, setor, action } = body as {
       campos?: Record<string, string>
       finalizar?: boolean
       finalizarSetor?: boolean
       setor?: string
+      action?: 'SALVAR' | 'FINALIZAR'
     }
 
     if (!setor) {
@@ -42,6 +43,12 @@ export async function POST(
     if (!campos || typeof campos !== 'object') {
       return NextResponse.json(
         { error: 'Campos são obrigatórios.' },
+        { status: 400 },
+      )
+    }
+    if (action && action !== 'SALVAR' && action !== 'FINALIZAR') {
+      return NextResponse.json(
+        { error: 'Ação inválida.' },
         { status: 400 },
       )
     }
@@ -107,7 +114,7 @@ export async function POST(
     if (setorRegistro.status === 'CONCLUIDO') {
       return NextResponse.json(
         { error: 'Setor já concluído. Não é possível editar.' },
-        { status: 400 },
+        { status: 409 },
       )
     }
 
@@ -129,11 +136,13 @@ export async function POST(
     const constaFlag =
       normalizedStatus === 'CONSTA'
         ? 'CONSTA'
-        : normalizedStatus === 'NADA CONSTA'
+        : normalizedStatus === 'NADA CONSTA' ||
+            normalizedStatus === 'NADA_CONSTA'
           ? 'NADA_CONSTA'
           : null
 
-    const shouldFinalize = Boolean(finalizarSetor ?? finalizar)
+    const shouldFinalize =
+      action === 'FINALIZAR' || Boolean(finalizarSetor ?? finalizar)
     if (shouldFinalize && !constaFlag) {
       return NextResponse.json(
         { error: 'Informe o status (Consta ou Nada Consta) antes de finalizar.' },
@@ -144,7 +153,12 @@ export async function POST(
     const agora = new Date()
 
     const updated = await prisma.solicitacaoSetor.update({
-      where: { id: setorRegistro.id },
+       where: {
+        solicitacaoId_setor: {
+          solicitacaoId: id,
+          setor: normalizedSetor,
+        },
+      },
       data: {
         campos: camposAtualizados,
         constaFlag,
@@ -157,6 +171,8 @@ export async function POST(
           : {}),
       },
     })
+
+    return NextResponse.json(updated)
 
     return NextResponse.json(updated)
   } catch (error) {

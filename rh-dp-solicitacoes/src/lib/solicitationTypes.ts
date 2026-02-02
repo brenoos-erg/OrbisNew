@@ -11,6 +11,71 @@ export type NadaConstaSetorKey =
   | 'SST'
   | 'FINANCEIRO'
   | 'FISCAL'
+export type NadaConstaCampoDef = {
+  name: string
+  label: string
+  type: string
+  required?: boolean
+  options?: string[]
+  stage: string
+  section: string
+}
+
+export const NADA_CONSTA_TI_FIELDS: NadaConstaCampoDef[] = [
+  {
+    name: 'tiStatus',
+    label: 'Status (Consta / Nada Consta)',
+    type: 'select',
+    options: ['Consta', 'Nada Consta'],
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+  {
+    name: 'tiCancelamentos',
+    label: 'Cancel. (E-mail, Geartech, BITRIX, AD, Sapiens, MS, AUTODESK)',
+    type: 'select',
+    options: ['Sim', 'Não', 'Não Aplicável'],
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+  {
+    name: 'tiDevolucaoCelular',
+    label: 'Devolução Celular corporativo',
+    type: 'select',
+    options: ['Entregue', 'Não Entregue', 'Não Aplicável'],
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+  {
+    name: 'tiDevolucaoNotebook',
+    label: 'Devolução Notebook da empresa',
+    type: 'select',
+    options: ['Entregue', 'Não Entregue', 'Não Aplicável'],
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+  {
+    name: 'tiObs',
+    label: 'Obs. (situação dos equipamentos, patrimônio, etc)',
+    type: 'textarea',
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+  {
+    name: 'tiValorTotal',
+    label: 'R$ (valor total)',
+    type: 'number',
+    stage: 'ti',
+    section: 'Tecnologia da Informação',
+  },
+]
+
+export function getNadaConstaDefaultFieldsForSetor(
+  setor: NadaConstaSetorKey,
+): NadaConstaCampoDef[] {
+  if (setor === 'TI') return NADA_CONSTA_TI_FIELDS
+  return []
+}
 
 export const NADA_CONSTA_SETORES: {
   key: NadaConstaSetorKey

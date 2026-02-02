@@ -8,6 +8,7 @@ import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
+  getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
   resolveNadaConstaSetorByDepartment,
 } from '@/lib/solicitationTypes'
@@ -51,6 +52,8 @@ type SchemaJson = {
   camposEspecificos?: CampoEspecifico[]
 }
 
+type ConstaFlag = 'CONSTA' | 'NADA_CONSTA'
+
 type PayloadSolicitante = {
   fullName?: string
   email?: string
@@ -64,6 +67,7 @@ type Payload = {
   solicitante?: PayloadSolicitante
   [key: string]: any
 }
+
 
 type Attachment = {
   id: string
@@ -255,6 +259,19 @@ function formatDate(dateStr?: string | null) {
   } catch {
     return '-'
   }
+}
+function normalizeConstaValue(value: unknown): ConstaFlag | '' {
+  if (typeof value !== 'string') return ''
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+
+  if (normalized === 'CONSTA') return 'CONSTA'
+  if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA')
+    return 'NADA_CONSTA'
+  return ''
 }
 
 // ===== Helpers de Status =====
@@ -508,15 +525,42 @@ export function SolicitationDetailModal({
   const setorMeta = selectedSetor
     ? NADA_CONSTA_SETORES.find((setor) => setor.key === selectedSetor)
     : null
-  const camposNadaConstaSetor = setorMeta
-    ? camposSchema.filter((campo) => campo.stage === setorMeta.stage)
-    : []
+  const camposNadaConstaSetor = useMemo(() => {
+    if (!setorMeta) return []
+    const schemaCampos = camposSchema.filter(
+      (campo) => campo.stage === setorMeta.stage,
+    )
+    const defaultCampos = getNadaConstaDefaultFieldsForSetor(setorMeta.key)
+    if (defaultCampos.length === 0) {
+      return schemaCampos
+    }
+
+    const defaultsByName = new Map(
+      defaultCampos.map((campo) => [campo.name, campo]),
+    )
+    const merged = schemaCampos.map((campo) => {
+      const fallback = defaultsByName.get(campo.name)
+      if (!fallback) return campo
+      return {
+        ...campo,
+        type: fallback.type ?? campo.type,
+        options: fallback.options ?? campo.options,
+        label: campo.label ?? fallback.label,
+      }
+    })
+    const existingNames = new Set(schemaCampos.map((campo) => campo.name))
+    const missingDefaults = defaultCampos.filter(
+      (campo) => !existingNames.has(campo.name),
+    )
+    return [...merged, ...missingDefaults]
+  }, [camposSchema, setorMeta])
   const selectedSetorRegistro = selectedSetor
     ? detail?.solicitacaoSetores?.find(
         (setor) => setor.setor === selectedSetor,
       )
     : null
   const isSetorConcluido = selectedSetorRegistro?.status === 'CONCLUIDO'
+  const constaFieldName = setorMeta?.constaField ?? null
 
   const userSetores = useMemo(() => {
     const setores = new Set<NadaConstaSetorKey>()
@@ -568,7 +612,8 @@ export function SolicitationDetailModal({
     isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
     isDesligamento && isDpDestino && !isFinalizadaOuCancelada
-    const setoresNadaConsta = (() => {
+    
+  const setoresNadaConsta = (() => {
     if (!isNadaConsta || !detail) return []
     const setoresMap = new Map(
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
