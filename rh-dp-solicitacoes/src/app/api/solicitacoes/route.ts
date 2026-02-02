@@ -11,6 +11,7 @@ import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
+  isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
@@ -461,6 +462,7 @@ export const POST = withModuleLevel(
         const isNadaConsta = isSolicitacaoNadaConsta(tipo)
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
+        const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
 
         const rhCostCenter = await prisma.costCenter.findFirst({
           where: {
@@ -483,6 +485,48 @@ export const POST = withModuleLevel(
             ],
           },
         })
+        /* =====================================================================
+           2.5) Agendamento de Férias (auto aprovado e encaminhado ao DP)
+           ===================================================================== */
+        if (isAgendamentoFerias) {
+          const dpDepartment = await prisma.department.findUnique({
+            where: { code: '08' },
+            select: { id: true },
+          })
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: false,
+              approvalStatus: 'APROVADO',
+              approvalAt: new Date(),
+              approverId: null,
+              status: 'EM_ATENDIMENTO',
+              costCenterId: null,
+              departmentId: dpDepartment?.id ?? departmentId,
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'APROVACAO_AUTOMATICA',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message:
+                'Solicitação aprovada automaticamente e encaminhada para a fila do Departamento Pessoal.',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
 
          /* =====================================================================
            3) RQ_063 - Solicitação de Pessoal

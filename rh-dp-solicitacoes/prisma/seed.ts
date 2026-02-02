@@ -266,6 +266,147 @@ async function main() {
       },
     })
     console.log('✅ Tipo "Solicitação de Admissão" ok.')
+     const agendamentoFeriasSchema = {
+      meta: {
+        departamentos: [dpDepartment.id],
+        categoria: 'SERVIÇOS DE DP',
+        centroResponsavel: 'DEPARTAMENTO PESSOAL',
+        autoApprove: true,
+        requiresApproval: false,
+      },
+      camposEspecificos: [
+        {
+          name: 'matricula',
+          label: 'Matrícula',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'nomeColaborador',
+          label: 'Nome',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'cargoColaborador',
+          label: 'Cargo',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'ccContrato',
+          label: 'CC/Contrato',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'periodoAquisitivoInicio',
+          label: 'Período Aquisitivo (Dt.Ini)',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Período aquisitivo',
+        },
+        {
+          name: 'periodoAquisitivoFim',
+          label: 'Período Aquisitivo (Dt.Fim)',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Período aquisitivo',
+        },
+        {
+          name: 'inicioGozo',
+          label: 'Início do Gozo',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Gozo',
+        },
+        {
+          name: 'qtdDiasCorridos',
+          label: 'Qtd de dias (Corridos)',
+          type: 'number',
+          stage: 'solicitante',
+          section: 'Gozo',
+        },
+        {
+          name: 'fimGozo',
+          label: 'Fim do Gozo',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Gozo',
+        },
+        {
+          name: 'dataRetorno',
+          label: 'Dt de retorno (dia útil)',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Gozo',
+        },
+        {
+          name: 'abonoPecuniarioSim',
+          label: 'Sim',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Abono Pecuniário',
+        },
+        {
+          name: 'abonoPecuniarioNao',
+          label: 'Não',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Abono Pecuniário',
+        },
+        {
+          name: 'abonoDias',
+          label: 'Qtd de dias (abono)',
+          type: 'number',
+          stage: 'solicitante',
+          section: 'Abono Pecuniário',
+        },
+        {
+          name: 'pagamentoAbonoQuando',
+          label: 'Pagar quando?',
+          type: 'select',
+          options: ['Na folha do mês', 'Na folha seguinte', 'Outro'],
+          stage: 'solicitante',
+          section: 'Pagamento do Abono Pecuniário',
+        },
+        {
+          name: 'anexosSolicitacao',
+          label: 'Anexo(s) da Solicitação',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+        {
+          name: 'anexosSolicitante',
+          label: 'Anexo(s) do Solicitante',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'AGENDAMENTO DE FÉRIAS' },
+      update: {
+        descricao: 'SERVIÇOS DE DP - agendamento de férias',
+        schemaJson: agendamentoFeriasSchema,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'AGENDAMENTO_DE_FERIAS',
+        nome: 'AGENDAMENTO DE FÉRIAS',
+        descricao: 'SERVIÇOS DE DP - agendamento de férias',
+        schemaJson: agendamentoFeriasSchema,
+        updatedAt: new Date(),
+      },
+    })
+    console.log('✅ Tipo "AGENDAMENTO DE FÉRIAS" ok.')
     const desligamentoSchema = {
       meta: {
         departamentos: [dpDepartment.id],
