@@ -502,10 +502,11 @@ export const POST = withModuleLevel(
               approvalAt: new Date(),
               approverId: null,
               status: 'EM_ATENDIMENTO',
-              costCenterId: null,
+              costCenterId: created.costCenterId,
               departmentId: dpDepartment?.id ?? departmentId,
             },
           })
+
 
           await prisma.event.create({
             data: {
