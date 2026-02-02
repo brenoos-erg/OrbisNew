@@ -619,7 +619,14 @@ export function SolicitationDetailModal({
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
     )
 
-    return NADA_CONSTA_SETORES.map((setor) => {
+    const allowedSetores =
+      currentUser?.role === 'ADMIN'
+        ? new Set(NADA_CONSTA_SETORES.map((setor) => setor.key))
+        : userSetores
+
+    return NADA_CONSTA_SETORES.filter((setor) =>
+      allowedSetores.has(setor.key),
+    ).map((setor) => {
       const registro = setoresMap.get(setor.key)
       return {
         key: setor.key,
@@ -638,19 +645,18 @@ export function SolicitationDetailModal({
   useEffect(() => {
     if (!isNadaConsta) return
 
-    const defaultSetor = NADA_CONSTA_SETORES[0]?.key ?? null
+     const defaultSetor = setoresNadaConsta[0]?.key ?? null
     if (!selectedSetor) {
       setSelectedSetor(defaultSetor)
       return
     }
 
-    const exists = NADA_CONSTA_SETORES.some(
-      (setor) => setor.key === selectedSetor,
-    )
+    const exists = setoresNadaConsta.some((setor) => setor.key === selectedSetor)
     if (!exists) {
       setSelectedSetor(defaultSetor)
     }
-  }, [detail?.id, isNadaConsta, selectedSetor])
+  }, [detail?.id, isNadaConsta, selectedSetor, setoresNadaConsta])
+
 
   useEffect(() => {
     if (!isNadaConsta || !selectedSetor) return
@@ -661,14 +667,26 @@ export function SolicitationDetailModal({
     const nextCampos = camposNadaConstaSetor.reduce<Record<string, string>>(
       (acc, campo) => {
           const rawValue = storedCampos[campo.name]
+        const normalizedValue =
+          campo.name === constaFieldName
+            ? normalizeConstaValue(rawValue)
+            : rawValue
         acc[campo.name] =
-          rawValue === undefined || rawValue === null ? '' : String(rawValue)
+          normalizedValue === undefined || normalizedValue === null
+            ? ''
+            : String(normalizedValue)
         return acc
       },
       {},
     )
     setNadaConstaCampos(nextCampos)
-  }, [camposNadaConstaSetor, detail?.id, isNadaConsta, selectedSetor])
+  }, [
+    camposNadaConstaSetor,
+    constaFieldName,
+    detail?.id,
+    isNadaConsta,
+    selectedSetor,
+  ])
   useEffect(() => {
     if (!isNadaConsta || camposNadaConstaSetor.length === 0) {
       setIsNadaConstaSetorOpen(false)
@@ -729,7 +747,7 @@ export function SolicitationDetailModal({
           body: JSON.stringify({
             setor: selectedSetor,
             campos: camposPayload,
-            finalizarSetor: finalizar,
+            action: finalizar ? 'FINALIZAR' : 'SALVAR',
           }),
         },
       )
@@ -755,6 +773,33 @@ export function SolicitationDetailModal({
     const baseClass =
       'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm'
       const isDisabled = !canEditNadaConstaSetor
+    const isConstaField = campo.name === constaFieldName
+
+    if (isConstaField) {
+      const normalizedValue = normalizeConstaValue(value) as ConstaFlag | ''
+      return (
+        <div key={campo.name} className="space-y-2 text-xs text-slate-700">
+          <span className="font-semibold">{campo.label}</span>
+          <div className="flex flex-wrap gap-4">
+            {(['CONSTA', 'NADA_CONSTA'] as ConstaFlag[]).map((option) => (
+              <label key={option} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={campo.name}
+                  value={option}
+                  checked={normalizedValue === option}
+                  onChange={() => handleNadaConstaChange(campo.name, option)}
+                  disabled={isDisabled}
+                />
+                <span>
+                  {option === 'CONSTA' ? 'Consta' : 'Nada Consta'}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )
+    }
 
     if (campo.type === 'checkbox') {
       return (
