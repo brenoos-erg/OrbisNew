@@ -1672,7 +1672,7 @@ export function SolicitationDetailModal({
                         onClick={() => setIsNadaConstaSetorOpen(false)}
                         aria-hidden="true"
                       />
-                      <div className="relative z-10 w-full max-w-3xl rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+                      <div className="relative z-10 flex w-full max-w-5xl max-h-[90vh] flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
@@ -1693,7 +1693,7 @@ export function SolicitationDetailModal({
                           </button>
                         </div>
 
-                        <div className="mt-4">
+                         <div className="mt-4 flex-1 overflow-y-auto pr-1">
                           {camposNadaConstaSetor.length > 0 ? (
                             <div className="space-y-3 text-xs text-slate-700">
                               {camposNadaConstaSetor.map(renderNadaConstaCampo)}
