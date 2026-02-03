@@ -133,20 +133,30 @@ export const NADA_CONSTA_SETORES_KEYS = NADA_CONSTA_SETORES.map(
   (setor) => setor.key,
 )
 
-export function resolveNadaConstaSetorByDepartment(
+export function resolveNadaConstaSetoresByDepartment(
   dept?: {
     code?: string | null
     name?: string | null
   } | null,
-): NadaConstaSetorKey | null {
-  if (!dept) return null
+): NadaConstaSetorKey[] {
+  if (!dept) return []
+  const resolved: NadaConstaSetorKey[] = []
+  const pushUnique = (value: NadaConstaSetorKey) => {
+    if (!resolved.includes(value)) {
+      resolved.push(value)
+    }
+  }
+
   const code = dept.code?.trim()
-  if (code === '08') return 'DP'
-  if (code === '20') return 'TI'
-  if (code === '11') return 'LOGISTICA'
-  if (code === '10') return 'FINANCEIRO'
-  if (code === '06') return 'FISCAL'
-  if (code === '19') return 'SST'
+  if (code === '08') pushUnique('DP')
+  if (code === '20') pushUnique('TI')
+  if (code === '11') {
+    pushUnique('LOGISTICA')
+    pushUnique('ALMOX')
+  }
+  if (code === '10') pushUnique('FINANCEIRO')
+  if (code === '06') pushUnique('FISCAL')
+  if (code === '19') pushUnique('SST')
 
   const normalized =
     dept.name
@@ -155,17 +165,29 @@ export function resolveNadaConstaSetorByDepartment(
       .replace(/[\u0300-\u036f]/g, '')
       .toUpperCase() ?? ''
 
-  if (normalized.includes('PESSOAL')) return 'DP'
+  if (normalized.includes('PESSOAL')) pushUnique('DP')
   if (normalized.includes('TECNOLOGIA') || normalized.includes('INFORMACAO'))
-    return 'TI'
-  if (normalized.includes('ALMOX')) return 'ALMOX'
-  if (normalized.includes('LOGISTICA')) return 'LOGISTICA'
+    pushUnique('TI')
+  if (normalized.includes('ALMOX')) pushUnique('ALMOX')
+  if (normalized.includes('LOGISTICA')) {
+    pushUnique('LOGISTICA')
+    pushUnique('ALMOX')
+  }
   if (normalized.includes('SST') || normalized.includes('SEGURANCA'))
-    return 'SST'
-  if (normalized.includes('FINANCEIRO')) return 'FINANCEIRO'
+    pushUnique('SST')
+  if (normalized.includes('FINANCEIRO')) pushUnique('FINANCEIRO')
   if (normalized.includes('FISCAL') || normalized.includes('CONTABIL'))
-    return 'FISCAL'
-  return null
+    pushUnique('FISCAL')
+  return resolved
+}
+
+export function resolveNadaConstaSetorByDepartment(
+  dept?: {
+    code?: string | null
+    name?: string | null
+  } | null,
+): NadaConstaSetorKey | null {
+  return resolveNadaConstaSetoresByDepartment(dept)[0] ?? null
 }
 
 export function isSolicitacaoDesligamento(tipo?: TipoSolicitacaoLike | null) {

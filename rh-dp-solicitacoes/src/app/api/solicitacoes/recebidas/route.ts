@@ -7,9 +7,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import {
-  resolveNadaConstaSetorByDepartment,
-} from '@/lib/solicitationTypes'
+import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const where: any = {}
@@ -120,14 +118,14 @@ export async function GET(req: NextRequest) {
     }
 
     const setorKeys = new Set<string>()
-    const primarySetor = resolveNadaConstaSetorByDepartment(me.department)
-    if (primarySetor) {
-      setorKeys.add(primarySetor)
+    const primarySetores = resolveNadaConstaSetoresByDepartment(me.department)
+    for (const setor of primarySetores) {
+      setorKeys.add(setor)
     }
 
     for (const link of departmentLinks) {
-      const setor = resolveNadaConstaSetorByDepartment(link.department)
-      if (setor) {
+      const resolved = resolveNadaConstaSetoresByDepartment(link.department)
+      for (const setor of resolved) {
         setorKeys.add(setor)
       }
     }

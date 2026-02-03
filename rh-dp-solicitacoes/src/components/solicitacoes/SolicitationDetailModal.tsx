@@ -10,7 +10,7 @@ import {
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
-  resolveNadaConstaSetorByDepartment,
+  resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 
 const LABEL_RO =
@@ -125,12 +125,12 @@ const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
   ]
 
   for (const dept of departments) {
-    const resolved = resolveNadaConstaSetorByDepartment({
+   const resolved = resolveNadaConstaSetoresByDepartment({
       code: dept.code ?? null,
       name: dept.name ?? null,
     })
-    if (resolved) {
-      sectors.add(resolved)
+    for (const setor of resolved) {
+      sectors.add(setor)
     }
   }
 
@@ -644,6 +644,12 @@ export function SolicitationDetailModal({
       }
     })
   })()
+  const visibleSetoresNadaConsta = useMemo(() => {
+    if (userIsDpOrAdmin) return setoresNadaConsta
+    if (userSectorKeys.size === 0) return []
+    return setoresNadaConsta.filter((setor) => userSectorKeys.has(setor.key))
+  }, [setoresNadaConsta, userIsDpOrAdmin, userSectorKeys])
+
 
   const selectedSetorLabel = useMemo(() => {
     if (!activeSector) return null
@@ -652,8 +658,10 @@ export function SolicitationDetailModal({
   }, [activeSector, setoresNadaConsta])
   const defaultActiveSector = useMemo(() => {
     if (!isNadaConsta) return null
-    return setoresNadaConsta[0]?.key ?? userSectors[0] ?? null
-  }, [isNadaConsta, setoresNadaConsta, userSectors])
+    return (
+      visibleSetoresNadaConsta[0]?.key ?? userSectors[0] ?? null
+    )
+  }, [isNadaConsta, userSectors, visibleSetoresNadaConsta])
 
 
   useEffect(() => {
@@ -665,11 +673,18 @@ export function SolicitationDetailModal({
       return
     }
 
-    const exists = setoresNadaConsta.some((setor) => setor.key === activeSector)
+    const exists = visibleSetoresNadaConsta.some(
+      (setor) => setor.key === activeSector,
+    )
     if (!exists) {
       setActiveSector(defaultActiveSector)
     }
-  }, [activeSector, defaultActiveSector, isNadaConsta, setoresNadaConsta])
+  }, [
+    activeSector,
+    defaultActiveSector,
+    isNadaConsta,
+    visibleSetoresNadaConsta,
+  ])
 
 
   useEffect(() => {
@@ -1579,9 +1594,9 @@ export function SolicitationDetailModal({
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                         Setores responsáveis
                       </p>
-                       {userIsDpOrAdmin ? (
+                        {visibleSetoresNadaConsta.length > 0 ? (
                         <div className="space-y-2 text-xs">
-                          {setoresNadaConsta.map((setor) => {
+                          {visibleSetoresNadaConsta.map((setor) => {
                             const isConcluida = setor.status === 'CONCLUIDO'
                             const isCurrent = activeSector === setor.key
                             const badgeClass = isConcluida

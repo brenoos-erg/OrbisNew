@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import {
   NADA_CONSTA_SETORES,
-  resolveNadaConstaSetorByDepartment,
+  resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 
 export async function POST(
@@ -70,15 +70,15 @@ export async function POST(
     })
 
     const userSetores = new Set<string>()
-    const primarySetor = resolveNadaConstaSetorByDepartment(me.department)
-    if (primarySetor) {
-      userSetores.add(primarySetor)
+    const primarySetores = resolveNadaConstaSetoresByDepartment(me.department)
+    for (const setor of primarySetores) {
+      userSetores.add(setor)
     }
 
     for (const link of departmentLinks) {
-      const resolved = resolveNadaConstaSetorByDepartment(link.department)
-      if (resolved) {
-        userSetores.add(resolved)
+      const resolved = resolveNadaConstaSetoresByDepartment(link.department)
+      for (const setor of resolved) {
+        userSetores.add(setor)
       }
     }
 

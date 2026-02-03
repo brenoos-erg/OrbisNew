@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
@@ -15,8 +14,9 @@ import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
-  resolveNadaConstaSetorByDepartment,
+  resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+
 
 
 /**
@@ -164,14 +164,18 @@ export const GET = withModuleLevel(
           }
 
           const setorKeys = new Set<string>()
-          const primarySetor = resolveNadaConstaSetorByDepartment(me.department)
-          if (primarySetor) {
-            setorKeys.add(primarySetor)
+          const primarySetores = resolveNadaConstaSetoresByDepartment(
+            me.department,
+          )
+          for (const setor of primarySetores) {
+            setorKeys.add(setor)
           }
 
           for (const link of departmentLinks) {
-            const setor = resolveNadaConstaSetorByDepartment(link.department)
-            if (setor) {
+            const resolved = resolveNadaConstaSetoresByDepartment(
+              link.department,
+            )
+            for (const setor of resolved) {
               setorKeys.add(setor)
             }
           }
