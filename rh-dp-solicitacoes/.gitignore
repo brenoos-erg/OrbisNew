@@ -10,6 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+*.zip
+.next/
+deploy/.next/
+
+
 # testing
 /coverage
 
