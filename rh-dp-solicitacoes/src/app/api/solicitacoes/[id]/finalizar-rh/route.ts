@@ -65,6 +65,22 @@ export async function POST(
         { status: 404 },
       )
     }
+    const pendingTermAssignments = await prisma.documentAssignment.count({
+      where: {
+        document: {
+          solicitationId: solicitation.id,
+          type: 'TERMO_RESPONSABILIDADE',
+        },
+        status: { in: ['PENDENTE', 'AGUARDANDO_ASSINATURA'] },
+      },
+    })
+
+    if (pendingTermAssignments > 0) {
+      return NextResponse.json(
+        { error: 'Aguardando assinatura do termo de responsabilidade.' },
+        { status: 409 },
+      )
+    }
 
     const isSolicitacaoPessoal =
       solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'

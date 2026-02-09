@@ -31,10 +31,12 @@ function mapStatusLabel(status: string) {
   if (status === 'ABERTA') return 'AGUARDANDO ATENDIMENTO'
   if (status === 'EM_ATENDIMENTO') return 'EM ATENDIMENTO'
   if (status === 'AGUARDANDO_APROVACAO') return 'AGUARD. APROVAÇÃO'
+  if (status === 'AGUARDANDO_TERMO') return 'AGUARD. TERMO'
   if (status === 'CONCLUIDA') return 'CONCLUÍDA'
   if (status === 'CANCELADA') return 'CANCELADA'
   return status
 }
+
 
 export default function ReceivedRequestsPage() {
   const [filters, setFilters] = useState<FilterState>({

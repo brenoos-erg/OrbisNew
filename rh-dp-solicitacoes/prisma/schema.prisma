@@ -171,50 +171,85 @@ model Department {
 }
 
 model Solicitation {
-  id               String                 @id @default(uuid())
-  titulo           String
-  descricao        String?
-  tipoId           String
-  payload          Json
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  approvalAt       DateTime?
-  approvalComment  String?
-  approvalStatus   ApprovalStatus         @default(NAO_PRECISA)
-  approverId       String?
-  costCenterId     String?
-  dataAbertura     DateTime               @default(now())
-  dataCancelamento DateTime?
-  dataFechamento   DateTime?
-  dataPrevista     DateTime?
-  departmentId     String
-  prioridade       SolicitationPriority?
-  protocolo        String                 @unique
-  requiresApproval Boolean                @default(false)
-  solicitanteId    String
-  status           SolicitationStatus     @default(ABERTA)
-  parentId         String?
-  vagaPrevista     Boolean                @default(false)
-  assumidaPorId    String?
-  assumidaEm       DateTime?
-  anexos           Attachment[]
-  comentarios      Comment[]
-  eventos          Event[]
-  approver         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
-  assumidaPor      User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
-  costCenter       CostCenter?            @relation(fields: [costCenterId], references: [id])
-  department       Department             @relation(fields: [departmentId], references: [id])
-  parent           Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
-  children         Solicitation[]         @relation("SolicitationParent")
-  solicitante      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
-  tipo             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
-  timelines        SolicitationTimeline[]
+  id                 String                 @id @default(uuid())
+  titulo             String
+  descricao          String?
+  tipoId             String
+  payload            Json
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  approvalAt         DateTime?
+  approvalComment    String?
+  approvalStatus     ApprovalStatus         @default(NAO_PRECISA)
+  approverId         String?
+  costCenterId       String?
+  dataAbertura       DateTime               @default(now())
+  dataCancelamento   DateTime?
+  dataFechamento     DateTime?
+  dataPrevista       DateTime?
+  departmentId       String
+  prioridade         SolicitationPriority?
+  protocolo          String                 @unique
+  requiresApproval   Boolean                @default(false)
+  solicitanteId      String
+  status             SolicitationStatus     @default(ABERTA)
+  parentId           String?
+  vagaPrevista       Boolean                @default(false)
+  assumidaPorId      String?
+  assumidaEm         DateTime?
+  anexos             Attachment[]
+  comentarios        Comment[]
+  eventos            Event[]
+  approver           User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  assumidaPor        User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
+  costCenter         CostCenter?            @relation(fields: [costCenterId], references: [id])
+  department         Department             @relation(fields: [departmentId], references: [id])
+  parent             Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
+  children           Solicitation[]         @relation("SolicitationParent")
+  solicitante        User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
+  tipo               TipoSolicitacao        @relation(fields: [tipoId], references: [id])
+  timelines          SolicitationTimeline[]
+  solicitacaoSetores SolicitacaoSetor[]
+  documents          Document[]
   solicitacaoSetores SolicitacaoSetor[]
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
   @@index([departmentId, dataAbertura])
   @@index([requiresApproval, approvalStatus, dataAbertura])
   @@index([status, dataAbertura])
+}
+model Document {
+  id             String               @id @default(uuid())
+  solicitationId String?
+  type           DocumentType
+  title          String
+  pdfUrl         String
+  createdAt      DateTime             @default(now())
+  createdById    String
+  solicitation   Solicitation?        @relation(fields: [solicitationId], references: [id], onDelete: SetNull)
+  createdBy      User                 @relation("DocumentCreatedBy", fields: [createdById], references: [id])
+  assignments    DocumentAssignment[]
+
+  @@index([solicitationId])
+}
+
+model DocumentAssignment {
+  id              String                   @id @default(uuid())
+  documentId      String
+  userId          String
+  status          DocumentAssignmentStatus @default(PENDENTE)
+  signingProvider String?
+  signingUrl      String?
+  signedAt        DateTime?
+  auditTrailUrl   String?
+  auditTrailHash  String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  document        Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user            User                     @relation("DocumentAssignedTo", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@index([userId, status])
 }
 
 model SolicitacaoSetor {
@@ -270,6 +305,8 @@ model User {
   vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
   vehicleStatusLogs                          VehicleStatusLog[]
   tiEquipments                               TiEquipment[]
+  documentsCreated                           Document[]                   @relation("DocumentCreatedBy")
+  documentsAssigned                          DocumentAssignment[]         @relation("DocumentAssignedTo")
   WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                @relation("WorkRefusal_analyzedByIdToUser")
   WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
   WorkRefusalAttachment                      WorkRefusalAttachment[]
@@ -294,14 +331,14 @@ model Module {
 }
 
 model AccessGroup {
-  id        String             @id @default(uuid())
-  name      String             @unique
-  notes     String?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  grants    AccessGroupGrant[]
-   featureGrants FeatureGrant[]
-  members   GroupMember[]
+  id            String             @id @default(uuid())
+  name          String             @unique
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  grants        AccessGroupGrant[]
+  featureGrants FeatureGrant[]
+  members       GroupMember[]
 
   @@map("AccessGroup")
 }
@@ -332,15 +369,16 @@ model AccessGroupGrant {
   @@unique([groupId, moduleId])
   @@map("AccessGroupGrant")
 }
+
 model ModuleFeature {
-  id        String      @id @default(uuid())
-  moduleId  String
-  key       String
-  name      String
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  module    Module      @relation(fields: [moduleId], references: [id])
-  grants    FeatureGrant[]
+  id          String              @id @default(uuid())
+  moduleId    String
+  key         String
+  name        String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  module      Module              @relation(fields: [moduleId], references: [id])
+  grants      FeatureGrant[]
   levelGrants FeatureLevelGrant[]
 
   @@unique([moduleId, key])
@@ -348,25 +386,26 @@ model ModuleFeature {
 }
 
 model FeatureGrant {
-  id        String      @id @default(uuid())
+  id        String        @id @default(uuid())
   groupId   String
   featureId String
   actions   Action[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  group     AccessGroup @relation(fields: [groupId], references: [id])
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  group     AccessGroup   @relation(fields: [groupId], references: [id])
   feature   ModuleFeature @relation(fields: [featureId], references: [id])
 
   @@unique([groupId, featureId])
   @@map("FeatureGrant")
 }
+
 model FeatureLevelGrant {
-  id        String       @id @default(uuid())
+  id        String        @id @default(uuid())
   featureId String
   level     ModuleLevel
   actions   Action[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
   feature   ModuleFeature @relation(fields: [featureId], references: [id])
 
   @@unique([featureId, level])
@@ -458,20 +497,20 @@ enum TiEquipmentStatus {
 }
 
 model TiEquipment {
-  id                    String              @id @default(uuid())
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  name                  String
-  patrimonio            String              @unique
-  userId                String
-  value                 Decimal?           @db.Decimal(14, 2)
-  costCenterIdSnapshot  String?
-  serialNumber          String?             @unique
-  category              TiEquipmentCategory
-  status                TiEquipmentStatus   @default(IN_STOCK)
-  observations          String?
-  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  costCenterSnapshot    CostCenter?         @relation(fields: [costCenterIdSnapshot], references: [id], onDelete: SetNull)
+   id                   String              @id @default(uuid())
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  name                 String
+  patrimonio           String              @unique
+  userId               String
+  value                Decimal?            @db.Decimal(14, 2)
+  costCenterIdSnapshot String?
+  serialNumber         String?             @unique
+  category             TiEquipmentCategory
+  status               TiEquipmentStatus   @default(IN_STOCK)
+  observations         String?
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  costCenterSnapshot   CostCenter?         @relation(fields: [costCenterIdSnapshot], references: [id], onDelete: SetNull)
 
   @@index([category, status])
   @@map("TiEquipment")
@@ -666,8 +705,20 @@ enum SolicitationStatus {
   ABERTA
   EM_ATENDIMENTO
   AGUARDANDO_APROVACAO
+  AGUARDANDO_TERMO
   CONCLUIDA
   CANCELADA
+}
+
+enum DocumentType {
+  TERMO_RESPONSABILIDADE
+}
+
+enum DocumentAssignmentStatus {
+  PENDENTE
+  AGUARDANDO_ASSINATURA
+  ASSINADO
+  RECUSADO
 }
 
 enum SolicitationPriority {

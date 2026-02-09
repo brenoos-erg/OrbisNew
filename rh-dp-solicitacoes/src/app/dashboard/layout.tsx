@@ -78,7 +78,7 @@ export default async function DashboardLayout({
     }
     if (dbUnavailable) {
       const params = new URLSearchParams({ 'db-unavailable': '1', next: '/dashboard' })
-      redirect(`/login?${params.toString()}`)
+       redirect(`/login?${params.toString()}`)
     }
     redirect('/login')
   }
@@ -103,6 +103,7 @@ export default async function DashboardLayout({
   let showEquipments = false
   let canReviewRefusal = false
   let canAccessRefusalPanel = false
+  let showMyDocuments = false
   let configFeatures = {
     painel: false,
     usuarios: false,
@@ -127,6 +128,11 @@ export default async function DashboardLayout({
     minhas: false,
     nova: false,
     pendentes: false,
+  }
+  let myDocumentsFeatures = {
+    listar: false,
+    visualizar: false,
+    assinar: false,
   }
   let equipmentFeatures = {
     atalho: false,
@@ -154,6 +160,7 @@ export default async function DashboardLayout({
       const fleetLevel = levels[MODULE_KEYS.FROTAS]
       const refusalLevel = levels[MODULE_KEYS.RECUSA]
       const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
+      const myDocumentsLevel = levels[MODULE_KEYS.MEUS_DOCUMENTOS]
 
      const [
         canViewConfigPainel,
@@ -173,6 +180,9 @@ export default async function DashboardLayout({
         canViewRecusaMinhas,
         canViewRecusaNova,
         canViewRecusaPendentes,
+        canViewMyDocumentsListar,
+        canViewMyDocumentsVisualizar,
+        canSignMyDocuments,
         canViewEquipAtalho,
         canViewEquipLinhaTelefonica,
         canViewEquipSmartphone,
@@ -200,6 +210,9 @@ export default async function DashboardLayout({
         canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.MINHAS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.NOVA, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.RECUSA, FEATURE_KEYS.RECUSA.PENDENTES, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.LISTAR, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.VISUALIZAR, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.ASSINAR, Action.VIEW),
         canFeature(
           appUser.id,
           MODULE_KEYS.EQUIPAMENTOS_TI,
@@ -284,6 +297,11 @@ export default async function DashboardLayout({
         nova: canViewRecusaNova,
         pendentes: canViewRecusaPendentes,
       }
+       myDocumentsFeatures = {
+        listar: canViewMyDocumentsListar,
+        visualizar: canViewMyDocumentsVisualizar,
+        assinar: canSignMyDocuments,
+      }
       equipmentFeatures = {
         atalho: canViewEquipAtalho,
         linhaTelefonica: canViewEquipLinhaTelefonica,
@@ -306,6 +324,10 @@ export default async function DashboardLayout({
         hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) &&
         hasStructure &&
         Object.values(refusalFeatures).some(Boolean)
+         showMyDocuments =
+        hasMinLevel(myDocumentsLevel, ModuleLevel.NIVEL_1) &&
+        hasStructure &&
+        Object.values(myDocumentsFeatures).some(Boolean)
       showEquipments =
         hasMinLevel(equipmentLevel, ModuleLevel.NIVEL_1) && Object.values(equipmentFeatures).some(Boolean)
       canApprove =
@@ -341,6 +363,7 @@ export default async function DashboardLayout({
           showFleet={showFleet}
           showRefusal={showRefusal}
           showEquipments={showEquipments}
+          showMyDocuments={showMyDocuments}
           canApprove={canApprove}
           canReviewRefusal={canReviewRefusal}
           canAccessRefusalPanel={canAccessRefusalPanel}
@@ -349,6 +372,7 @@ export default async function DashboardLayout({
           fleetFeatures={fleetFeatures}
           refusalFeatures={refusalFeatures}
           equipmentFeatures={equipmentFeatures}
+          myDocumentsFeatures={myDocumentsFeatures}
           userMenu={<UserMenu collapsed={false} user={appUser} />}
         />
 

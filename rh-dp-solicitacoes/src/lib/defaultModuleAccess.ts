@@ -1,7 +1,7 @@
 import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-export const DEFAULT_MODULE_KEYS = ['SOLICITACOES', 'DIREITO-DE-RECUSA']
+export const DEFAULT_MODULE_KEYS = ['solicitacoes', 'direito-de-recusa', 'meus-documentos']
 
 export async function ensureDefaultModuleAccess(
   userId: string,

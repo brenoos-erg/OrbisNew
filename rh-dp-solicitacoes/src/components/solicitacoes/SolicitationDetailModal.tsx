@@ -155,6 +155,7 @@ type SolicitationStatus =
   | 'ABERTA'
   | 'EM_ATENDIMENTO'
   | 'AGUARDANDO_APROVACAO'
+  | 'AGUARDANDO_TERMO'
   | 'CONCLUIDA'
   | 'CANCELADA'
 
@@ -201,6 +202,7 @@ type TimelineStepKey =
   | 'REPROVADO'
   | 'AGUARDANDO_ATENDIMENTO'
   | 'EM_ATENDIMENTO'
+  | 'AGUARDANDO_TERMO'
   | 'CONCLUIDA'
   | 'CANCELADA'
 
@@ -225,6 +227,7 @@ function buildTimeline(
   if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
     // fluxo sem aprovação: Aberta → Em atendimento → Concluída/Cancelada
     steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
+    steps.push({ key: 'AGUARDANDO_TERMO', label: 'Aguardando termo' })
     steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
   } else {
     // fluxo com aprovação
@@ -242,7 +245,8 @@ function buildTimeline(
         label: 'Aguardando atendimento',
       })
       steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
-      steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
+      steps.push({ key: 'AGUARDANDO_TERMO', label: 'Aguardando termo' })
+    steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
     } else if (approvalStatus === 'REPROVADO') {
       steps.push({ key: 'REPROVADO', label: 'Reprovado' })
       steps.push({
@@ -258,6 +262,7 @@ function buildTimeline(
   if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
     // sem aprovação
     if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
+    else if (status === 'AGUARDANDO_TERMO') currentKey = 'AGUARDANDO_TERMO'
     else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
     else if (status === 'CANCELADA') currentKey = 'CANCELADA'
     else currentKey = 'ABERTA'
@@ -270,10 +275,12 @@ function buildTimeline(
     else if (status === 'AGUARDANDO_APROVACAO')
       currentKey = 'AGUARDANDO_APROVACAO'
     else if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
+    else if (status === 'AGUARDANDO_TERMO') currentKey = 'AGUARDANDO_TERMO'
     else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
     else if (status === 'CANCELADA') currentKey = 'CANCELADA'
     else currentKey = 'APROVADO'
   }
+
 
   const currentIndex = Math.max(
     0,
@@ -326,6 +333,7 @@ function getStatusLabel(s: {
     ABERTA: 'Aberta',
     EM_ATENDIMENTO: 'Em atendimento',
     AGUARDANDO_APROVACAO: 'Aguardando aprovação',
+    AGUARDANDO_TERMO: 'Aguardando termo',
     CONCLUIDA: 'Concluída',
     CANCELADA: 'Cancelada',
   }
@@ -334,6 +342,7 @@ function getStatusLabel(s: {
 }
 
 // ===== PROPS DO MODAL =====
+
 
 type Props = {
   isOpen: boolean

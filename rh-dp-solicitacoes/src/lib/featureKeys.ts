@@ -7,6 +7,7 @@ export const MODULE_KEYS = {
   RECUSA: 'direito-de-recusa',
   EQUIPAMENTOS_TI: 'controle-equipamentos-ti',
   CELULAR: 'celular',
+  MEUS_DOCUMENTOS: 'meus-documentos',
 } as const
 
 export const FEATURE_KEYS = {
@@ -34,6 +35,11 @@ export const FEATURE_KEYS = {
     MINHAS: 'RECUSA.MINHAS',
     NOVA: 'RECUSA.NOVA',
     PENDENTES: 'RECUSA.PENDENTES',
+  },
+  MEUS_DOCUMENTOS: {
+    LISTAR: 'MEUS_DOCUMENTOS.LISTAR',
+    VISUALIZAR: 'MEUS_DOCUMENTOS.VISUALIZAR',
+    ASSINAR: 'MEUS_DOCUMENTOS.ASSINAR',
   },
   EQUIPAMENTOS_TI: {
     ATALHO: 'EQUIPAMENTOS_TI.ATALHO',

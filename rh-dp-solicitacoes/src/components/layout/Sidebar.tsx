@@ -36,6 +36,7 @@ type Props = {
   showFleet: boolean
   showRefusal: boolean
   showEquipments: boolean
+  showMyDocuments: boolean
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
@@ -64,6 +65,11 @@ type Props = {
     nova: boolean
     pendentes: boolean
   }
+  myDocumentsFeatures: {
+    listar: boolean
+    visualizar: boolean
+    assinar: boolean
+  }
   equipmentFeatures: {
     atalho: boolean
     linhaTelefonica: boolean
@@ -83,6 +89,7 @@ export default function Sidebar({
   showFleet,
   showRefusal,
   showEquipments,
+  showMyDocuments,
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
@@ -90,6 +97,7 @@ export default function Sidebar({
   solicitacaoFeatures,
   fleetFeatures,
   refusalFeatures,
+  myDocumentsFeatures,
   equipmentFeatures,
   userMenu,
 }: Props) {
@@ -106,6 +114,7 @@ export default function Sidebar({
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
   const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
   const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
+  const inMyDocuments = pathname.startsWith('/dashboard/meus-documentos')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
@@ -310,6 +319,20 @@ export default function Sidebar({
 
         {/* MENU */}
         <nav className="px-3 space-y-2 mt-2">
+          {showMyDocuments && myDocumentsFeatures.listar && (
+            <Link
+              href="/dashboard/meus-documentos"
+              className={`${baseSection} ${
+                inMyDocuments ? activeSection : inactiveSection
+              }`}
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                <ScanLine className="h-5 w-5 shrink-0" />
+              </span>
+              {!collapsed && <span className={labelBase}>Meus documentos</span>}
+            </Link>
+          )}
+
           {showFleet && (
             <div>
               <button

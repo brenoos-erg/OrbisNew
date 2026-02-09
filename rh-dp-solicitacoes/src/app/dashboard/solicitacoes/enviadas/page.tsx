@@ -109,6 +109,7 @@ export default function SentRequestsPage() {
       { id: 'ABERTA', nome: 'ABERTA' },
       { id: 'AGUARDANDO_APROVACAO', nome: 'AGUARDANDO_APROVACAO' },
       { id: 'EM_ATENDIMENTO', nome: 'EM_ATENDIMENTO' },
+      { id: 'AGUARDANDO_TERMO', nome: 'AGUARDANDO_TERMO' },
       { id: 'CONCLUIDA', nome: 'CONCLUIDA' },
       { id: 'CANCELADA', nome: 'CANCELADA' },
     ],

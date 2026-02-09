@@ -1206,6 +1206,7 @@ async function main() {
   const fleetModule = await ensureModule(MODULE_KEYS.FROTAS, 'Gestão de Frotas')
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
+  const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',
@@ -1218,6 +1219,7 @@ async function main() {
     refusalModule,
     celularModule,
     equipmentsModule,
+    meusDocumentosModule,
   ]
 
 
@@ -1287,6 +1289,12 @@ async function main() {
     update: {},
     create: { departmentId: tiDepartment.id, moduleId: equipmentsModule.id },
   })
+
+  await prisma.departmentModule.upsert({
+    where: { departmentId_moduleId: { departmentId: tiDepartment.id, moduleId: meusDocumentosModule.id } },
+    update: {},
+    create: { departmentId: tiDepartment.id, moduleId: meusDocumentosModule.id },
+  })
   /* =========================
      FEATURES E GRANTS POR FEATURE
      ========================= */
@@ -1349,6 +1357,15 @@ async function main() {
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS, name: 'Outros equipamentos' },
       ],
     },
+    {
+      moduleId: meusDocumentosModule.id,
+      moduleKey: MODULE_KEYS.MEUS_DOCUMENTOS,
+      items: [
+        { key: FEATURE_KEYS.MEUS_DOCUMENTOS.LISTAR, name: 'Listar documentos' },
+        { key: FEATURE_KEYS.MEUS_DOCUMENTOS.VISUALIZAR, name: 'Visualizar documentos' },
+        { key: FEATURE_KEYS.MEUS_DOCUMENTOS.ASSINAR, name: 'Assinar documentos' },
+      ],
+    },
   ]
 
   const createdFeatures: { id: string; key: string; moduleKey: string }[] = []
@@ -1388,6 +1405,9 @@ async function main() {
     }
     if (moduleKey === MODULE_KEYS.EQUIPAMENTOS_TI) {
       return ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as Action[]
+    }
+    if (moduleKey === MODULE_KEYS.MEUS_DOCUMENTOS) {
+      return ['VIEW'] as Action[]
     }
     return ['VIEW'] as Action[]
   }
