@@ -4,9 +4,9 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
+
 
 model Attachment {
   id             String       @id
@@ -31,7 +31,7 @@ model RefusalAttachment {
 }
 
 model RefusalReport {
-  id                     String              @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id                     String              @id @default(uuid())
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   employeeId             String
@@ -104,7 +104,7 @@ model CostCenter {
 }
 
 model Position {
-  id                      String      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id                      String      @id @default(uuid())
   name                    String      @unique
   description             String?
   createdAt               DateTime    @default(now())
@@ -135,7 +135,7 @@ model Position {
 }
 
 model Leader {
-  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id        String   @id @default(uuid())
   fullName  String
   email     String?  @unique
   phone     String?
@@ -269,12 +269,12 @@ model SolicitacaoSetor {
 }
 
 model User {
-  id                                         String                       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id                                         String                       @id @default(uuid())
   email                                      String                       @unique
   role                                       Role                         @default(COLABORADOR)
   createdAt                                  DateTime                     @default(now())
   updatedAt                                  DateTime                     @updatedAt
-  authId                                     String?                      @unique @db.Uuid
+  authId                                     String?                      @unique @db.Char(36)
   fullName                                   String
   login                                      String?                      @unique(map: "user_login_key")
   phone                                      String?
@@ -357,17 +357,28 @@ model GroupMember {
 }
 
 model AccessGroupGrant {
-  id        String      @id @default(uuid())
+  id        String                   @id @default(uuid())
   groupId   String
   moduleId  String
-  actions   Action[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  group     AccessGroup @relation(fields: [groupId], references: [id])
-  module    Module      @relation(fields: [moduleId], references: [id])
+  actions   AccessGroupGrantAction[]
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  group     AccessGroup              @relation(fields: [groupId], references: [id])
+  module    Module                   @relation(fields: [moduleId], references: [id])
 
   @@unique([groupId, moduleId])
   @@map("AccessGroupGrant")
+}
+
+model AccessGroupGrantAction {
+  id        String           @id @default(cuid())
+  grantId   String
+  action    Action
+  createdAt DateTime         @default(now())
+  grant     AccessGroupGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@unique([grantId, action])
+  @@index([grantId])
 }
 
 model ModuleFeature {
@@ -386,30 +397,51 @@ model ModuleFeature {
 }
 
 model FeatureGrant {
-  id        String        @id @default(uuid())
+  id        String               @id @default(uuid())
   groupId   String
   featureId String
-  actions   Action[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  group     AccessGroup   @relation(fields: [groupId], references: [id])
-  feature   ModuleFeature @relation(fields: [featureId], references: [id])
+  actions   FeatureGrantAction[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  group     AccessGroup          @relation(fields: [groupId], references: [id])
+  feature   ModuleFeature        @relation(fields: [featureId], references: [id])
 
   @@unique([groupId, featureId])
   @@map("FeatureGrant")
 }
 
+model FeatureGrantAction {
+  id        String       @id @default(cuid())
+  grantId   String
+  action    Action
+  createdAt DateTime     @default(now())
+  grant     FeatureGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@unique([grantId, action])
+  @@index([grantId])
+}
+
 model FeatureLevelGrant {
-  id        String        @id @default(uuid())
+  id        String                    @id @default(uuid())
   featureId String
   level     ModuleLevel
-  actions   Action[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  feature   ModuleFeature @relation(fields: [featureId], references: [id])
+  actions   FeatureLevelGrantAction[]
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  feature   ModuleFeature             @relation(fields: [featureId], references: [id])
 
   @@unique([featureId, level])
   @@map("FeatureLevelGrant")
+}
+model FeatureLevelGrantAction {
+  id        String            @id @default(cuid())
+  grantId   String
+  action    Action
+  createdAt DateTime          @default(now())
+  grant     FeatureLevelGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@unique([grantId, action])
+  @@index([grantId])
 }
 
 model CostCenterModule {
@@ -469,7 +501,7 @@ model DepartmentModule {
 }
 
 model UserDepartment {
-  id           String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  id           String     @id @default(uuid())
   userId       String
   departmentId String
   createdAt    DateTime   @default(now())

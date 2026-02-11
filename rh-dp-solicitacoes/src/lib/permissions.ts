@@ -26,15 +26,21 @@ async function loadFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) 
     where: {
       level,
       feature: {
-        module: { key: { equals: moduleKey, mode: 'insensitive' } },
+        module: { key: { equals: moduleKey } },
       },
     },
-    select: { actions: true, feature: { select: { key: true } } },
+    select: {
+      actions: { select: { action: true } },
+      feature: { select: { key: true } },
+    },
   })
 
   const map = new Map<string, Action[]>()
   for (const grant of grants) {
-    map.set(normalizeFeatureKey(grant.feature.key), grant.actions)
+    map.set(
+      normalizeFeatureKey(grant.feature.key),
+      grant.actions.map((item) => item.action),
+    )
   }
 
   return map

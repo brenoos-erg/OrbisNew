@@ -90,34 +90,10 @@ const normalizedMessage = error.message?.toLowerCase() ?? ''
 async function main() {
   console.log('🌱 Iniciando seed...')
 
-  // 1) Validar DIRECT_DATABASE_URL
-  if (!process.env.DIRECT_DATABASE_URL) {
-    console.error('❌ DIRECT_DATABASE_URL não está definido no .env')
-    console.error('➡️ Coloque no seu .env algo como:')
-    console.error(
-      'DIRECT_DATABASE_URL="postgresql://postgres:***@db.SEUPROJETO.supabase.co:5432/postgres?schema=public"',
-    )
-    process.exit(1)
-  }
+  const databaseHost = hostOf(process.env.DATABASE_URL)
+  console.log('🔎 Host DATABASE_URL:', databaseHost)
 
-  // 2) Forçar Prisma Client a usar DIRECT, mesmo que DATABASE_URL seja pooler
-  const beforeHost = hostOf(process.env.DATABASE_URL)
-  const directHost = hostOf(process.env.DIRECT_DATABASE_URL)
-
-  process.env.DATABASE_URL = process.env.DIRECT_DATABASE_URL
-
-  const afterHost = hostOf(process.env.DATABASE_URL)
-
-  console.log('🔎 Host DATABASE_URL (antes):', beforeHost)
-  console.log('🔎 Host DIRECT_DATABASE_URL :', directHost)
-  console.log('✅ Host DATABASE_URL (agora):', afterHost)
-
-  if (afterHost !== directHost) {
-    console.error('❌ Falha ao forçar DATABASE_URL para DIRECT_DATABASE_URL')
-    process.exit(1)
-  }
-
-  // 3) Agora sim cria o PrismaClient
+  // PrismaClient usa apenas DATABASE_URL
   const prisma = new PrismaClient()
   const supabaseAdmin = getSupabaseAdmin()
 
@@ -1245,7 +1221,7 @@ async function main() {
     }
 
     const caseInsensitive = await prisma.module.findFirst({
-      where: { key: { equals: key, mode: 'insensitive' } },
+      where: { key: { equals: key } },
     })
     if (caseInsensitive) {
       return prisma.module.update({
@@ -1285,12 +1261,57 @@ async function main() {
     create: { name: 'Administradores', notes: 'Acesso total ao sistema' },
   })
 
-  for (const mod of allModules) {
-    await prisma.accessGroupGrant.upsert({
-      where: { groupId_moduleId: { groupId: adminGroup.id, moduleId: mod.id } },
-      update: { actions: ALL_ACTIONS },
-      create: { groupId: adminGroup.id, moduleId: mod.id, actions: ALL_ACTIONS },
+  const upsertAccessGroupGrant = async (params: {
+    groupId: string
+    moduleId: string
+    actions: Action[]
+  }) => {
+    const { groupId, moduleId, actions } = params
+
+    return prisma.accessGroupGrant.upsert({
+      where: { groupId_moduleId: { groupId, moduleId } },
+      create: {
+        groupId,
+        moduleId,
+        actions: {
+          create: actions.map((action) => ({ action })),
+        },
+      },
+      update: {
+        actions: {
+          deleteMany: {},
+          create: actions.map((action) => ({ action })),
+        },
+      },
     })
+  }
+  const upsertFeatureGrant = async (params: {
+    groupId: string
+    featureId: string
+    actions: Action[]
+  }) => {
+    const { groupId, featureId, actions } = params
+
+    return prisma.featureGrant.upsert({
+      where: { groupId_featureId: { groupId, featureId } },
+      create: {
+        groupId,
+        featureId,
+        actions: {
+          create: actions.map((action) => ({ action })),
+        },
+      },
+      update: {
+        actions: {
+          deleteMany: {},
+          create: actions.map((action) => ({ action })),
+        },
+      },
+    })
+  }
+
+  for (const mod of allModules) {
+    await upsertAccessGroupGrant({ groupId: adminGroup.id, moduleId: mod.id, actions: ALL_ACTIONS })
   }
 
   await prisma.groupMember.upsert({
@@ -1313,10 +1334,10 @@ async function main() {
     create: { name: 'Tecnologia da Informação', notes: 'Grupo do TI' },
   })
 
-  await prisma.accessGroupGrant.upsert({
-    where: { groupId_moduleId: { groupId: tiGroup.id, moduleId: configModule.id } },
-    update: { actions: ['VIEW', 'CREATE', 'UPDATE'] },
-    create: { groupId: tiGroup.id, moduleId: configModule.id, actions: ['VIEW', 'CREATE', 'UPDATE'] },
+  await upsertAccessGroupGrant({
+    groupId: tiGroup.id,
+    moduleId: configModule.id,
+    actions: ['VIEW', 'CREATE', 'UPDATE'],
   })
 
   const rq063ApproversGroup = await prisma.accessGroup.upsert({
@@ -1325,10 +1346,10 @@ async function main() {
     create: { name: 'Aprovadores RQ_063', notes: 'Gestores que podem aprovar a RQ_063' },
   })
 
-  await prisma.accessGroupGrant.upsert({
-    where: { groupId_moduleId: { groupId: rq063ApproversGroup.id, moduleId: solicitacoesModule.id } },
-    update: { actions: ['VIEW', 'APPROVE'] },
-    create: { groupId: rq063ApproversGroup.id, moduleId: solicitacoesModule.id, actions: ['VIEW', 'APPROVE'] },
+  await upsertAccessGroupGrant({
+    groupId: rq063ApproversGroup.id,
+    moduleId: solicitacoesModule.id,
+    actions: ['VIEW', 'APPROVE'],
   })
 
   const safetyDepartment = await prisma.department.findUnique({ where: { code: '19' } })
@@ -1448,31 +1469,52 @@ async function main() {
   }
 
   for (const feature of createdFeatures) {
-    await prisma.featureGrant.upsert({
-      where: { groupId_featureId: { groupId: adminGroup.id, featureId: feature.id } },
-      update: { actions: ALL_ACTIONS },
-      create: { groupId: adminGroup.id, featureId: feature.id, actions: ALL_ACTIONS },
-    })
-  }
+     export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-  const tiActions = (moduleKey: string) => {
-    if (moduleKey === MODULE_KEYS.CONFIGURACOES) {
-      return ['VIEW', 'CREATE', 'UPDATE'] as Action[]
-    }
-    if (moduleKey === MODULE_KEYS.EQUIPAMENTOS_TI) {
-      return ['VIEW', 'CREATE', 'UPDATE', 'DELETE'] as Action[]
-    }
-    if (moduleKey === MODULE_KEYS.MEUS_DOCUMENTOS) {
-      return ['VIEW'] as Action[]
-    }
-    return ['VIEW'] as Action[]
-  }
+import { Action } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 
-  for (const feature of createdFeatures) {
-    await prisma.featureGrant.upsert({
-      where: { groupId_featureId: { groupId: tiGroup.id, featureId: feature.id } },
-      update: { actions: tiActions(feature.moduleKey) },
-      create: { groupId: tiGroup.id, featureId: feature.id, actions: tiActions(feature.moduleKey) },
+function normalizeActionList(actions: unknown): Action[] {
+  if (!Array.isArray(actions)) return []
+  return actions
+    .map((item) => (typeof item === 'string' ? item.toUpperCase() : ''))
+    .filter((item): item is Action =>
+      ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'].includes(item as Action),
+    )
+}
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const { moduleKey, actions } = await req.json()
+  const mod = await prisma.module.findUnique({ where: { key: moduleKey } })
+  if (!mod) return NextResponse.json({ error: 'Módulo inválido' }, { status: 400 })
+
+  const normalizedActions = normalizeActionList(actions)
+
+  const grant = await prisma.accessGroupGrant.upsert({
+    where: { groupId_moduleId: { groupId: params.id, moduleId: mod.id } },
+    create: {
+      groupId: params.id,
+      moduleId: mod.id,
+      actions: {
+        create: normalizedActions.map((action) => ({ action })),
+      },
+    },
+    update: {
+      actions: {
+        deleteMany: {},
+        create: normalizedActions.map((action) => ({ action })),
+      },
+    },
+    include: {
+      actions: { select: { action: true } },
+    },
+  })
+
+  return NextResponse.json({
+    ...grant,
+    actions: grant.actions.map((item) => item.action),
     })
   }
 

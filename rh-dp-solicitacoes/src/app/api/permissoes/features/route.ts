@@ -99,12 +99,25 @@ export async function GET(req: NextRequest) {
           }),
           prisma.featureLevelGrant.findMany({
             where: { feature: { moduleId: featureModuleId } },
-            select: { id: true, featureId: true, level: true, actions: true },
+            select: {
+              id: true,
+              featureId: true,
+              level: true,
+              actions: { select: { action: true } },
+            },
           }),
         ])
 
         const levels: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
-        const grantsByKey = new Map(levelGrants.map((g) => [`${g.featureId}-${g.level}`, g]))
+        const grantsByKey = new Map(
+          levelGrants.map((g) => [
+            `${g.featureId}-${g.level}`,
+            {
+              ...g,
+              actions: g.actions.map((item) => item.action),
+            },
+          ]),
+        )
 
         const resolvedGrants = features.flatMap((feature) =>
           levels.map((level) => {
@@ -181,12 +194,25 @@ export async function GET(req: NextRequest) {
           }),
           prisma.featureLevelGrant.findMany({
             where: { feature: { moduleId: module.id } },
-            select: { id: true, featureId: true, level: true, actions: true },
+             select: {
+              id: true,
+              featureId: true,
+              level: true,
+              actions: { select: { action: true } },
+            },
           }),
         ])
 
         const levels: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
-        const grantsByKey = new Map(levelGrants.map((g) => [`${g.featureId}-${g.level}`, g]))
+        const grantsByKey = new Map(
+          levelGrants.map((g) => [
+            `${g.featureId}-${g.level}`,
+            {
+              ...g,
+              actions: g.actions.map((item) => item.action),
+            },
+          ]),
+        )
 
         const resolvedGrants = features.flatMap((feature) =>
           levels.map((level) => {
@@ -249,7 +275,7 @@ export async function PATCH(req: NextRequest) {
       const normalizedFeatureKey = featureKey.toUpperCase()
 
       const feature = await prisma.moduleFeature.findFirst({
-        where: { key: { equals: normalizedFeatureKey, mode: 'insensitive' } },
+        where: { key: { equals: normalizedFeatureKey } },
         select: { id: true, key: true },
       })
 
@@ -264,16 +290,33 @@ export async function PATCH(req: NextRequest) {
             level,
           },
         },
-        update: { actions },
+        update: {
+          actions: {
+            deleteMany: {},
+            create: actions.map((action) => ({ action })),
+          },
+        },
         create: {
           featureId: feature.id,
           level,
-          actions,
+          actions: {
+            create: actions.map((action) => ({ action })),
+          },
         },
-        select: { id: true, featureId: true, level: true, actions: true },
+        select: {
+          id: true,
+          featureId: true,
+          level: true,
+          actions: { select: { action: true } },
+        },
       })
-
-      return NextResponse.json({ ok: true, levelGrant })
+      return NextResponse.json({
+        ok: true,
+        levelGrant: {
+          ...levelGrant,
+          actions: levelGrant.actions.map((item) => item.action),
+         },
+      })
     } catch (e: any) {
       console.error('PATCH /api/permissoes/features error', e)
 
