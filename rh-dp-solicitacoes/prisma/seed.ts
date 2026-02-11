@@ -1260,6 +1260,10 @@ async function main() {
     update: {},
     create: { name: 'Administradores', notes: 'Acesso total ao sistema' },
   })
+  const buildNestedActions = (actions: Action[]) => ({
+    create: actions.map((action) => ({ action })),
+  })
+
 
   const upsertAccessGroupGrant = async (params: {
     groupId: string
@@ -1268,17 +1272,36 @@ async function main() {
   }) => {
     const { groupId, moduleId, actions } = params
 
-    return prisma.accessGroupGrant.upsert({
-      where: { groupId_moduleId: { groupId, moduleId } },
-      create: {
-        groupId,
-        moduleId,
-        actions,
-      },
-      update: {
-        actions,
-      },
-    })
+    try {
+      return await prisma.accessGroupGrant.upsert({
+        where: { groupId_moduleId: { groupId, moduleId } },
+        create: {
+          groupId,
+          moduleId,
+          actions: actions as any,
+        },
+        update: {
+          actions: actions as any,
+        },
+      })
+    } catch {
+      const nestedActions = buildNestedActions(actions)
+
+      return prisma.accessGroupGrant.upsert({
+        where: { groupId_moduleId: { groupId, moduleId } },
+        create: {
+          groupId,
+          moduleId,
+          actions: nestedActions as any,
+        },
+        update: {
+          actions: {
+            deleteMany: {},
+            ...nestedActions,
+          } as any,
+        },
+      })
+    }
   }
   const upsertFeatureGrant = async (params: {
     groupId: string
@@ -1287,17 +1310,36 @@ async function main() {
   }) => {
     const { groupId, featureId, actions } = params
 
-    return prisma.featureGrant.upsert({
-      where: { groupId_featureId: { groupId, featureId } },
-      create: {
-        groupId,
-        featureId,
-        actions,
-      },
-      update: {
-        actions,
-      },
-    })
+    try {
+      return await prisma.featureGrant.upsert({
+        where: { groupId_featureId: { groupId, featureId } },
+        create: {
+          groupId,
+          featureId,
+          actions: actions as any,
+        },
+        update: {
+          actions: actions as any,
+        },
+      })
+    } catch {
+      const nestedActions = buildNestedActions(actions)
+
+      return prisma.featureGrant.upsert({
+        where: { groupId_featureId: { groupId, featureId } },
+        create: {
+          groupId,
+          featureId,
+          actions: nestedActions as any,
+        },
+        update: {
+          actions: {
+            deleteMany: {},
+            ...nestedActions,
+          } as any,
+        },
+      })
+    }
   }
 
   for (const mod of allModules) {
