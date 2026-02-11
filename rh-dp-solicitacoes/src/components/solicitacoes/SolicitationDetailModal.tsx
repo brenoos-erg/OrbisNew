@@ -425,7 +425,7 @@ export function SolicitationDetailModal({
   }, [isOpen])
   useEffect(() => {
     const isEquipamentoTipo = detail?.tipo?.nome === 'SOLICITAÇÃO DE EQUIPAMENTO'
-    if (!isOpen || !isEquipamentoTipo) return
+   if (!isOpen || !isEquipamentoTipo || isApprovalMode || !canManage) return
     let alive = true
 
     async function loadTiInventory() {
@@ -453,7 +453,7 @@ export function SolicitationDetailModal({
     return () => {
       alive = false
     }
-  }, [isOpen, detail?.id, detail?.tipo?.nome])
+  }, [isOpen, detail?.id, detail?.tipo?.nome, isApprovalMode, canManage])
 
 
   const [closing, setClosing] = useState(false)
@@ -1305,7 +1305,7 @@ export function SolicitationDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <div>
@@ -1342,41 +1342,7 @@ export function SolicitationDetailModal({
               </>
             )}
 
-            {/* Ações de assumir/finalizar – só quando pode gerenciar */}
-            {showManagementActions && (
-              <>
-                {canAssumir && (
-                  <button
-                    onClick={handleAssumirChamado}
-                    disabled={assumindo}
-                    className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
-                  >
-                    {assumindo ? 'Assumindo...' : 'Assumir chamado'}
-                  </button>
-                )}
-
-                {!isDpDestino && canFinalizarRh && isSolicitacaoPessoal && (
-                  <button
-                    onClick={() => setShowContratadoForm((v) => !v)}
-                    className="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                  >
-                    {showContratadoForm
-                      ? 'Ocultar dados do contratado'
-                      : 'Dados do contratado'}
-                  </button>
-                )}
-
-                {canFinalizarRh && (
-                  <button
-                    onClick={handleFinalizarRh}
-                    disabled={closing}
-                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                  >
-                    {closing ? 'Enviando...' : finalizarLabel}
-                  </button>
-                )}
-              </>
-            )}
+            
 
             <button
               onClick={onClose}
@@ -1445,7 +1411,8 @@ export function SolicitationDetailModal({
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
-          <div className="space-y-5">
+          <div className="flex flex-col gap-5 lg:flex-row">
+            <div className="min-w-0 flex-1 space-y-5">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
             <div className="flex gap-4">
@@ -1667,60 +1634,7 @@ export function SolicitationDetailModal({
                   </div>
                 </div>
               </div>
-              {isSolicitacaoEquipamentoTi && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
-                    Inventário TI e decisão de atendimento
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <label className="space-y-1 text-xs text-slate-700">
-                      <span className="font-semibold">Equipamento disponível (IN_STOCK)</span>
-                      <select
-                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                        value={selectedEquipmentId}
-                        onChange={(e) => setSelectedEquipmentId(e.target.value)}
-                        disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
-                      >
-                        <option value="">Selecione...</option>
-                        {tiInventory.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.patrimonio} - {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="space-y-1 text-xs text-slate-700">
-                      <span className="font-semibold">URL do PDF do termo</span>
-                      <input
-                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                        value={equipmentPdfUrl}
-                        onChange={(e) => setEquipmentPdfUrl(e.target.value)}
-                        placeholder="https://.../termo.pdf"
-                        disabled={closing || isFinalizadaOuCancelada}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleTiAlocarEquipamento}
-                      disabled={closing || isFinalizadaOuCancelada}
-                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-                    >
-                      {closing ? 'Processando...' : 'Alocar equipamento e gerar termo'}
-                    </button>
-                    <button
-                      onClick={handleTiSemEstoque}
-                      disabled={closing || isFinalizadaOuCancelada}
-                      className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
-                    >
-                      Sem estoque → encaminhar para aprovação
-                    </button>
-                  </div>
-                </div>
-              )}
+              
 
               {/* Formulário do tipo de solicitação */}
                {isNadaConsta ? (
@@ -1817,110 +1731,12 @@ export function SolicitationDetailModal({
 
                       </div>
 
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                          Dados do setor
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Os campos do setor ficam em uma janela separada para
-                          facilitar o preenchimento.
-                        </p>
-                        {selectedSetorLabel && (
-                          <p className="mt-2 text-xs font-semibold text-slate-700">
-                            Setor selecionado: {selectedSetorLabel}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                         onClick={() => {
-                          if (!activeSector && defaultActiveSector) {
-                            setActiveSector(defaultActiveSector)
-                          }
-                          setIsNadaConstaSetorOpen(true)
-                        }}
-                        disabled={
-                          camposNadaConstaSetor.length === 0 ||
-                          (!activeSector && !defaultActiveSector)
-                        }
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Abrir janela do setor
-                      </button>
-                    </div>
-                    {camposNadaConstaSetor.length === 0 && (
-                      <p className="mt-2 text-xs text-slate-500">
-                        Selecione um setor para liberar os campos.
+                  {!showManagementActions && (
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="text-xs text-slate-500">
+                        Tratativas do Nada Consta disponíveis apenas no painel de atendimento.
                       </p>
-                    )}
-                  </div>
 
-                  {isNadaConstaSetorOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
-                      <div
-                        className="absolute inset-0 bg-slate-900/40"
-                        onClick={() => setIsNadaConstaSetorOpen(false)}
-                        aria-hidden="true"
-                      />
-                      <div className="relative z-10 flex w-full max-w-5xl max-h-[90vh] flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                              Dados do setor
-                            </p>
-                            {selectedSetorLabel && (
-                              <p className="text-sm font-semibold text-slate-700">
-                                {selectedSetorLabel}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setIsNadaConstaSetorOpen(false)}
-                            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            Fechar
-                          </button>
-                        </div>
-
-                         <div className="mt-4 flex-1 overflow-y-auto pr-1">
-                          {camposNadaConstaSetor.length > 0 ? (
-                            <div className="space-y-3 text-xs text-slate-700">
-                              {camposNadaConstaSetor.map(renderNadaConstaCampo)}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-500">
-                              Selecione um setor para preencher os dados.
-                            </p>
-                          )}
-
-                          {camposNadaConstaSetor.length > 0 &&
-                            canEditNadaConstaSetor && (
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSalvarNadaConsta(false)}
-                                  disabled={savingNadaConsta}
-                                  className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                                >
-                                  {savingNadaConsta
-                                    ? 'Salvando...'
-                                    : 'Salvar'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleSalvarNadaConsta(true)}
-                                  disabled={savingNadaConsta}
-                                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                                >
-                                  Finalizar setor
-                                </button>
-                              </div>
-                            )}
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1941,8 +1757,8 @@ export function SolicitationDetailModal({
                   onDpDataDemissaoChange={setDpDataDemissao}
                   onDpDataPrevistaAcertoChange={setDpDataPrevistaAcerto}
                   onDpConsideracoesChange={setDpConsideracoes}
-                  rhEditable={canEditRhSection}
-                  dpEditable={canEditDpSection}
+                  rhEditable={false}
+                  dpEditable={false}
                 />
               ) : (
                 camposSchema.length > 0 && (
@@ -1971,8 +1787,8 @@ export function SolicitationDetailModal({
                 )
               )}
 
-              {/* DADOS DO CONTRATADO (formulário extra) */}
-              {showContratadoForm && (
+               {/* DADOS DO CONTRATADO (formulário extra) */}
+              {showContratadoForm && !showManagementActions && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
                     Dados do contratado
@@ -2069,7 +1885,7 @@ export function SolicitationDetailModal({
               )}
 
               {/* Bloco de incentivo / educação */}
-              {isSolicitacaoIncentivo && (
+              {isSolicitacaoIncentivo && !showManagementActions && (
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
                     Informações para incentivo à educação
@@ -2192,7 +2008,149 @@ export function SolicitationDetailModal({
               )}
             </>
           )}
-           </div>
+            </div>
+
+            {showManagementActions && detail && (
+              <aside className="w-full shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:w-[390px] lg:max-h-[72vh] lg:overflow-y-auto">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                  Painel de Tratativas
+                </p>
+
+                <div className="space-y-4">
+                  {canAssumir && (
+                    <button
+                      onClick={handleAssumirChamado}
+                      disabled={assumindo || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                    >
+                      {assumindo ? 'Assumindo...' : 'Assumir chamado'}
+                    </button>
+                  )}
+
+                  {!isDpDestino && canFinalizarRh && isSolicitacaoPessoal && (
+                    <button
+                      onClick={() => setShowContratadoForm((v) => !v)}
+                      className="w-full rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                    >
+                      {showContratadoForm
+                        ? 'Ocultar dados do contratado'
+                        : 'Dados do contratado'}
+                    </button>
+                  )}
+
+                  {canFinalizarRh && (
+                    <button
+                      onClick={handleFinalizarRh}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                    >
+                      {closing ? 'Enviando...' : finalizarLabel}
+                    </button>
+                  )}
+
+                  {isSolicitacaoEquipamentoTi && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
+                        Inventário TI e decisão de atendimento
+                      </p>
+
+                      <div className="space-y-3">
+                        <label className="space-y-1 text-xs text-slate-700">
+                          <span className="font-semibold">
+                            Equipamento disponível (IN_STOCK)
+                          </span>
+                          <select
+                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                            value={selectedEquipmentId}
+                            onChange={(e) => setSelectedEquipmentId(e.target.value)}
+                            disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
+                          >
+                            <option value="">Selecione...</option>
+                            {tiInventory.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.patrimonio} - {item.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="space-y-1 text-xs text-slate-700">
+                          <span className="font-semibold">URL do PDF do termo</span>
+                          <input
+                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                            value={equipmentPdfUrl}
+                            onChange={(e) => setEquipmentPdfUrl(e.target.value)}
+                            placeholder="https://.../termo.pdf"
+                            disabled={closing || isFinalizadaOuCancelada}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={handleTiAlocarEquipamento}
+                          disabled={closing || isFinalizadaOuCancelada}
+                          className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+                        >
+                          {closing ? 'Processando...' : 'Alocar equipamento e gerar termo'}
+                        </button>
+                        <button
+                          onClick={handleTiSemEstoque}
+                          disabled={closing || isFinalizadaOuCancelada}
+                          className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
+                        >
+                          Sem estoque → encaminhar para aprovação
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isNadaConsta && (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                        Tratativa do setor
+                      </p>
+
+                      {nadaConstaError && (
+                        <p className="mb-2 text-xs text-red-600">{nadaConstaError}</p>
+                      )}
+
+                      {camposNadaConstaSetor.length > 0 ? (
+                        <div className="space-y-3 text-xs text-slate-700">
+                          {camposNadaConstaSetor.map(renderNadaConstaCampo)}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Selecione um setor para preencher os dados.
+                        </p>
+                      )}
+
+                      {camposNadaConstaSetor.length > 0 && canEditNadaConstaSetor && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSalvarNadaConsta(false)}
+                            disabled={savingNadaConsta}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            {savingNadaConsta ? 'Salvando...' : 'Salvar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSalvarNadaConsta(true)}
+                            disabled={savingNadaConsta}
+                            className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                          >
+                            Finalizar setor
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            )}
+          </div>
         </div>
 
         {/* Rodapé */}
