@@ -6,16 +6,19 @@ import { ModuleLevel, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
+import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
+  isSolicitacaoEquipamento,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+
 
 
 
@@ -319,22 +322,6 @@ export const GET = withModuleLevel(
  * Acha um "aprovador nível 3" vinculado ao centro de custo,
  * ou qualquer usuário como fallback.
  */
-async function findLevel3ApproverForCostCenter(costCenterId?: string | null) {
-  if (costCenterId) {
-    const link = await prisma.userCostCenter.findFirst({
-      where: { costCenterId },
-      include: { user: true },
-    })
-
-    if (link?.user) {
-      return link.user
-    }
-  }
-
-  // fallback: qualquer usuário
-  const fallback = await prisma.user.findFirst()
-  return fallback
-}
 
 /**
  * Monta o payload padrão com dados do solicitante + campos do formulário
@@ -419,14 +406,33 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
-        const resolvedCostCenterId = costCenterId ?? me.costCenterId ?? null
+         const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
 
-        if (!resolvedCostCenterId) {
+        const tiDepartment = await prisma.department.findUnique({
+          where: { code: '20' },
+          select: { id: true },
+        })
+
+        if (isSolicitacaoEquipamentoTi && !tiDepartment) {
+          return NextResponse.json(
+            { error: 'Departamento de TI não encontrado para este tipo de solicitação.' },
+            { status: 400 },
+          )
+        }
+        const resolvedDepartmentId =
+          isSolicitacaoEquipamentoTi && tiDepartment
+            ? tiDepartment.id
+            : departmentId
+        const resolvedCostCenterId =
+          isSolicitacaoEquipamentoTi ? null : costCenterId ?? me.costCenterId ?? null
+
+        if (!resolvedCostCenterId && !isSolicitacaoEquipamentoTi) {
           return NextResponse.json(
             { error: 'Centro de custo é obrigatório.' },
             { status: 400 },
           )
         }
+
 
 
         // monta o payload com dados do solicitante + campos do formulário
@@ -438,7 +444,7 @@ export const POST = withModuleLevel(
             protocolo,
             tipoId,
             costCenterId: resolvedCostCenterId,
-            departmentId,
+            departmentId: resolvedDepartmentId,
             solicitanteId,
             titulo,
             descricao,
@@ -507,7 +513,7 @@ export const POST = withModuleLevel(
               approverId: null,
               status: 'ABERTA',
               costCenterId: created.costCenterId,
-              departmentId: dpDepartment?.id ?? departmentId,
+              departmentId: dpDepartment?.id ?? resolvedDepartmentId,
             },
           })
 
@@ -521,6 +527,7 @@ export const POST = withModuleLevel(
             },
           })
 
+
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
@@ -532,6 +539,45 @@ export const POST = withModuleLevel(
 
           return NextResponse.json(updated, { status: 201 })
         }
+        /* =====================================================================
+           2.6) Solicitação de Equipamento (encaminha obrigatoriamente para TI)
+           ===================================================================== */
+        if (isSolicitacaoEquipamentoTi) {
+          const approver = await findLevel3SolicitacoesApprover()
+          const approverId = approver?.id ?? null
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              departmentId: resolvedDepartmentId,
+              costCenterId: null,
+              requiresApproval: false,
+              approvalStatus: 'NAO_PRECISA',
+              approverId,
+              status: 'ABERTA',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message: 'Solicitação de equipamento encaminhada automaticamente para TI.',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'ENCAMINHADA_TI',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
+
 
          /* =====================================================================
            3) RQ_063 - Solicitação de Pessoal
@@ -574,7 +620,7 @@ export const POST = withModuleLevel(
                 approverId: null,
                 status: 'ABERTA',
                 costCenterId: rhCostCenter.id,
-                departmentId: rhCostCenter.departmentId ?? departmentId,
+                 departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
               },
             })
 
@@ -600,9 +646,8 @@ export const POST = withModuleLevel(
           }
 
           // qualquer coisa diferente de SIM exige aprovação
-          const approver = await findLevel3ApproverForCostCenter(
-            resolvedCostCenterId,
-          )
+          const approver = await findLevel3SolicitacoesApprover()
+
           const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({
@@ -649,7 +694,7 @@ export const POST = withModuleLevel(
               approverId: null, // RH vai tratar
               status: 'AGUARDANDO_APROVACAO',
               costCenterId: rhCostCenter.id,
-              departmentId: rhCostCenter.departmentId ?? departmentId,
+              departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
             },
           })
 
@@ -737,9 +782,7 @@ export const POST = withModuleLevel(
            5) Solicitação de Abono Educacional
            ===================================================================== */
         if (isAbonoEducacional) {
-          const approver = await findLevel3ApproverForCostCenter(
-            resolvedCostCenterId,
-          )
+           const approver = await findLevel3SolicitacoesApprover()
           const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({

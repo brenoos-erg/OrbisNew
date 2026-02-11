@@ -4,6 +4,8 @@ type TipoSolicitacaoLike = {
 }
 export const AGENDAMENTO_FERIAS_TIPO_ID = 'AGENDAMENTO_DE_FERIAS'
 export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
+export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'
+export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
 
 export type NadaConstaSetorKey =
   | 'DP'
@@ -214,4 +216,12 @@ export function isSolicitacaoAgendamentoFerias(
   if (id === AGENDAMENTO_FERIAS_TIPO_ID) return true
   const nome = tipo.nome?.trim().toUpperCase() ?? ''
   return nome === AGENDAMENTO_FERIAS_TIPO_NOME
+}
+
+export function isSolicitacaoEquipamento(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === SOLICITACAO_EQUIPAMENTO_TIPO_ID) return true
+  const nome = tipo.nome?.trim().toUpperCase() ?? ''
+  return nome === SOLICITACAO_EQUIPAMENTO_TIPO_NOME
 }

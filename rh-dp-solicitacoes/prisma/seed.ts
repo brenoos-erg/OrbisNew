@@ -245,6 +245,62 @@ async function main() {
     },
   })
   console.log('✅ Tipo "Vale-transporte" ok.')
+  await prisma.tipoSolicitacao.upsert({
+    where: { nome: 'SOLICITAÇÃO DE EQUIPAMENTO' },
+    update: {
+      descricao: 'Solicitação para fornecimento de equipamento de TI',
+      schemaJson: {
+        meta: { departamentos: [tiDepartment.id] },
+        camposEspecificos: [
+          {
+            name: 'tipoEquipamento',
+            label: 'Tipo de equipamento',
+            type: 'text',
+            required: true,
+            stage: 'solicitante',
+            section: 'Dados da solicitação',
+          },
+          {
+            name: 'justificativa',
+            label: 'Justificativa',
+            type: 'textarea',
+            required: true,
+            stage: 'solicitante',
+            section: 'Dados da solicitação',
+          },
+        ],
+      },
+      updatedAt: new Date(),
+    },
+    create: {
+      id: 'SOLICITACAO_EQUIPAMENTO',
+      nome: 'SOLICITAÇÃO DE EQUIPAMENTO',
+      descricao: 'Solicitação para fornecimento de equipamento de TI',
+      schemaJson: {
+        meta: { departamentos: [tiDepartment.id] },
+        camposEspecificos: [
+          {
+            name: 'tipoEquipamento',
+            label: 'Tipo de equipamento',
+            type: 'text',
+            required: true,
+            stage: 'solicitante',
+            section: 'Dados da solicitação',
+          },
+          {
+            name: 'justificativa',
+            label: 'Justificativa',
+            type: 'textarea',
+            required: true,
+            stage: 'solicitante',
+            section: 'Dados da solicitação',
+          },
+        ],
+      },
+      updatedAt: new Date(),
+    },
+  })
+  console.log('✅ Tipo "SOLICITAÇÃO DE EQUIPAMENTO" ok.')
 
   /* =========================
      DP: Solicitação de Admissão

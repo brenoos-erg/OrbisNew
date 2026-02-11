@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
-import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
 
 function generateProtocolo() {
   const now = new Date()
@@ -81,6 +81,16 @@ export async function POST(
         { status: 409 },
       )
     }
+    const signedTermAssignments = await prisma.documentAssignment.count({
+      where: {
+        document: {
+          solicitationId: solicitation.id,
+          type: 'TERMO_RESPONSABILIDADE',
+        },
+        status: 'ASSINADO',
+      },
+    })
+
 
     const isSolicitacaoPessoal =
       solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
@@ -88,6 +98,14 @@ export async function POST(
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
     const isAdmissaoGerada =
+    const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(solicitation.tipo)
+
+    if (isSolicitacaoEquipamentoTi && signedTermAssignments === 0) {
+      return NextResponse.json(
+        { error: 'Só é possível finalizar após o termo de responsabilidade estar assinado.' },
+        { status: 409 },
+      )
+    }
       solicitation.tipo?.nome === 'Solicitação de Admissão'
       const isDpDestino = Boolean(
       solicitation.costCenter?.externalCode === '590' ||
@@ -104,12 +122,13 @@ export async function POST(
       !isSolicitacaoPessoal &&
       !isSolicitacaoIncentivo &&
       !isAdmissaoGerada &&
-      !isDesligamento
+      !isDesligamento &&
+      !isSolicitacaoEquipamentoTi
     ) {
       return NextResponse.json(
         {
           error:
-            'Esta rota só pode ser usada para RQ_063, RQ_091, RQ_247 ou solicitações de admissão oriundas do RH.',
+            'Esta rota só pode ser usada para RQ_063, RQ_091, RQ_247, solicitações de equipamento ou solicitações de admissão oriundas do RH.',
         },
         { status: 400 },
       )
@@ -159,6 +178,35 @@ export async function POST(
           { status: 400 },
         )
       }
+    }
+    if (isSolicitacaoEquipamentoTi) {
+      const agora = new Date()
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: 'Solicitação de equipamento concluída após assinatura do termo.',
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_TI',
+        },
+      })
+
+      return NextResponse.json({ solicitation: updated }, { status: 200 })
     }
     if (isAdmissaoGerada && vemDeRh) {
       const agora = new Date()

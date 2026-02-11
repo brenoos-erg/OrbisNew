@@ -7,6 +7,7 @@ import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
+  isSolicitacaoEquipamento,
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
@@ -34,6 +35,12 @@ export type Row = {
   requiresApproval?: boolean
   approvalStatus?: string | null
   costCenterId?: string | null
+}
+type TiInventoryItem = {
+  id: string
+  patrimonio: string
+  name: string
+  status: string
 }
 
 
@@ -416,6 +423,38 @@ export function SolicitationDetailModal({
       alive = false
     }
   }, [isOpen])
+  useEffect(() => {
+    const isEquipamentoTipo = detail?.tipo?.nome === 'SOLICITAÇÃO DE EQUIPAMENTO'
+    if (!isOpen || !isEquipamentoTipo) return
+    let alive = true
+
+    async function loadTiInventory() {
+      setLoadingTiInventory(true)
+      try {
+        const res = await fetch('/api/ti/equipamentos?status=IN_STOCK&pageSize=50', {
+          cache: 'no-store',
+        })
+        if (!res.ok) return
+        const json = (await res.json()) as {
+          rows?: Array<{ id: string; patrimonio: string; name: string; status: string }>
+        }
+        if (alive) {
+          setTiInventory((json.rows ?? []).filter((item) => item.status === 'IN_STOCK'))
+        }
+      } catch (err) {
+        console.error('Erro ao carregar inventário de TI', err)
+      } finally {
+        if (alive) setLoadingTiInventory(false)
+      }
+    }
+
+    loadTiInventory()
+
+    return () => {
+      alive = false
+    }
+  }, [isOpen, detail?.id, detail?.tipo?.nome])
+
 
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -423,6 +462,10 @@ export function SolicitationDetailModal({
   const [approvalAction, setApprovalAction] =
     useState<'APROVAR' | 'REPROVAR' | null>(null)
   const [approvalComment, setApprovalComment] = useState('')
+  const [tiInventory, setTiInventory] = useState<TiInventoryItem[]>([])
+  const [loadingTiInventory, setLoadingTiInventory] = useState(false)
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
+  const [equipmentPdfUrl, setEquipmentPdfUrl] = useState('')
 
   const [assumindo, setAssumindo] = useState(false)
   const [assumirError, setAssumirError] = useState<string | null>(null)
@@ -518,13 +561,14 @@ export function SolicitationDetailModal({
   const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
 
-  // Fluxos especiais
+    // Fluxos especiais
   const isSolicitacaoPessoal =
     detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
+  const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
 
@@ -975,6 +1019,75 @@ export function SolicitationDetailModal({
       setAssumirError(err?.message ?? 'Erro ao assumir chamado.')
     } finally {
       setAssumindo(false)
+    }
+  }
+  async function handleTiSemEstoque() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/equipamento`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SEM_ESTOQUE' }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Não foi possível encaminhar para aprovação.')
+      }
+
+      setCloseSuccess('Sem estoque: solicitação encaminhada para aprovação nível 3.')
+      await refreshDetailFromServer()
+    } catch (err: any) {
+      console.error('Erro ao encaminhar solicitação sem estoque', err)
+      setCloseError(err?.message ?? 'Erro ao encaminhar solicitação para aprovação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  async function handleTiAlocarEquipamento() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    if (!selectedEquipmentId || !equipmentPdfUrl.trim()) {
+      setCloseError('Selecione um equipamento e informe a URL do termo (PDF).')
+      return
+    }
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/equipamento`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ALOCAR',
+          equipmentId: selectedEquipmentId,
+          pdfUrl: equipmentPdfUrl.trim(),
+          signingProvider: 'Clicksign/DocuSign',
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Não foi possível alocar o equipamento.')
+      }
+
+      setCloseSuccess('Equipamento alocado e termo enviado para assinatura.')
+      await refreshDetailFromServer()
+    } catch (err: any) {
+      console.error('Erro ao alocar equipamento', err)
+      setCloseError(err?.message ?? 'Erro ao alocar equipamento.')
+    } finally {
+      setClosing(false)
     }
   }
 
@@ -1554,6 +1667,60 @@ export function SolicitationDetailModal({
                   </div>
                 </div>
               </div>
+              {isSolicitacaoEquipamentoTi && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
+                    Inventário TI e decisão de atendimento
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <label className="space-y-1 text-xs text-slate-700">
+                      <span className="font-semibold">Equipamento disponível (IN_STOCK)</span>
+                      <select
+                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                        value={selectedEquipmentId}
+                        onChange={(e) => setSelectedEquipmentId(e.target.value)}
+                        disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
+                      >
+                        <option value="">Selecione...</option>
+                        {tiInventory.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.patrimonio} - {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="space-y-1 text-xs text-slate-700">
+                      <span className="font-semibold">URL do PDF do termo</span>
+                      <input
+                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                        value={equipmentPdfUrl}
+                        onChange={(e) => setEquipmentPdfUrl(e.target.value)}
+                        placeholder="https://.../termo.pdf"
+                        disabled={closing || isFinalizadaOuCancelada}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleTiAlocarEquipamento}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+                    >
+                      {closing ? 'Processando...' : 'Alocar equipamento e gerar termo'}
+                    </button>
+                    <button
+                      onClick={handleTiSemEstoque}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
+                    >
+                      Sem estoque → encaminhar para aprovação
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Formulário do tipo de solicitação */}
                {isNadaConsta ? (
