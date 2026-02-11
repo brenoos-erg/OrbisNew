@@ -98,6 +98,7 @@ export async function POST(
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
     const isAdmissaoGerada =
+      solicitation.tipo?.nome === 'Solicitação de Admissão'
     const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(solicitation.tipo)
 
     if (isSolicitacaoEquipamentoTi && signedTermAssignments === 0) {
@@ -106,8 +107,7 @@ export async function POST(
         { status: 409 },
       )
     }
-      solicitation.tipo?.nome === 'Solicitação de Admissão'
-      const isDpDestino = Boolean(
+    const isDpDestino = Boolean(
       solicitation.costCenter?.externalCode === '590' ||
         solicitation.costCenter?.description?.toLowerCase().includes('pessoal') ||
         solicitation.department?.code === '08',
