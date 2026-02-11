@@ -211,13 +211,14 @@ model Solicitation {
   timelines          SolicitationTimeline[]
   solicitacaoSetores SolicitacaoSetor[]
   documents          Document[]
-  solicitacaoSetores SolicitacaoSetor[]
+
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
   @@index([departmentId, dataAbertura])
   @@index([requiresApproval, approvalStatus, dataAbertura])
   @@index([status, dataAbertura])
 }
+
 model Document {
   id             String               @id @default(uuid())
   solicitationId String?
@@ -266,7 +267,6 @@ model SolicitacaoSetor {
   @@unique([solicitacaoId, setor])
   @@index([setor, status])
 }
-
 
 model User {
   id                                         String                       @id @default(dbgenerated("(gen_random_uuid())::text"))
@@ -411,6 +411,7 @@ model FeatureLevelGrant {
   @@unique([featureId, level])
   @@map("FeatureLevelGrant")
 }
+
 model CostCenterModule {
   id           String     @id @default(uuid())
   costCenterId String
@@ -478,6 +479,7 @@ model UserDepartment {
   @@unique([userId, departmentId])
   @@map("UserDepartment")
 }
+
 enum TiEquipmentCategory {
   LINHA_TELEFONICA
   SMARTPHONE
@@ -497,7 +499,7 @@ enum TiEquipmentStatus {
 }
 
 model TiEquipment {
-   id                   String              @id @default(uuid())
+  id                   String              @id @default(uuid())
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
   name                 String
