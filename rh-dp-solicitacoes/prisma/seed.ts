@@ -1273,15 +1273,10 @@ async function main() {
       create: {
         groupId,
         moduleId,
-        actions: {
-          create: actions.map((action) => ({ action })),
-        },
+        actions,
       },
       update: {
-        actions: {
-          deleteMany: {},
-          create: actions.map((action) => ({ action })),
-        },
+        actions,
       },
     })
   }
@@ -1297,15 +1292,10 @@ async function main() {
       create: {
         groupId,
         featureId,
-        actions: {
-          create: actions.map((action) => ({ action })),
-        },
+        actions,
       },
       update: {
-        actions: {
-          deleteMany: {},
-          create: actions.map((action) => ({ action })),
-        },
+        actions,
       },
     })
   }
@@ -1469,55 +1459,16 @@ async function main() {
   }
 
   for (const feature of createdFeatures) {
-     export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-import { Action } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server'
-
-function normalizeActionList(actions: unknown): Action[] {
-  if (!Array.isArray(actions)) return []
-  return actions
-    .map((item) => (typeof item === 'string' ? item.toUpperCase() : ''))
-    .filter((item): item is Action =>
-      ['VIEW', 'CREATE', 'UPDATE', 'DELETE', 'APPROVE'].includes(item as Action),
-    )
-}
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { moduleKey, actions } = await req.json()
-  const mod = await prisma.module.findUnique({ where: { key: moduleKey } })
-  if (!mod) return NextResponse.json({ error: 'Módulo inválido' }, { status: 400 })
-
-  const normalizedActions = normalizeActionList(actions)
-
-  const grant = await prisma.accessGroupGrant.upsert({
-    where: { groupId_moduleId: { groupId: params.id, moduleId: mod.id } },
-    create: {
-      groupId: params.id,
-      moduleId: mod.id,
-      actions: {
-        create: normalizedActions.map((action) => ({ action })),
-      },
-    },
-    update: {
-      actions: {
-        deleteMany: {},
-        create: normalizedActions.map((action) => ({ action })),
-      },
-    },
-    include: {
-      actions: { select: { action: true } },
-    },
-  })
-
-  return NextResponse.json({
-    ...grant,
-    actions: grant.actions.map((item) => item.action),
+    await upsertFeatureGrant({
+      groupId: adminGroup.id,
+      featureId: feature.id,
+      actions: ALL_ACTIONS,
     })
   }
 
+
+
+  console.log('✅ Features e permissões por feature cadastradas.')
 
 
   console.log('🎉 Seed concluído com sucesso!')

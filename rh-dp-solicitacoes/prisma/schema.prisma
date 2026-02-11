@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model Attachment {
   id             String       @id
   solicitationId String
@@ -433,6 +432,7 @@ model FeatureLevelGrant {
   @@unique([featureId, level])
   @@map("FeatureLevelGrant")
 }
+
 model FeatureLevelGrantAction {
   id        String            @id @default(cuid())
   grantId   String
