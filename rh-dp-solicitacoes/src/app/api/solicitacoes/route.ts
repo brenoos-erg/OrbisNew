@@ -424,7 +424,7 @@ export const POST = withModuleLevel(
             ? tiDepartment.id
             : departmentId
         const resolvedCostCenterId =
-          isSolicitacaoEquipamentoTi ? null : costCenterId ?? me.costCenterId ?? null
+          costCenterId ?? me.costCenterId ?? null
 
         if (!resolvedCostCenterId && !isSolicitacaoEquipamentoTi) {
           return NextResponse.json(
@@ -550,7 +550,7 @@ export const POST = withModuleLevel(
             where: { id: created.id },
             data: {
               departmentId: resolvedDepartmentId,
-              costCenterId: null,
+              costCenterId: resolvedCostCenterId,
               requiresApproval: false,
               approvalStatus: 'NAO_PRECISA',
               approverId,

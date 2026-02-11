@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
+import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
 /* ================================================================
    TYPES
 ================================================================ */
@@ -49,6 +50,7 @@ type CampoEspecifico = {
   defaultValue?: string;
   section?: string;
   stage?: string;
+  disabled?: boolean;
 };
 
 type TipoSolicitacao = {
@@ -95,6 +97,33 @@ const inputClass =
 const textareaClass =
   'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
 const selectClass = inputClass;
+const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
+  'Linhas telefônicas': [
+    'Ramais internos',
+    'Linha direta (fixa)',
+    'Linha com DDD/DID externo',
+  ],
+  Smartphones: [
+    'Básico (apps corporativos e comunicação)',
+    'Intermediário (apps de campo e câmera avançada)',
+    'Avançado (alto desempenho + pacote de dados)',
+  ],
+  Notebooks: [
+    'Administrativo (uso office e web)',
+    'Engenharia/Projetos (maior memória e processamento)',
+    'Executivo (mobilidade + bateria estendida)',
+  ],
+  Desktops: [
+    'Padrão escritório',
+    'Desempenho elevado',
+    'Estação fixa com múltiplos monitores',
+  ],
+  Monitores: ['21" Full HD', '24" Full HD', '27" QHD/4K', 'Ultrawide'],
+  Impressoras: ['Jato de tinta', 'Laser mono', 'Laser colorida', 'Multifuncional'],
+  'TP-Link': ['Roteador', 'Access Point', 'Switch gerenciável', 'Switch não gerenciável'],
+  'Outros equipamentos': ['Webcam', 'Headset', 'Dock station', 'Teclado e mouse', 'Outro'],
+};
+
 
 /* ================================================================
    COMPONENTE PRINCIPAL
@@ -229,11 +258,42 @@ export default function NovaSolicitacaoPage() {
   const isAbonoEducacional =
     selectedTipo?.nome === 'Solicitação de Incentivo à Educação' ||
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
+  const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
 
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
   const camposSolicitante = camposEspecificos.filter(
     (campo) => !campo.stage || campo.stage === 'solicitante',
   );
+  const camposSolicitanteComTi = useMemo(() => {
+    if (!isSolicitacaoEquipamentoTi) return camposSolicitante;
+
+    const equipmentTypeOptions = Object.keys(TI_EQUIPMENT_CONFIGS);
+    const selectedEquipmentType = extras.tipoEquipamentoTi ?? '';
+    const requiredConfigs = TI_EQUIPMENT_CONFIGS[selectedEquipmentType] ?? [];
+
+    const camposTi: CampoEspecifico[] = [
+      {
+        name: 'tipoEquipamentoTi',
+        label: 'Tipo de equipamento TI',
+        type: 'select',
+        required: true,
+        options: equipmentTypeOptions,
+        section: 'Equipamento TI',
+      },
+      {
+        name: 'configuracaoEquipamentoTi',
+        label: 'Configuração exigida',
+        type: 'select',
+        required: true,
+        options: requiredConfigs,
+        disabled: !selectedEquipmentType,
+        section: 'Equipamento TI',
+      },
+    ];
+
+    const existingNames = new Set(camposSolicitante.map((campo) => campo.name));
+    return [...camposSolicitante, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
+  }, [camposSolicitante, extras.tipoEquipamentoTi, isSolicitacaoEquipamentoTi]);
 
   useEffect(() => {
     if (!isAbonoEducacional) {
@@ -295,6 +355,14 @@ export default function NovaSolicitacaoPage() {
    5) EXTRAS / RQ_063 / ABONO
   ============================================================ */
   const handleExtraChange = (name: string, value: string) => {
+    if (name === 'tipoEquipamentoTi') {
+      setExtras((prev) => ({
+        ...prev,
+        tipoEquipamentoTi: value,
+        configuracaoEquipamentoTi: '',
+      }));
+      return;
+    }
     setExtras((prev) => ({
       ...prev,
       [name]: value,
@@ -421,7 +489,7 @@ export default function NovaSolicitacaoPage() {
 
         campos = { ...abonoCampos };
       } else {
-        const obrigatorios = camposSolicitante
+        const obrigatorios = camposSolicitanteComTi
           .filter((c) => c.required)
           .map((c) => c.name);
 
@@ -432,7 +500,7 @@ export default function NovaSolicitacaoPage() {
           return;
         }
 
-        campos = camposSolicitante.reduce<Record<string, string>>(
+        campos = camposSolicitanteComTi.reduce<Record<string, string>>(
           (acc, campo) => {
             acc[campo.name] = extras[campo.name] ?? '';
             return acc;
@@ -1636,14 +1704,14 @@ export default function NovaSolicitacaoPage() {
                   {selectedTipo.nome}
                 </h2>
 
-                {camposSolicitante.length === 0 && (
+                {camposSolicitanteComTi.length === 0 && (
                   <p className="text-xs text-gray-500">
                     Este tipo de solicitação não possui campos configurados.
                   </p>
                 )}
 
-                {camposSolicitante.length > 0 && (() => {
-                  const hasSections = camposSolicitante.some(
+                {camposSolicitanteComTi.length > 0 && (() => {
+                  const hasSections = camposSolicitanteComTi.some(
                     (campo) => campo.section,
                   );
 
@@ -1709,7 +1777,7 @@ export default function NovaSolicitacaoPage() {
                           )}
 
                           {campo.type === 'select' && campo.options && (
-                            <select {...(commonProps as any)}>
+                             <select {...(commonProps as any)} disabled={campo.disabled}>
                               <option value="">Selecione...</option>
                               {campo.options.map((opt) => (
                                 <option key={opt} value={opt}>
@@ -1734,12 +1802,12 @@ export default function NovaSolicitacaoPage() {
                   if (!hasSections) {
                     return (
                       <div className="grid gap-4 md:grid-cols-2">
-                        {camposSolicitante.map(renderCampo)}
+                        {camposSolicitanteComTi.map(renderCampo)}
                       </div>
                     );
                   }
 
-                  const grouped = camposSolicitante.reduce<
+                  const grouped = camposSolicitanteComTi.reduce<
                     Record<string, CampoEspecifico[]>
                   >((acc, campo) => {
                     const key = campo.section ?? 'Outros';
