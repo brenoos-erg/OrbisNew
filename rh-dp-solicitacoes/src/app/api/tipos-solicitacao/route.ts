@@ -3,9 +3,7 @@ export const revalidate = 0
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-
 
 type CampoEspecifico = {
   name: string
@@ -19,17 +17,44 @@ type CampoEspecifico = {
 }
 
 type TipoMeta = {
-  centros?: string[]        // ids do centro de custo permitidos
-  departamentos?: string[]  // ids de departamentos permitidos
+  centros?: string[]
+  departamentos?: string[]
 }
 
-// Aceita tanto "camposEspecificos" quanto "campos" no JSON do banco
 type SchemaJson = {
   meta?: TipoMeta
   camposEspecificos?: CampoEspecifico[]
   campos?: CampoEspecifico[]
 }
+const asStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
+}
 
+const shouldIncludeTipo = ({
+  schema,
+  centroCustoId,
+  departamentoId,
+}: {
+  schema: SchemaJson | null
+  centroCustoId: string | null
+  departamentoId: string | null
+}) => {
+  const centrosPermitidos = asStringArray(schema?.meta?.centros)
+  const departamentosPermitidos = asStringArray(schema?.meta?.departamentos)
+
+  const centroPermitido =
+    !centroCustoId ||
+    centrosPermitidos.length === 0 ||
+    centrosPermitidos.includes(centroCustoId)
+
+  const departamentoPermitido =
+    !departamentoId ||
+    departamentosPermitidos.length === 0 ||
+    departamentosPermitidos.includes(departamentoId)
+
+  return centroPermitido && departamentoPermitido
+}
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -37,46 +62,38 @@ export async function GET(request: Request) {
     const centroCustoId = searchParams.get('centroCustoId')
     const departamentoId = searchParams.get('departamentoId')
 
-    // 1) Carrega os tipos filtrando direto no banco (JSONB)
-    const tipos = await prisma.$queryRaw<
-      {
-        id: string
-        nome: string
-        descricao: string | null
-        schemaJson: SchemaJson | null
-      }[]
-    >(Prisma.sql`
-      SELECT *
-      FROM "TipoSolicitacao"
-      WHERE (
-        ${centroCustoId}::text IS NULL
-        OR ("schemaJson"->'meta'->'centros') IS NULL
-         OR jsonb_typeof(("schemaJson"->'meta'->'centros')) <> 'array'
-        OR jsonb_array_length(("schemaJson"->'meta'->'centros')) = 0
-        OR ("schemaJson"->'meta'->'centros') ? ${centroCustoId}
-      )
-      AND (
-        ${departamentoId}::text IS NULL
-        OR ("schemaJson"->'meta'->'departamentos') IS NULL
-        OR jsonb_typeof(("schemaJson"->'meta'->'departamentos')) <> 'array'
-        OR jsonb_array_length(("schemaJson"->'meta'->'departamentos')) = 0
-        OR ("schemaJson"->'meta'->'departamentos') ? ${departamentoId}
-      )
-    `)
-
-    // 2) Resposta limpa para o frontend
-    const resposta = tipos.map((tipo) => {
-      const schema = tipo.schemaJson
-
-      const campos = schema?.camposEspecificos ?? schema?.campos ?? []
-
-      return {
-        id: tipo.id,
-        nome: tipo.nome,
-        descricao: tipo.descricao ?? undefined,
-        camposEspecificos: campos,
-      }
+    
+    const tipos = await prisma.tipoSolicitacao.findMany({
+      select: {
+        id: true,
+        nome: true,
+        descricao: true,
+        schemaJson: true,
+      },
+      orderBy: {
+        nome: 'asc',
+      },
     })
+
+    const resposta = tipos
+      .filter((tipo) =>
+        shouldIncludeTipo({
+          schema: tipo.schemaJson as SchemaJson,
+          centroCustoId,
+          departamentoId,
+        }),
+      )
+      .map((tipo) => {
+        const schema = tipo.schemaJson as SchemaJson
+        const campos = schema?.camposEspecificos ?? schema?.campos ?? []
+
+        return {
+          id: tipo.id,
+          nome: tipo.nome,
+          descricao: tipo.descricao ?? undefined,
+          camposEspecificos: campos,
+        }
+      })
 
     return NextResponse.json(resposta)
   } catch (error) {
@@ -87,3 +104,4 @@ export async function GET(request: Request) {
     )
   }
 }
+
