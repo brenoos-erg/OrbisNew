@@ -45,6 +45,12 @@ async function loadFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) 
 
   return map
 }
+async function isAdminUser(userId: string) {
+  return memoizeRequest(`permissions/admin/${userId}`, async () => {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    return user?.role === 'ADMIN'
+  })
+}
 
 async function getFeatureGrantsForLevel(moduleKey: string, level: ModuleLevel) {
   const normalizedModuleKey = normalizeModuleKey(moduleKey)
@@ -89,6 +95,8 @@ export async function canFeature(
     const normalizedFeatureKey = normalizeFeatureKey(featureKey)
 
     try {
+      if (await isAdminUser(userId)) return true
+
       const level = await getUserModuleLevel(userId, normalizedModuleKey)
       if (!level) return false
 

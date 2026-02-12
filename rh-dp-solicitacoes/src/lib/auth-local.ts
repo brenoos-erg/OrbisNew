@@ -1,30 +1,24 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { randomBytes, scryptSync, timingSafeEqual, createHmac } from 'node:crypto'
+import { timingSafeEqual, createHmac } from 'node:crypto'
+import bcrypt from 'bcryptjs'
 
 import { AUTH_COOKIE_NAME, AUTH_MAX_AGE_SECONDS } from '@/lib/auth-constants'
 
 type SessionPayload = { sub: string; iat: number; exp: number }
 
 function getAuthSecret() {
-  const secret = process.env.AUTH_SECRET
-  if (!secret) throw new Error('AUTH_SECRET não configurado.')
+  const secret = process.env.JWT_SECRET ?? process.env.AUTH_SECRET
+  if (!secret) throw new Error('JWT_SECRET não configurado.')
   return secret
 }
 
 export async function hashPassword(plain: string) {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(plain, salt, 64).toString('hex')
-  return `${salt}:${hash}`
+  return bcrypt.hash(plain, 12)
 }
 
 export async function verifyPassword(plain: string, stored: string) {
-  const [salt, expected] = stored.split(':')
-  if (!salt || !expected) return false
-  const hash = scryptSync(plain, salt, 64).toString('hex')
-  const hashBuf = Buffer.from(hash)
-  const expectedBuf = Buffer.from(expected)
-  return hashBuf.length === expectedBuf.length && timingSafeEqual(hashBuf, expectedBuf)
+  return bcrypt.compare(plain, stored)
 }
 
 function signPayload(payload: SessionPayload) {

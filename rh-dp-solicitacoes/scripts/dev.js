@@ -9,8 +9,11 @@ const commonOptions = {
 
 const skipMigrations = process.env.SKIP_PRISMA_MIGRATE === "true";
 const skipSeed = process.env.SKIP_PRISMA_SEED === "true";
+const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
-if (skipMigrations) {
+if (!hasDatabaseUrl) {
+  console.warn("\n⚠️  DATABASE_URL não definido: pulando prisma migrate/db push e seed no ambiente local.");
+} else if (skipMigrations) {
   console.log("SKIP_PRISMA_MIGRATE=true: skipping prisma migrate and running prisma db push for local schema sync.");
   const dbPushResult = spawnSync("npx", ["prisma", "db", "push"], commonOptions);
 
@@ -27,7 +30,9 @@ if (skipMigrations) {
     );
   }
 }
-if (skipSeed) {
+if (!hasDatabaseUrl) {
+  console.log("Skipping Prisma seed because DATABASE_URL is not configured.");
+} else if (skipSeed) {
   console.log("Skipping Prisma seed because SKIP_PRISMA_SEED=true.");
 } else {
   const seedResult = spawnSync("npx", ["prisma", "db", "seed"], commonOptions);

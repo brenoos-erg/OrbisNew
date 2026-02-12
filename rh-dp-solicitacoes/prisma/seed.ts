@@ -2,12 +2,11 @@
 
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { randomBytes, randomUUID, scryptSync } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
+import bcrypt from 'bcryptjs'
 
 async function hashPassword(plain: string) {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(plain, salt, 64).toString('hex')
-  return `${salt}:${hash}`
+  return bcrypt.hash(plain, 12)
 }
 
 function hostOf(url?: string) {
@@ -1264,14 +1263,10 @@ async function main() {
     create: { userId: superAdminUser.id, groupId: adminGroup.id, role: 'MANAGER' },
   })
 
-    const systemModules = await prisma.module.findMany({
-    where: {
-      OR: [
-        { id: { in: allModules.map((module) => module.id) } },
-        { key: { in: Object.values(MODULE_KEYS) } },
-      ],
-    },
+     const systemModules = await prisma.module.findMany({
+    select: { id: true, key: true },
   })
+
 
   for (const mod of systemModules) {
     await prisma.userModuleAccess.upsert({
@@ -1412,7 +1407,6 @@ async function main() {
   }
 
   const allSystemFeatures = await prisma.moduleFeature.findMany({
-    where: { moduleId: { in: systemModules.map((module) => module.id) } },
     select: { id: true },
   })
 
@@ -1421,6 +1415,28 @@ async function main() {
       groupId: adminGroup.id,
       featureId: feature.id,
       actions: ALL_ACTIONS,
+    })
+
+    await prisma.featureLevelGrant.upsert({
+      where: {
+        featureId_level: {
+          featureId: feature.id,
+          level: ModuleLevel.NIVEL_3,
+        },
+      },
+      create: {
+        featureId: feature.id,
+        level: ModuleLevel.NIVEL_3,
+        actions: {
+          create: ALL_ACTIONS.map((action) => ({ action })),
+        },
+      },
+      update: {
+        actions: {
+          deleteMany: {},
+          create: ALL_ACTIONS.map((action) => ({ action })),
+        },
+      },
     })
   }
 

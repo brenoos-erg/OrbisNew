@@ -37,6 +37,7 @@ async function loadUserModuleContext(
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      role: true,
       department: {
         select: {
           code: true,
@@ -62,7 +63,23 @@ async function loadUserModuleContext(
   })
   const levels: AccessMap = {}
 
-   // Base: todos os módulos vinculados aos departamentos ficam visíveis com NIVEL_1
+ 
+  if (user?.role === 'ADMIN') {
+    const modules = await prisma.module.findMany({ select: { key: true } })
+    for (const module of modules) {
+      levels[normalizeModuleKey(module.key)] = ModuleLevel.NIVEL_3
+    }
+
+    return {
+      levels,
+      departmentCode:
+        user.department?.code ??
+        user.userDepartments.find((d) => d.department?.code)?.department?.code ??
+        null,
+    }
+  }
+
+  // Base: todos os módulos vinculados aos departamentos ficam visíveis com NIVEL_1
   const departments = [
     ...(user?.department ? [user.department] : []),
     ...(user?.userDepartments.map((link) => link.department) ?? []),
