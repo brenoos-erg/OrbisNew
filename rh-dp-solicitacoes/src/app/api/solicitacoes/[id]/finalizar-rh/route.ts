@@ -352,7 +352,7 @@ export async function POST(
       where: {
         OR: [
           { code: 'DP' },
-          { name: { contains: 'Pessoal', mode: 'insensitive' } },
+          { name: { contains: 'Pessoal' } },
         ],
       },
     })
@@ -467,7 +467,7 @@ export async function POST(
           where: {
             OR: [
               { code: 'DP' },
-              { name: { contains: 'Pessoal', mode: 'insensitive' } },
+              { name: { contains: 'Pessoal' } },
             ],
           },
         })
@@ -585,7 +585,7 @@ export async function POST(
           where: {
             OR: [
               { code: 'DP' },
-              { name: { contains: 'Pessoal', mode: 'insensitive' } },
+              { name: { contains: 'Pessoal' } },
             ],
           },
         })

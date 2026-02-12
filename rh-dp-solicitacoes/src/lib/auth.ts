@@ -1,22 +1,10 @@
-// src/lib/auth.ts
-import { cookies } from 'next/headers'
 import { performance } from 'node:perf_hooks'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { User } from '@supabase/supabase-js'
 import { ModuleLevel, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
 import { isDbUnavailableError } from '@/lib/db-unavailable'
-import {
-  ensureRequestContext,
-  logTiming,
-  memoizeRequest,
-} from '@/lib/request-metrics'
-
-const getSupabaseServerClient = () =>
-  createServerComponentClient({
-    cookies,
-  })
+import { ensureRequestContext, logTiming, memoizeRequest } from '@/lib/request-metrics'
+import { readSessionFromCookies } from '@/lib/auth-local'
 
 export const appUserSelect = {
   id: true,
@@ -28,6 +16,7 @@ export const appUserSelect = {
   role: true,
   costCenterId: true,
   departmentId: true,
+  mustChangePassword: true,
   department: { select: { id: true, code: true, name: true } },
 }
 
@@ -35,113 +24,48 @@ export type SelectedAppUser = Prisma.UserGetPayload<{ select: typeof appUserSele
 
 export type CurrentAppUserResult = {
   appUser: (SelectedAppUser & { moduleLevels?: Record<string, ModuleLevel> }) | null
-  session: { user: User } | null
+  session: { userId: string; issuedAt?: number } | null
   dbUnavailable: boolean
 }
 
-export async function resolveAppUserFromSessionUser(
-  sessionUser: User | null,
-  seedUser?: SelectedAppUser | null,
+async function resolveAppUserFromSession(
+  session: { userId: string; issuedAt?: number } | null,
 ): Promise<CurrentAppUserResult> {
-  const session = sessionUser ? { user: sessionUser } : null
-
-  if (!sessionUser) {
-    return { appUser: null, session, dbUnavailable: false }
-  }
-
-  const authId = sessionUser.id
-  const email = sessionUser.email ?? undefined
-
-  let appUser = seedUser ?? null
-  let dbUnavailable = false
+  if (!session) return { appUser: null, session: null, dbUnavailable: false }
 
   try {
-    if (!appUser) {
-      const lookupStartedAt = performance.now()
-      appUser = await prisma.user.findUnique({
-        where: { authId },
-        select: appUserSelect,
-      })
-      logTiming('prisma.user.findUnique', lookupStartedAt)
-    }
+    const lookupStartedAt = performance.now()
+    const appUser = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: appUserSelect,
+    })
+    logTiming('prisma.user.findUnique(session.userId)', lookupStartedAt)
 
-    if (!appUser && email) {
-      const emailLookupStartedAt = performance.now()
-      const userByEmail = await prisma.user.findUnique({
-        where: { email },
-        select: appUserSelect,
+    if (!appUser) return { appUser: null, session, dbUnavailable: false }
 
-      })
-      logTiming('prisma.user.findUnique(email)', emailLookupStartedAt)
+    const levelsStartedAt = performance.now()
+    const moduleLevels = await getUserModuleLevels(appUser.id)
+    logTiming('prisma.moduleLevels.load', levelsStartedAt)
 
-      if (userByEmail) {
-        const updateStartedAt = performance.now()
-        appUser = await prisma.user.update({
-          where: { id: userByEmail.id },
-          data: { authId },
-          select: appUserSelect,
-        })
-        logTiming('prisma.user.update.authId', updateStartedAt)
-      }
-    }
+    return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable: false }
   } catch (error) {
     if (isDbUnavailableError(error)) {
       console.error('Não foi possível conectar ao banco de dados para buscar usuário', error)
-      dbUnavailable = true
-    } else {
-      console.error('Erro ao buscar usuário no banco de dados', error)
+      return { appUser: null, session, dbUnavailable: true }
     }
 
-    return { appUser: null, session, dbUnavailable }
+    console.error('Erro ao buscar usuário no banco de dados', error)
+    return { appUser: null, session, dbUnavailable: false }
   }
-
-  if (appUser) {
-    try {
-      const levelsStartedAt = performance.now()
-      const moduleLevels = await getUserModuleLevels(appUser.id)
-      logTiming('prisma.moduleLevels.load', levelsStartedAt)
-      return { appUser: { ...appUser, moduleLevels }, session, dbUnavailable }
-    } catch (error) {
-      if (isDbUnavailableError(error)) {
-        console.error('Não foi possível conectar ao banco de dados para carregar módulos do usuário', error)
-        dbUnavailable = true
-      } else {
-        console.error('Erro ao carregar módulos do usuário', error)
-      }
-
-      return { appUser: null, session, dbUnavailable }
-    }
-  }
-
-  return { appUser, session, dbUnavailable }
 }
+
 async function loadCurrentUser(): Promise<CurrentAppUserResult> {
-  const authStartedAt = performance.now()
-  const supabase = getSupabaseServerClient()
-
-  const { data: userResult, error: userError } = await supabase.auth.getUser()
-  logTiming('supabase.auth.getUser', authStartedAt)
-
-  if (userError) {
-    console.error('Erro ao buscar usuário autenticado', userError)
-    return { appUser: null, session: null, dbUnavailable: false }
-  }
-
-  return resolveAppUserFromSessionUser(userResult.user)
+  return resolveAppUserFromSession(readSessionFromCookies())
 }
 
 export async function getCurrentAppUser() {
   return ensureRequestContext('auth/getCurrentAppUser', () =>
     memoizeRequest('auth/getCurrentAppUser', () => loadCurrentUser()),
-  )
-}
-export async function getCurrentAppUserFromSessionUser(
-  sessionUser: User | null,
-  seedUser?: SelectedAppUser | null,
-): Promise<CurrentAppUserResult> {
-  const key = `auth/getCurrentAppUser/${sessionUser?.id ?? 'anon'}`
-  return ensureRequestContext('auth/getCurrentAppUser', () =>
-    memoizeRequest(key, () => resolveAppUserFromSessionUser(sessionUser, seedUser)),
   )
 }
 

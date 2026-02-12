@@ -1,19 +1,14 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { supabaseBrowser } from '@/lib/supabase/client'
 
 export default function Header() {
   const router = useRouter()
-  const supabase = supabaseBrowser()
 
   async function handleSignOut() {
-    // 1) derruba sessão no cliente
-    try { await supabase.auth.signOut({ scope: 'global' }) } catch {}
-
-    // 2) derruba cookies no servidor (Next middleware depende disso)
+    // limpa cookie no servidor
     try { await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' }) } catch {}
 
-    // 3) navegação “à prova de cache”
+    // navegação “à prova de cache”
     router.replace('/login')
     router.refresh()
     // 4) fallback bruto (se algo cachear mesmo assim)

@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
       where: {
         status: 'ATIVO',
         OR: [
-          { login: { equals: identifier, mode: 'insensitive' } },
-          { email: { equals: identifier, mode: 'insensitive' } },
+          { login: { equals: identifier } },
+          { email: { equals: identifier } },
         ],
       },
       select: {

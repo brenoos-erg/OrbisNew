@@ -23,7 +23,7 @@ async function ensureCoreModules() {
   for (const module of CORE_MODULES) {
     // Evita criar duplicados com variações da key (maiúsculas/underscores etc.)
     const existing = await prisma.module.findFirst({
-      where: { key: { equals: module.key, mode: 'insensitive' } },
+      where: { key: { equals: module.key } },
       select: { id: true, key: true },
     })
 

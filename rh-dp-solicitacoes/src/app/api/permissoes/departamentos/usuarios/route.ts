@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     if (search) {
       const users = await prisma.user.findMany({
         where: {
-          fullName: { contains: search, mode: 'insensitive' },
+          fullName: { contains: search },
         },
         select: {
           id: true,

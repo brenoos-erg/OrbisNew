@@ -4,7 +4,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearSessionMeCache } from '@/lib/session-cache'
-import { supabaseBrowser } from '@/lib/supabase/client'
 import { ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react'
 
 type Props = {
@@ -27,8 +26,6 @@ export default function UserMenu({ collapsed, user }: Props) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
-  const supabase = supabaseBrowser()
-
   const fullName =
     user?.fullName?.toString()?.trim() ||
     user?.email?.toString()?.trim() ||
@@ -38,9 +35,6 @@ export default function UserMenu({ collapsed, user }: Props) {
   const email = user?.email?.toString()?.trim() || ''
 
   async function handleSignOut() {
-    try {
-      await supabase.auth.signOut({ scope: 'global' })
-    } catch {}
     try {
       await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' })
     } catch {}

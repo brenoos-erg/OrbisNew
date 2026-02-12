@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
     const user = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: { equals: normalizedTerm, mode: 'insensitive' } },
-          { fullName: { contains: normalizedTerm, mode: 'insensitive' } },
+          { email: { equals: normalizedTerm } },
+          { fullName: { contains: normalizedTerm } },
         ],
       },
       orderBy: { fullName: 'asc' },

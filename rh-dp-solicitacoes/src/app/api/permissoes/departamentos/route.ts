@@ -43,7 +43,7 @@ async function ensureCoreModules() {
 
     // Se não houver, procura uma variação case-insensitive para normalizar com segurança
     const existingVariant = await prisma.module.findFirst({
-      where: { key: { equals: module.key, mode: 'insensitive' } },
+      where: { key: { equals: module.key } },
       select: { id: true },
     })
 

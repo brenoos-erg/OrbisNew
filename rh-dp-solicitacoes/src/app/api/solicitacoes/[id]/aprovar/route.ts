@@ -58,7 +58,7 @@ export async function POST(
 
       const links = await prisma.userCostCenter.findMany({
         where: { userId: me.id },
-        select: { costCenterId: true },
+       select: { costCenterId: true },
       })
 
       for (const link of links) {
@@ -83,10 +83,10 @@ export async function POST(
         where: {
           OR: [
             {
-              description: { contains: 'Recursos Humanos', mode: 'insensitive' },
+              description: { contains: 'Recursos Humanos' },
             },
-            { abbreviation: { contains: 'RH', mode: 'insensitive' } },
-            { code: { contains: 'RH', mode: 'insensitive' } },
+            { abbreviation: { contains: 'RH' } },
+            { code: { contains: 'RH' } },
           ],
         },
       })

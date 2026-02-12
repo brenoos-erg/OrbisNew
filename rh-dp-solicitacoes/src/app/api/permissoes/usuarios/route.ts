@@ -22,8 +22,8 @@ async function buildUserPayload(search: string) {
   const user = await prisma.user.findFirst({
     where: {
       OR: [
-        { email: { equals: searchTerm, mode: 'insensitive' } },
-        { fullName: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { equals: searchTerm } },
+        { fullName: { contains: searchTerm } },
       ],
     },
     orderBy: { fullName: 'asc' },

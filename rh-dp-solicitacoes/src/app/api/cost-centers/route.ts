@@ -30,13 +30,13 @@ export async function GET(req: Request) {
   const where: Prisma.CostCenterWhereInput | undefined = q
     ? {
         OR: [
-          { description: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q } },
           { code: { contains: q } },
           { externalCode: { contains: q } },
-          { abbreviation: { contains: q, mode: 'insensitive' } },
-          { area: { contains: q, mode: 'insensitive' } },
-          { managementType: { contains: q, mode: 'insensitive' } },
-          { groupName: { contains: q, mode: 'insensitive' } },
+          { abbreviation: { contains: q } },
+          { area: { contains: q } },
+          { managementType: { contains: q } },
+          { groupName: { contains: q } },
         ],
       }
     : undefined

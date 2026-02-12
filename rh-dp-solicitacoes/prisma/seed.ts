@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto'
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { hashPassword } from '@/lib/auth-local'
 
 function hostOf(url?: string) {
   if (!url) return '(undefined)'
@@ -15,76 +15,7 @@ function hostOf(url?: string) {
     return m?.[1] ?? '(parse-failed)'
   }
 }
-function getSupabaseAdmin(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !key) return null
-
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
-}
-
-async function findAuthUserIdByEmail(admin: SupabaseClient, email: string) {
-  const target = email.trim().toLowerCase()
-  const perPage = 1000
-  let page = 1
-
-  for (let i = 0; i < 20; i++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
-    if (error) throw new Error(error.message)
-
-    const found = (data?.users ?? []).find((u) => (u.email ?? '').toLowerCase() === target)
-    if (found?.id) return found.id
-
-    if (!data?.users || data.users.length < perPage) break
-    page++
-  }
-
-  return null
-}
-
-async function ensureAuthUser(
-  admin: SupabaseClient,
-  opts: { email: string; password: string; metadata?: Record<string, any> },
-): Promise<string | null> {
-  const { email, password, metadata } = opts
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: metadata,
-  })
-
-  if (!error) return data.user?.id ?? null
-
-const normalizedMessage = error.message?.toLowerCase() ?? ''
-  const conflict =
-    error.code === 'email_exists' ||
-    normalizedMessage.includes('already exist') ||
-    normalizedMessage.includes('already registered') ||
-    normalizedMessage.includes('already been registered') ||
-    normalizedMessage.includes('email rate limit')
-
-  if (!conflict) throw error
-
-  const existingId = await findAuthUserIdByEmail(admin, email)
-  if (!existingId) {
-    console.warn(
-      '⚠️  Conta já existe no Supabase Auth, mas não foi possível localizar o authId para:',
-      email,
-    )
-    return null
-  }
-
-  const { error: updateErr } = await admin.auth.admin.updateUserById(existingId, {
-    email,
-    password,
-    user_metadata: metadata,
-  })
-  if (updateErr) throw updateErr
-
-  return existingId
-}
 
 
 async function main() {
@@ -95,7 +26,6 @@ async function main() {
 
   // PrismaClient usa apenas DATABASE_URL
   const prisma = new PrismaClient()
-  const supabaseAdmin = getSupabaseAdmin()
 
   
 
@@ -148,12 +78,15 @@ async function main() {
   })
   if (!tiDepartment) throw new Error('Departamento TI (code=20) não encontrado.')
 
+  const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@123'
   const superAdminUser = await prisma.user.upsert({
     where: { email: 'superadmin@ergengenharia.com.br' },
     update: {
       departmentId: tiDepartment.id,
       role: 'ADMIN',
       status: UserStatus.ATIVO,
+      passwordHash: await hashPassword(defaultPassword),
+      mustChangePassword: false,
     },
     create: {
       login: 'superadmin',
@@ -163,37 +96,11 @@ async function main() {
       status: UserStatus.ATIVO,
       role: 'ADMIN',
       departmentId: tiDepartment.id,
+      passwordHash: await hashPassword(defaultPassword),
+      mustChangePassword: false,
     },
   })
-  console.log('✅ Usuário super admin criado/atualizado:', superAdminUser.email)
-  if (supabaseAdmin) {
-    const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@123'
-
-    const authId = await ensureAuthUser(supabaseAdmin, {
-      email: superAdminUser.email,
-      password: defaultPassword,
-      metadata: {
-        fullName: superAdminUser.fullName,
-        login: superAdminUser.login,
-        phone: superAdminUser.phone,
-        role: superAdminUser.role,
-      },
-    })
-
-    if (authId) {
-      await prisma.user.update({
-        where: { id: superAdminUser.id },
-        data: { authId },
-      })
-      console.log('🔐 Usuário super admin sincronizado no Supabase Auth com authId:', authId)
-      console.log('   ➡️  Email:', superAdminUser.email)
-      console.log('   ➡️  Senha padrão:', defaultPassword)
-    } else {
-      console.warn('⚠️  Não foi possível obter authId para o super admin.')
-    }
-  } else {
-    console.warn('⚠️  Supabase Admin não configurado (SUPABASE_SERVICE_ROLE_KEY ausente); pulando criação no Auth.')
-  }
+  console.log('✅ Usuário super admin local criado/atualizado:', superAdminUser.email)
 
 
   const rhDepartment = await prisma.department.findUnique({ where: { code: '17' } })

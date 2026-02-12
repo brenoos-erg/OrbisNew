@@ -60,7 +60,7 @@ function calculateFatigue(fatigue: Array<{ name: string; answer?: string }>) {
 
 async function findConfigLevel3Emails() {
   const configModule = await prisma.module.findFirst({
-    where: { key: { equals: 'configuracoes', mode: 'insensitive' } },
+    where: { key: { equals: 'configuracoes' } },
   })
 
   if (!configModule) {

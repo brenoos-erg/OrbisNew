@@ -71,7 +71,6 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (protocolo) {
     where.protocolo = {
       contains: protocolo,
-      mode: 'insensitive',
     }
   }
 
@@ -79,10 +78,10 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     where.solicitante = {
       OR: [
         {
-          fullName: { contains: solicitante, mode: 'insensitive' },
+          fullName: { contains: solicitante },
         },
         {
-          email: { contains: solicitante, mode: 'insensitive' },
+          email: { contains: solicitante },
         },
       ],
     }
@@ -91,10 +90,10 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (text) {
     const or: any[] = [
       {
-        titulo: { contains: text, mode: 'insensitive' },
+        titulo: { contains: text },
       },
       {
-        descricao: { contains: text, mode: 'insensitive' },
+        descricao: { contains: text },
       },
     ]
     if (where.OR) {
@@ -500,17 +499,15 @@ export const POST = withModuleLevel(
               {
                 description: {
                   contains: 'Recursos Humanos',
-                  mode: 'insensitive',
-                },
+                                  },
               },
               {
                 abbreviation: {
                   contains: 'RH',
-                  mode: 'insensitive',
                 },
               },
               {
-                code: { contains: 'RH', mode: 'insensitive' },
+                code: { contains: 'RH' },
               },
             ],
           },

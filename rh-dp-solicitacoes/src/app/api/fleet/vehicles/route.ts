@@ -66,7 +66,6 @@ export async function GET(req: Request) {
         ? {
             plate: {
               equals: plate,
-              mode: 'insensitive',
             },
           }
         : {}),

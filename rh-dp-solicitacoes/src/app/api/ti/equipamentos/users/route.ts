@@ -52,8 +52,8 @@ export async function GET(req: Request) {
       ...(search
         ? {
             OR: [
-              { fullName: { contains: search, mode: 'insensitive' } },
-              { email: { contains: search, mode: 'insensitive' } },
+              { fullName: { contains: search } },
+              { email: { contains: search } },
             ],
           }
         : {}),

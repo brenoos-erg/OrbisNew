@@ -42,23 +42,22 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (protocolo) {
     where.protocolo = {
       contains: protocolo,
-      mode: 'insensitive',
     }
   }
 
   if (solicitante) {
     where.solicitante = {
       OR: [
-        { fullName: { contains: solicitante, mode: 'insensitive' } },
-        { email: { contains: solicitante, mode: 'insensitive' } },
+        { fullName: { contains: solicitante } },
+        { email: { contains: solicitante } },
       ],
     }
   }
 
   if (text) {
     const or: any[] = [
-      { titulo: { contains: text, mode: 'insensitive' } },
-      { descricao: { contains: text, mode: 'insensitive' } },
+      { titulo: { contains: text } },
+      { descricao: { contains: text } },
     ]
     if (where.OR) {
       where.OR = [...where.OR, ...or]
@@ -66,6 +65,7 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
       where.OR = or
     }
   }
+
 
   return where
 }
