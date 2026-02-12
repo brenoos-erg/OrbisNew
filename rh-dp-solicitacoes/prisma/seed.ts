@@ -1,9 +1,14 @@
 /* prisma/seed.ts */
 
-import { randomUUID } from 'crypto'
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { hashPassword } from '@/lib/auth-local'
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto'
+
+async function hashPassword(plain: string) {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(plain, salt, 64).toString('hex')
+  return `${salt}:${hash}`
+}
 
 function hostOf(url?: string) {
   if (!url) return '(undefined)'

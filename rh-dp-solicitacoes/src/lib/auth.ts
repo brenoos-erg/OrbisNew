@@ -60,7 +60,7 @@ async function resolveAppUserFromSession(
 }
 
 async function loadCurrentUser(): Promise<CurrentAppUserResult> {
-  return resolveAppUserFromSession(readSessionFromCookies())
+  return resolveAppUserFromSession(await readSessionFromCookies())
 }
 
 export async function getCurrentAppUser() {

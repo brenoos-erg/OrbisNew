@@ -50,8 +50,13 @@ export function signSession(userId: string) {
   return signPayload({ sub: userId, iat: now, exp: now + AUTH_MAX_AGE_SECONDS })
 }
 
-export function readSessionFromCookies() {
-  const token = cookies().get(AUTH_COOKIE_NAME)?.value
+export async function getAuthToken() {
+  const cookieStore = await cookies()
+  return cookieStore.get(AUTH_COOKIE_NAME)?.value
+}
+
+export async function readSessionFromCookies() {
+  const token = await getAuthToken()
   if (!token) return null
   const payload = verifyToken(token)
   if (!payload) return null

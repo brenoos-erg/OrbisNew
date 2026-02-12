@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { AUTH_COOKIE_NAME } from '@/lib/auth-constants'
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const url = req.nextUrl
   const path = url.pathname
 
