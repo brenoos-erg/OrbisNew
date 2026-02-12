@@ -1,4 +1,5 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
 const { spawnSync, spawn } = require("child_process");
 
 const commonOptions = {
@@ -7,8 +8,16 @@ const commonOptions = {
   env: process.env,
 };
 
+const DEFAULT_MYSQL_DATABASE_URL = "mysql://orbis:orbis123@localhost:3306/orbis";
+
 const skipMigrations = process.env.SKIP_PRISMA_MIGRATE === "true";
 const skipSeed = process.env.SKIP_PRISMA_SEED === "true";
+
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = DEFAULT_MYSQL_DATABASE_URL;
+  console.log(`DATABASE_URL não definido. Usando padrão local: ${DEFAULT_MYSQL_DATABASE_URL}`);
+}
+
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
 if (!hasDatabaseUrl) {

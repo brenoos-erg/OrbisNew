@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { AUTH_COOKIE_NAME } from '@/lib/auth-constants'
 
-export function proxy(req: NextRequest) {
-  const { searchParams } = req.nextUrl
-  const code = searchParams.get('code')
-  const errorDescription = searchParams.get('error_description')
+export default function proxy(req: NextRequest) {
+  const requestUrl = new URL(req.url)
+  const code = requestUrl.searchParams.get('code')
+  const errorDescription = requestUrl.searchParams.get('error_description')
 
   if (code) {
     const url = req.nextUrl.clone()
