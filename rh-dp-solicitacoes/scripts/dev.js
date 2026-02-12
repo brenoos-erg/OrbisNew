@@ -11,7 +11,12 @@ const skipMigrations = process.env.SKIP_PRISMA_MIGRATE === "true";
 const skipSeed = process.env.SKIP_PRISMA_SEED === "true";
 
 if (skipMigrations) {
-  console.log("Skipping Prisma migrations because SKIP_PRISMA_MIGRATE=true.");
+  console.log("SKIP_PRISMA_MIGRATE=true: skipping prisma migrate and running prisma db push for local schema sync.");
+  const dbPushResult = spawnSync("npx", ["prisma", "db", "push"], commonOptions);
+
+  if (dbPushResult.status !== 0) {
+    console.warn("\n⚠️  Prisma db push failed. The dev server will still start, but database operations may not work.");
+  }
 } else {
   const migrateResult = spawnSync("npx", ["prisma", "migrate", "deploy"], commonOptions);
 

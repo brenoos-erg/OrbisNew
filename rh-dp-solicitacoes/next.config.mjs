@@ -1,3 +1,6 @@
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 /**
  * @type {import('next').NextConfig}
  *
@@ -15,9 +18,14 @@ const sanitizedBasePath = basePath
     : `/${basePath.replace(/\/$/, '')}`
   : ''
 
+const projectRoot = dirname(fileURLToPath(import.meta.url))
+
 const nextConfig = {
   basePath: sanitizedBasePath || undefined,
   assetPrefix: sanitizedBasePath || undefined,
+  turbopack: {
+    root: projectRoot,
+  },
 }
 
 export default nextConfig

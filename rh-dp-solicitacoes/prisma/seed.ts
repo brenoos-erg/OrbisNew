@@ -1264,7 +1264,16 @@ async function main() {
     create: { userId: superAdminUser.id, groupId: adminGroup.id, role: 'MANAGER' },
   })
 
-  for (const mod of allModules) {
+    const systemModules = await prisma.module.findMany({
+    where: {
+      OR: [
+        { id: { in: allModules.map((module) => module.id) } },
+        { key: { in: Object.values(MODULE_KEYS) } },
+      ],
+    },
+  })
+
+  for (const mod of systemModules) {
     await prisma.userModuleAccess.upsert({
       where: { userId_moduleId: { userId: superAdminUser.id, moduleId: mod.id } },
       update: { level: ModuleLevel.NIVEL_3 },
@@ -1319,12 +1328,11 @@ async function main() {
   /* =========================
      FEATURES E GRANTS POR FEATURE
      ========================= */
-  type ModuleFeatures = { moduleId: string; moduleKey: string; items: { key: string; name: string }[] }
+   type ModuleFeatures = { moduleId: string; items: { key: string; name: string }[] }
 
   const featureCatalog: ModuleFeatures[] = [
     {
       moduleId: configModule.id,
-      moduleKey: MODULE_KEYS.CONFIGURACOES,
       items: [
         { key: FEATURE_KEYS.CONFIGURACOES.PAINEL, name: 'Painel de Configurações' },
         { key: FEATURE_KEYS.CONFIGURACOES.USUARIOS, name: 'Usuários' },
@@ -1335,7 +1343,6 @@ async function main() {
     },
     {
       moduleId: solicitacoesModule.id,
-      moduleKey: MODULE_KEYS.SOLICITACOES,
       items: [
         { key: FEATURE_KEYS.SOLICITACOES.ENVIADAS, name: 'Solicitações Enviadas' },
         { key: FEATURE_KEYS.SOLICITACOES.RECEBIDAS, name: 'Solicitações Recebidas' },
@@ -1345,7 +1352,6 @@ async function main() {
     },
     {
       moduleId: fleetModule.id,
-      moduleKey: MODULE_KEYS.FROTAS,
       items: [
         { key: FEATURE_KEYS.FROTAS.VEICULOS, name: 'Veículos' },
         { key: FEATURE_KEYS.FROTAS.CHECKINS, name: 'Check-ins' },
@@ -1355,7 +1361,6 @@ async function main() {
     },
     {
       moduleId: refusalModule.id,
-      moduleKey: MODULE_KEYS.RECUSA,
       items: [
         { key: FEATURE_KEYS.RECUSA.PAINEL, name: 'Painel de Direito de Recusa' },
         { key: FEATURE_KEYS.RECUSA.MINHAS, name: 'Minhas recusas' },
@@ -1365,7 +1370,6 @@ async function main() {
     },
     {
       moduleId: equipmentsModule.id,
-      moduleKey: MODULE_KEYS.EQUIPAMENTOS_TI,
       items: [
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.ATALHO, name: 'Atalho de controle rápido' },
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.LINHA_TELEFONICA, name: 'Linhas telefônicas' },
@@ -1380,7 +1384,6 @@ async function main() {
     },
     {
       moduleId: meusDocumentosModule.id,
-      moduleKey: MODULE_KEYS.MEUS_DOCUMENTOS,
       items: [
         { key: FEATURE_KEYS.MEUS_DOCUMENTOS.LISTAR, name: 'Listar documentos' },
         { key: FEATURE_KEYS.MEUS_DOCUMENTOS.VISUALIZAR, name: 'Visualizar documentos' },
@@ -1389,11 +1392,9 @@ async function main() {
     },
   ]
 
-  const createdFeatures: { id: string; key: string; moduleKey: string }[] = []
-
   for (const catalog of featureCatalog) {
     for (const item of catalog.items) {
-      const feature = await prisma.moduleFeature.upsert({
+      await prisma.moduleFeature.upsert({
         where: {
           moduleId_key: {
             moduleId: catalog.moduleId,
@@ -1407,12 +1408,15 @@ async function main() {
           moduleId: catalog.moduleId,
         },
       })
-
-      createdFeatures.push({ id: feature.id, key: feature.key, moduleKey: catalog.moduleKey })
     }
   }
 
-  for (const feature of createdFeatures) {
+  const allSystemFeatures = await prisma.moduleFeature.findMany({
+    where: { moduleId: { in: systemModules.map((module) => module.id) } },
+    select: { id: true },
+  })
+
+  for (const feature of allSystemFeatures) {
     await upsertFeatureGrant({
       groupId: adminGroup.id,
       featureId: feature.id,
