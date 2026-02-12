@@ -65,7 +65,7 @@ const categories: Array<{ value: TiEquipmentCategory | 'ALL'; label: string }> =
 ]
 
 const statusOptions: Array<{ value: TiEquipmentStatus; label: string }> = [
-  { value: 'IN_STOCK', label: 'Em estoque' },
+  { value: 'IN_STOCK', label: 'Estoque' },
   { value: 'ASSIGNED', label: 'Em uso' },
   { value: 'MAINTENANCE', label: 'Em manutenção' },
   { value: 'RETIRED', label: 'Baixado' },
@@ -362,8 +362,10 @@ export default function TiEquipmentsPanel({
 
   const [userSearch, setUserSearch] = useState('')
   const [userOptions, setUserOptions] = useState<UserOption[]>([])
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [searchingUsers, setSearchingUsers] = useState(false)
   const userSearchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const userComboboxRef = useRef<HTMLDivElement | null>(null)
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -570,8 +572,11 @@ useEffect(() => {
       costCenterMissing: false,
     })
     setFormOpen(true)
+    setUserDropdownOpen(false)
+    setUserOptions([])
     setFormError(null)
   }
+
 
   function openEdit(row: EquipmentRow) {
     setEditing(row)
@@ -590,12 +595,16 @@ useEffect(() => {
       costCenterMissing: !row.costCenterSnapshot?.id,
     })
     setFormOpen(true)
+    setUserDropdownOpen(false)
+    setUserOptions([])
     setFormError(null)
   }
 
   function closeForm() {
     setFormOpen(false)
     setEditing(null)
+    setUserDropdownOpen(false)
+    setUserOptions([])
     setFormError(null)
   }
 function handleScanSubmit(value: string) {
@@ -617,6 +626,7 @@ function handleScanSubmit(value: string) {
       costCenterMissing: !user.costCenter?.id,
     }))
     setUserSearch(user.fullName)
+    setUserDropdownOpen(false)
     setUserOptions([])
   }
 
@@ -624,6 +634,12 @@ function handleScanSubmit(value: string) {
      if (!formOpen) return
 
     const term = userSearch.trim()
+    const shouldOpenByTyping = term.length > 0
+
+    if (!userDropdownOpen && !shouldOpenByTyping) {
+      setUserOptions([])
+      return
+    }
 
     if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current)
 
@@ -664,7 +680,7 @@ function handleScanSubmit(value: string) {
     return () => {
       if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current)
     }
-  }, [formOpen, userSearch])
+  }, [formOpen, userDropdownOpen, userSearch])
 
   async function saveForm(e: React.FormEvent) {
     e.preventDefault()
@@ -812,7 +828,7 @@ const tableExtraLabel =
                 </p>
                 <p className="mt-2 text-xs text-slate-500">
                   A coluna &quot;Identificação&quot; vira IMEI/Nº de série ou observações dependendo
-                  da categoria. O status pode ser &quot;Em estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
+                  da categoria. O status pode ser &quot;Estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
                   ou &quot;Baixado&quot;.
                 </p>
               </div>
@@ -823,7 +839,7 @@ const tableExtraLabel =
                 </label>
                 <textarea
                   className={`${INPUT} min-h-[180px] font-mono`}
-                  placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Em estoque; SN123; 4500,00"
+                  placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Estoque; SN123; 4500,00"
                   value={bulkInput}
                   onChange={(e) => setBulkInput(e.target.value)}
                 />
@@ -1060,12 +1076,24 @@ const tableExtraLabel =
                   <label className="text-xs font-semibold uppercase text-slate-600">
                     {getUserLabel(formValues.category)} *
                   </label>
-                  <div className="relative">
+                  <div className="relative" ref={userComboboxRef}>
                     <input
                       className={INPUT}
                       value={userSearch || formValues.userLabel}
+                      onClick={() => setUserDropdownOpen(true)}
+                      onFocus={() => {
+                        // não abrir apenas por foco automático do modal
+                      }}
+                      onBlur={(e) => {
+                        const nextTarget = e.relatedTarget as Node | null
+                        if (!nextTarget || !userComboboxRef.current?.contains(nextTarget)) {
+                          setUserDropdownOpen(false)
+                        }
+                      }}
                       onChange={(e) => {
-                        setUserSearch(e.target.value)
+                        const value = e.target.value
+                        setUserSearch(value)
+                        if (value.trim().length > 0) setUserDropdownOpen(true)
                         setFormValues((prev) => ({
                           ...prev,
                           userLabel: '',
@@ -1079,7 +1107,7 @@ const tableExtraLabel =
                     {searchingUsers && (
                       <Loader2 className="absolute right-2 top-2 h-4 w-4 animate-spin text-slate-400" />
                     )}
-                    {userOptions.length > 0 && (
+                    {userDropdownOpen && userOptions.length > 0 && (
                       <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg">
                         {userOptions.map((user) => (
                           <button
@@ -1314,7 +1342,7 @@ const tableExtraLabel =
       {/* Cards de resumo */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <SummaryCard title={`Total (${currentCategoryLabel})`} value={counts.total} accent="bg-slate-800 text-white" />
-        <SummaryCard title="Em estoque" value={counts.inStock} accent="bg-green-100 text-green-800" />
+        <SummaryCard title="Estoque" value={counts.inStock} accent="bg-green-100 text-green-800" />
         <SummaryCard title="Em uso" value={counts.assigned} accent="bg-blue-100 text-blue-800" />
         <SummaryCard title="Em manutenção" value={counts.maintenance} accent="bg-amber-100 text-amber-800" />
         <SummaryCard title="Baixados" value={counts.retired} accent="bg-slate-100 text-slate-800" />
@@ -1673,12 +1701,24 @@ const tableExtraLabel =
                 <label className="text-xs font-semibold uppercase text-slate-600">
                    {getUserLabel(formValues.category)} *
                 </label>
-                <div className="relative">
+                <div className="relative" ref={userComboboxRef}>
                   <input
                     className={INPUT}
                     value={userSearch || formValues.userLabel}
+                    onClick={() => setUserDropdownOpen(true)}
+                    onFocus={() => {
+                      // não abrir apenas por foco automático do modal
+                    }}
+                    onBlur={(e) => {
+                      const nextTarget = e.relatedTarget as Node | null
+                      if (!nextTarget || !userComboboxRef.current?.contains(nextTarget)) {
+                        setUserDropdownOpen(false)
+                      }
+                    }}
                     onChange={(e) => {
-                      setUserSearch(e.target.value)
+                      const value = e.target.value
+                      setUserSearch(value)
+                      if (value.trim().length > 0) setUserDropdownOpen(true)
                       setFormValues((prev) => ({
                         ...prev,
                         userLabel: '',
@@ -1692,7 +1732,7 @@ const tableExtraLabel =
                   {searchingUsers && (
                     <Loader2 className="absolute right-2 top-2 h-4 w-4 animate-spin text-slate-400" />
                   )}
-                  {userOptions.length > 0 && (
+                  {userDropdownOpen && userOptions.length > 0 && (
                     <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg">
                       {userOptions.map((user) => (
                         <button
@@ -1880,7 +1920,7 @@ const tableExtraLabel =
               </p>
               <p className="mt-2 text-xs text-slate-500">
                 A coluna &quot;Identificação&quot; vira IMEI/Nº de série ou observações dependendo
-                da categoria. O status pode ser &quot;Em estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
+                da categoria. O status pode ser &quot;Estoque&quot;, &quot;Em uso&quot;, &quot;Em manutenção&quot;
                 ou &quot;Baixado&quot;.
               </p>
             </div>
@@ -1891,7 +1931,7 @@ const tableExtraLabel =
               </label>
               <textarea
                 className={`${INPUT} min-h-[180px] font-mono`}
-                placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Em estoque; SN123; 4500,00"
+                placeholder="Notebook Dell; 12345; usuario@empresa.com; Notebook; Estoque; SN123; 4500,00"
                 value={bulkInput}
                 onChange={(e) => setBulkInput(e.target.value)}
               />
@@ -1969,7 +2009,7 @@ function StatusBadge({ status }: { status: string }) {
     string,
     { label: string; className: string }
   > = {
-    IN_STOCK: { label: 'Em estoque', className: 'bg-green-100 text-green-800' },
+    IN_STOCK: { label: 'Estoque', className: 'bg-green-100 text-green-800' },
     ASSIGNED: { label: 'Em uso', className: 'bg-blue-100 text-blue-800' },
     MAINTENANCE: { label: 'Em manutenção', className: 'bg-amber-100 text-amber-800' },
     RETIRED: { label: 'Baixado', className: 'bg-slate-100 text-slate-800' },

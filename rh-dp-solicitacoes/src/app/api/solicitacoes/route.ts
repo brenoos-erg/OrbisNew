@@ -422,35 +422,7 @@ export const POST = withModuleLevel(
           isSolicitacaoEquipamentoTi && tiDepartment
             ? tiDepartment.id
             : departmentId
-        const fallbackCostCenter =
-          costCenterId ||
-          me.costCenterId ||
-          (
-            await prisma.costCenter.findFirst({
-              where: {
-                status: 'ACTIVE',
-                ...(resolvedDepartmentId
-                  ? { departmentId: resolvedDepartmentId }
-                  : {}),
-              },
-              select: { id: true },
-              orderBy: { createdAt: 'asc' },
-            })
-          )?.id ||
-          (await prisma.costCenter.findFirst({
-            where: { status: 'ACTIVE' },
-            select: { id: true },
-            orderBy: { createdAt: 'asc' },
-          }))?.id ||
-          null
-        const resolvedCostCenterId = fallbackCostCenter
-
-         if (!resolvedCostCenterId) {
-          return NextResponse.json(
-            { error: 'Centro de custo é obrigatório.' },
-            { status: 400 },
-          )
-        }
+        const resolvedCostCenterId = costCenterId || me.costCenterId || null
 
 
 
