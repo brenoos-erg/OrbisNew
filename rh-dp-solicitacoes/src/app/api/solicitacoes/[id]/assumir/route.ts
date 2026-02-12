@@ -9,15 +9,16 @@ import crypto from 'crypto'
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
-    const solicitationId = params.id
+    const { id: solicitationId } = await params
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
     })
+
 
     if (!solic) {
       return NextResponse.json(

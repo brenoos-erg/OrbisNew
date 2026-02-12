@@ -9,7 +9,7 @@ import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
 
 type RouteParams = {
-  params: { userId: string }
+  params: Promise<{ userId: string }>
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteParams) {

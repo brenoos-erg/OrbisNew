@@ -11,11 +11,11 @@ import {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
-    const { id } = params
+    const { id } = await params
     const body = await req.json().catch(() => null)
 
     if (!body || typeof body !== 'object') {

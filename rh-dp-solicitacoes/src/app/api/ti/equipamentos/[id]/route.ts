@@ -26,7 +26,7 @@ function mapRow(row: any) {
   }
 }
 
-export async function PUT(req: Request, context: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
@@ -40,7 +40,7 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
-  const id = context.params.id
+  const { id } = await context.params
 
   try {
     const body = await req.json()
@@ -156,7 +156,7 @@ export async function PUT(req: Request, context: { params: { id: string } }) {
   }
 }
 
-export async function DELETE(_req: Request, context: { params: { id: string } }) {
+export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { appUser, requestId, dbUnavailable } = await getCurrentAppUserFromRouteHandler()
 
   if (!appUser) {
@@ -170,7 +170,7 @@ export async function DELETE(_req: Request, context: { params: { id: string } })
     return NextResponse.json({ error: 'Não autenticado', requestId }, { status: 401 })
   }
 
-  const id = context.params.id
+  const { id } = await context.params
 
   try {
     const existing = await prisma.tiEquipment.findUnique({ where: { id } })

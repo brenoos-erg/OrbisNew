@@ -5,14 +5,15 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 type RouteParams = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 // GET /api/configuracoes/cargos/:id
 export async function GET(_req: Request, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const cargo = await prisma.position.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -51,10 +52,11 @@ export async function GET(_req: Request, { params }: RouteParams) {
 // PATCH /api/configuracoes/cargos/:id
 export async function PATCH(req: Request, { params }: RouteParams) {
   try {
+    const { id } = await params;
     const body = await req.json();
 
     const updated = await prisma.position.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: body.name ?? undefined,
         description: body.description ?? undefined,
@@ -85,8 +87,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 // DELETE /api/configuracoes/cargos/:id
 export async function DELETE(_req: Request, { params }: RouteParams) {
   try {
+    const { id } = await params;
     await prisma.position.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ ok: true });
