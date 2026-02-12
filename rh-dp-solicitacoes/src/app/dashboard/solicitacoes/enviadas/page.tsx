@@ -118,6 +118,9 @@ export default function SentRequestsPage() {
   useEffect(() => {
     let active = true
     const controller = new AbortController()
+    const isAbortError =
+      (error: unknown) =>
+        error instanceof DOMException && error.name === 'AbortError'
     const loadFilters = async () => {
       try {
         const [departmentsRes, costCentersRes] = await Promise.all([
@@ -141,6 +144,7 @@ export default function SentRequestsPage() {
           )
         }
       } catch (err) {
+        if (isAbortError(err) || controller.signal.aborted) return
         console.error('Erro ao carregar filtros de solicitações', err)
         if (active) {
           setDepartments([])
