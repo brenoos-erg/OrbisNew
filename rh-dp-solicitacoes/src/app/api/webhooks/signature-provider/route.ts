@@ -3,6 +3,7 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { finalizeSolicitationIfNoPending } from '@/lib/signature/finalizeSolicitationIfNoPending'
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,34 +27,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'assignmentId é obrigatório.' }, { status: 400 })
     }
 
-    const updated = await prisma.documentAssignment.update({
-      where: { id: assignmentId },
-      data: {
-        status: signed ? 'ASSINADO' : 'RECUSADO',
-        signedAt: signed ? (signedAt ? new Date(signedAt) : new Date()) : null,
-        auditTrailUrl: auditTrailUrl ?? null,
-        auditTrailHash: auditTrailHash ?? null,
-      },
-      include: {
-        document: { select: { solicitationId: true } },
-      },
-    })
-
-    if (signed && updated.document.solicitationId) {
-      const pending = await prisma.documentAssignment.count({
-        where: {
-          document: { solicitationId: updated.document.solicitationId },
-          status: { in: ['PENDENTE', 'AGUARDANDO_ASSINATURA'] },
+     const updated = await prisma.$transaction(async (tx) => {
+      const assignment = await tx.documentAssignment.update({
+        where: { id: assignmentId },
+        data: {
+          status: signed ? 'ASSINADO' : 'RECUSADO',
+          signedAt: signed ? (signedAt ? new Date(signedAt) : new Date()) : null,
+          auditTrailUrl: auditTrailUrl ?? null,
+          auditTrailHash: auditTrailHash ?? null,
+        },
+        include: {
+          document: { select: { solicitationId: true } },
         },
       })
 
-      if (pending === 0) {
-        await prisma.solicitation.update({
-          where: { id: updated.document.solicitationId },
-          data: { status: 'CONCLUIDA', dataFechamento: new Date() },
-        })
+      if (signed && assignment.document.solicitationId) {
+        await finalizeSolicitationIfNoPending(tx, assignment.document.solicitationId, 'webhook-assinatura')
       }
-    }
+
+      return assignment
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

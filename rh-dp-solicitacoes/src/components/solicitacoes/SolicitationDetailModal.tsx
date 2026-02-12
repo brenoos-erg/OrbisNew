@@ -425,21 +425,36 @@ export function SolicitationDetailModal({
   }, [isOpen])
   useEffect(() => {
     const isEquipamentoTipo = detail?.tipo?.nome === 'SOLICITAÇÃO DE EQUIPAMENTO'
-   if (!isOpen || !isEquipamentoTipo || isApprovalMode || !canManage) return
+    if (!isOpen || !isEquipamentoTipo || isApprovalMode || !canManage) return
     let alive = true
 
     async function loadTiInventory() {
       setLoadingTiInventory(true)
       try {
-        const res = await fetch('/api/ti/equipamentos?status=IN_STOCK&pageSize=50', {
-          cache: 'no-store',
-        })
-        if (!res.ok) return
-        const json = (await res.json()) as {
-          rows?: Array<{ id: string; patrimonio: string; name: string; status: string }>
-        }
+        const pageSize = 50
+        let page = 1
+        let total = 0
+        const inventory: TiInventoryItem[] = []
+
+        do {
+          const res = await fetch(`/api/ti/equipamentos?status=IN_STOCK&pageSize=${pageSize}&page=${page}`, {
+            cache: 'no-store',
+          })
+          if (!res.ok) return
+
+          const json = (await res.json()) as {
+            items?: TiInventoryItem[]
+            total?: number
+          }
+
+          const pageItems = (json.items ?? []).filter((item) => item.status === 'IN_STOCK')
+          inventory.push(...pageItems)
+
+          total = Number.isFinite(json.total) ? Number(json.total) : inventory.length
+          page += 1
+        } while (inventory.length < total)
         if (alive) {
-          setTiInventory((json.rows ?? []).filter((item) => item.status === 'IN_STOCK'))
+          setTiInventory(inventory)
         }
       } catch (err) {
         console.error('Erro ao carregar inventário de TI', err)
@@ -465,7 +480,8 @@ export function SolicitationDetailModal({
   const [tiInventory, setTiInventory] = useState<TiInventoryItem[]>([])
   const [loadingTiInventory, setLoadingTiInventory] = useState(false)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
-  const [equipmentPdfUrl, setEquipmentPdfUrl] = useState('')
+  const [generatedDocumentUrl, setGeneratedDocumentUrl] = useState<string | null>(null)
+  const [generatedSigningUrl, setGeneratedSigningUrl] = useState<string | null>(null)
 
   const [assumindo, setAssumindo] = useState(false)
   const [assumirError, setAssumirError] = useState<string | null>(null)
@@ -1055,8 +1071,8 @@ export function SolicitationDetailModal({
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
-    if (!selectedEquipmentId || !equipmentPdfUrl.trim()) {
-      setCloseError('Selecione um equipamento e informe a URL do termo (PDF).')
+     if (!selectedEquipmentId) {
+      setCloseError('Selecione um equipamento para continuar.')
       return
     }
 
@@ -1069,10 +1085,9 @@ export function SolicitationDetailModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'ALOCAR',
+          action: 'ALOCAR_E_GERAR_TERMO',
           equipmentId: selectedEquipmentId,
-          pdfUrl: equipmentPdfUrl.trim(),
-          signingProvider: 'Clicksign/DocuSign',
+          signingProvider: 'DOCUSIGN',
         }),
       })
 
@@ -1081,7 +1096,10 @@ export function SolicitationDetailModal({
         throw new Error(json?.error ?? 'Não foi possível alocar o equipamento.')
       }
 
-      setCloseSuccess('Equipamento alocado e termo enviado para assinatura.')
+      const json = await res.json().catch(() => ({}))
+      setGeneratedDocumentUrl(json?.documentUrl ?? null)
+      setGeneratedSigningUrl(json?.signingUrl ?? null)
+      setCloseSuccess('Equipamento alocado, termo gerado e assinatura DocuSign iniciada.')
       await refreshDetailFromServer()
     } catch (err: any) {
       console.error('Erro ao alocar equipamento', err)
@@ -2074,16 +2092,6 @@ export function SolicitationDetailModal({
                           </select>
                         </label>
 
-                        <label className="space-y-1 text-xs text-slate-700">
-                          <span className="font-semibold">URL do PDF do termo</span>
-                          <input
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                            value={equipmentPdfUrl}
-                            onChange={(e) => setEquipmentPdfUrl(e.target.value)}
-                            placeholder="https://.../termo.pdf"
-                            disabled={closing || isFinalizadaOuCancelada}
-                          />
-                        </label>
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -2102,6 +2110,30 @@ export function SolicitationDetailModal({
                           Sem estoque → encaminhar para aprovação
                         </button>
                       </div>
+                       {(generatedDocumentUrl || generatedSigningUrl) && (
+                        <div className="mt-3 space-y-2 text-xs">
+                          {generatedDocumentUrl && (
+                            <a
+                              href={generatedDocumentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-blue-700 underline"
+                            >
+                              Ver termo gerado
+                            </a>
+                          )}
+                          {generatedSigningUrl && (
+                            <a
+                              href={generatedSigningUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-emerald-700 underline"
+                            >
+                              Assinar agora (DocuSign)
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

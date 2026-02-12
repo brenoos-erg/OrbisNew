@@ -7,10 +7,11 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { canFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { finalizeSolicitationIfNoPending } from '@/lib/signature/finalizeSolicitationIfNoPending'
 
 export async function POST(
   _req: Request,
-   { params }: { params: Promise<{ assignmentId: string }> },
+  { params }: { params: Promise<{ assignmentId: string }> },
 ) {
   try {
     const me = await requireActiveUser()
@@ -37,40 +38,35 @@ export async function POST(
       return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404 })
     }
 
-    const updated = await prisma.documentAssignment.update({
-      where: { id: assignment.id },
-      data: {
-        status: 'ASSINADO',
-        signedAt: new Date(),
-      },
-    })
+    if (assignment.signingProvider === 'DOCUSIGN' && process.env.ALLOW_INTERNAL_SIGNATURE !== 'true') {
+      return NextResponse.json(
+        {
+          error: 'Assinatura deve ser realizada via DocuSign',
+          signingUrl: assignment.signingUrl,
+        },
+        { status: 400 },
+      )
+    }
 
-    if (assignment.document.solicitationId) {
-      const pending = await prisma.documentAssignment.count({
-        where: {
-          document: { solicitationId: assignment.document.solicitationId },
-          status: { in: ['PENDENTE', 'AGUARDANDO_ASSINATURA'] },
+    const updated = await prisma.$transaction(async (tx) => {
+      const signed = await tx.documentAssignment.update({
+        where: { id: assignment.id },
+        data: {
+          status: 'ASSINADO',
+          signedAt: new Date(),
         },
       })
 
-      if (pending === 0) {
-        await prisma.solicitation.update({
-          where: { id: assignment.document.solicitationId },
-          data: {
-            status: 'CONCLUIDA',
-            dataFechamento: new Date(),
-          },
-        })
-
-        await prisma.solicitationTimeline.create({
-          data: {
-            solicitationId: assignment.document.solicitationId,
-            status: 'CONCLUIDA',
-            message: 'Solicitação concluída após assinatura do termo.',
-          },
-        })
+      if (assignment.document.solicitationId) {
+        await finalizeSolicitationIfNoPending(
+          tx,
+          assignment.document.solicitationId,
+          'assinatura-interna',
+        )
       }
-    }
+
+      return signed
+    })
 
     return NextResponse.json({ assignment: updated })
   } catch (error) {

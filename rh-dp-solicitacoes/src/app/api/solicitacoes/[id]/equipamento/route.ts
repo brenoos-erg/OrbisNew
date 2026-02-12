@@ -7,6 +7,17 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
 import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
+import { generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
+import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
+import { createEnvelopeFromPdfBuffer } from '@/lib/signature/providers/docusign/envelopes'
+import { createRecipientView } from '@/lib/signature/providers/docusign/recipientView'
+
+const DEFAULT_CLAUSES = [
+  'Utilizar o equipamento exclusivamente para fins profissionais autorizados pela empresa.',
+  'Preservar a integridade física e lógica do equipamento, comunicando imediatamente qualquer incidente.',
+  'Não instalar softwares sem autorização prévia da área de TI.',
+  'Devolver o equipamento quando solicitado ou no desligamento, com todos os acessórios recebidos.',
+]
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +27,7 @@ export async function POST(
     const me = await requireActiveUser()
     const solicitationId = (await params).id
     const body = (await req.json().catch(() => ({}))) as {
-      action?: 'ALOCAR' | 'SEM_ESTOQUE'
+      action?: 'ALOCAR' | 'ALOCAR_E_GERAR_TERMO' | 'SEM_ESTOQUE'
       equipmentId?: string
       title?: string
       pdfUrl?: string
@@ -25,7 +36,7 @@ export async function POST(
     }
 
     const action = body.action
-    if (!action || !['ALOCAR', 'SEM_ESTOQUE'].includes(action)) {
+    if (!action || !['ALOCAR', 'ALOCAR_E_GERAR_TERMO', 'SEM_ESTOQUE'].includes(action)) {
       return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
     }
 
@@ -33,6 +44,8 @@ export async function POST(
       where: { id: solicitationId },
       include: {
         tipo: true,
+        costCenter: true,
+        solicitante: true,
       },
     })
 
@@ -82,16 +95,20 @@ export async function POST(
       return NextResponse.json(updated)
     }
 
-    if (!body.equipmentId || !body.pdfUrl) {
+    if (!body.equipmentId) {
+      return NextResponse.json({ error: 'equipmentId é obrigatório para alocação.' }, { status: 400 })
+    }
+
+    if (action === 'ALOCAR' && !body.pdfUrl) {
       return NextResponse.json(
-        { error: 'equipmentId e pdfUrl são obrigatórios para alocação.' },
+        { error: 'pdfUrl é obrigatório para a ação legada ALOCAR.' },
         { status: 400 },
       )
     }
 
     const equipment = await prisma.tiEquipment.findUnique({
       where: { id: body.equipmentId },
-      select: { id: true, status: true, name: true, patrimonio: true },
+      select: { id: true, status: true, name: true, patrimonio: true, category: true, serialNumber: true },
     })
 
     if (!equipment) {
@@ -103,6 +120,30 @@ export async function POST(
         { error: 'Somente equipamentos com status IN_STOCK podem ser alocados.' },
         { status: 409 },
       )
+    }
+    let generatedPdfUrl = body.pdfUrl?.trim() || ''
+    let generatedPdfBuffer: Buffer | undefined
+
+    if (action === 'ALOCAR_E_GERAR_TERMO') {
+      const pdfBuffer = await generatePdfFromHtml({
+        protocolo: solicitation.protocolo,
+        dataHora: new Date().toLocaleString('pt-BR'),
+        nomeSolicitante: solicitation.solicitante.fullName,
+        email: solicitation.solicitante.email,
+        login: solicitation.solicitante.login || '-',
+        telefone: solicitation.solicitante.phone || '-',
+        centroCusto: solicitation.costCenter?.description || '-',
+        equipamentoNome: equipment.name,
+        equipamentoModelo: equipment.serialNumber || equipment.category || '-',
+        patrimonio: equipment.patrimonio,
+        regras: DEFAULT_CLAUSES,
+        aceite: 'Declaro que li, compreendi e concordo integralmente com as regras acima.',
+      })
+
+      const fileName = `termo-responsabilidade-${solicitation.protocolo}-${equipment.patrimonio}-${Date.now()}.pdf`
+      const uploaded = await uploadGeneratedFile({ fileName, buffer: pdfBuffer, contentType: 'application/pdf' })
+      generatedPdfUrl = uploaded.url
+      generatedPdfBuffer = pdfBuffer
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -121,16 +162,18 @@ export async function POST(
           title:
             body.title?.trim() ||
             `Termo de responsabilidade - ${solicitation.protocolo} - ${equipment.name}`,
-          pdfUrl: String(body.pdfUrl).trim(),
+          pdfUrl: generatedPdfUrl,
           createdById: me.id,
-          assignments: {
-            create: {
-              userId: solicitation.solicitanteId,
-              status: body.signingUrl ? 'AGUARDANDO_ASSINATURA' : 'PENDENTE',
-              signingProvider: body.signingProvider ? String(body.signingProvider) : null,
-              signingUrl: body.signingUrl ? String(body.signingUrl) : null,
-            },
-          },
+        },
+      })
+
+      const assignment = await tx.documentAssignment.create({
+        data: {
+          userId: solicitation.solicitanteId,
+          documentId: document.id,
+          status: body.signingUrl || action === 'ALOCAR_E_GERAR_TERMO' ? 'AGUARDANDO_ASSINATURA' : 'PENDENTE',
+          signingProvider: action === 'ALOCAR_E_GERAR_TERMO' ? 'DOCUSIGN' : body.signingProvider || null,
+          signingUrl: body.signingUrl ? String(body.signingUrl) : null,
         },
       })
 
@@ -163,8 +206,46 @@ export async function POST(
         },
       })
 
-      return { updated, document }
+      return { updated, document, assignment }
     })
+
+    if (action === 'ALOCAR_E_GERAR_TERMO') {
+      const clientUserId = result.assignment.id
+      const returnUrl = `${process.env.APP_BASE_URL}/dashboard/meus-documentos/return?assignmentId=${result.assignment.id}`
+      const { envelopeId } = await createEnvelopeFromPdfBuffer({
+        pdfBuffer: generatedPdfBuffer!,
+        filename: result.document.title,
+        emailSubject: `Assinatura de termo - ${solicitation.protocolo}`,
+        signerName: solicitation.solicitante.fullName,
+        signerEmail: solicitation.solicitante.email,
+        clientUserId,
+      })
+
+      const recipient = await createRecipientView({
+        envelopeId,
+        signerName: solicitation.solicitante.fullName,
+        signerEmail: solicitation.solicitante.email,
+        clientUserId,
+        returnUrl,
+      })
+
+      const assignment = await prisma.documentAssignment.update({
+        where: { id: result.assignment.id },
+        data: {
+          signingProvider: 'DOCUSIGN',
+          signingUrl: recipient.url,
+          signingExternalId: envelopeId,
+          signingReturnUrl: returnUrl,
+        },
+      })
+
+      return NextResponse.json({
+        assignmentId: assignment.id,
+        documentUrl: result.document.pdfUrl,
+        signingUrl: recipient.url,
+        status: assignment.status,
+      })
+    }
 
     return NextResponse.json(result)
   } catch (error) {

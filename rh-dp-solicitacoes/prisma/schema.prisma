@@ -238,9 +238,11 @@ model DocumentAssignment {
   documentId      String
   userId          String
   status          DocumentAssignmentStatus @default(PENDENTE)
-  signingProvider String?
-  signingUrl      String?
-  signedAt        DateTime?
+  signingProvider   String?
+  signingUrl        String?
+  signingExternalId String?
+  signingReturnUrl  String?
+  signedAt          DateTime?
   auditTrailUrl   String?
   auditTrailHash  String?
   createdAt       DateTime                 @default(now())

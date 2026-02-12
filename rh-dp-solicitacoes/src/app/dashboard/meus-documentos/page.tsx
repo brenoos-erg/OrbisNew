@@ -7,6 +7,7 @@ type AssignmentRow = {
   status: 'PENDENTE' | 'AGUARDANDO_ASSINATURA' | 'ASSINADO' | 'RECUSADO'
   signingProvider: string | null
   signingUrl: string | null
+  auditTrailUrl?: string | null
   signedAt: string | null
   document: {
     id: string
@@ -84,13 +85,29 @@ export default function MeusDocumentosPage() {
   async function signNow(row: AssignmentRow) {
     setBusyId(row.id)
     try {
-      const res = await fetch(`/api/meus-documentos/${row.id}/assinar`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null)
-        throw new Error(payload?.error ?? 'Erro ao assinar documento.')
+        let signingUrl = row.signingUrl
+
+      if (!signingUrl) {
+        const res = await fetch(`/api/documents/${row.document.id}/request-signature`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignmentId: row.id, provider: 'DOCUSIGN' }),
+        })
+
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null)
+          throw new Error(payload?.error ?? 'Erro ao iniciar assinatura.')
+        }
+
+        const payload = await res.json().catch(() => ({}))
+        signingUrl = payload?.signingUrl || payload?.assignment?.signingUrl || null
       }
+
+      if (!signingUrl) {
+        throw new Error('Link de assinatura ainda não disponível.')
+      }
+
+      window.open(signingUrl, '_blank', 'noopener,noreferrer')
       await load()
     } catch (err: any) {
       setError(err?.message ?? 'Erro ao assinar documento.')
@@ -118,8 +135,9 @@ export default function MeusDocumentosPage() {
 
         <div className="space-y-3">
           {rows.map((row) => {
-            const canAsk = row.status === 'PENDENTE'
+            const canAsk = row.status === 'PENDENTE' && !row.signingUrl
             const canSign = row.status === 'AGUARDANDO_ASSINATURA' || row.status === 'PENDENTE'
+
 
             return (
               <div key={row.id} className="rounded-lg border border-gray-200 p-4">
@@ -157,8 +175,18 @@ export default function MeusDocumentosPage() {
                         disabled={busyId === row.id}
                         className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
-                        {busyId === row.id ? 'Assinando...' : 'Assinar'}
+                           {busyId === row.id ? 'Abrindo...' : 'Assinar'}
                       </button>
+                    ) : null}
+                    {row.auditTrailUrl ? (
+                      <a
+                        href={row.auditTrailUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Ver trilha
+                      </a>
                     ) : null}
                   </div>
                 </div>

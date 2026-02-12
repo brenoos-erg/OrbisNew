@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { font-family: Arial, sans-serif; color: #1f2937; margin: 32px; font-size: 12px; }
+      h1 { font-size: 18px; margin-bottom: 4px; }
+      h2 { font-size: 14px; margin-top: 20px; }
+      .meta { margin-bottom: 20px; }
+      .meta p { margin: 2px 0; }
+      .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-top: 10px; }
+      ul { margin: 8px 0 0 18px; }
+      li { margin-bottom: 6px; }
+      .signature { margin-top: 40px; border-top: 1px solid #64748b; padding-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Termo de Responsabilidade de Equipamento</h1>
+    <div class="meta">
+      <p><strong>Protocolo:</strong> {{protocolo}}</p>
+      <p><strong>Data/Hora:</strong> {{dataHora}}</p>
+    </div>
+
+    <h2>Dados do solicitante</h2>
+    <div class="box">
+      <p><strong>Nome:</strong> {{nomeSolicitante}}</p>
+      <p><strong>E-mail:</strong> {{email}}</p>
+      <p><strong>Login:</strong> {{login}}</p>
+      <p><strong>Telefone:</strong> {{telefone}}</p>
+      <p><strong>Centro de custo:</strong> {{centroCusto}}</p>
+    </div>
+
+    <h2>Equipamento alocado</h2>
+    <div class="box">
+      <p><strong>Equipamento:</strong> {{equipamentoNome}}</p>
+      <p><strong>Modelo:</strong> {{equipamentoModelo}}</p>
+      <p><strong>Patrimônio/Identificador:</strong> {{patrimonio}}</p>
+    </div>
+
+    <h2>Regras e cláusulas</h2>
+    <div class="box">
+      <ul>
+        {{#each regras}}
+          <li>{{this}}</li>
+        {{/each}}
+      </ul>
+      <p style="margin-top: 12px"><strong>Aceite:</strong> {{aceite}}</p>
+    </div>
+
+    <div class="signature">
+      <p><strong>Assinatura eletrônica via DocuSign.</strong></p>
+      <p>Ao assinar eletronicamente este documento, o solicitante declara ciência e concordância com os termos acima.</p>
+    </div>
+  </body>
+</html>

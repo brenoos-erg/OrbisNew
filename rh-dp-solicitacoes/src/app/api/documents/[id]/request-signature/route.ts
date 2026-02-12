@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { canFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { createEmbeddedSigningForAssignment } from '@/lib/signature/docusignAssignment'
 
 export async function POST(
   req: NextRequest,
@@ -27,10 +28,7 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}))
-    const { assignmentId, provider = 'EXTERNAL_PROVIDER' } = body as {
-      assignmentId?: string
-      provider?: string
-    }
+    const { assignmentId } = body as { assignmentId?: string }
 
     if (!assignmentId) {
       return NextResponse.json({ error: 'assignmentId é obrigatório.' }, { status: 400 })
@@ -44,18 +42,22 @@ export async function POST(
       return NextResponse.json({ error: 'Atribuição de documento não encontrada.' }, { status: 404 })
     }
 
-    const signingUrl = `/dashboard/meus-documentos?assinar=${assignment.id}`
+    if (
+      assignment.signingProvider === 'DOCUSIGN' &&
+      assignment.signingUrl &&
+      assignment.status === 'AGUARDANDO_ASSINATURA'
+    ) {
+      return NextResponse.json({ assignment, signingUrl: assignment.signingUrl })
+    }
 
-    const updated = await prisma.documentAssignment.update({
-      where: { id: assignment.id },
-      data: {
-        status: 'AGUARDANDO_ASSINATURA',
-        signingProvider: String(provider),
-        signingUrl,
-      },
+    const session = await createEmbeddedSigningForAssignment({
+      assignmentId: assignment.id,
+      signerName: assignment.user.fullName,
+      signerEmail: assignment.user.email,
+      fileName: assignment.document.title,
     })
 
-    return NextResponse.json({ assignment: updated, signingUrl })
+    return NextResponse.json(session)
   } catch (error) {
     console.error('Erro ao solicitar assinatura', error)
     return NextResponse.json({ error: 'Erro ao solicitar assinatura.' }, { status: 500 })
