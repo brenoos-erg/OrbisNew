@@ -10,11 +10,11 @@ import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
-    const solicitationId = params.id
+    const solicitationId = (await params).id
     const body = (await req.json().catch(() => ({}))) as {
       action?: 'ALOCAR' | 'SEM_ESTOQUE'
       equipmentId?: string

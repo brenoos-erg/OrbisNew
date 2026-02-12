@@ -8,7 +8,7 @@ import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 
-type RouteParams = { params: { id: string } }
+type RouteParams = { params: Promise<{ id: string }> }
 
 // 🔒 Somente NIVEL_3 no módulo "solicitacoes"
 export const POST = withModuleLevel<RouteParams>(
@@ -16,7 +16,7 @@ export const POST = withModuleLevel<RouteParams>(
   ModuleLevel.NIVEL_3,
   async (req: Request, { params, me }) => {
     try {
-      const { id: solicitationId } = params
+      const { id: solicitationId } = await params
 
       const body = await req.json().catch(() => ({}))
       const comment: string | undefined = body.comment

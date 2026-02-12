@@ -21,7 +21,7 @@ function normalizeLevel(levels: Record<string, ModuleLevel | undefined>) {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } },
+ { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
@@ -40,7 +40,7 @@ export async function PATCH(
     }
 
     const report = await prisma.refusalReport.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
     })
 
     if (!report) {

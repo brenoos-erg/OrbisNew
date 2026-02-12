@@ -8,11 +8,11 @@ import crypto from 'crypto'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
-    const solicitationId = params.id
+    const solicitationId = (await params).id
     const body = await req.json().catch(() => ({}))
 
     const {

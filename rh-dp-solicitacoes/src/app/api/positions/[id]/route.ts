@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 // PATCH /api/positions/[id] -> editar cargo
 export async function PATCH(request: Request, { params }: Params) {
@@ -12,7 +12,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const body = await request.json()
 
     const updated = await prisma.position.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         name: body.name,
         description: body.description ?? null,
@@ -52,7 +52,7 @@ export async function PATCH(request: Request, { params }: Params) {
 // DELETE /api/positions/[id]
 export async function DELETE(_request: Request, { params }: Params) {
   try {
-    await prisma.position.delete({ where: { id: params.id } })
+    await prisma.position.delete({ where: { id: (await params).id } })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('DELETE /api/positions/[id] error', e)

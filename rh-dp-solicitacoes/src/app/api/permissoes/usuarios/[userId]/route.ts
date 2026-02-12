@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     // opcional: só deixa logado mexer
     await requireActiveUser()
 
-    const { userId } = params
+    const { userId } = await params
     const body = await req.json().catch(() => ({}))
 
     const {

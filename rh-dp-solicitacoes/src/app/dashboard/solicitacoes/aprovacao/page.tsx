@@ -206,7 +206,7 @@ export default function ApprovalsPage() {
             ) : (
               rows.map((row) => (
                 <tr
-                  key={row.id}
+                   key={row.id}
                   onClick={() => handleOpenPreview(row)}
                   className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
                 >
@@ -214,7 +214,7 @@ export default function ApprovalsPage() {
                     {row.protocolo ?? '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {new Date(row.createdAt).toLocaleString('pt-BR')}
+                    {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {row.tipo?.nome ?? '—'}

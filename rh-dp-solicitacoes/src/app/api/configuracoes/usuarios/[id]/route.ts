@@ -9,23 +9,23 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { Action } from '@prisma/client'
 import { hashPassword } from '@/lib/auth-local'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.VIEW)
-  const u = await prisma.user.findUnique({ where: { id: params.id }, select: { id: true, fullName: true, email: true, login: true, phone: true, costCenterId: true, costCenter: { select: { description: true } } } })
+  const u = await prisma.user.findUnique({ where: { id: (await params).id }, select: { id: true, fullName: true, email: true, login: true, phone: true, costCenterId: true, costCenter: { select: { description: true } } } })
   if (!u) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
   return NextResponse.json({ ...u, login: u.login ?? '', phone: u.phone ?? '', costCenterName: u.costCenter?.description ?? null })
 
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
     await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.UPDATE)
     const body = await req.json()
     const password = (body.password ?? '').trim()
     const updated = await prisma.user.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: {
         fullName: body.fullName?.trim() || undefined,
         email: body.email?.trim().toLowerCase() || undefined,
@@ -43,9 +43,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.USUARIOS, Action.DELETE)
-  await prisma.user.delete({ where: { id: params.id } })
+  await prisma.user.delete({ where: { id: (await params).id } })
   return NextResponse.json({ ok: true })
 }

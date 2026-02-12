@@ -10,7 +10,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
@@ -37,7 +37,7 @@ export async function POST(
     }
 
     const assignment = await prisma.documentAssignment.findFirst({
-      where: { id: assignmentId, documentId: params.id, userId: me.id },
+      where: { id: assignmentId, documentId: (await params).id, userId: me.id },
     })
 
     if (!assignment) {

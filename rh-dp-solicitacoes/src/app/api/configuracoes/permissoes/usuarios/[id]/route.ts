@@ -10,11 +10,11 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
      const me = await requireActiveUser()
     await assertUserMinLevel(me.id, 'configuracoes', 'NIVEL_3')
-    const userId = params.id
+    const userId = (await params).id
     const body = await req.json()
     const moduleKey = String(body.moduleKey || '').trim()
     const level = (body.level || null) as ModuleLevel | null

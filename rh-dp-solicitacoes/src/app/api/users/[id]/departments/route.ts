@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ensureUserDepartmentLink, removeUserDepartmentLink } from '@/lib/userDepartments'
 
-type RouteParams = { params: { id: string } }
+type RouteParams = { params: Promise<{ id: string }> }
 
 function normalizeDepartmentLabel(department: { code: string; name: string }) {
   return department.code ? `${department.code} - ${department.name}` : department.name
@@ -14,7 +14,8 @@ function normalizeDepartmentLabel(department: { code: string; name: string }) {
 
 // Lista departamentos vinculados (inclui o principal)
 export async function GET(_req: NextRequest, { params }: RouteParams) {
-  const { id: userId } = params
+  const { id: userId } = await params
+
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -72,7 +73,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 }
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
-  const { id: userId } = params
+  const { id: userId } = await params
 
   const body = await req.json().catch(() => ({}))
   const departmentId = body.departmentId as string | undefined
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
-  const { id: userId } = params
+  const { id: userId } = await params
 
   const url = new URL(req.url)
   const departmentId = url.searchParams.get('departmentId')

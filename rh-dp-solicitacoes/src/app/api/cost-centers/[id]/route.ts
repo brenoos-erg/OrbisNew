@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 
 
 // PATCH: edita
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const body = await req.json().catch(() => ({}))
   const {
     description,
@@ -26,7 +26,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   const updated = await prisma.costCenter.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data: {
       description: description.trim(),
       code: code?.trim() ?? null,
@@ -45,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 // DELETE: apaga
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  await prisma.costCenter.delete({ where: { id: params.id } })
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  await prisma.costCenter.delete({ where: { id: (await params).id } })
   return NextResponse.json({ ok: true })
 }

@@ -38,11 +38,11 @@ function buildSearchWhere(search?: string | null): Prisma.TiEquipmentWhereInput 
   if (!term) return undefined
 
   const OR: Prisma.TiEquipmentWhereInput[] = [
-    { name: { contains: term, mode: Prisma.QueryMode.insensitive } },
-    { patrimonio: { contains: term, mode: Prisma.QueryMode.insensitive } },
-    { serialNumber: { contains: term, mode: Prisma.QueryMode.insensitive } },
-    { user: { is: { fullName: { contains: term, mode: Prisma.QueryMode.insensitive } } } },
-    { user: { is: { email: { contains: term, mode: Prisma.QueryMode.insensitive } } } },
+    { name: { contains: term } },
+    { patrimonio: { contains: term } },
+    { serialNumber: { contains: term } },
+    { user: { is: { fullName: { contains: term } } } },
+    { user: { is: { email: { contains: term } } } },
   ]
 
   return { OR }

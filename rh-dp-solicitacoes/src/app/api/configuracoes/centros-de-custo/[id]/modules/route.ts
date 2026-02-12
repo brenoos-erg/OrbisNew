@@ -5,14 +5,14 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 
-type Params = { params: { id: string } }
+type Params = { params: Promise<{ id: string }> }
 
 /**
  * Lista os módulos vinculados ao Centro de Custo
  */
 export async function GET(_req: Request, { params }: Params) {
   const rows = await prisma.costCenterModule.findMany({
-    where: { costCenterId: params.id },
+    where: { costCenterId: (await params).id },
     include: { module: { select: { id: true, key: true, name: true } } },
     orderBy: { createdAt: 'desc' },
   })
@@ -36,9 +36,9 @@ export async function POST(req: Request, { params }: Params) {
 
   // Índice único gerado pelo @@unique([costCenterId, moduleId])
   await prisma.costCenterModule.upsert({
-    where: { costCenterId_moduleId: { costCenterId: params.id, moduleId: mod.id } },
+    where: { costCenterId_moduleId: { costCenterId: (await params).id, moduleId: mod.id } },
     update: {},
-    create: { costCenterId: params.id, moduleId: mod.id },
+    create: { costCenterId: (await params).id, moduleId: mod.id },
   })
 
   return NextResponse.json({ ok: true }, { status: 201 })
@@ -56,7 +56,7 @@ export async function DELETE(req: Request, { params }: Params) {
   if (!mod) return NextResponse.json({ ok: true }) // nada pra deletar
 
   await prisma.costCenterModule.delete({
-    where: { costCenterId_moduleId: { costCenterId: params.id, moduleId: mod.id } },
+    where: { costCenterId_moduleId: { costCenterId: (await params).id, moduleId: mod.id } },
   })
 
   return NextResponse.json({ ok: true })

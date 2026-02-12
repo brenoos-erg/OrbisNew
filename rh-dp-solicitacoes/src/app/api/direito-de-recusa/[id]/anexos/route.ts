@@ -16,14 +16,14 @@ async function saveFile(file: File, folder: string) {
   return relPath
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireActiveUser()
   const form = await req.formData()
   const files = form.getAll('files').filter((f): f is File => f instanceof File)
   const created = []
   for (const file of files) {
     const url = await saveFile(file, 'direito-recusa')
-    const row = await prisma.refusalAttachment.create({ data: { id: randomUUID(), reportId: params.id, filename: file.name, url, mimeType: file.type || 'application/octet-stream', sizeBytes: file.size } })
+    const row = await prisma.refusalAttachment.create({ data: { id: randomUUID(), reportId: (await params).id, filename: file.name, url, mimeType: file.type || 'application/octet-stream', sizeBytes: file.size } })
     created.push(row)
   }
   return NextResponse.json({ items: created })

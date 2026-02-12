@@ -10,9 +10,9 @@ import { prisma } from '@/lib/prisma'
 // ----------------------------------------------------
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id: userId } = params
+  const { id: userId } = await params
 
   const links = await prisma.userCostCenter.findMany({
     where: { userId },
@@ -69,10 +69,10 @@ async function getCostCenterIdFromRequest(req: Request): Promise<string | null> 
 // ----------------------------------------------------
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const costCenterId = await getCostCenterIdFromRequest(req)
 
     if (!costCenterId) {
@@ -81,7 +81,6 @@ export async function POST(
         { status: 400 },
       )
     }
-
     // Garante usuário
     const user = await prisma.user.findUnique({
       where: { id },
@@ -156,10 +155,10 @@ export async function POST(
 // ----------------------------------------------------
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const costCenterId = await getCostCenterIdFromRequest(req)
 
     if (!costCenterId) {
