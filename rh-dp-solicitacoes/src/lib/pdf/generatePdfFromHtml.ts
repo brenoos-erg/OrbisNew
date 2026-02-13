@@ -40,25 +40,32 @@ function getRuntimeModule(moduleName: string): any {
 }
 
 const currentFilePath = fileURLToPath(import.meta.url)
-const templatePath = path.resolve(
-  path.dirname(currentFilePath),
-  '..',
-  '..',
-  'templates',
-  'termo_responsabilidade.hbs',
-)
+const templateDir = path.resolve(path.dirname(currentFilePath), '..', '..', 'templates')
 
-export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
-  try {
-    await access(templatePath)
-  } catch {
-    throw new PdfGenerationError(
-      'Template do termo de responsabilidade não encontrado.',
-      500,
-      `Arquivo esperado em: ${templatePath}`,
-    )
+const templateCandidates = [
+  'termo_responsabilidade.hbs',
+  'termo_responsabilidades.hbs',
+].map((templateFile) => path.join(templateDir, templateFile))
+
+async function resolveTemplatePath() {
+  for (const candidatePath of templateCandidates) {
+    try {
+      await access(candidatePath)
+      return candidatePath
+    } catch {
+      continue
+    }
   }
 
+  throw new PdfGenerationError(
+    'Template do termo de responsabilidade não encontrado.',
+    500,
+    `Arquivos esperados em: ${templateCandidates.join(' ou ')}`,
+  )
+}
+
+export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
+  const templatePath = await resolveTemplatePath()
   const templateSource = await readFile(templatePath, 'utf-8')
 
   const handlebars = getRuntimeModule('handlebars')
