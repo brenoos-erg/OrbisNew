@@ -39,3 +39,23 @@ Quando o envelope chega como `completed`:
   - macOS/Linux: `npx playwright install chromium`
   - Windows (PowerShell): `npx playwright install chromium`
 - Se o Playwright não estiver disponível no runtime, o endpoint retorna erro 422 com mensagem instrutiva para instalação.
+## Migração para URLs longas no DocumentAssignment
+Para evitar erro de Prisma ao salvar recipient view URL da DocuSign (campos acima de 191 caracteres), aplique a migration que converte os campos para `TEXT`:
+
+1. Rode as migrations:
+   - `npx prisma migrate dev` (ambiente local)
+   - `npx prisma migrate deploy` (ambientes CI/prod)
+2. Gere o client, se necessário:
+   - `npx prisma generate`
+
+A migration `202602140001_expand_document_assignment_url_columns` altera as colunas:
+- `signingUrl`
+- `signingReturnUrl`
+- `auditTrailUrl`
+
+## Verificação rápida do ajuste (> 191 chars)
+Após migrar o banco, execute:
+
+- `npm run test:signing-url`
+
+Esse script cria dados temporários, salva URLs longas nos três campos de assinatura do `DocumentAssignment`, valida a leitura e remove os registros de teste.
