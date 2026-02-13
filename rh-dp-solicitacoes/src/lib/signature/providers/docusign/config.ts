@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 type DocuSignConfig = {
   basePath: string
   accountId: string
@@ -17,8 +20,21 @@ function getEnv(name: string, required = true) {
   return value || ''
 }
 
+function getPrivateKey() {
+  const envKey = process.env.DOCUSIGN_PRIVATE_KEY?.trim()
+  if (envKey) return envKey.replace(/\\n/g, '\n')
+
+  const keyPath = process.env.DOCUSIGN_PRIVATE_KEY_PATH?.trim()
+  if (!keyPath) {
+    throw new Error('Variável de ambiente obrigatória ausente: DOCUSIGN_PRIVATE_KEY (ou DOCUSIGN_PRIVATE_KEY_PATH)')
+  }
+
+  const abs = path.isAbsolute(keyPath) ? keyPath : path.resolve(process.cwd(), keyPath)
+  return fs.readFileSync(abs, 'utf8').trim()
+}
+
 export function getDocuSignConfig(): DocuSignConfig {
-  const privateKey = getEnv('DOCUSIGN_PRIVATE_KEY').replace(/\\n/g, '\n')
+  const privateKey = getPrivateKey()
 
   return {
     basePath: getEnv('DOCUSIGN_BASE_PATH').replace(/\/$/, ''),
