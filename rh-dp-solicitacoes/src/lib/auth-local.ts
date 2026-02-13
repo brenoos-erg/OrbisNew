@@ -7,8 +7,22 @@ import { AUTH_COOKIE_NAME, AUTH_MAX_AGE_SECONDS } from '@/lib/auth-constants'
 
 type SessionPayload = { sub: string; iat: number; exp: number }
 
+const DEV_FALLBACK_JWT_SECRET = 'local-dev-jwt-secret'
+let didWarnMissingSecret = false
+
 function getAuthSecret() {
-   return process.env.JWT_SECRET ?? process.env.AUTH_SECRET
+  const secret = process.env.JWT_SECRET ?? process.env.AUTH_SECRET
+  if (secret) return secret
+
+  if (process.env.NODE_ENV !== 'production') {
+    if (!didWarnMissingSecret) {
+      console.warn('JWT_SECRET/AUTH_SECRET não configurado. Usando segredo padrão local para desenvolvimento.')
+      didWarnMissingSecret = true
+    }
+    return DEV_FALLBACK_JWT_SECRET
+  }
+
+  return undefined
 }
 
 export async function hashPassword(plain: string) {
