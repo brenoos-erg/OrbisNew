@@ -31,3 +31,11 @@ Quando o envelope chega como `completed`:
 ## Compatibilidade
 - A ação legada `ALOCAR` continua suportada (exige `pdfUrl`).
 - Endpoint interno `/api/meus-documentos/[assignmentId]/assinar` bloqueia assinatura de documentos DocuSign, exceto se `ALLOW_INTERNAL_SIGNATURE=true`.
+
+## Dependências para geração automática de PDF
+- O backend usa `handlebars` + `playwright` para renderizar o termo em PDF no fluxo `ALOCAR_E_GERAR_TERMO`.
+- O projeto possui `postinstall` para instalar o browser Chromium automaticamente: `playwright install chromium`.
+- Instalação manual (quando necessário):
+  - macOS/Linux: `npx playwright install chromium`
+  - Windows (PowerShell): `npx playwright install chromium`
+- Se o Playwright não estiver disponível no runtime, o endpoint retorna erro 422 com mensagem instrutiva para instalação.

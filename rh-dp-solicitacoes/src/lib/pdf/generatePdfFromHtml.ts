@@ -1,5 +1,6 @@
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export type TermoTemplateData = {
   protocolo: string
@@ -16,6 +17,18 @@ export type TermoTemplateData = {
   aceite: string
 }
 
+export class PdfGenerationError extends Error {
+  statusCode: number
+  detail?: string
+
+  constructor(message: string, statusCode = 500, detail?: string) {
+    super(message)
+    this.name = 'PdfGenerationError'
+    this.statusCode = statusCode
+    this.detail = detail
+  }
+}
+
 function getRuntimeModule(moduleName: string): any {
   try {
     // eslint-disable-next-line @typescript-eslint/no-implied-eval
@@ -26,39 +39,45 @@ function getRuntimeModule(moduleName: string): any {
   }
 }
 
+const currentFilePath = fileURLToPath(import.meta.url)
+const templatePath = path.resolve(
+  path.dirname(currentFilePath),
+  '..',
+  '..',
+  'templates',
+  'termo_responsabilidade.hbs',
+)
+
 export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
-  const templateDirectory = path.join(process.cwd(), 'src', 'templates')
-  const templateCandidates = ['termo_responsabilidades.hbs', 'termo_responsabilidade.hbs']
-
-  let templatePath: string | null = null
-  for (const candidate of templateCandidates) {
-    const candidatePath = path.join(templateDirectory, candidate)
-    try {
-      await access(candidatePath)
-      templatePath = candidatePath
-      break
-    } catch {
-      // tenta próximo nome de arquivo conhecido
-    }
+  try {
+    await access(templatePath)
+  } catch {
+    throw new PdfGenerationError(
+      'Template do termo de responsabilidade não encontrado.',
+      500,
+      `Arquivo esperado em: ${templatePath}`,
+    )
   }
 
-  if (!templatePath) {
-    throw new Error('Template de termo de responsabilidade não encontrado em src/templates.')
-  }
   const templateSource = await readFile(templatePath, 'utf-8')
 
   const handlebars = getRuntimeModule('handlebars')
-  const html = handlebars
-    ? handlebars.compile(templateSource)(data)
-    : templateSource
-        .replace('{{protocolo}}', data.protocolo)
-        .replace('{{dataHora}}', data.dataHora)
-        .replace('{{nomeSolicitante}}', data.nomeSolicitante)
+  if (!handlebars) {
+    throw new PdfGenerationError(
+      'Dependência Handlebars não está disponível para renderizar o termo.',
+      500,
+      'Instale com: npm install handlebars',
+    )
+  }
+
+  const html = handlebars.compile(templateSource)(data)
 
   const playwright = getRuntimeModule('playwright')
   if (!playwright?.chromium) {
-    throw new Error(
-      'Falha ao gerar PDF automaticamente: Playwright não está disponível no runtime. Instale playwright para habilitar geração automática.',
+    throw new PdfGenerationError(
+      'Não foi possível gerar o PDF automaticamente porque o Playwright não está instalado no ambiente.',
+      422,
+      'Instale com: npm install playwright && npx playwright install chromium',
     )
   }
 

@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "prisma db push && ts-node -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts",
-    "generate:checklist": "node -r ts-node/register src/scripts/generateChecklistReport.ts"
+   "generate:checklist": "node -r ts-node/register src/scripts/generateChecklistReport.ts",
+    "postinstall": "playwright install chromium"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -30,7 +31,9 @@
     "nodemailer": "^7.0.11",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "handlebars": "^4.7.8",
+    "playwright": "^1.56.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",

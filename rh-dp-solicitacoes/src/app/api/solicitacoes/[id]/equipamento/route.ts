@@ -7,7 +7,7 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
 import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
-import { generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
+import { PdfGenerationError, generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
 import { createEnvelopeFromPdfBuffer } from '@/lib/signature/providers/docusign/envelopes'
 import { createRecipientView } from '@/lib/signature/providers/docusign/recipientView'
@@ -253,7 +253,22 @@ export async function POST(
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Erro no fluxo de equipamento da solicitação', error)
+    console.error(
+      'Erro no fluxo de equipamento da solicitação',
+      error?.stack || error,
+    )
+
+    const isProduction = process.env.NODE_ENV === 'production'
+
+    if (error instanceof PdfGenerationError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          detail: !isProduction ? error.detail || error.message : undefined,
+        },
+        { status: error.statusCode },
+      )
+    }
 
     const detail =
       error?.response?.body?.message ||
@@ -264,7 +279,7 @@ export async function POST(
     return NextResponse.json(
       {
         error: 'Erro ao processar solicitação de equipamento.',
-        detail,
+        detail: !isProduction ? detail : undefined,
       },
       { status: 500 },
     )
