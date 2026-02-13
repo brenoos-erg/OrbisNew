@@ -7,6 +7,41 @@ type CachedToken = {
 }
 
 let cachedToken: CachedToken | null = null
+function buildDocuSignAuthErrorMessage(params: {
+  status: number
+  bodyText: string
+  oauthBasePath: string
+  clientId: string
+}) {
+  const { status, bodyText, oauthBasePath, clientId } = params
+  let details = bodyText
+
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: string; error_description?: string }
+    if (parsed.error === 'invalid_grant' && parsed.error_description === 'issuer_not_found') {
+      const environmentHint = oauthBasePath.includes('account-d.docusign.com')
+        ? 'demo/sandbox'
+        : oauthBasePath.includes('account.docusign.com')
+          ? 'produção'
+          : `oauth base path configurado (${oauthBasePath})`
+
+      details = [
+        `${bodyText}`,
+        '',
+        'Diagnóstico provável: o `DOCUSIGN_CLIENT_ID` não foi encontrado nesse ambiente da DocuSign.',
+        `- client_id atual: ${clientId}`,
+        `- ambiente inferido: ${environmentHint}`,
+        '- Verifique se a Integration Key existe no mesmo ambiente configurado em `DOCUSIGN_OAUTH_BASE_PATH`.',
+        '- Se estiver em sandbox, confirme `DOCUSIGN_OAUTH_BASE_PATH=account-d.docusign.com`.',
+        '- Se estiver em produção, confirme `DOCUSIGN_OAUTH_BASE_PATH=account.docusign.com`.',
+      ].join('\n')
+    }
+  } catch {
+    // Mantém a mensagem original quando o corpo não é JSON.
+  }
+
+  return `Falha ao autenticar no DocuSign (${status}): ${details}`
+}
 
 export async function getDocuSignAccessToken() {
   const now = Date.now()
@@ -51,7 +86,14 @@ export async function getDocuSignAccessToken() {
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Falha ao autenticar no DocuSign (${response.status}): ${text}`)
+     throw new Error(
+      buildDocuSignAuthErrorMessage({
+        status: response.status,
+        bodyText: text,
+        oauthBasePath: config.oauthBasePath,
+        clientId: config.clientId,
+      }),
+    )
   }
 
   const json = (await response.json()) as { access_token: string; expires_in: number }
