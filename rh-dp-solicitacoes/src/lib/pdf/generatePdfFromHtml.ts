@@ -30,17 +30,13 @@ export class PdfGenerationError extends Error {
   }
 }
 
-const requireModule = createRequire(import.meta.url)
+const requireFromProject = createRequire(path.join(process.cwd(), 'package.json'))
 
-async function getRuntimeModule(moduleName: string): Promise<any | null> {
+function getRuntimeModule(moduleName: string): any | null {
   try {
-    return await import(moduleName)
+    return requireFromProject(moduleName)
   } catch {
-    try {
-      return requireModule(moduleName)
-    } catch {
-      return null
-    }
+    return null
   }
 }
 
@@ -73,8 +69,8 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
   const templatePath = await resolveTemplatePath()
   const templateSource = await readFile(templatePath, 'utf-8')
 
-  const handlebars = await getRuntimeModule('handlebars')
-  if (!handlebars) {
+  const handlebars = getRuntimeModule('handlebars')
+  if (!handlebars?.compile) {
     throw new PdfGenerationError(
       'Dependência Handlebars não está disponível para renderizar o termo.',
       500,
@@ -82,9 +78,9 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
     )
   }
 
-  const html = handlebars.default?.compile(templateSource)(data) ?? handlebars.compile(templateSource)(data)
+  const html = handlebars.compile(templateSource)(data)
 
-  const playwright = await getRuntimeModule('playwright')
+  const playwright = getRuntimeModule('playwright')
   if (!playwright?.chromium) {
     throw new PdfGenerationError(
       'Não foi possível gerar o PDF automaticamente porque o Playwright não está instalado no ambiente.',
