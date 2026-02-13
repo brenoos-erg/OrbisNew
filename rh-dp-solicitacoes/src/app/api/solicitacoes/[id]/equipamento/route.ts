@@ -211,7 +211,11 @@ export async function POST(
 
     if (action === 'ALOCAR_E_GERAR_TERMO') {
       const clientUserId = result.assignment.id
-      const returnUrl = `${process.env.APP_BASE_URL}/dashboard/meus-documentos/return?assignmentId=${result.assignment.id}`
+      const appBaseUrl =
+        process.env.APP_BASE_URL?.trim() ||
+        process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+        req.nextUrl.origin
+      const returnUrl = `${appBaseUrl}/dashboard/meus-documentos/return?assignmentId=${result.assignment.id}`
       const { envelopeId } = await createEnvelopeFromPdfBuffer({
         pdfBuffer: generatedPdfBuffer!,
         filename: result.document.title,
@@ -248,10 +252,20 @@ export async function POST(
     }
 
     return NextResponse.json(result)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro no fluxo de equipamento da solicitação', error)
+
+    const detail =
+      error?.response?.body?.message ||
+      error?.response?.text ||
+      error?.message ||
+      null
+
     return NextResponse.json(
-      { error: 'Erro ao processar solicitação de equipamento.' },
+      {
+        error: 'Erro ao processar solicitação de equipamento.',
+        detail,
+      },
       { status: 500 },
     )
   }

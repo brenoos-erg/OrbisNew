@@ -380,7 +380,6 @@ export function SolicitationDetailModal({
   onFinalized,
   canManage = true,
 }: Props) {
-  if (!isOpen || !row) return null
 
   const isApprovalMode = mode === 'approval'
   const [detail, setDetail] = useState<SolicitationDetail | null>(detailProp)
@@ -506,7 +505,7 @@ export function SolicitationDetailModal({
   const [dpDataPrevistaAcerto, setDpDataPrevistaAcerto] = useState('')
   const [dpConsideracoes, setDpConsideracoes] = useState('')
 
-  const effectiveStatus = (detail?.status ?? row.status) as SolicitationStatus
+  const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
 
   const { steps: timelineSteps, currentIndex } = buildTimeline(
@@ -519,7 +518,7 @@ export function SolicitationDetailModal({
     approvalStatus,
     assumidaPorId:
       (detail as any)?.assumidaPorId ??
-      row.responsavelId ??
+      row?.responsavelId ??
       null,
   })
 
@@ -1093,7 +1092,8 @@ export function SolicitationDetailModal({
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
-        throw new Error(json?.error ?? 'Não foi possível alocar o equipamento.')
+        const apiMessage = [json?.error, json?.detail].filter(Boolean).join(' - ')
+        throw new Error(apiMessage || 'Não foi possível alocar o equipamento.')
       }
 
       const json = await res.json().catch(() => ({}))
@@ -1320,6 +1320,7 @@ export function SolicitationDetailModal({
     setApprovalAction(null)
     setCloseError(null)
   }
+  if (!isOpen || !row) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
