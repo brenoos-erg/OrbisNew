@@ -1,5 +1,6 @@
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 export type TermoTemplateData = {
@@ -29,13 +30,17 @@ export class PdfGenerationError extends Error {
   }
 }
 
-function getRuntimeModule(moduleName: string): any {
+const requireModule = createRequire(import.meta.url)
+
+async function getRuntimeModule(moduleName: string): Promise<any | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const req = new Function('name', 'return require(name)') as (name: string) => any
-    return req(moduleName)
+    return await import(moduleName)
   } catch {
-    return null
+    try {
+      return requireModule(moduleName)
+    } catch {
+      return null
+    }
   }
 }
 
@@ -68,7 +73,7 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
   const templatePath = await resolveTemplatePath()
   const templateSource = await readFile(templatePath, 'utf-8')
 
-  const handlebars = getRuntimeModule('handlebars')
+  const handlebars = await getRuntimeModule('handlebars')
   if (!handlebars) {
     throw new PdfGenerationError(
       'Dependência Handlebars não está disponível para renderizar o termo.',
@@ -77,9 +82,9 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
     )
   }
 
-  const html = handlebars.compile(templateSource)(data)
+  const html = handlebars.default?.compile(templateSource)(data) ?? handlebars.compile(templateSource)(data)
 
-  const playwright = getRuntimeModule('playwright')
+  const playwright = await getRuntimeModule('playwright')
   if (!playwright?.chromium) {
     throw new PdfGenerationError(
       'Não foi possível gerar o PDF automaticamente porque o Playwright não está instalado no ambiente.',
