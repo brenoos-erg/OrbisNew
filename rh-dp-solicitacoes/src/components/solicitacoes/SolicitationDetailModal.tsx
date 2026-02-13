@@ -424,7 +424,8 @@ export function SolicitationDetailModal({
   }, [isOpen])
   useEffect(() => {
     const isEquipamentoTipo = detail?.tipo?.nome === 'SOLICITAÇÃO DE EQUIPAMENTO'
-    if (!isOpen || !isEquipamentoTipo || isApprovalMode || !canManage) return
+     if (!isOpen || !detail?.id || !isEquipamentoTipo || isApprovalMode || !canManage) return
+    const solicitationId = detail.id
     let alive = true
 
     async function loadTiInventory() {
@@ -436,7 +437,7 @@ export function SolicitationDetailModal({
         const inventory: TiInventoryItem[] = []
 
         do {
-          const res = await fetch(`/api/ti/equipamentos?status=IN_STOCK&pageSize=${pageSize}&page=${page}`, {
+          const res = await fetch(`/api/solicitacoes/${solicitationId}/equipamento?pageSize=${pageSize}&page=${page}`, {
             cache: 'no-store',
           })
           if (!res.ok) return

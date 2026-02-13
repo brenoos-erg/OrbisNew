@@ -285,3 +285,62 @@ export async function POST(
     )
   }
 }
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireActiveUser()
+    const solicitationId = (await params).id
+    const pageParam = Number.parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10)
+    const pageSizeParam = Number.parseInt(req.nextUrl.searchParams.get('pageSize') ?? '50', 10)
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+    const pageSize = Number.isFinite(pageSizeParam)
+      ? Math.min(100, Math.max(5, pageSizeParam))
+      : 50
+
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id: solicitationId },
+      include: { tipo: true },
+    })
+
+    if (!solicitation) {
+      return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+    }
+
+    if (!isSolicitacaoEquipamento(solicitation.tipo)) {
+      return NextResponse.json(
+        { error: 'Esta rota é exclusiva para solicitações de equipamento.' },
+        { status: 400 },
+      )
+    }
+
+    const where = { status: 'IN_STOCK' as const }
+    const [items, total] = await Promise.all([
+      prisma.tiEquipment.findMany({
+        where,
+        orderBy: [{ updatedAt: 'desc' }, { patrimonio: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          patrimonio: true,
+          status: true,
+          category: true,
+          serialNumber: true,
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.tiEquipment.count({ where }),
+    ])
+
+    return NextResponse.json({ items, total })
+  } catch (error) {
+    console.error('Erro ao carregar equipamentos em estoque para solicitação', error)
+    return NextResponse.json(
+      { error: 'Erro ao carregar equipamentos em estoque.' },
+      { status: 500 },
+    )
+  }
+}
