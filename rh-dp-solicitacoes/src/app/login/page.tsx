@@ -37,12 +37,25 @@ function LoginPageContent() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
-    })
-    const payload = await res.json().catch(() => ({}))
+    }).catch(() => null)
+
+    if (!res) {
+      setLoading(false)
+      setLoginError('Não foi possível conectar ao servidor de autenticação.')
+      return
+    }
+
+    const payload = await res.json().catch(() => null)
     setLoading(false)
 
     if (!res.ok) {
-      setLoginError(payload?.error || 'Falha ao autenticar.')
+      const statusMessage: Record<number, string> = {
+        400: 'Identificador e senha são obrigatórios.',
+        401: 'Credenciais inválidas.',
+        403: 'Usuário inativo.',
+        500: 'Erro interno no servidor de autenticação.',
+      }
+      setLoginError(payload?.error || statusMessage[res.status] || 'Falha ao autenticar.')
       return
     }
 
