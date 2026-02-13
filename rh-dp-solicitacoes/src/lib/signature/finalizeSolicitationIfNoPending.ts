@@ -16,13 +16,20 @@ export async function finalizeSolicitationIfNoPending(
     return false
   }
 
-  await tx.solicitation.update({
-    where: { id: solicitationId },
+  const closeResult = await tx.solicitation.updateMany({
+    where: {
+      id: solicitationId,
+      status: { not: 'CONCLUIDA' },
+    },
     data: {
       status: 'CONCLUIDA',
       dataFechamento: new Date(),
     },
   })
+  if (closeResult.count === 0) {
+    return false
+  }
+
 
   await tx.solicitationTimeline.create({
     data: {
