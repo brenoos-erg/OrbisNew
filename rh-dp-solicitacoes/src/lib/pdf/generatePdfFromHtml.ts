@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 export type TermoTemplateData = {
@@ -27,7 +27,24 @@ function getRuntimeModule(moduleName: string): any {
 }
 
 export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
-  const templatePath = path.join(process.cwd(), 'src', 'templates', 'termo_responsabilidade.hbs')
+  const templateDirectory = path.join(process.cwd(), 'src', 'templates')
+  const templateCandidates = ['termo_responsabilidades.hbs', 'termo_responsabilidade.hbs']
+
+  let templatePath: string | null = null
+  for (const candidate of templateCandidates) {
+    const candidatePath = path.join(templateDirectory, candidate)
+    try {
+      await access(candidatePath)
+      templatePath = candidatePath
+      break
+    } catch {
+      // tenta próximo nome de arquivo conhecido
+    }
+  }
+
+  if (!templatePath) {
+    throw new Error('Template de termo de responsabilidade não encontrado em src/templates.')
+  }
   const templateSource = await readFile(templatePath, 'utf-8')
 
   const handlebars = getRuntimeModule('handlebars')
