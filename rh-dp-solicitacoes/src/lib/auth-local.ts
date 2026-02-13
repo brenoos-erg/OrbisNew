@@ -8,9 +8,7 @@ import { AUTH_COOKIE_NAME, AUTH_MAX_AGE_SECONDS } from '@/lib/auth-constants'
 type SessionPayload = { sub: string; iat: number; exp: number }
 
 function getAuthSecret() {
-  const secret = process.env.JWT_SECRET ?? process.env.AUTH_SECRET
-  if (!secret) throw new Error('JWT_SECRET não configurado.')
-  return secret
+   return process.env.JWT_SECRET ?? process.env.AUTH_SECRET
 }
 
 export async function hashPassword(plain: string) {
@@ -22,15 +20,19 @@ export async function verifyPassword(plain: string, stored: string) {
 }
 
 function signPayload(payload: SessionPayload) {
+  const secret = getAuthSecret()
+  if (!secret) throw new Error('JWT_SECRET não configurado.')
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const sig = createHmac('sha256', getAuthSecret()).update(encoded).digest('base64url')
+  const sig = createHmac('sha256', secret).update(encoded).digest('base64url')
   return `${encoded}.${sig}`
 }
 
 function verifyToken(token: string): SessionPayload | null {
+  const secret = getAuthSecret()
+  if (!secret) return null
   const [encoded, sig] = token.split('.')
   if (!encoded || !sig) return null
-  const expected = createHmac('sha256', getAuthSecret()).update(encoded).digest('base64url')
+  const expected = createHmac('sha256', secret).update(encoded).digest('base64url')
   const sigBuf = Buffer.from(sig)
   const expectedBuf = Buffer.from(expected)
   if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null
