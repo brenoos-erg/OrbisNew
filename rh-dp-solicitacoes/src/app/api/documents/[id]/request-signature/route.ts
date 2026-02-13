@@ -36,6 +36,10 @@ export async function POST(
 
     const assignment = await prisma.documentAssignment.findFirst({
       where: { id: assignmentId, documentId: (await params).id, userId: me.id },
+      include: {
+        user: { select: { fullName: true, email: true } },
+        document: { select: { title: true } },
+      },
     })
 
     if (!assignment) {
