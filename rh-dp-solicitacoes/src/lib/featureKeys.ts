@@ -8,6 +8,7 @@ export const MODULE_KEYS = {
   EQUIPAMENTOS_TI: 'controle-equipamentos-ti',
   CELULAR: 'celular',
   MEUS_DOCUMENTOS: 'meus-documentos',
+  SST: 'sst',
 } as const
 
 export const FEATURE_KEYS = {
@@ -40,6 +41,9 @@ export const FEATURE_KEYS = {
     LISTAR: 'MEUS_DOCUMENTOS.LISTAR',
     VISUALIZAR: 'MEUS_DOCUMENTOS.VISUALIZAR',
     ASSINAR: 'MEUS_DOCUMENTOS.ASSINAR',
+  },
+  SST: {
+    NAO_CONFORMIDADES: 'SST.NAO_CONFORMIDADES',
   },
   EQUIPAMENTOS_TI: {
     ATALHO: 'EQUIPAMENTOS_TI.ATALHO',

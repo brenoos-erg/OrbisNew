@@ -234,21 +234,21 @@ model Document {
 }
 
 model DocumentAssignment {
-  id              String                   @id @default(uuid())
-  documentId      String
-  userId          String
-  status          DocumentAssignmentStatus @default(PENDENTE)
+  id                String                   @id @default(uuid())
+  documentId        String
+  userId            String
+  status            DocumentAssignmentStatus @default(PENDENTE)
   signingProvider   String?
-  signingUrl        String?                 @db.Text
-  signingExternalId String?                 @db.Text
-  signingReturnUrl  String?                 @db.Text
+  signingUrl        String?                  @db.Text
+  signingExternalId String?                  @db.Text
+  signingReturnUrl  String?                  @db.Text
   signedAt          DateTime?
-  auditTrailUrl   String?                   @db.Text
-  auditTrailHash  String?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  document        Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user            User                     @relation("DocumentAssignedTo", fields: [userId], references: [id], onDelete: Cascade)
+  auditTrailUrl     String?                  @db.Text
+  auditTrailHash    String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  document          Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user              User                     @relation("DocumentAssignedTo", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, userId])
   @@index([userId, status])
@@ -316,6 +316,13 @@ model User {
   WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
   WorkRefusalAttachment                      WorkRefusalAttachment[]
   WorkRefusalHistory                         WorkRefusalHistory[]
+  nonConformitiesAsRequester                 NonConformity[]              @relation("NonConformityRequester")
+  nonConformitiesAsResponsible               NonConformity[]              @relation("NonConformityResponsible")
+  nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
+  nonConformityActionItems                   NonConformityActionItem[]
+  nonConformityAttachments                   NonConformityAttachment[]
+  nonConformityComments                      NonConformityComment[]
+  nonConformityTimelineEvents                NonConformityTimeline[]
 
   @@map("User")
 }
@@ -690,6 +697,107 @@ model WorkRefusalHistory {
   WorkRefusal   WorkRefusal       @relation(fields: [workRefusalId], references: [id])
 }
 
+model NonConformitySequence {
+  year      Int      @id
+  lastValue Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NonConformity {
+  id                               String                    @id @default(cuid())
+  numeroRnc                        String                    @unique
+  tipo                             NonConformityType
+  classificacao                    NonConformitySeverity
+  origem                           NonConformityOrigin
+  local                            String
+  dataOcorrencia                   DateTime
+  descricao                        String                    @db.LongText
+  solicitanteId                    String
+  solicitanteNome                  String
+  solicitanteEmail                 String
+  responsavelTratativaId           String?
+  status                           NonConformityStatus       @default(ABERTA)
+  acaoImediata                     String?                   @db.LongText
+  dataAcaoImediata                 DateTime?
+  causaRaiz                        String?                   @db.LongText
+  verificacaoEficaciaTexto         String?                   @db.LongText
+  verificacaoEficaciaData          DateTime?
+  verificacaoEficaciaAprovadoPorId String?
+  createdAt                        DateTime                  @default(now())
+  updatedAt                        DateTime                  @updatedAt
+  solicitante                      User                      @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
+  responsavelTratativa             User?                     @relation("NonConformityResponsible", fields: [responsavelTratativaId], references: [id])
+  verificacaoEficaciaAprovadoPor   User?                     @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
+  planoDeAcao                      NonConformityActionItem[]
+  anexos                           NonConformityAttachment[]
+  comentarios                      NonConformityComment[]
+  timeline                         NonConformityTimeline[]
+
+  @@index([status, createdAt])
+  @@index([solicitanteId, createdAt])
+  @@index([responsavelTratativaId, status])
+}
+
+model NonConformityActionItem {
+  id              String                    @id @default(cuid())
+  nonConformityId String
+  descricao       String
+  responsavelId   String?
+  responsavelNome String?
+  prazo           DateTime?
+  status          NonConformityActionStatus @default(PENDENTE)
+  evidencias      String?                   @db.LongText
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  nonConformity   NonConformity             @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  responsavel     User?                     @relation(fields: [responsavelId], references: [id])
+
+  @@index([nonConformityId, status])
+}
+
+model NonConformityAttachment {
+  id              String        @id @default(cuid())
+  nonConformityId String
+  filename        String
+  url             String
+  mimeType        String
+  sizeBytes       Int
+  createdAt       DateTime      @default(now())
+  createdById     String?
+  nonConformity   NonConformity @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  createdBy       User?         @relation(fields: [createdById], references: [id])
+
+  @@index([nonConformityId, createdAt])
+}
+
+model NonConformityComment {
+  id              String        @id @default(cuid())
+  nonConformityId String
+  autorId         String
+  texto           String        @db.LongText
+  createdAt       DateTime      @default(now())
+  nonConformity   NonConformity @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  autor           User          @relation(fields: [autorId], references: [id])
+
+  @@index([nonConformityId, createdAt])
+}
+
+model NonConformityTimeline {
+  id              String               @id @default(cuid())
+  nonConformityId String
+  actorId         String?
+  tipo            String
+  fromStatus      NonConformityStatus?
+  toStatus        NonConformityStatus?
+  message         String?              @db.LongText
+  createdAt       DateTime             @default(now())
+  nonConformity   NonConformity        @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  actor           User?                @relation(fields: [actorId], references: [id])
+
+  @@index([nonConformityId, createdAt])
+}
+
 enum Role {
   COLABORADOR
   RH
@@ -786,4 +894,41 @@ enum WorkRefusalStatus {
   PROCEDENTE
   NAO_PROCEDENTE
   ENCERRADO
+}
+
+enum NonConformityStatus {
+  ABERTA
+  EM_TRATATIVA
+  AGUARDANDO_VERIFICACAO
+  ENCERRADA
+  CANCELADA
+}
+
+enum NonConformityType {
+  PROCESSO
+  COMPORTAMENTAL
+  DOCUMENTAL
+  EQUIPAMENTO
+  OUTRO
+}
+
+enum NonConformitySeverity {
+  LEVE
+  MODERADA
+  GRAVE
+}
+
+enum NonConformityOrigin {
+  AUDITORIA
+  INSPECAO
+  OBSERVACAO
+  INCIDENTE
+  OUTRO
+}
+
+enum NonConformityActionStatus {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
 }

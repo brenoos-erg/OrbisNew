@@ -1150,6 +1150,7 @@ async function main() {
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
   const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
+  const sstModule = await ensureModule(MODULE_KEYS.SST, 'Segurança do Trabalho')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',
@@ -1163,6 +1164,7 @@ async function main() {
     celularModule,
     equipmentsModule,
     meusDocumentosModule,
+    sstModule,
   ]
 
 
@@ -1383,6 +1385,12 @@ async function main() {
         { key: FEATURE_KEYS.MEUS_DOCUMENTOS.LISTAR, name: 'Listar documentos' },
         { key: FEATURE_KEYS.MEUS_DOCUMENTOS.VISUALIZAR, name: 'Visualizar documentos' },
         { key: FEATURE_KEYS.MEUS_DOCUMENTOS.ASSINAR, name: 'Assinar documentos' },
+      ],
+    },
+     {
+      moduleId: sstModule.id,
+      items: [
+        { key: FEATURE_KEYS.SST.NAO_CONFORMIDADES, name: 'Não conformidades' },
       ],
     },
   ]

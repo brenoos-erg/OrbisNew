@@ -35,6 +35,7 @@ type Props = {
   showConfig: boolean
   showFleet: boolean
   showRefusal: boolean
+  showSst: boolean
   showEquipments: boolean
   showMyDocuments: boolean
   canApprove: boolean
@@ -88,6 +89,7 @@ export default function Sidebar({
   showConfig,
   showFleet,
   showRefusal,
+  showSst,
   showEquipments,
   showMyDocuments,
   canApprove,
@@ -113,6 +115,7 @@ export default function Sidebar({
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
   const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
+  const inSst = pathname.startsWith('/dashboard/sst')
   const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
   const inMyDocuments = pathname.startsWith('/dashboard/meus-documentos')
 
@@ -120,6 +123,7 @@ export default function Sidebar({
   const [openConfig, setOpenConfig] = useState(inConfig)
   const [openFleet, setOpenFleet] = useState(inFleet)
   const [openRefusal, setOpenRefusal] = useState(inRefusal)
+  const [openSst, setOpenSst] = useState(inSst)
   const [openEquipment, setOpenEquipment] = useState(inEquipment)
 
   // quando mudar de rota, abre o grupo correspondente e fecha o outro
@@ -129,33 +133,45 @@ export default function Sidebar({
       setOpenConfig(false)
       setOpenFleet(false)
       setOpenRefusal(false)
+      setOpenSst(false)
       setOpenEquipment(false)
     } else if (inConfig) {
       setOpenConfig(true)
       setOpenSolic(false)
       setOpenFleet(false)
       setOpenRefusal(false)
+      setOpenSst(false)
       setOpenEquipment(false)
     } else if (inFleet) {
       setOpenFleet(true)
       setOpenSolic(false)
       setOpenConfig(false)
       setOpenRefusal(false)
+      setOpenSst(false)
       setOpenEquipment(false)
     } else if (inRefusal) {
       setOpenRefusal(true)
+      setOpenSst(false)
+      setOpenFleet(false)
+      setOpenSolic(false)
+      setOpenConfig(false)
+      setOpenEquipment(false)
+    } else if (inSst) {
+      setOpenSst(true)
+      setOpenRefusal(false)
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
       setOpenEquipment(false)
     } else if (inEquipment) {
       setOpenEquipment(true)
+      setOpenSst(false)
       setOpenRefusal(false)
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
     }
-  }, [inSolic, inConfig, inFleet, inRefusal, inEquipment])
+  }, [inSolic, inConfig, inFleet, inRefusal, inSst, inEquipment])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -554,7 +570,51 @@ export default function Sidebar({
               )}
             </div>
           )}
-            {showRefusal && (
+            {showSst && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenSst((v) => !v)}
+                className={`${baseSection} ${inSst ? activeSection : inactiveSection}`}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <ShieldAlert className="h-5 w-5 shrink-0" />
+                </span>
+                {!collapsed && <span className={labelBase}>Segurança do Trabalho</span>}
+              </button>
+
+              {openSst && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/sst/nao-conformidades"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/sst/nao-conformidades')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardCheck size={16} /> <span className={labelBase}>Não Conformidades</span>
+                  </Link>
+                  {showRefusal && (
+                    <Link
+                      href="/dashboard/direito-de-recusa"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/direito-de-recusa')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Shield size={16} /> <span className={labelBase}>Direito de Recusa</span>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {showRefusal && (
             <div>
               <button
                 type="button"

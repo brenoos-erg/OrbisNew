@@ -30,6 +30,11 @@ const MODULE_CARDS: ModuleCard[] = [
     name: 'Controle de Equipamentos TI',
     href: '/dashboard/controle-equipamentos-ti',
   },
+   {
+    key: MODULE_KEYS.SST,
+    name: 'Segurança do Trabalho',
+    href: '/dashboard/sst/nao-conformidades',
+  },
 ]
 
 export default async function CelularPage() {

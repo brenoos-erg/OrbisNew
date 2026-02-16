@@ -100,6 +100,7 @@ export default async function DashboardLayout({
   let canApprove = false
   let showFleet = false
   let showRefusal = false
+  let showSst = false
   let showEquipments = false
   let canReviewRefusal = false
   let canAccessRefusalPanel = false
@@ -161,6 +162,7 @@ export default async function DashboardLayout({
       const refusalLevel = levels[MODULE_KEYS.RECUSA]
       const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
       const myDocumentsLevel = levels[MODULE_KEYS.MEUS_DOCUMENTOS]
+      const sstLevel = levels[MODULE_KEYS.SST]
 
      const [
         canViewConfigPainel,
@@ -324,6 +326,7 @@ export default async function DashboardLayout({
         hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) &&
         hasStructure &&
         Object.values(refusalFeatures).some(Boolean)
+      showSst = hasMinLevel(sstLevel, ModuleLevel.NIVEL_1) && hasStructure
          showMyDocuments =
         hasMinLevel(myDocumentsLevel, ModuleLevel.NIVEL_1) &&
         hasStructure &&
@@ -362,6 +365,7 @@ export default async function DashboardLayout({
           showConfig={showConfig}
           showFleet={showFleet}
           showRefusal={showRefusal}
+          showSst={showSst}
           showEquipments={showEquipments}
           showMyDocuments={showMyDocuments}
           canApprove={canApprove}
