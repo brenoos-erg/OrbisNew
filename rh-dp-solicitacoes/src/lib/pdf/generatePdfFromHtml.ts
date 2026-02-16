@@ -16,6 +16,7 @@ export type TermoTemplateData = {
   patrimonio: string
   regras: string[]
   aceite: string
+  logoDataUri?: string
 }
 
 export class PdfGenerationError extends Error {
@@ -42,11 +43,17 @@ function getRuntimeModule(moduleName: string): any | null {
 
 const currentFilePath = fileURLToPath(import.meta.url)
 const templateDir = path.resolve(path.dirname(currentFilePath), '..', '..', 'templates')
+const projectRoot = process.cwd()
 
 const templateCandidates = [
   'termo_responsabilidade.hbs',
   'termo_responsabilidades.hbs',
 ].map((templateFile) => path.join(templateDir, templateFile))
+
+const logoCandidates = [
+  path.join(projectRoot, 'public', 'erg-logotipo.png'),
+  path.join(projectRoot, 'erg-logotipo.png'),
+]
 
 async function resolveTemplatePath() {
   for (const candidatePath of templateCandidates) {
@@ -57,12 +64,25 @@ async function resolveTemplatePath() {
       continue
     }
   }
-
-  throw new PdfGenerationError(
+throw new PdfGenerationError(
     'Template do termo de responsabilidade não encontrado.',
     500,
     `Arquivos esperados em: ${templateCandidates.join(' ou ')}`,
   )
+}
+
+async function resolveLogoDataUri() {
+  for (const candidatePath of logoCandidates) {
+    try {
+      await access(candidatePath)
+      const logoBuffer = await readFile(candidatePath)
+      return `data:image/png;base64,${logoBuffer.toString('base64')}`
+    } catch {
+      continue
+    }
+  }
+
+  return ''
 }
 
 export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
@@ -78,7 +98,11 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
     )
   }
 
-  const html = handlebars.compile(templateSource)(data)
+  const logoDataUri = data.logoDataUri || (await resolveLogoDataUri())
+  const html = handlebars.compile(templateSource)({
+    ...data,
+    logoDataUri,
+  })
 
   const playwright = getRuntimeModule('playwright')
   if (!playwright?.chromium) {
@@ -93,7 +117,7 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
 
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'load' })
+    await page.setContent(html, { waitUntil: 'networkidle' })
     const pdf = await page.pdf({ format: 'A4', printBackground: true })
     return Buffer.from(pdf)
   } finally {

@@ -14,7 +14,8 @@
     "seed": "prisma db push && ts-node -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts",
     "generate:checklist": "node -r ts-node/register src/scripts/generateChecklistReport.ts",
     "postinstall": "playwright install chromium",
-    "test:signing-url": "node scripts/verify-long-signing-url.mjs"
+    "test:signing-url": "node scripts/verify-long-signing-url.mjs",
+    "test:pdf-termo": "ts-node --esm scripts/generate-termo-pdf.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

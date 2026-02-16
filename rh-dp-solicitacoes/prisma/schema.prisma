@@ -240,7 +240,7 @@ model DocumentAssignment {
   status          DocumentAssignmentStatus @default(PENDENTE)
   signingProvider   String?
   signingUrl        String?                 @db.Text
-  signingExternalId String?
+  signingExternalId String?                 @db.Text
   signingReturnUrl  String?                 @db.Text
   signedAt          DateTime?
   auditTrailUrl   String?                   @db.Text

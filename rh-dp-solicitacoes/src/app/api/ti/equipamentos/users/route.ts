@@ -42,32 +42,43 @@ export async function GET(req: Request) {
     )
   }
 
-  const { searchParams } = new URL(req.url)
-  const search = searchParams.get('search')?.trim() ?? ''
-  const limitParam = Number.parseInt(searchParams.get('limit') ?? '10', 10)
-  const limit = Number.isFinite(limitParam) ? Math.min(50, Math.max(5, limitParam)) : 10
+ try {
+    const { searchParams } = new URL(req.url)
+    const search = searchParams.get('search')?.trim() ?? ''
+    const limitParam = Number.parseInt(searchParams.get('limit') ?? '10', 10)
+    const limit = Number.isFinite(limitParam) ? Math.min(50, Math.max(5, limitParam)) : 10
 
-  const users = await prisma.user.findMany({
-    where: {
-      ...(search
-        ? {
-            OR: [
-              { fullName: { contains: search } },
-              { email: { contains: search } },
-            ],
-          }
-        : {}),
-      status: 'ATIVO',
-    },
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      costCenter: { select: { id: true, description: true, externalCode: true, code: true } },
-    },
-    orderBy: { fullName: 'asc' },
-    take: limit,
-  })
+    const users = await prisma.user.findMany({
+      where: {
+        ...(search
+          ? {
+              OR: [
+                { fullName: { contains: search } },
+                { email: { contains: search } },
+              ],
+            }
+          : {}),
+        status: 'ATIVO',
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        costCenter: { select: { id: true, description: true, externalCode: true, code: true } },
+      },
+      orderBy: { fullName: 'asc' },
+      take: limit,
+    })
 
-  return NextResponse.json(users)
+    return NextResponse.json(users)
+  } catch (error) {
+    console.error('[ti/equipamentos/users][GET] Falha ao buscar usuários', {
+      requestId,
+      error,
+    })
+    return NextResponse.json(
+      { error: 'Falha ao buscar usuários.', requestId },
+      { status: 500 },
+    )
+  }
 }

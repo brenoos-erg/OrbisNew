@@ -27,6 +27,12 @@ SUPERADMIN_PASSWORD="SuperAdmin@123"
 npm install
 ```
 
+### Dependências para geração de termo/PDF
+```bash
+npm i handlebars playwright
+npx playwright install chromium
+```
+
 ## 4) Rodar o projeto
 ```bash
 SKIP_PRISMA_MIGRATE=true npm run dev

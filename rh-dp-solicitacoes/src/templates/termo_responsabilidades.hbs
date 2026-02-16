@@ -3,53 +3,239 @@
   <head>
     <meta charset="UTF-8" />
     <style>
-      body { font-family: Arial, sans-serif; color: #1f2937; margin: 32px; font-size: 12px; }
-      h1 { font-size: 18px; margin-bottom: 4px; }
-      h2 { font-size: 14px; margin-top: 20px; }
-      .meta { margin-bottom: 20px; }
-      .meta p { margin: 2px 0; }
-      .box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-top: 10px; }
-      ul { margin: 8px 0 0 18px; }
-      li { margin-bottom: 6px; }
-      .signature { margin-top: 40px; border-top: 1px solid #64748b; padding-top: 8px; }
+      @page {
+        size: A4;
+        margin: 16mm;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111827;
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .document {
+        border: 1px solid #111827;
+        min-height: calc(297mm - 32mm);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        display: grid;
+        grid-template-columns: 180px 1fr 220px;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid #111827;
+        padding: 10px;
+      }
+
+      .logo {
+        height: 30px;
+        max-width: 150px;
+        object-fit: contain;
+      }
+
+      .title {
+        text-align: center;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+      }
+
+      .meta {
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .meta strong { display: inline-block; min-width: 72px; }
+
+      .section {
+        margin-top: 10px;
+        border: 1px solid #111827;
+      }
+
+      .section-title {
+        background: #f3f4f6;
+        border-bottom: 1px solid #111827;
+        padding: 6px 8px;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+
+      .section-body { padding: 8px; }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 16px;
+      }
+
+      .grid p,
+      p { margin: 0; }
+
+      .ack {
+        margin-top: 12px;
+        border: 1px solid #111827;
+        padding: 10px;
+        text-align: justify;
+      }
+
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      .items-table th,
+      .items-table td {
+        border: 1px solid #111827;
+        padding: 6px;
+        font-size: 11px;
+      }
+
+      .items-table th {
+        background: #f3f4f6;
+        text-align: left;
+      }
+
+      .observations {
+        margin-top: 10px;
+        border: 1px solid #111827;
+        padding: 8px;
+      }
+
+      .obs-title {
+        font-weight: 700;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+
+      .obs-row { margin-bottom: 6px; }
+
+      .checkbox {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border: 1px solid #111827;
+        margin: 0 5px 0 12px;
+        vertical-align: middle;
+      }
+
+      .signature {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+        align-items: end;
+      }
+
+      .signature-line {
+        border-top: 1px solid #111827;
+        text-align: center;
+        padding-top: 4px;
+      }
+
+      .date-line {
+        text-align: center;
+        border-bottom: 1px solid #111827;
+        margin: 0 auto 8px;
+        width: 120px;
+      }
+
+      .footer {
+        margin-top: auto;
+        border: 1px solid #111827;
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      .footer td {
+        border: 1px solid #111827;
+        padding: 6px;
+        font-size: 10px;
+        text-align: center;
+      }
     </style>
   </head>
   <body>
-    <h1>Termo de Responsabilidade de Equipamento</h1>
-    <div class="meta">
-      <p><strong>Protocolo:</strong> {{protocolo}}</p>
-      <p><strong>Data/Hora:</strong> {{dataHora}}</p>
-    </div>
+    <main class="document">
+      <header class="header">
+        <div>
+          {{#if logoDataUri}}
+            <img src="{{logoDataUri}}" alt="Logo ERG" class="logo" />
+          {{/if}}
+        </div>
+        <div class="title">TERMO DE RESPONSABILIDADE DE EQUIPAMENTO</div>
+        <div class="meta">
+          <div><strong>Protocolo:</strong> {{protocolo}}</div>
+          <div><strong>Data/Hora:</strong> {{dataHora}}</div>
+        </div>
+      </header>
 
-    <h2>Dados do solicitante</h2>
-    <div class="box">
-      <p><strong>Nome:</strong> {{nomeSolicitante}}</p>
-      <p><strong>E-mail:</strong> {{email}}</p>
-      <p><strong>Login:</strong> {{login}}</p>
-      <p><strong>Telefone:</strong> {{telefone}}</p>
-      <p><strong>Centro de custo:</strong> {{centroCusto}}</p>
-    </div>
+      <section class="section">
+        <div class="section-title">Dados do solicitante</div>
+        <div class="section-body grid">
+          <p><strong>Nome:</strong> {{nomeSolicitante}}</p>
+          <p><strong>E-mail:</strong> {{email}}</p>
+          <p><strong>Login:</strong> {{login}}</p>
+          <p><strong>Telefone:</strong> {{telefone}}</p>
+          <p><strong>Centro de custo:</strong> {{centroCusto}}</p>
+        </div>
+      </section>
 
-    <h2>Equipamento alocado</h2>
-    <div class="box">
-      <p><strong>Equipamento:</strong> {{equipamentoNome}}</p>
-      <p><strong>Modelo:</strong> {{equipamentoModelo}}</p>
-      <p><strong>Patrimônio/Identificador:</strong> {{patrimonio}}</p>
-    </div>
+      <p class="ack">
+        Ficando assim acertado assino ciente de minha responsabilidade o presente termo em duas vias de igual teor.
+      </p>
 
-    <h2>Regras e cláusulas</h2>
-    <div class="box">
-      <ul>
-        {{#each regras}}
-          <li>{{this}}</li>
-        {{/each}}
-      </ul>
-      <p style="margin-top: 12px"><strong>Aceite:</strong> {{aceite}}</p>
-    </div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th style="width: 18%">Itens</th>
+            <th style="width: 40%">Modelo/Itens</th>
+            <th style="width: 22%">Patrimônio</th>
+            <th style="width: 20%">Nº da Linha</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{equipamentoNome}}</td>
+            <td>{{equipamentoModelo}}</td>
+            <td>{{patrimonio}}</td>
+            <td>-</td>
+          </tr>
+        </tbody>
+      </table>
 
-    <div class="signature">
-      <p><strong>Assinatura eletrônica via DocuSign.</strong></p>
-      <p>Ao assinar eletronicamente este documento, o solicitante declara ciência e concordância com os termos acima.</p>
-    </div>
+      <section class="observations">
+        <div class="obs-title">Observações</div>
+        <div class="obs-row">Tela riscada:<span class="checkbox"></span>Sim<span class="checkbox"></span>Não</div>
+        <div class="obs-row">Avaria à vista:<span class="checkbox"></span>Sim<span class="checkbox"></span>Não - Se sim, qual? ________________________</div>
+        <div class="obs-row">Carregador original:<span class="checkbox"></span>Sim<span class="checkbox"></span>Não</div>
+      </section>
+
+      <section class="signature">
+        <div>
+          <div class="date-line">__/__/____</div>
+          <div style="text-align: center; font-size: 11px">Data</div>
+        </div>
+        <div class="signature-line">(Colaborador)</div>
+      </section>
+
+      <table class="footer" aria-label="Rodapé de revisão documental">
+        <tr>
+          <td>INDEXADOR</td>
+          <td>REVISÃO</td>
+          <td>DATA</td>
+          <td>PÁGINA</td>
+        </tr>
+      </table>
+    </main>
   </body>
 </html>
