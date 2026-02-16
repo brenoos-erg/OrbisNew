@@ -19,16 +19,26 @@ async function saveFile(file: File, folder: string) {
   await writeFile(absPath, bytes)
   return relPath
 }
+async function canAccessNc(nonConformityId: string, userId: string, level: ModuleLevel | undefined) {
+  const nc = await prisma.nonConformity.findUnique({ where: { id: nonConformityId }, select: { solicitanteId: true } })
+  if (!nc) return false
+  if (hasMinLevel(level, ModuleLevel.NIVEL_2)) return true
+  return nc.solicitanteId === userId
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
-    if (!hasMinLevel(normalizeSstLevel(levels), ModuleLevel.NIVEL_1)) {
+    const level = normalizeSstLevel(levels)
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
     const nonConformityId = (await params).id
+    if (!(await canAccessNc(nonConformityId, me.id, level))) {
+      return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
+    }
     const form = await req.formData()
     const files = form.getAll('files').filter((f): f is File => f instanceof File)
 
@@ -59,8 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ items: created })
   } catch (error) {
-    console.error('POST /api/sst/nao-conformidades/[id]/anexos error', error)
-   return NextResponse.json({ error: 'Erro ao enviar anexos.', detail: devErrorDetail(error) }, { status: 500 })
+     return NextResponse.json({ error: 'Erro ao enviar anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
@@ -82,7 +91,6 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('DELETE /api/sst/nao-conformidades/[id]/anexos error', error)
     return NextResponse.json({ error: 'Erro ao excluir anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

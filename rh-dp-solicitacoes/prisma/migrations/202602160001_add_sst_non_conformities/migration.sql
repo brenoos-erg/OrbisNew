@@ -12,19 +12,27 @@ CREATE TABLE `NonConformitySequence` (
 CREATE TABLE `NonConformity` (
     `id` VARCHAR(191) NOT NULL,
     `numeroRnc` VARCHAR(191) NOT NULL,
-    `tipo` ENUM('PROCESSO', 'COMPORTAMENTAL', 'DOCUMENTAL', 'EQUIPAMENTO', 'OUTRO') NOT NULL,
-    `classificacao` ENUM('LEVE', 'MODERADA', 'GRAVE') NOT NULL,
-    `origem` ENUM('AUDITORIA', 'INSPECAO', 'OBSERVACAO', 'INCIDENTE', 'OUTRO') NOT NULL,
-    `local` VARCHAR(191) NOT NULL,
-    `dataOcorrencia` DATETIME(3) NOT NULL,
+    `tipoNc` ENUM('AUDITORIA_CLIENTE', 'AUDITORIA_EXTERNA', 'AUDITORIA_INTERNA', 'OUTROS', 'PROCESSOS', 'NOTIFICACOES_CLIENTE') NOT NULL,
+    `evidenciaObjetiva` LONGTEXT NOT NULL,
+    `empresa` VARCHAR(191) NOT NULL DEFAULT 'ERG ENGENHARIA',
+    `centroQueDetectouId` VARCHAR(191) NOT NULL,
+    `centroQueOriginouId` VARCHAR(191) NOT NULL,
+    `prazoAtendimento` DATETIME(3) NOT NULL,
+    `fechamentoEm` DATETIME(3) NULL,
+    `referenciaSig` VARCHAR(191) NULL,
+    `gravidade` INTEGER NULL,
+    `urgencia` INTEGER NULL,
+    `tendencia` INTEGER NULL,
     `descricao` LONGTEXT NOT NULL,
+    `aprovadoQualidadeEm` DATETIME(3) NULL,
+    `aprovadoQualidadePorId` VARCHAR(191) NULL,
+    `aprovadoQualidadeStatus` ENUM('PENDENTE', 'APROVADO', 'REPROVADO') NOT NULL DEFAULT 'PENDENTE',
+    `aprovadoQualidadeObservacao` LONGTEXT NULL,
     `solicitanteId` VARCHAR(191) NOT NULL,
     `solicitanteNome` VARCHAR(191) NOT NULL,
     `solicitanteEmail` VARCHAR(191) NOT NULL,
-    `responsavelTratativaId` VARCHAR(191) NULL,
-    `status` ENUM('ABERTA', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NOT NULL DEFAULT 'ABERTA',
-    `acaoImediata` LONGTEXT NULL,
-    `dataAcaoImediata` DATETIME(3) NULL,
+    `status` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NOT NULL DEFAULT 'ABERTA',
+    `acoesImediatas` LONGTEXT NULL,
     `causaRaiz` LONGTEXT NULL,
     `verificacaoEficaciaTexto` LONGTEXT NULL,
     `verificacaoEficaciaData` DATETIME(3) NULL,
@@ -34,8 +42,7 @@ CREATE TABLE `NonConformity` (
 
     UNIQUE INDEX `NonConformity_numeroRnc_key`(`numeroRnc`),
     INDEX `NonConformity_status_createdAt_idx`(`status`, `createdAt`),
-    INDEX `NonConformity_solicitanteId_createdAt_idx`(`solicitanteId`, `createdAt`),
-    INDEX `NonConformity_responsavelTratativaId_status_idx`(`responsavelTratativaId`, `status`),
+      INDEX `NonConformity_centroQueDetectouId_centroQueOriginouId_idx`(`centroQueDetectouId`, `centroQueOriginouId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -61,13 +68,18 @@ CREATE TABLE `NonConformityAttachment` (
     `id` VARCHAR(191) NOT NULL,
     `nonConformityId` VARCHAR(191) NOT NULL,
     `filename` VARCHAR(191) NOT NULL,
-    `url` VARCHAR(191) NOT NULL,
-    `mimeType` VARCHAR(191) NOT NULL,
-    `sizeBytes` INTEGER NOT NULL,
+    `url` TEXT NOT NULL,
+    -- CreateTable
+CREATE TABLE `NonConformityCauseItem` (
+    `id` VARCHAR(191) NOT NULL,
+    `nonConformityId` VARCHAR(191) NOT NULL,
+    `ordem` INTEGER NOT NULL,
+    `pergunta` VARCHAR(191) NOT NULL,
+    `resposta` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `createdById` VARCHAR(191) NULL,
+    `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `NonConformityAttachment_nonConformityId_createdAt_idx`(`nonConformityId`, `createdAt`),
+    INDEX `NonConformityCauseItem_nonConformityId_ordem_idx`(`nonConformityId`, `ordem`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -89,8 +101,8 @@ CREATE TABLE `NonConformityTimeline` (
     `nonConformityId` VARCHAR(191) NOT NULL,
     `actorId` VARCHAR(191) NULL,
     `tipo` VARCHAR(191) NOT NULL,
-    `fromStatus` ENUM('ABERTA', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
-    `toStatus` ENUM('ABERTA', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
+     `fromStatus` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
+    `toStatus` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
     `message` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -99,34 +111,17 @@ CREATE TABLE `NonConformityTimeline` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
+ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_centroQueDetectouId_fkey` FOREIGN KEY (`centroQueDetectouId`) REFERENCES `CostCenter`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_centroQueOriginouId_fkey` FOREIGN KEY (`centroQueOriginouId`) REFERENCES `CostCenter`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_aprovadoQualidadePorId_fkey` FOREIGN KEY (`aprovadoQualidadePorId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_solicitanteId_fkey` FOREIGN KEY (`solicitanteId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_responsavelTratativaId_fkey` FOREIGN KEY (`responsavelTratativaId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformity` ADD CONSTRAINT `NonConformity_verificacaoEficaciaAprovadoPorId_fkey` FOREIGN KEY (`verificacaoEficaciaAprovadoPorId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityActionItem` ADD CONSTRAINT `NonConformityActionItem_nonConformityId_fkey` FOREIGN KEY (`nonConformityId`) REFERENCES `NonConformity`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityActionItem` ADD CONSTRAINT `NonConformityActionItem_responsavelId_fkey` FOREIGN KEY (`responsavelId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityAttachment` ADD CONSTRAINT `NonConformityAttachment_nonConformityId_fkey` FOREIGN KEY (`nonConformityId`) REFERENCES `NonConformity`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityAttachment` ADD CONSTRAINT `NonConformityAttachment_createdById_fkey` FOREIGN KEY (`createdById`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
+ALTER TABLE `NonConformityCauseItem` ADD CONSTRAINT `NonConformityCauseItem_nonConformityId_fkey` FOREIGN KEY (`nonConformityId`) REFERENCES `NonConformity`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE `NonConformityComment` ADD CONSTRAINT `NonConformityComment_nonConformityId_fkey` FOREIGN KEY (`nonConformityId`) REFERENCES `NonConformity`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityComment` ADD CONSTRAINT `NonConformityComment_autorId_fkey` FOREIGN KEY (`autorId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityTimeline` ADD CONSTRAINT `NonConformityTimeline_nonConformityId_fkey` FOREIGN KEY (`nonConformityId`) REFERENCES `NonConformity`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `NonConformityTimeline` ADD CONSTRAINT `NonConformityTimeline_actorId_fkey` FOREIGN KEY (`actorId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

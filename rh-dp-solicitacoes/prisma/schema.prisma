@@ -98,6 +98,8 @@ model CostCenter {
   vehicleCostCenters   VehicleCostCenter[]
   displacementCheckins VehicleDisplacementCheckin[]
   tiEquipmentSnapshots TiEquipment[]
+  nonConformitiesDetected NonConformity[] @relation("NonConformityDetectedCenter")
+  nonConformitiesOriginated NonConformity[] @relation("NonConformityOriginCenter")
 
   @@map("CostCenter")
 }
@@ -317,7 +319,7 @@ model User {
   WorkRefusalAttachment                      WorkRefusalAttachment[]
   WorkRefusalHistory                         WorkRefusalHistory[]
   nonConformitiesAsRequester                 NonConformity[]              @relation("NonConformityRequester")
-  nonConformitiesAsResponsible               NonConformity[]              @relation("NonConformityResponsible")
+  nonConformitiesAsQualityApprover           NonConformity[]              @relation("NonConformityQualityApprover")
   nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
   nonConformityAttachments                   NonConformityAttachment[]
@@ -707,36 +709,46 @@ model NonConformitySequence {
 model NonConformity {
   id                               String                    @id @default(cuid())
   numeroRnc                        String                    @unique
-  tipo                             NonConformityType
-  classificacao                    NonConformitySeverity
-  origem                           NonConformityOrigin
-  local                            String
-  dataOcorrencia                   DateTime
+  tipoNc                           NonConformityType
+  evidenciaObjetiva                String                    @db.LongText
+  empresa                          String                    @default("ERG ENGENHARIA")
+  centroQueDetectouId              String
+  centroQueOriginouId              String
+  prazoAtendimento                 DateTime
+  fechamentoEm                     DateTime?
+  referenciaSig                    String?
+  gravidade                        Int?
+  urgencia                         Int?
+  tendencia                        Int?
   descricao                        String                    @db.LongText
+  aprovadoQualidadeEm              DateTime?
+  aprovadoQualidadePorId           String?
+  aprovadoQualidadeStatus          NonConformityApprovalStatus @default(PENDENTE)
+  aprovadoQualidadeObservacao      String?                   @db.LongText
   solicitanteId                    String
   solicitanteNome                  String
   solicitanteEmail                 String
-  responsavelTratativaId           String?
   status                           NonConformityStatus       @default(ABERTA)
-  acaoImediata                     String?                   @db.LongText
-  dataAcaoImediata                 DateTime?
+  acoesImediatas                   String?                   @db.LongText
   causaRaiz                        String?                   @db.LongText
   verificacaoEficaciaTexto         String?                   @db.LongText
   verificacaoEficaciaData          DateTime?
   verificacaoEficaciaAprovadoPorId String?
   createdAt                        DateTime                  @default(now())
   updatedAt                        DateTime                  @updatedAt
+  centroQueDetectou                CostCenter                @relation("NonConformityDetectedCenter", fields: [centroQueDetectouId], references: [id])
+  centroQueOriginou                CostCenter                @relation("NonConformityOriginCenter", fields: [centroQueOriginouId], references: [id])
   solicitante                      User                      @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
-  responsavelTratativa             User?                     @relation("NonConformityResponsible", fields: [responsavelTratativaId], references: [id])
+  aprovadoQualidadePor             User?                     @relation("NonConformityQualityApprover", fields: [aprovadoQualidadePorId], references: [id])
   verificacaoEficaciaAprovadoPor   User?                     @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
   planoDeAcao                      NonConformityActionItem[]
+  estudoCausa                      NonConformityCauseItem[]
   anexos                           NonConformityAttachment[]
   comentarios                      NonConformityComment[]
   timeline                         NonConformityTimeline[]
 
   @@index([status, createdAt])
-  @@index([solicitanteId, createdAt])
-  @@index([responsavelTratativaId, status])
+  @@index([centroQueDetectouId, centroQueOriginouId])
 }
 
 model NonConformityActionItem {
@@ -770,6 +782,19 @@ model NonConformityAttachment {
 
   @@index([nonConformityId, createdAt])
 }
+model NonConformityCauseItem {
+  id              String        @id @default(cuid())
+  nonConformityId String
+  ordem           Int
+  pergunta        String
+  resposta        String?       @db.LongText
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  nonConformity   NonConformity @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+
+  @@index([nonConformityId, ordem])
+}
+
 
 model NonConformityComment {
   id              String        @id @default(cuid())
@@ -898,6 +923,8 @@ enum WorkRefusalStatus {
 
 enum NonConformityStatus {
   ABERTA
+  AGUARDANDO_APROVACAO_QUALIDADE
+  APROVADA_QUALIDADE
   EM_TRATATIVA
   AGUARDANDO_VERIFICACAO
   ENCERRADA
@@ -905,25 +932,12 @@ enum NonConformityStatus {
 }
 
 enum NonConformityType {
-  PROCESSO
-  COMPORTAMENTAL
-  DOCUMENTAL
-  EQUIPAMENTO
-  OUTRO
-}
-
-enum NonConformitySeverity {
-  LEVE
-  MODERADA
-  GRAVE
-}
-
-enum NonConformityOrigin {
-  AUDITORIA
-  INSPECAO
-  OBSERVACAO
-  INCIDENTE
-  OUTRO
+  AUDITORIA_CLIENTE
+  AUDITORIA_EXTERNA
+  AUDITORIA_INTERNA
+  OUTROS
+  PROCESSOS
+  NOTIFICACOES_CLIENTE
 }
 
 enum NonConformityActionStatus {
@@ -931,4 +945,10 @@ enum NonConformityActionStatus {
   EM_ANDAMENTO
   CONCLUIDA
   CANCELADA
+}
+
+enum NonConformityApprovalStatus {
+  PENDENTE
+  APROVADO
+  REPROVADO
 }

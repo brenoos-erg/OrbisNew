@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityOrigin, NonConformitySeverity, NonConformityStatus, NonConformityType } from '@prisma/client'
+import { ModuleLevel, NonConformityApprovalStatus, NonConformityStatus, NonConformityType, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
@@ -9,18 +9,15 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function nextRncNumber() {
+async function nextRncNumber(tx: Prisma.TransactionClient) {
   const year = new Date().getFullYear()
-  const value = await prisma.$transaction(async (tx) => {
-    const seq = await tx.nonConformitySequence.upsert({
-      where: { year },
-      update: { lastValue: { increment: 1 } },
-      create: { year, lastValue: 1 },
-      select: { lastValue: true },
-    })
-    return seq.lastValue
+  const seq = await tx.nonConformitySequence.upsert({
+    where: { year },
+    update: { lastValue: { increment: 1 } },
+    create: { year, lastValue: 1 },
+    select: { lastValue: true },
   })
-  return `RNC-${year}-${String(value).padStart(4, '0')}`
+  return `RNC-${year}-${String(seq.lastValue).padStart(4, '0')}`
 }
 
 export async function GET(req: NextRequest) {
@@ -35,6 +32,11 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
+    const tipoNc = searchParams.get('tipoNc')
+    const centroQueDetectouId = searchParams.get('centroQueDetectouId')
+    const centroQueOriginouId = searchParams.get('centroQueOriginouId')
+    const dataInicio = searchParams.get('dataInicio')
+    const dataFim = searchParams.get('dataFim')
     const q = searchParams.get('q')?.trim()
 
     const where: any = {}
@@ -44,13 +46,25 @@ export async function GET(req: NextRequest) {
     if (status && Object.values(NonConformityStatus).includes(status as NonConformityStatus)) {
       where.status = status as NonConformityStatus
     }
-    if (q) {
+    if (tipoNc && Object.values(NonConformityType).includes(tipoNc as NonConformityType)) {
+      where.tipoNc = tipoNc as NonConformityType
+    }
+    if (centroQueDetectouId) where.centroQueDetectouId = centroQueDetectouId
+    if (centroQueOriginouId) where.centroQueOriginouId = centroQueOriginouId
+    if (dataInicio || dataFim) {
+      where.createdAt = {
+        ...(dataInicio ? { gte: new Date(dataInicio) } : {}),
+        ...(dataFim ? { lte: new Date(dataFim) } : {}),
+      }
+    }
+     if (q) {
       where.OR = [
         { numeroRnc: { contains: q } },
-        { local: { contains: q } },
         { descricao: { contains: q } },
+        { evidenciaObjetiva: { contains: q } },
       ]
     }
+
 
     const items = await prisma.nonConformity.findMany({
       where,
@@ -59,18 +73,17 @@ export async function GET(req: NextRequest) {
         id: true,
         numeroRnc: true,
         status: true,
-        tipo: true,
-        classificacao: true,
-        origem: true,
-        local: true,
-        dataOcorrencia: true,
+        tipoNc: true,
         createdAt: true,
+        prazoAtendimento: true,
         solicitanteNome: true,
-        responsavelTratativa: { select: { id: true, fullName: true } },
+        aprovadoQualidadeStatus: true,
+        centroQueDetectou: { select: { id: true, description: true } },
+        centroQueOriginou: { select: { id: true, description: true } },
       },
     })
 
-     return NextResponse.json({ items })
+    return NextResponse.json({ items })
   } catch (error) {
     console.error('GET /api/sst/nao-conformidades error', error)
     return NextResponse.json({ error: 'Erro ao listar não conformidades.', detail: devErrorDetail(error) }, { status: 500 })
@@ -88,72 +101,65 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({} as any))
-    const {
-      tipo,
-      classificacao,
-      origem,
-      local,
-      data,
-      descricao,
-      acaoImediata,
-      dataAcaoImediata,
-      responsavelTratativaId,
-    } = body
+     const descricao = String(body?.descricao || '').trim()
+    const evidenciaObjetiva = String(body?.evidenciaObjetiva || '').trim()
+    const centroQueDetectouId = String(body?.centroQueDetectouId || '').trim()
+    const centroQueOriginouId = String(body?.centroQueOriginouId || '').trim()
 
-    if (!tipo || !classificacao || !origem || !local || !data || !descricao) {
-      return NextResponse.json({ error: 'Preencha os campos obrigatórios.' }, { status: 400 })
+    if (!descricao || !evidenciaObjetiva || !centroQueDetectouId || !centroQueOriginouId) {
+      return NextResponse.json({ error: 'Descrição, evidência objetiva e centros são obrigatórios.' }, { status: 400 })
     }
 
-    if (!Object.values(NonConformityType).includes(tipo)) {
-      return NextResponse.json({ error: 'Tipo inválido.' }, { status: 400 })
-    }
-    if (!Object.values(NonConformitySeverity).includes(classificacao)) {
-      return NextResponse.json({ error: 'Classificação inválida.' }, { status: 400 })
-    }
-    if (!Object.values(NonConformityOrigin).includes(origem)) {
-      return NextResponse.json({ error: 'Origem inválida.' }, { status: 400 })
+    const tipoNc = body?.tipoNc && Object.values(NonConformityType).includes(body.tipoNc)
+      ? body.tipoNc as NonConformityType
+      : NonConformityType.OUTROS
+
+    const [detected, origin] = await Promise.all([
+      prisma.costCenter.findUnique({ where: { id: centroQueDetectouId }, select: { id: true } }),
+      prisma.costCenter.findUnique({ where: { id: centroQueOriginouId }, select: { id: true } }),
+    ])
+
+    if (!detected || !origin) {
+      return NextResponse.json({ error: 'Centro de custo inválido.' }, { status: 400 })
     }
 
-    let responsavelTratativaConnect: { id: string } | undefined
-    if (responsavelTratativaId) {
-      if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-        return NextResponse.json({ error: 'Nível insuficiente para definir responsável.' }, { status: 403 })
-      }
-      const responsible = await prisma.user.findUnique({ where: { id: String(responsavelTratativaId) }, select: { id: true } })
-      if (!responsible) {
-        return NextResponse.json({ error: 'Responsável de tratativa não encontrado.' }, { status: 404 })
-      }
-      responsavelTratativaConnect = { id: responsible.id }
-    }
+     const created = await prisma.$transaction(async (tx) => {
+      const numeroRnc = await nextRncNumber(tx)
+      const createdAt = new Date()
+      const prazoAtendimento = new Date(createdAt)
+      prazoAtendimento.setDate(prazoAtendimento.getDate() + 90)
 
-    const numeroRnc = await nextRncNumber()
-
-    const created = await prisma.nonConformity.create({
-      data: {
-        numeroRnc,
-        tipo,
-        classificacao,
-        origem,
-        local: String(local).trim(),
-        dataOcorrencia: new Date(data),
-        descricao: String(descricao).trim(),
-        solicitanteId: me.id,
-        solicitanteNome: me.fullName,
-        solicitanteEmail: me.email,
-        status: NonConformityStatus.ABERTA,
-        acaoImediata: acaoImediata ? String(acaoImediata).trim() : null,
-        dataAcaoImediata: dataAcaoImediata ? new Date(dataAcaoImediata) : null,
-        responsavelTratativaId: responsavelTratativaConnect?.id ?? null,
-        timeline: {
-          create: {
-            actorId: me.id,
-            tipo: 'CRIACAO',
-            toStatus: NonConformityStatus.ABERTA,
-            message: 'Não conformidade registrada',
+      return tx.nonConformity.create({
+        data: {
+          numeroRnc,
+          tipoNc,
+          descricao,
+          evidenciaObjetiva,
+          empresa: 'ERG ENGENHARIA',
+          centroQueDetectouId,
+          centroQueOriginouId,
+          prazoAtendimento,
+          referenciaSig: body?.referenciaSig ? String(body.referenciaSig).trim() : null,
+          acoesImediatas: body?.acoesImediatas ? String(body.acoesImediatas).trim() : null,
+          gravidade: body?.gravidade ?? null,
+          urgencia: body?.urgencia ?? null,
+          tendencia: body?.tendencia ?? null,
+          solicitanteId: me.id,
+          solicitanteNome: me.fullName,
+          solicitanteEmail: me.email,
+          status: NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE,
+          aprovadoQualidadeStatus: NonConformityApprovalStatus.PENDENTE,
+          timeline: {
+            create: {
+              actorId: me.id,
+              tipo: 'CRIACAO',
+              toStatus: NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE,
+                        message: 'Não conformidade registrada e enviada para aprovação da qualidade',
+            },
           },
         },
-      },
-      select: { id: true, numeroRnc: true },
+        select: { id: true, numeroRnc: true },
+      })
     })
 
     return NextResponse.json(created, { status: 201 })

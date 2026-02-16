@@ -10,44 +10,49 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
-    if (!hasMinLevel(normalizeSstLevel(levels), ModuleLevel.NIVEL_3)) {
-      return NextResponse.json({ error: 'Somente nível 3 pode aprovar verificação de eficácia.' }, { status: 403 })
+    const level = normalizeSstLevel(levels)
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
+      return NextResponse.json({ error: 'Somente qualidade (nível 2/3) pode registrar verificação de eficácia.' }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({} as any))
-    const texto = String(body?.texto || '').trim()
-    const data = body?.data ? new Date(body.data) : new Date()
-
-    if (!texto) return NextResponse.json({ error: 'Texto da verificação é obrigatório.' }, { status: 400 })
+    const texto = String(body?.analiseQualidade || '').trim()
+    if (!texto) return NextResponse.json({ error: 'Texto da análise é obrigatório.' }, { status: 400 })
 
     const id = (await params).id
     const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.nonConformity.findUnique({ where: { id }, select: { status: true } })
+      if (!current) throw new Error('NOT_FOUND')
+
       const row = await tx.nonConformity.update({
         where: { id },
         data: {
           verificacaoEficaciaTexto: texto,
-          verificacaoEficaciaData: data,
+          verificacaoEficaciaData: new Date(),
           verificacaoEficaciaAprovadoPorId: me.id,
           status: NonConformityStatus.ENCERRADA,
+          fechamentoEm: new Date(),
         },
       })
 
-      await tx.nonConformityTimeline.create({
+       await tx.nonConformityTimeline.create({
         data: {
           nonConformityId: id,
           actorId: me.id,
-          tipo: 'VERIFICACAO_EFICACIA',
-          fromStatus: row.status,
+          tipo: 'FECHAMENTO',
+          fromStatus: current.status,
           toStatus: NonConformityStatus.ENCERRADA,
-          message: 'Verificação de eficácia aprovada e NC encerrada',
+          message: 'Verificação de eficácia registrada e NC encerrada',
         },
       })
       return row
     })
 
     return NextResponse.json(updated)
-  } catch (error) {
-    console.error('POST /api/sst/nao-conformidades/[id]/verificacao-eficacia error', error)
+  } catch (error: any) {
+    if (error?.message === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+    }
     return NextResponse.json({ error: 'Erro ao registrar verificação de eficácia.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

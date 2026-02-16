@@ -1,25 +1,31 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+
+type CostCenter = { id: string; description: string; code?: string | null }
 
 export default function NovaNaoConformidadePage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [centers, setCenters] = useState<CostCenter[]>([])
+
+  useEffect(() => {
+    fetch('/api/cost-centers/select').then((r) => r.json()).then(setCenters).catch(() => setCenters([]))
+  }, [])
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const payload = {
-      tipo: form.get('tipo'),
-      classificacao: form.get('classificacao'),
-      origem: form.get('origem'),
-      local: form.get('local'),
-      data: form.get('data'),
       descricao: form.get('descricao'),
-      acaoImediata: form.get('acaoImediata'),
-      dataAcaoImediata: form.get('dataAcaoImediata') || null,
+      evidenciaObjetiva: form.get('evidenciaObjetiva'),
+      centroQueDetectouId: form.get('centroQueDetectouId'),
+      centroQueOriginouId: form.get('centroQueOriginouId'),
+      tipoNc: form.get('tipoNc'),
+      referenciaSig: form.get('referenciaSig'),
+      acoesImediatas: form.get('acoesImediatas'),
     }
 
     try {
@@ -48,17 +54,16 @@ export default function NovaNaoConformidadePage() {
       </header>
 
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <FieldSelect name="tipo" label="Tipo" options={['PROCESSO', 'COMPORTAMENTAL', 'DOCUMENTAL', 'EQUIPAMENTO', 'OUTRO']} />
-          <FieldSelect name="classificacao" label="Classificação" options={['LEVE', 'MODERADA', 'GRAVE']} />
-          <FieldSelect name="origem" label="Origem" options={['AUDITORIA', 'INSPECAO', 'OBSERVACAO', 'INCIDENTE', 'OUTRO']} />
-          <FieldInput name="local" label="Local" />
-          <FieldInput name="data" type="date" label="Data" />
-          <FieldInput name="dataAcaoImediata" type="date" label="Data da ação imediata" required={false} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <FieldSelect name="tipoNc" label="Tipo NC" options={['AUDITORIA_CLIENTE', 'AUDITORIA_EXTERNA', 'AUDITORIA_INTERNA', 'OUTROS', 'PROCESSOS', 'NOTIFICACOES_CLIENTE']} />
+          <FieldInput name="referenciaSig" label="Referência SIG" required={false} />
+          <FieldSelect name="centroQueDetectouId" label="Centro que detectou" options={centers.map((x) => x.id)} labels={Object.fromEntries(centers.map((x) => [x.id, `${x.code || '-'} - ${x.description}`]))} />
+          <FieldSelect name="centroQueOriginouId" label="Centro que originou" options={centers.map((x) => x.id)} labels={Object.fromEntries(centers.map((x) => [x.id, `${x.code || '-'} - ${x.description}`]))} />
         </div>
 
-        <FieldTextarea name="descricao" label="Descrição da não conformidade" />
-        <FieldTextarea name="acaoImediata" label="Ação imediata" required={false} />
+        <FieldTextarea name="descricao" label="Descrição" />
+        <FieldTextarea name="evidenciaObjetiva" label="Evidência objetiva" />
+        <FieldTextarea name="acoesImediatas" label="Ações imediatas" required={false} />
 
         {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
 
@@ -74,8 +79,8 @@ export default function NovaNaoConformidadePage() {
 function FieldInput({ label, name, type = 'text', required = true }: { label: string; name: string; type?: string; required?: boolean }) {
   return <label className="space-y-1 text-sm font-medium text-slate-700">{label}<input type={type} name={name} required={required} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-normal" /></label>
 }
-function FieldSelect({ label, name, options }: { label: string; name: string; options: string[] }) {
-  return <label className="space-y-1 text-sm font-medium text-slate-700">{label}<select name={name} required className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-normal">{options.map((option)=><option key={option} value={option}>{option}</option>)}</select></label>
+function FieldSelect({ label, name, options, labels = {} }: { label: string; name: string; options: string[]; labels?: Record<string, string> }) {
+  return <label className="space-y-1 text-sm font-medium text-slate-700">{label}<select name={name} required className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-normal">{options.map((option)=><option key={option} value={option}>{labels[option] || option}</option>)}</select></label>
 }
 function FieldTextarea({ label, name, required = true }: { label: string; name: string; required?: boolean }) {
   return <label className="space-y-1 text-sm font-medium text-slate-700">{label}<textarea name={name} required={required} rows={4} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-normal" /></label>
