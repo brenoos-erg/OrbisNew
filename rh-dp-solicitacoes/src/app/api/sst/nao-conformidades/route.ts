@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, NonConformityOrigin, NonConformitySeverity, NonConformityStatus, NonConformityType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
@@ -69,10 +70,10 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ items })
+     return NextResponse.json({ items })
   } catch (error) {
     console.error('GET /api/sst/nao-conformidades error', error)
-    return NextResponse.json({ error: 'Erro ao listar não conformidades.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao listar não conformidades.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
@@ -158,6 +159,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     console.error('POST /api/sst/nao-conformidades error', error)
-    return NextResponse.json({ error: 'Erro ao criar não conformidade.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao criar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

@@ -11,7 +11,7 @@ model Attachment {
   id             String       @id
   solicitationId String
   filename       String
-  url            String
+  url            String       @db.Text
   mimeType       String
   sizeBytes      Int
   createdAt      DateTime     @default(now())
@@ -22,7 +22,7 @@ model RefusalAttachment {
   id        String        @id
   reportId  String
   filename  String
-  url       String
+  url       String        @db.Text
   mimeType  String
   sizeBytes Int
   createdAt DateTime      @default(now())
@@ -223,7 +223,7 @@ model Document {
   solicitationId String?
   type           DocumentType
   title          String
-  pdfUrl         String
+  pdfUrl         String?              @db.Text
   createdAt      DateTime             @default(now())
   createdById    String
   solicitation   Solicitation?        @relation(fields: [solicitationId], references: [id], onDelete: SetNull)
@@ -677,7 +677,7 @@ model WorkRefusalAttachment {
   id            String      @id
   workRefusalId String
   filename      String
-  url           String
+  url           String      @db.Text
   mimeType      String
   sizeBytes     Int
   createdAt     DateTime    @default(now())
@@ -760,7 +760,7 @@ model NonConformityAttachment {
   id              String        @id @default(cuid())
   nonConformityId String
   filename        String
-  url             String
+  url             String        @db.Text
   mimeType        String
   sizeBytes       Int
   createdAt       DateTime      @default(now())

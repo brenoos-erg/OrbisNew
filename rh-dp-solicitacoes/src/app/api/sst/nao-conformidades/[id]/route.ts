@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, NonConformityActionStatus, NonConformityStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
@@ -34,10 +35,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Você só pode visualizar as suas não conformidades.' }, { status: 403 })
     }
 
-    return NextResponse.json({ item: nc })
+  return NextResponse.json({ item: nc })
   } catch (error) {
     console.error('GET /api/sst/nao-conformidades/[id] error', error)
-    return NextResponse.json({ error: 'Erro ao carregar não conformidade.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao carregar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
@@ -132,9 +133,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return item
     })
 
-    return NextResponse.json(updated)
+   return NextResponse.json(updated)
   } catch (error) {
     console.error('PATCH /api/sst/nao-conformidades/[id] error', error)
-    return NextResponse.json({ error: 'Erro ao atualizar não conformidade.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao atualizar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

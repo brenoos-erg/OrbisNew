@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { canFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
@@ -71,6 +72,6 @@ export async function POST(
     return NextResponse.json({ assignment: updated })
   } catch (error) {
     console.error('Erro ao assinar documento', error)
-    return NextResponse.json({ error: 'Erro ao assinar documento.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao assinar documento.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

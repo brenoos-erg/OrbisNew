@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, NonConformityStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
@@ -47,6 +48,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json(updated)
   } catch (error) {
     console.error('POST /api/sst/nao-conformidades/[id]/verificacao-eficacia error', error)
-    return NextResponse.json({ error: 'Erro ao registrar verificação de eficácia.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao registrar verificação de eficácia.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

@@ -40,6 +40,10 @@ export async function createEmbeddedSigningForAssignment(input: CreateEmbeddedSi
   let envelopeId = assignment.signingExternalId
 
   if (!envelopeId) {
+     if (!assignment.document.pdfUrl) {
+      throw new Error('Documento sem PDF disponível para iniciar assinatura DocuSign.')
+    }
+
     const pdfBuffer = await downloadPdfBuffer(assignment.document.pdfUrl)
 
     const envelope = await createEnvelopeFromPdfBuffer({

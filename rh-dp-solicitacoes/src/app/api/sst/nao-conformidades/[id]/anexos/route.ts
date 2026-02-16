@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ items: created })
   } catch (error) {
     console.error('POST /api/sst/nao-conformidades/[id]/anexos error', error)
-    return NextResponse.json({ error: 'Erro ao enviar anexos.' }, { status: 500 })
+   return NextResponse.json({ error: 'Erro ao enviar anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
@@ -82,6 +83,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('DELETE /api/sst/nao-conformidades/[id]/anexos error', error)
-    return NextResponse.json({ error: 'Erro ao excluir anexos.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao excluir anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { canFeature } from '@/lib/permissions'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
@@ -64,6 +65,6 @@ export async function POST(
     return NextResponse.json(session)
   } catch (error) {
     console.error('Erro ao solicitar assinatura', error)
-    return NextResponse.json({ error: 'Erro ao solicitar assinatura.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao solicitar assinatura.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

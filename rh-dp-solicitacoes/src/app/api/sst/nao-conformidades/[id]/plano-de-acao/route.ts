@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, NonConformityActionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
@@ -62,6 +63,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ items: saved })
   } catch (error) {
     console.error('POST /api/sst/nao-conformidades/[id]/plano-de-acao error', error)
-    return NextResponse.json({ error: 'Erro ao salvar plano de ação.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao salvar plano de ação.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

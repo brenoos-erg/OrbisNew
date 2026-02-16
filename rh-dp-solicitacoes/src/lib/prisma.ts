@@ -2,15 +2,17 @@
 import { PrismaClient } from '@prisma/client'
 import { recordPrismaQuery } from '@/lib/request-metrics'
 
+const DEFAULT_MYSQL_DATABASE_URL = 'mysql://orbis:orbis123@localhost:3306/orbis'
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
 const cleanEnvUrl = (value?: string | null) => value?.trim() || null
-const databaseUrl = cleanEnvUrl(process.env.DATABASE_URL)
+const databaseUrl = cleanEnvUrl(process.env.DATABASE_URL) || DEFAULT_MYSQL_DATABASE_URL
 
-if (!databaseUrl) {
-  throw new Error('Nenhuma URL de banco encontrada (DATABASE_URL).')
+if (!process.env.DATABASE_URL) {
+  console.warn('DATABASE_URL não definido. Usando URL local padrão para inicialização do Prisma Client.')
 }
 
 const enableQueryMetrics =

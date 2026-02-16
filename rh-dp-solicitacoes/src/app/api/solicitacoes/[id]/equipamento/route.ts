@@ -3,6 +3,7 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
@@ -339,7 +340,7 @@ export async function GET(
   } catch (error) {
     console.error('Erro ao carregar equipamentos em estoque para solicitação', error)
     return NextResponse.json(
-      { error: 'Erro ao carregar equipamentos em estoque.' },
+      { error: 'Erro ao carregar equipamentos em estoque.', detail: devErrorDetail(error) },
       { status: 500 },
     )
   }

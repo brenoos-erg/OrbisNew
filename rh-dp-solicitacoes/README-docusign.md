@@ -57,5 +57,15 @@ A migration `202602140001_expand_document_assignment_url_columns` altera as colu
 Após migrar o banco, execute:
 
 - `npm run test:signing-url`
-
 Esse script cria dados temporários, salva URLs longas nos três campos de assinatura do `DocumentAssignment`, valida a leitura e remove os registros de teste.
+## Troubleshooting rápido
+
+### Colunas de URL longas (MySQL)
+As colunas `DocumentAssignment.signingUrl`, `signingReturnUrl`, `auditTrailUrl`, `signingExternalId` e `Document.pdfUrl` devem ser `TEXT` no banco. Use as migrations mais recentes e valide com:
+
+```bash
+npm run test:signing-url
+```
+
+### Erro 500 genérico nas APIs
+Em ambiente de desenvolvimento as rotas retornam `{ error, detail }` para facilitar diagnóstico. Em produção o campo `detail` é omitido.

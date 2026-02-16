@@ -7,7 +7,7 @@
     "prebuild": "prisma generate",
     "build": "next build",
     "start": "prisma migrate deploy && next start",
-    "lint": "next lint",
+    "lint": "tsc --noEmit",
     "test": "ts-node --esm tests/import-users.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -15,7 +15,7 @@
     "generate:checklist": "node -r ts-node/register src/scripts/generateChecklistReport.ts",
     "postinstall": "playwright install chromium",
     "test:signing-url": "node scripts/verify-long-signing-url.mjs",
-    "test:pdf-termo": "ts-node --esm scripts/generate-termo-pdf.ts"
+    "test:pdf-termo": "node scripts/generate-termo-pdf.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

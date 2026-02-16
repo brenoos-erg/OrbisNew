@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
+import { config as loadEnv } from 'dotenv'
+
+loadEnv()
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'mysql://orbis:orbis123@localhost:3306/orbis'
+}
 
 const prisma = new PrismaClient()
 
-function buildLongUrl(label) {
-  const longQuery = 'x'.repeat(512)
-  return `https://example.docusign.com/${label}?token=${longQuery}`
+function buildLongValue(label, size = 1200) {
+  return `https://example.docusign.com/${label}?token=${'x'.repeat(size)}`
 }
 
 async function main() {
@@ -23,7 +28,7 @@ async function main() {
     data: {
       type: 'TERMO_RESPONSABILIDADE',
       title: `Documento teste ${suffix}`,
-      pdfUrl: `https://storage.local/${suffix}.pdf`,
+      pdfUrl: buildLongValue(`document-${suffix}`),
       createdById: user.id,
     },
   })
@@ -36,9 +41,10 @@ async function main() {
     },
   })
 
-  const signingUrl = buildLongUrl('recipient-view')
-  const signingReturnUrl = buildLongUrl('return')
-  const auditTrailUrl = buildLongUrl('audit-trail')
+  const signingUrl = buildLongValue('recipient-view')
+  const signingReturnUrl = buildLongValue('return')
+  const auditTrailUrl = buildLongValue('audit-trail')
+  const signingExternalId = `env-${'a'.repeat(1100)}-${suffix}`
 
   await prisma.documentAssignment.update({
     where: { id: assignment.id },
@@ -47,7 +53,7 @@ async function main() {
       signingUrl,
       signingReturnUrl,
       auditTrailUrl,
-      signingExternalId: `env-${suffix}`,
+      signingExternalId,
     },
   })
 
@@ -57,18 +63,23 @@ async function main() {
       signingUrl: true,
       signingReturnUrl: true,
       auditTrailUrl: true,
+      signingExternalId: true,
+      document: { select: { pdfUrl: true } },
     },
   })
 
   if (
     stored.signingUrl !== signingUrl ||
     stored.signingReturnUrl !== signingReturnUrl ||
-    stored.auditTrailUrl !== auditTrailUrl
+    stored.auditTrailUrl !== auditTrailUrl ||
+    stored.signingExternalId !== signingExternalId ||
+    stored.document.pdfUrl !== document.pdfUrl
   ) {
-    throw new Error('URLs longas não foram persistidas corretamente.')
+    throw new Error('Campos de URL longos não foram persistidos corretamente.')
   }
 
-  console.log('OK: URLs longas (>191 chars) persistidas com sucesso no DocumentAssignment.')
+  console.log('OK: URLs/IDs longos (>1000 chars) persistidos com sucesso em Document e DocumentAssignment.')
+
 
   await prisma.documentAssignment.delete({ where: { id: assignment.id } })
   await prisma.document.delete({ where: { id: document.id } })

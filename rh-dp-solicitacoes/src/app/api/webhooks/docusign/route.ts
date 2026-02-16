@@ -4,6 +4,7 @@ export const revalidate = 0
 import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { devErrorDetail } from '@/lib/apiError'
 import { downloadCertificateOfCompletion } from '@/lib/signature/providers/docusign/envelopes'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
 import { finalizeSolicitationIfNoPending } from '@/lib/signature/finalizeSolicitationIfNoPending'
@@ -99,9 +100,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ ok: true })
+   return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao processar webhook DocuSign', error)
-    return NextResponse.json({ error: 'Erro ao processar webhook DocuSign.' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao processar webhook DocuSign.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

@@ -1,7 +1,6 @@
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 
 export type TermoTemplateData = {
   protocolo: string
@@ -41,34 +40,24 @@ function getRuntimeModule(moduleName: string): any | null {
   }
 }
 
-const currentFilePath = fileURLToPath(import.meta.url)
-const templateDir = path.resolve(path.dirname(currentFilePath), '..', '..', 'templates')
-const projectRoot = process.cwd()
-
-const templateCandidates = [
-  'termo_responsabilidade.hbs',
-  'termo_responsabilidades.hbs',
-].map((templateFile) => path.join(templateDir, templateFile))
-
+const templatePath = path.resolve(process.cwd(), 'src', 'templates', 'termo_responsabilidade.hbs')
 const logoCandidates = [
-  path.join(projectRoot, 'public', 'erg-logotipo.png'),
-  path.join(projectRoot, 'erg-logotipo.png'),
+  path.join(process.cwd(), 'public', 'erg-logotipo.png'),
+  path.join(process.cwd(), 'erg-logotipo.png'),
 ]
 
 async function resolveTemplatePath() {
-  for (const candidatePath of templateCandidates) {
-    try {
-      await access(candidatePath)
-      return candidatePath
-    } catch {
-      continue
-    }
+  try {
+    await access(templatePath)
+    return templatePath
+  } catch {
+    throw new PdfGenerationError(
+      'Template do termo de responsabilidade não encontrado.',
+      500,
+      `Arquivo esperado em: ${templatePath}`,
+    )
   }
-throw new PdfGenerationError(
-    'Template do termo de responsabilidade não encontrado.',
-    500,
-    `Arquivos esperados em: ${templateCandidates.join(' ou ')}`,
-  )
+
 }
 
 async function resolveLogoDataUri() {
@@ -86,8 +75,9 @@ async function resolveLogoDataUri() {
 }
 
 export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buffer> {
-  const templatePath = await resolveTemplatePath()
-  const templateSource = await readFile(templatePath, 'utf-8')
+  const resolvedTemplatePath = await resolveTemplatePath()
+  const templateSource = await readFile(resolvedTemplatePath, 'utf-8')
+
 
   const handlebars = getRuntimeModule('handlebars')
   if (!handlebars?.compile) {
@@ -113,7 +103,16 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
     )
   }
 
-  const browser = await playwright.chromium.launch({ headless: true })
+  let browser: any
+  try {
+    browser = await playwright.chromium.launch({ headless: true })
+  } catch (error: any) {
+    throw new PdfGenerationError(
+      'Chromium do Playwright indisponível para geração de PDF.',
+      409,
+      error?.message || 'Execute: npx playwright install chromium',
+    )
+  }
 
   try {
     const page = await browser.newPage()
