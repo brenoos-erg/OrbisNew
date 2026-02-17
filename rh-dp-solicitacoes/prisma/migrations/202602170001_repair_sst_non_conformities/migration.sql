@@ -42,34 +42,60 @@ CREATE TABLE IF NOT EXISTS `NonConformity` (
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE `NonConformity`
-  ADD COLUMN IF NOT EXISTS `tipoNc` ENUM('AUDITORIA_CLIENTE', 'AUDITORIA_EXTERNA', 'AUDITORIA_INTERNA', 'OUTROS', 'PROCESSOS', 'NOTIFICACOES_CLIENTE') NULL,
-  ADD COLUMN IF NOT EXISTS `evidenciaObjetiva` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `empresa` VARCHAR(191) NOT NULL DEFAULT 'ERG ENGENHARIA',
-  ADD COLUMN IF NOT EXISTS `centroQueDetectouId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `centroQueOriginouId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `prazoAtendimento` DATETIME(3) NULL,
-  ADD COLUMN IF NOT EXISTS `fechamentoEm` DATETIME(3) NULL,
-  ADD COLUMN IF NOT EXISTS `referenciaSig` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `gravidade` INTEGER NULL,
-  ADD COLUMN IF NOT EXISTS `urgencia` INTEGER NULL,
-  ADD COLUMN IF NOT EXISTS `tendencia` INTEGER NULL,
-  ADD COLUMN IF NOT EXISTS `descricao` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `aprovadoQualidadeEm` DATETIME(3) NULL,
-  ADD COLUMN IF NOT EXISTS `aprovadoQualidadePorId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `aprovadoQualidadeStatus` ENUM('PENDENTE', 'APROVADO', 'REPROVADO') NOT NULL DEFAULT 'PENDENTE',
-  ADD COLUMN IF NOT EXISTS `aprovadoQualidadeObservacao` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `solicitanteId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `solicitanteNome` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `solicitanteEmail` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `status` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NOT NULL DEFAULT 'ABERTA',
-  ADD COLUMN IF NOT EXISTS `acoesImediatas` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `causaRaiz` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `verificacaoEficaciaTexto` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `verificacaoEficaciaData` DATETIME(3) NULL,
-  ADD COLUMN IF NOT EXISTS `verificacaoEficaciaAprovadoPorId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'tipoNc');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `tipoNc` ENUM(''AUDITORIA_CLIENTE'', ''AUDITORIA_EXTERNA'', ''AUDITORIA_INTERNA'', ''OUTROS'', ''PROCESSOS'', ''NOTIFICACOES_CLIENTE'') NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'evidenciaObjetiva');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `evidenciaObjetiva` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'empresa');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `empresa` VARCHAR(191) NOT NULL DEFAULT ''ERG ENGENHARIA''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'centroQueDetectouId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `centroQueDetectouId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'centroQueOriginouId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `centroQueOriginouId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'prazoAtendimento');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `prazoAtendimento` DATETIME(3) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'fechamentoEm');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `fechamentoEm` DATETIME(3) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'referenciaSig');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `referenciaSig` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'gravidade');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `gravidade` INTEGER NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'urgencia');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `urgencia` INTEGER NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'tendencia');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `tendencia` INTEGER NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'descricao');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `descricao` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'aprovadoQualidadeEm');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `aprovadoQualidadeEm` DATETIME(3) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'aprovadoQualidadePorId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `aprovadoQualidadePorId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'aprovadoQualidadeStatus');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `aprovadoQualidadeStatus` ENUM(''PENDENTE'', ''APROVADO'', ''REPROVADO'') NOT NULL DEFAULT ''PENDENTE''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'aprovadoQualidadeObservacao');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `aprovadoQualidadeObservacao` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'solicitanteId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `solicitanteId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'solicitanteNome');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `solicitanteNome` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'solicitanteEmail');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `solicitanteEmail` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'status');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `status` ENUM(''ABERTA'', ''AGUARDANDO_APROVACAO_QUALIDADE'', ''APROVADA_QUALIDADE'', ''EM_TRATATIVA'', ''AGUARDANDO_VERIFICACAO'', ''ENCERRADA'', ''CANCELADA'') NOT NULL DEFAULT ''ABERTA''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'acoesImediatas');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `acoesImediatas` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'causaRaiz');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `causaRaiz` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'verificacaoEficaciaTexto');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `verificacaoEficaciaTexto` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'verificacaoEficaciaData');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `verificacaoEficaciaData` DATETIME(3) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'verificacaoEficaciaAprovadoPorId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `verificacaoEficaciaAprovadoPorId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'createdAt');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformity' AND COLUMN_NAME = 'updatedAt');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformity` ADD COLUMN `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 UPDATE `NonConformity` SET `tipoNc` = 'OUTROS' WHERE `tipoNc` IS NULL;
 
@@ -87,14 +113,20 @@ CREATE TABLE IF NOT EXISTS `NonConformityActionItem` (
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE `NonConformityActionItem`
-  ADD COLUMN IF NOT EXISTS `responsavelId` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `responsavelNome` VARCHAR(191) NULL,
-  ADD COLUMN IF NOT EXISTS `prazo` DATETIME(3) NULL,
-  ADD COLUMN IF NOT EXISTS `status` ENUM('PENDENTE', 'EM_ANDAMENTO', 'CONCLUIDA', 'CANCELADA') NOT NULL DEFAULT 'PENDENTE',
-  ADD COLUMN IF NOT EXISTS `evidencias` LONGTEXT NULL,
-  ADD COLUMN IF NOT EXISTS `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'responsavelId');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `responsavelId` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'responsavelNome');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `responsavelNome` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'prazo');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `prazo` DATETIME(3) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'status');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `status` ENUM(''PENDENTE'', ''EM_ANDAMENTO'', ''CONCLUIDA'', ''CANCELADA'') NOT NULL DEFAULT ''PENDENTE''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'evidencias');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `evidencias` LONGTEXT NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'createdAt');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityActionItem' AND COLUMN_NAME = 'updatedAt');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityActionItem` ADD COLUMN `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `NonConformityAttachment` (
   `id` VARCHAR(191) NOT NULL,
@@ -108,11 +140,14 @@ CREATE TABLE IF NOT EXISTS `NonConformityAttachment` (
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-ALTER TABLE `NonConformityAttachment`
-   ADD COLUMN IF NOT EXISTS `mimeType` VARCHAR(191) NOT NULL DEFAULT 'application/octet-stream',
-  ADD COLUMN IF NOT EXISTS `sizeBytes` INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS `createdById` VARCHAR(191) NULL;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityAttachment' AND COLUMN_NAME = 'mimeType');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityAttachment` ADD COLUMN `mimeType` VARCHAR(191) NOT NULL DEFAULT ''application/octet-stream''', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityAttachment' AND COLUMN_NAME = 'sizeBytes');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityAttachment` ADD COLUMN `sizeBytes` INTEGER NOT NULL DEFAULT 0', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityAttachment' AND COLUMN_NAME = 'createdAt');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityAttachment` ADD COLUMN `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'NonConformityAttachment' AND COLUMN_NAME = 'createdById');
+SET @sql := IF(@col_exists = 0, 'ALTER TABLE `NonConformityAttachment` ADD COLUMN `createdById` VARCHAR(191) NULL', 'SELECT 1'); PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `NonConformityComment` (
   `id` VARCHAR(191) NOT NULL,
