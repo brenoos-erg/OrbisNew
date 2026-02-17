@@ -5,6 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -50,13 +51,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       await tx.nonConformity.update({ where: { id }, data: { causaRaiz } })
-      await tx.nonConformityTimeline.create({
-        data: {
-          nonConformityId: id,
-          actorId: me.id,
-          tipo: 'ESTUDO_CAUSA',
-          message: 'Estudo de causa atualizado',
-        },
+       await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'ESTUDO_CAUSA',
+        message: 'Estudo de causa atualizado',
       })
       return rows
     })

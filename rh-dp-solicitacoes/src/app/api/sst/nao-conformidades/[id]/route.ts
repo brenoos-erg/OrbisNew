@@ -10,6 +10,15 @@ import { canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConf
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+
+function parseGutValue(value: unknown) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 5) return undefined
+  return parsed
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
@@ -24,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       include: {
         planoDeAcao: { include: { responsavel: { select: { id: true, fullName: true } } }, orderBy: { createdAt: 'asc' } },
         estudoCausa: { orderBy: { ordem: 'asc' } },
-        anexos: { orderBy: { createdAt: 'desc' } },
+        anexos: { include: { createdBy: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'desc' } },
         comentarios: { include: { autor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },
         timeline: { include: { actor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },
         centroQueDetectou: { select: { id: true, description: true } },
@@ -97,22 +106,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           referenciaSig: body?.referenciaSig !== undefined ? (body.referenciaSig ? String(body.referenciaSig).trim() : null) : undefined,
           acoesImediatas: body?.acoesImediatas !== undefined ? (body.acoesImediatas ? String(body.acoesImediatas).trim() : null) : undefined,
           causaRaiz: body?.causaRaiz !== undefined ? (body.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined,
-          gravidade: body?.gravidade !== undefined ? Number(body.gravidade) : undefined,
-          urgencia: body?.urgencia !== undefined ? Number(body.urgencia) : undefined,
-          tendencia: body?.tendencia !== undefined ? Number(body.tendencia) : undefined,
+          gravidade: parseGutValue(body?.gravidade),
+          urgencia: parseGutValue(body?.urgencia),
+          tendencia: parseGutValue(body?.tendencia),
           fechamentoEm: shouldSetClosedAt(nextStatus) ? new Date() : undefined,
         },
       })
 
-      await tx.nonConformityTimeline.create({
-        data: {
-          nonConformityId: id,
-          actorId: me.id,
-          tipo: nextStatus && nextStatus !== current.status ? 'STATUS_CHANGE' : 'ATUALIZACAO',
-          fromStatus: nextStatus && nextStatus !== current.status ? current.status : undefined,
-          toStatus: nextStatus && nextStatus !== current.status ? nextStatus : undefined,
-          message: nextStatus && nextStatus !== current.status ? `Status alterado para ${nextStatus}` : 'Não conformidade atualizada',
-        },
+      await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: nextStatus && nextStatus !== current.status ? 'STATUS_CHANGE' : 'ATUALIZACAO',
+        fromStatus: nextStatus && nextStatus !== current.status ? current.status : undefined,
+        toStatus: nextStatus && nextStatus !== current.status ? nextStatus : undefined,
+        message: nextStatus && nextStatus !== current.status ? `Status alterado para ${nextStatus}` : 'Não conformidade atualizada',
       })
 
       return item

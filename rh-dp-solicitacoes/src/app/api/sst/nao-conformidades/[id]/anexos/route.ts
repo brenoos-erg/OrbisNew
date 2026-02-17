@@ -8,6 +8,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 async function saveFile(file: File, folder: string) {
   const bytes = Buffer.from(await file.arrayBuffer())
@@ -19,6 +20,13 @@ async function saveFile(file: File, folder: string) {
   await writeFile(absPath, bytes)
   return relPath
 }
+
+async function getContext(userId: string) {
+  const { levels } = await getUserModuleContext(userId)
+  const level = normalizeSstLevel(levels)
+  return { level }
+}
+
 async function canAccessNc(nonConformityId: string, userId: string, level: ModuleLevel | undefined) {
   const nc = await prisma.nonConformity.findUnique({ where: { id: nonConformityId }, select: { solicitanteId: true } })
   if (!nc) return false
@@ -26,11 +34,34 @@ async function canAccessNc(nonConformityId: string, userId: string, level: Modul
   return nc.solicitanteId === userId
 }
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const me = await requireActiveUser()
+    const { level } = await getContext(me.id)
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+      return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
+    }
+
+    const nonConformityId = (await params).id
+    if (!(await canAccessNc(nonConformityId, me.id, level))) {
+      return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
+    }
+
+    const items = await prisma.nonConformityAttachment.findMany({
+      where: { nonConformityId },
+      include: { createdBy: { select: { id: true, fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+    return NextResponse.json({ items })
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao listar anexos.', detail: devErrorDetail(error) }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
-    const { levels } = await getUserModuleContext(me.id)
-    const level = normalizeSstLevel(levels)
+    const { level } = await getContext(me.id)
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
@@ -58,29 +89,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       created.push(row)
     }
 
-    await prisma.nonConformityTimeline.create({
-      data: {
-        nonConformityId,
-        actorId: me.id,
-        tipo: 'ANEXO',
-        message: `${created.length} anexo(s) enviado(s)`,
-      },
+     await appendNonConformityTimelineEvent(prisma, {
+      nonConformityId,
+      actorId: me.id,
+      tipo: 'ANEXO',
+      message: `${created.length} anexo(s) enviado(s)`,
     })
 
     return NextResponse.json({ items: created })
   } catch (error) {
-     return NextResponse.json({ error: 'Erro ao enviar anexos.', detail: devErrorDetail(error) }, { status: 500 })
+      return NextResponse.json({ error: 'Erro ao enviar anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireActiveUser()
+    const me = await requireActiveUser()
+    const { level } = await getContext(me.id)
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+      return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
+    }
+
+    const nonConformityId = (await params).id
+    if (!(await canAccessNc(nonConformityId, me.id, level))) {
+      return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
+    }
+
     const body = await req.json().catch(() => null)
     const ids: string[] = Array.isArray(body?.ids) ? body.ids : []
+    const rows = await prisma.nonConformityAttachment.findMany({ where: { id: { in: ids }, nonConformityId } })
 
-    const rows = await prisma.nonConformityAttachment.findMany({ where: { id: { in: ids } } })
-    await prisma.nonConformityAttachment.deleteMany({ where: { id: { in: ids } } })
+    await prisma.nonConformityAttachment.deleteMany({ where: { id: { in: rows.map((x) => x.id) } } })
     for (const row of rows) {
       try {
         await unlink(path.join(process.cwd(), 'public', row.url))
@@ -88,8 +127,16 @@ export async function DELETE(req: NextRequest) {
         // noop
       }
     }
+     await prisma.nonConformityTimeline.create({
+      data: {
+        nonConformityId,
+        actorId: me.id,
+        tipo: 'ANEXO_EXCLUIDO',
+        message: `${rows.length} anexo(s) removido(s)`,
+      },
+    })
 
-    return NextResponse.json({ ok: true })
+     return NextResponse.json({ ok: true })
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao excluir anexos.', detail: devErrorDetail(error) }, { status: 500 })
   }

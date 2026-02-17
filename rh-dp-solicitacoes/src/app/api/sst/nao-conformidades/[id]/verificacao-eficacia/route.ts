@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -35,15 +36,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-       await tx.nonConformityTimeline.create({
-        data: {
-          nonConformityId: id,
-          actorId: me.id,
-          tipo: 'FECHAMENTO',
-          fromStatus: current.status,
-          toStatus: NonConformityStatus.ENCERRADA,
-          message: 'Verificação de eficácia registrada e NC encerrada',
-        },
+        await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'FECHAMENTO',
+        fromStatus: current.status,
+        toStatus: NonConformityStatus.ENCERRADA,
+        message: 'Verificação de eficácia registrada e NC encerrada',
       })
       return row
     })

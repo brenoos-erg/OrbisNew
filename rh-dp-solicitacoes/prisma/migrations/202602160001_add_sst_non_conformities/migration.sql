@@ -40,7 +40,7 @@ CREATE TABLE `NonConformity` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-   UNIQUE INDEX `NonConformity_numeroRnc_key`(`numeroRnc`),
+    UNIQUE INDEX `NonConformity_numeroRnc_key`(`numeroRnc`),
     INDEX `NonConformity_status_createdAt_idx`(`status`, `createdAt`),
     INDEX `NonConformity_centroQueDetectouId_centroQueOriginouId_idx`(`centroQueDetectouId`, `centroQueOriginouId`),
     PRIMARY KEY (`id`)
@@ -69,7 +69,16 @@ CREATE TABLE `NonConformityAttachment` (
     `nonConformityId` VARCHAR(191) NOT NULL,
     `filename` VARCHAR(191) NOT NULL,
     `url` TEXT NOT NULL,
-    -- CreateTable
+    `mimeType` VARCHAR(191) NOT NULL,
+    `sizeBytes` INTEGER NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `createdById` VARCHAR(191) NULL,
+
+    INDEX `NonConformityAttachment_nonConformityId_createdAt_idx`(`nonConformityId`, `createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `NonConformityCauseItem` (
     `id` VARCHAR(191) NOT NULL,
     `nonConformityId` VARCHAR(191) NOT NULL,
@@ -101,7 +110,7 @@ CREATE TABLE `NonConformityTimeline` (
     `nonConformityId` VARCHAR(191) NOT NULL,
     `actorId` VARCHAR(191) NULL,
     `tipo` VARCHAR(191) NOT NULL,
-       `fromStatus` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
+    `fromStatus` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
     `toStatus` ENUM('ABERTA', 'AGUARDANDO_APROVACAO_QUALIDADE', 'APROVADA_QUALIDADE', 'EM_TRATATIVA', 'AGUARDANDO_VERIFICACAO', 'ENCERRADA', 'CANCELADA') NULL,
     `message` LONGTEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

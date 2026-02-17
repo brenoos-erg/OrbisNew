@@ -6,6 +6,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeSstLevel } from '@/lib/sst/access'
 import { canApproveNc } from '@/lib/sst/nonConformity'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,15 +38,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-      await tx.nonConformityTimeline.create({
-        data: {
-          nonConformityId: id,
-          actorId: me.id,
-          tipo: 'APROVACAO_QUALIDADE',
-          fromStatus: row.status,
-          toStatus: status,
-          message: aprovado ? 'Aprovação da qualidade concluída' : 'Não conformidade reprovada pela qualidade',
-        },
+      await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'APROVACAO_QUALIDADE',
+        fromStatus: row.status,
+        toStatus: status,
+        message: aprovado ? 'Aprovação da qualidade concluída' : 'Não conformidade reprovada pela qualidade',
       })
 
       return row

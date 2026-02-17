@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import GutRadarCard from '@/components/sst/GutRadarCard'
+import { GUT_OPTIONS } from '@/lib/sst/gut'
 
 type Detail = any
 
@@ -12,6 +14,9 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [comment, setComment] = useState('')
   const [analiseQualidade, setAnaliseQualidade] = useState('')
   const [causaRaiz, setCausaRaiz] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [gutSaving, setGutSaving] = useState(false)
+  const [gut, setGut] = useState({ gravidade: 1, urgencia: 1, tendencia: 1 })
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
     Array.from({ length: 5 }).map((_, i) => ({ pergunta: `Por quê ${i + 1}?`, resposta: '' })),
   )
@@ -19,13 +24,18 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const bloqueado = !aprovado
 
-   async function load() {
+  async function load() {
     try {
       setLoading(true)
       const res = await fetch(`/api/sst/nao-conformidades/${id}`, { cache: 'no-store' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Erro ao carregar')
       setItem(data.item)
+      setGut({
+        gravidade: Number(data.item.gravidade) || 1,
+        urgencia: Number(data.item.urgencia) || 1,
+        tendencia: Number(data.item.tendencia) || 1,
+      })
       setAnaliseQualidade(data.item.verificacaoEficaciaTexto || '')
       setCausaRaiz(data.item.causaRaiz || '')
       if (Array.isArray(data.item.estudoCausa) && data.item.estudoCausa.length) {
@@ -57,15 +67,37 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     if (!files?.length) return
     const form = new FormData()
     Array.from(files).forEach((f) => form.append('files', f))
+    setUploading(true)
     await fetch(`/api/sst/nao-conformidades/${id}/anexos`, { method: 'POST', body: form })
+    setUploading(false)
     load()
   }
+
+  async function removeAttachment(attachmentId: string) {
+    await fetch(`/api/sst/nao-conformidades/${id}/anexos`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [attachmentId] }),
+    })
+    load()
+  }
+
   async function aprovar(aprovadoValor: boolean) {
     await fetch(`/api/sst/nao-conformidades/${id}/aprovacao`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ aprovado: aprovadoValor }),
     })
+    load()
+  }
+  async function salvarGut() {
+    setGutSaving(true)
+    await fetch(`/api/sst/nao-conformidades/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gut),
+    })
+    setGutSaving(false)
     load()
   }
 
@@ -104,7 +136,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
       {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Somente a aba de evidências está liberada.</div> : null}
       {podeAprovar ? <div className="flex gap-2"><button onClick={() => aprovar(true)} className="rounded bg-emerald-600 px-3 py-2 text-sm text-white">Aprovar</button><button onClick={() => aprovar(false)} className="rounded bg-rose-600 px-3 py-2 text-sm text-white">Reprovar</button></div> : null}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+     <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <Card title="Não conformidade">
           <Info label="Descrição" value={item.descricao} />
           <Info label="Evidência objetiva" value={item.evidenciaObjetiva} />
@@ -116,12 +148,50 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
           <Info label="Tipo NC" value={item.tipoNc} />
           <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
         </Card>
-      <Card title="Evidências">
-          <input type="file" multiple onChange={(e) => uploadFiles(e.target.files)} className="mb-3 text-sm" />
-          {item.anexos?.length ? <ul className="space-y-1 text-sm">{item.anexos.map((a: any)=><li key={a.id}><a href={`/api/sst/nao-conformidades/${id}/anexos/${a.id}`} target="_blank" className="text-orange-700 hover:underline">{a.filename}</a></li>)}</ul> : <p className="text-sm text-slate-500">Nenhum anexo.</p>}
-        </Card>
+
+        <div className="space-y-4">
+          <Card title="Matriz GUT">
+            <FieldSelectNumeric label="Gravidade" value={gut.gravidade} options={GUT_OPTIONS.gravidade} onChange={(value) => setGut((prev) => ({ ...prev, gravidade: value }))} disabled={bloqueado} />
+            <FieldSelectNumeric label="Urgência" value={gut.urgencia} options={GUT_OPTIONS.urgencia} onChange={(value) => setGut((prev) => ({ ...prev, urgencia: value }))} disabled={bloqueado} />
+            <FieldSelectNumeric label="Tendência" value={gut.tendencia} options={GUT_OPTIONS.tendencia} onChange={(value) => setGut((prev) => ({ ...prev, tendencia: value }))} disabled={bloqueado} />
+            <button disabled={bloqueado || gutSaving} onClick={salvarGut} className="w-full rounded bg-orange-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{gutSaving ? 'Salvando...' : 'Salvar GUT'}</button>
+          </Card>
+          <GutRadarCard gravidade={gut.gravidade} urgencia={gut.urgencia} tendencia={gut.tendencia} />
+        </div>
       </section>
-       <Card title="Estudo de causa (5 porquês)">
+       <Card title="Evidências">
+        <div
+          className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center"
+          onDragOver={(e: DragEvent<HTMLDivElement>) => e.preventDefault()}
+          onDrop={(e: DragEvent<HTMLDivElement>) => {
+            e.preventDefault()
+            uploadFiles(e.dataTransfer.files)
+          }}
+        >
+          <p className="text-sm text-slate-700">Arraste arquivos aqui</p>
+          <label className="mt-2 inline-block cursor-pointer rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white">
+            Adicionar evidência
+            <input type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} />
+          </label>
+          {uploading ? <p className="mt-2 text-xs text-slate-500">Enviando...</p> : null}
+        </div>
+        {item.anexos?.length ? (
+          <ul className="space-y-2 text-sm">
+            {item.anexos.map((a: any) => (
+              <li key={a.id} className="rounded-md border border-slate-200 p-2">
+                {String(a.mimeType || '').startsWith('image/') ? (
+                  <img src={a.url} alt={a.filename} className="mb-2 h-20 w-20 rounded object-cover" />
+                ) : null}
+                <a href={`/api/sst/nao-conformidades/${id}/anexos/${a.id}`} target="_blank" className="text-orange-700 hover:underline">{a.filename}</a>
+                <p className="text-xs text-slate-500">{Math.round((a.sizeBytes || 0) / 1024)} KB · {new Date(a.createdAt).toLocaleString('pt-BR')} · {a.createdBy?.fullName || 'Sistema'}</p>
+                <button onClick={() => removeAttachment(a.id)} className="mt-1 text-xs text-rose-600 hover:underline">Excluir</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-slate-500">Nenhum anexo.</p>}
+      </Card>
+
+      <Card title="Estudo de causa (5 porquês)">
         <form onSubmit={salvarEstudoCausa} className="space-y-2">
           {porques.map((p, idx) => (
             <div key={idx} className="grid gap-2 md:grid-cols-2">
@@ -140,15 +210,14 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
           <textarea value={analiseQualidade} onChange={(e)=>setAnaliseQualidade(e.target.value)} disabled={bloqueado} className="w-full rounded border px-2 py-1 text-sm" rows={4} placeholder="Análise da qualidade" />
           <button disabled={bloqueado} className="rounded bg-orange-500 px-3 py-2 text-sm text-white">Salvar verificação</button>
         </form>
-      </Card>
-
+     </Card>
 
       <Card title="Comentários">
         <form onSubmit={sendComment} className="mb-3 space-y-2">
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" placeholder="Adicionar comentário" />
           <div className="text-right"><button className="rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white">Enviar comentário</button></div>
         </form>
-       </Card>
+      </Card>
 
       <Card title="Timeline">
         {item.timeline?.length ? <ul className="space-y-2">{item.timeline.map((t: any)=><li key={t.id} className="rounded-md border border-slate-200 p-2 text-sm"><p className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString('pt-BR')} · {t.actor?.fullName || 'Sistema'}</p><p className="text-slate-700">{t.message || t.tipo}</p></li>)}</ul> : <p className="text-sm text-slate-500">Sem eventos.</p>}
@@ -163,4 +232,15 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className="whitespace-pre-wrap text-sm text-slate-800">{value}</p></div>
+}
+
+function FieldSelectNumeric({ label, value, options, onChange, disabled }: { label: string; value: number; options: ReadonlyArray<{ value: number; label: string }>; onChange: (value: number) => void; disabled?: boolean }) {
+  return (
+    <label className="block space-y-1 text-sm font-medium text-slate-700">
+      {label}
+      <select value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-normal">
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  )
 }

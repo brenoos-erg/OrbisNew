@@ -65,3 +65,48 @@ No projeto, o `scripts/dev.js` roda `prisma generate` apenas antes do servidor s
 - Dependência: `playwright` (já declarada no `package.json`).
 - Pós-instalação: `playwright install chromium`.
 - Caso o Chromium esteja ausente, as rotas de geração de termo retornam erro claro (`409/422`) com orientação de instalação, em vez de `500` genérico.
+## Prisma com schema fixo (evita erro de pasta errada)
+
+Todos os scripts Prisma do `package.json` agora apontam explicitamente para `./prisma/schema.prisma`, então podem ser executados sem depender do diretório atual do terminal.
+
+### Comandos recomendados
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:deploy
+npm run prisma:seed
+```
+
+### PowerShell (executando da raiz do monorepo)
+```powershell
+npm --prefix .\rh-dp-solicitacoes run prisma:migrate
+npm --prefix .\rh-dp-solicitacoes run prisma:generate
+```
+## Checklist SST (Não Conformidades)
+
+Quando atualizar migrations do módulo SST, rode este fluxo para evitar erro em runtime (`P2021`/`P2022`):
+
+1. **Banco vazio (fresh DB)**
+   ```bash
+   npx prisma migrate reset --force
+   npx prisma migrate dev
+   ```
+2. **Aplicação incremental em banco já existente**
+   ```bash
+   npx prisma migrate dev
+   ```
+3. **Gerar client e popular dados**
+   ```bash
+   npx prisma generate
+   npx prisma db seed
+   ```
+4. **Validação da aplicação**
+   ```bash
+   npm run build
+   ```
+
+### Troubleshooting rápido (SST)
+
+- `P2022` com `NonConformity.tipoNc`: execute `npx prisma migrate dev` para garantir aplicação da migration de reparo SST.
+- `P2021` com `NonConformityTimeline`/`NonConformityCauseItem`: execute `npx prisma migrate dev` e confirme as migrations SST aplicadas em `_prisma_migrations`.
+- Windows + erro `EPERM` no `prisma generate`: seguir o passo a passo da seção **Windows: Prisma EPERM (query_engine-windows.dll.node)** acima e repetir `npx prisma generate`.

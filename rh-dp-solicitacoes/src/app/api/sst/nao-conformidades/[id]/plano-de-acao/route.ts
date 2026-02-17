@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 async function assertEditable(id: string, userId: string, level: ModuleLevel | undefined) {
   const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
@@ -44,8 +45,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-     await tx.nonConformityTimeline.create({
-        data: { nonConformityId: id, actorId: me.id, tipo: 'PLANO_ACAO', message: 'Ação criada no plano de ação' },
+     await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'PLANO_ACAO',
+        message: 'Ação criada no plano de ação',
       })
       return created
     })

@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,13 +28,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { nonConformityId: id, autorId: me.id, texto },
         include: { autor: { select: { id: true, fullName: true, email: true } } },
       })
-      await tx.nonConformityTimeline.create({
-        data: {
-          nonConformityId: id,
-          actorId: me.id,
-          tipo: 'COMENTARIO',
-          message: 'Comentário adicionado',
-        },
+       await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'COMENTARIO',
+        message: 'Comentário adicionado',
       })
       return created
     })

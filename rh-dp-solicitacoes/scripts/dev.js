@@ -10,13 +10,14 @@ const commonOptions = {
 }
 
 const DEFAULT_MYSQL_DATABASE_URL = 'mysql://orbis:orbis123@localhost:3306/orbis'
+const PRISMA_SCHEMA = path.resolve(__dirname, '..', 'prisma', 'schema.prisma')
 
 const skipMigrations = process.env.SKIP_PRISMA_MIGRATE === 'true'
 const skipSeed = process.env.SKIP_PRISMA_SEED === 'true'
 const skipPrismaGenerate = process.env.SKIP_PRISMA_GENERATE === 'true'
 
 function runPrismaGenerateOnce() {
-  const result = spawnSync('npx', ['prisma', 'generate'], commonOptions)
+  const result = spawnSync('npx', ['prisma', 'generate', '--schema', PRISMA_SCHEMA], commonOptions)
 
   if (result.status === 0) {
     return true
@@ -63,13 +64,13 @@ if (!hasDatabaseUrl) {
   console.warn('\n⚠️  DATABASE_URL não definido: pulando prisma migrate/db push e seed no ambiente local.')
 } else if (skipMigrations) {
   console.log('SKIP_PRISMA_MIGRATE=true: skipping prisma migrate and running prisma db push for local schema sync.')
-  const dbPushResult = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate'], commonOptions)
+  const dbPushResult = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate', '--schema', PRISMA_SCHEMA], commonOptions)
 
   if (dbPushResult.status !== 0) {
     console.warn('\n⚠️  Prisma db push failed. The dev server will still start, but database operations may not work.')
   }
 } else {
-  const migrateResult = spawnSync('npx', ['prisma', 'migrate', 'deploy'], commonOptions)
+  const migrateResult = spawnSync('npx', ['prisma', 'migrate', 'deploy', '--schema', PRISMA_SCHEMA], commonOptions)
 
   if (migrateResult.status !== 0) {
     console.warn('\n⚠️  Prisma migrations failed. The dev server will still start, but database operations may not work.')
@@ -84,7 +85,7 @@ if (!hasDatabaseUrl) {
 } else if (skipSeed) {
   console.log('Skipping Prisma seed because SKIP_PRISMA_SEED=true.')
 } else {
-  const seedResult = spawnSync('npx', ['prisma', 'db', 'seed'], commonOptions)
+  const seedResult = spawnSync('npx', ['prisma', 'db', 'seed', '--schema', PRISMA_SCHEMA], commonOptions)
 
   if (seedResult.status !== 0) {
     console.warn('\n⚠️  Prisma seed failed. The dev server will still start, but initial data may be missing.')
