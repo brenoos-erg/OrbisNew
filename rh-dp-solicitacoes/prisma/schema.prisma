@@ -77,29 +77,29 @@ model Event {
 }
 
 model CostCenter {
-  id                   String                       @id @default(uuid())
-  createdAt            DateTime                     @default(now())
-  updatedAt            DateTime                     @updatedAt
-  abbreviation         String?
-  area                 String?
-  code                 String?
-  description          String
-  externalCode         String?                      @unique(map: "CostCenter_externalCode_uq")
-  managementType       String?
-  status               CCStatus                     @default(ACTIVE)
-  groupName            String?                      @map("group_name")
-  observations         String?
-  departmentId         String?
-  department           Department?                  @relation(fields: [departmentId], references: [id])
-  modules              CostCenterModule[]
-  solicitations        Solicitation[]
-  users                User[]
-  userLinks            UserCostCenter[]
-  vehicleCostCenters   VehicleCostCenter[]
-  displacementCheckins VehicleDisplacementCheckin[]
-  tiEquipmentSnapshots TiEquipment[]
-  nonConformitiesDetected NonConformity[] @relation("NonConformityDetectedCenter")
-  nonConformitiesOriginated NonConformity[] @relation("NonConformityOriginCenter")
+  id                        String                       @id @default(uuid())
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  abbreviation              String?
+  area                      String?
+  code                      String?
+  description               String
+  externalCode              String?                      @unique(map: "CostCenter_externalCode_uq")
+  managementType            String?
+  status                    CCStatus                     @default(ACTIVE)
+  groupName                 String?                      @map("group_name")
+  observations              String?
+  departmentId              String?
+  department                Department?                  @relation(fields: [departmentId], references: [id])
+  modules                   CostCenterModule[]
+  solicitations             Solicitation[]
+  users                     User[]
+  userLinks                 UserCostCenter[]
+  vehicleCostCenters        VehicleCostCenter[]
+  displacementCheckins      VehicleDisplacementCheckin[]
+  tiEquipmentSnapshots      TiEquipment[]
+  nonConformitiesDetected   NonConformity[]              @relation("NonConformityDetectedCenter")
+  nonConformitiesOriginated NonConformity[]              @relation("NonConformityOriginCenter")
 
   @@map("CostCenter")
 }
@@ -707,11 +707,11 @@ model NonConformitySequence {
 }
 
 model NonConformity {
-  id                               String                    @id @default(cuid())
-  numeroRnc                        String                    @unique
+  id                               String                      @id @default(cuid())
+  numeroRnc                        String                      @unique
   tipoNc                           NonConformityType
-  evidenciaObjetiva                String                    @db.LongText
-  empresa                          String                    @default("ERG ENGENHARIA")
+  evidenciaObjetiva                String                      @db.LongText
+  empresa                          String                      @default("ERG ENGENHARIA")
   centroQueDetectouId              String
   centroQueOriginouId              String
   prazoAtendimento                 DateTime
@@ -720,27 +720,27 @@ model NonConformity {
   gravidade                        Int?
   urgencia                         Int?
   tendencia                        Int?
-  descricao                        String                    @db.LongText
+  descricao                        String                      @db.LongText
   aprovadoQualidadeEm              DateTime?
   aprovadoQualidadePorId           String?
   aprovadoQualidadeStatus          NonConformityApprovalStatus @default(PENDENTE)
-  aprovadoQualidadeObservacao      String?                   @db.LongText
+  aprovadoQualidadeObservacao      String?                     @db.LongText
   solicitanteId                    String
   solicitanteNome                  String
   solicitanteEmail                 String
-  status                           NonConformityStatus       @default(ABERTA)
-  acoesImediatas                   String?                   @db.LongText
-  causaRaiz                        String?                   @db.LongText
-  verificacaoEficaciaTexto         String?                   @db.LongText
+  status                           NonConformityStatus         @default(ABERTA)
+  acoesImediatas                   String?                     @db.LongText
+  causaRaiz                        String?                     @db.LongText
+  verificacaoEficaciaTexto         String?                     @db.LongText
   verificacaoEficaciaData          DateTime?
   verificacaoEficaciaAprovadoPorId String?
-  createdAt                        DateTime                  @default(now())
-  updatedAt                        DateTime                  @updatedAt
-  centroQueDetectou                CostCenter                @relation("NonConformityDetectedCenter", fields: [centroQueDetectouId], references: [id])
-  centroQueOriginou                CostCenter                @relation("NonConformityOriginCenter", fields: [centroQueOriginouId], references: [id])
-  solicitante                      User                      @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
-  aprovadoQualidadePor             User?                     @relation("NonConformityQualityApprover", fields: [aprovadoQualidadePorId], references: [id])
-  verificacaoEficaciaAprovadoPor   User?                     @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
+  createdAt                        DateTime                    @default(now())
+  updatedAt                        DateTime                    @updatedAt
+  centroQueDetectou                CostCenter                  @relation("NonConformityDetectedCenter", fields: [centroQueDetectouId], references: [id])
+  centroQueOriginou                CostCenter                  @relation("NonConformityOriginCenter", fields: [centroQueOriginouId], references: [id])
+  solicitante                      User                        @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
+  aprovadoQualidadePor             User?                       @relation("NonConformityQualityApprover", fields: [aprovadoQualidadePorId], references: [id])
+  verificacaoEficaciaAprovadoPor   User?                       @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
   planoDeAcao                      NonConformityActionItem[]
   estudoCausa                      NonConformityCauseItem[]
   anexos                           NonConformityAttachment[]
@@ -782,6 +782,7 @@ model NonConformityAttachment {
 
   @@index([nonConformityId, createdAt])
 }
+
 model NonConformityCauseItem {
   id              String        @id @default(cuid())
   nonConformityId String
@@ -794,7 +795,6 @@ model NonConformityCauseItem {
 
   @@index([nonConformityId, ordem])
 }
-
 
 model NonConformityComment {
   id              String        @id @default(cuid())
