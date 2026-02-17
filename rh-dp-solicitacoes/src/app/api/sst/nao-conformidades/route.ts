@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
       const prazoAtendimento = new Date(createdAt)
       prazoAtendimento.setDate(prazoAtendimento.getDate() + 90)
 
-      return tx.nonConformity.create({
+      const created = await tx.nonConformity.create({
         data: {
           numeroRnc,
           tipoNc,
@@ -160,17 +161,19 @@ export async function POST(req: NextRequest) {
           solicitanteEmail: me.email,
           status: NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE,
           aprovadoQualidadeStatus: NonConformityApprovalStatus.PENDENTE,
-          timeline: {
-            create: {
-              actorId: me.id,
-              tipo: 'CRIACAO',
-              toStatus: NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE,
-                        message: 'Não conformidade registrada e enviada para aprovação da qualidade',
-            },
-          },
         },
         select: { id: true, numeroRnc: true },
       })
+
+      await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: created.id,
+        actorId: me.id,
+        tipo: 'CRIACAO',
+        toStatus: NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE,
+        message: 'Não conformidade registrada e enviada para aprovação da qualidade',
+      })
+
+      return created
     })
 
     return NextResponse.json(created, { status: 201 })

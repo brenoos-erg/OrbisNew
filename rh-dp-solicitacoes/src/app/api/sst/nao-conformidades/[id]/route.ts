@@ -6,6 +6,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
+import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
