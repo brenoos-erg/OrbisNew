@@ -589,12 +589,34 @@ export default function Sidebar({
                     href="/dashboard/sst/nao-conformidades"
                     className={`${submenuItemBase}
                       ${
-                        pathname.startsWith('/dashboard/sst/nao-conformidades')
+                          pathname.startsWith('/dashboard/sst/nao-conformidades') && !pathname.startsWith('/dashboard/sst/nao-conformidades/nova')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <ClipboardCheck size={16} /> <span className={labelBase}>Não Conformidades</span>
+                    <ClipboardCheck size={16} /> <span className={labelBase}>Ações da Não Conformidade</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/sst/nao-conformidades/nova"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/sst/nao-conformidades/nova')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ScanLine size={16} /> <span className={labelBase}>Registrar Não Conformidade</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/sst/planos-de-acao"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/sst/planos-de-acao')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardList size={16} /> <span className={labelBase}>Planos de Ações</span>
                   </Link>
                   {showRefusal && (
                     <Link

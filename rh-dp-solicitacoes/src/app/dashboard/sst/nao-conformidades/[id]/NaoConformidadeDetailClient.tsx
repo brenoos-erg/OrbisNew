@@ -99,7 +99,7 @@ function toPreview(value?: string | null) {
   return raw.length > 70 ? `${raw.slice(0, 70)}...` : raw
 }
 
-export default function NaoConformidadeDetailClient({ id }: { id: string }) {
+export default function NaoConformidadeDetailClient({ id, initialSection }: { id: string; initialSection?: string }) {
   const [item, setItem] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -120,6 +120,15 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [actionModalOpen, setActionModalOpen] = useState(false)
   const [actionFiltersDraft, setActionFiltersDraft] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
   const [actionFilters, setActionFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
+
+  useEffect(() => {
+    if (!initialSection) return
+    const validSections: SectionKey[] = ['naoConformidade', 'evidencias', 'estudoCausa', 'planoDeAcao', 'verificacao', 'comentarios', 'timeline']
+    if (validSections.includes(initialSection as SectionKey)) {
+      setActiveSection(initialSection as SectionKey)
+    }
+  }, [initialSection])
+
 
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const bloqueado = !aprovado
