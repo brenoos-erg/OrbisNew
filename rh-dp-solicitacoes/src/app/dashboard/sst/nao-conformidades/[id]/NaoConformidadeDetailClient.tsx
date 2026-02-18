@@ -151,12 +151,6 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
 
   useEffect(() => { load() }, [id])
 
-  useEffect(() => {
-    if (bloqueado && activeSection !== 'evidencias') {
-      setActiveSection('evidencias')
-    }
-  }, [activeSection, bloqueado])
-
   async function sendComment(e: FormEvent) {
     e.preventDefault()
     if (!comment.trim()) return
@@ -362,7 +356,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   }
 
   function changeSection(section: SectionKey) {
-    if (bloqueado && section !== 'evidencias') return
+    
     setActiveSection(section)
   }
 
@@ -394,22 +388,20 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
         <Link href="/dashboard/sst/nao-conformidades" className="ml-auto text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
       </div>
 
-      {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Somente a aba de evidências está liberada.</div> : null}
+      {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Ações em modo somente leitura.</div> : null}
       {podeAprovar ? <div className="flex gap-2"><button onClick={() => aprovar(true)} className="rounded bg-emerald-600 px-3 py-2 text-sm text-white">Aprovar</button><button onClick={() => aprovar(false)} className="rounded bg-rose-600 px-3 py-2 text-sm text-white">Reprovar</button></div> : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => {
-            const disabled = bloqueado && tab.key !== 'evidencias'
             return (
               <button
                 key={tab.key}
                 type="button"
-                disabled={disabled}
                 onClick={() => changeSection(tab.key as SectionKey)}
                 className={`rounded-md px-3 py-2 text-sm font-medium transition ${activeSection === tab.key
                   ? 'bg-orange-500 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} disabled:cursor-not-allowed disabled:opacity-50`}
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
               >
                 {tab.label}
               </button>
@@ -549,7 +541,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={pesquisarAcoes} className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white">Pesquisar</button>
               <button type="button" onClick={limparFiltrosAcoes} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">Limpar</button>
-              <button type="button" onClick={exportarAcoesCsv} className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">Excel/Exportar</button>
+                <button type="button" onClick={exportarAcoesCsv} className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">Exportar (CSV)</button>
               <button
                 type="button"
                 onClick={abrirNovaAcaoModal}
@@ -567,7 +559,8 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
                   <tr>
                     <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Descrição</th>
+                    <th className="px-3 py-2">Nº/Ordem</th>
+                    <th className="px-3 py-2">O quê</th>
                     <th className="px-3 py-2">Responsável</th>
                     <th className="px-3 py-2">Prazo</th>
                     <th className="px-3 py-2">Evidências</th>
@@ -576,9 +569,10 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filteredActions.map((action) => (
+                  {filteredActions.map((action, index) => (
                     <tr key={action.id} className="align-top">
                       <td className="px-3 py-2 text-slate-700">{actionStatusLabel[action.status]}</td>
+                      <td className="px-3 py-2 text-slate-700">{index + 1}</td>
                       <td className="px-3 py-2 font-medium text-slate-800">{action.descricao}</td>
                       <td className="px-3 py-2 text-slate-700">{action.responsavelNome || '-'}</td>
                       <td className="px-3 py-2 text-slate-700">{formatActionDate(action.prazo)}</td>
@@ -586,7 +580,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
                       <td className="px-3 py-2 text-slate-700">{formatActionDate(action.createdAt)}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-3">
-                          <button type="button" onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline">{bloqueado ? 'Visualizar' : 'Editar'}</button>
+                          <button type="button" onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline">Visualizar/Editar</button>
                           <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
                         </div>
                       </td>
@@ -635,50 +629,62 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
             </div>
             <form onSubmit={salvarActionItem} className="space-y-3">
               <div className="grid gap-2 md:grid-cols-2">
-                <input
-                  value={actionDraft.descricao}
-                  onChange={(e) => setActionDraft((prev) => ({ ...prev, descricao: e.target.value }))}
-                  disabled={bloqueado || actionSaving}
-                  placeholder="Descrição da ação"
-                  className="rounded border px-2 py-1 text-sm"
-                />
-                <input
-                  value={actionDraft.responsavelNome}
-                  onChange={(e) => setActionDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
-                  disabled={bloqueado || actionSaving}
-                  placeholder="Responsável"
-                  className="rounded border px-2 py-1 text-sm"
-                />
-                <input
-                  type="date"
-                  value={actionDraft.prazo}
-                  onChange={(e) => setActionDraft((prev) => ({ ...prev, prazo: e.target.value }))}
-                  disabled={bloqueado || actionSaving}
-                  className="rounded border px-2 py-1 text-sm"
-                />
-                <select
-                  value={actionDraft.status}
-                  onChange={(e) => setActionDraft((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
-                  disabled={bloqueado || actionSaving}
-                  className="rounded border px-2 py-1 text-sm"
-                >
-                  {ACTION_STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>{actionStatusLabel[status]}</option>
-                  ))}
-                </select>
+               <label className="space-y-1 text-sm font-medium text-slate-700">
+                  O quê
+                  <input
+                    value={actionDraft.descricao}
+                    onChange={(e) => setActionDraft((prev) => ({ ...prev, descricao: e.target.value }))}
+                    disabled={bloqueado || actionSaving}
+                    className="w-full rounded border px-2 py-1 text-sm font-normal"
+                  />
+                </label>
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  Quem
+                  <input
+                    value={actionDraft.responsavelNome}
+                    onChange={(e) => setActionDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
+                    disabled={bloqueado || actionSaving}
+                    className="w-full rounded border px-2 py-1 text-sm font-normal"
+                  />
+                </label>
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  Quando
+                  <input
+                    type="date"
+                    value={actionDraft.prazo}
+                    onChange={(e) => setActionDraft((prev) => ({ ...prev, prazo: e.target.value }))}
+                    disabled={bloqueado || actionSaving}
+                    className="w-full rounded border px-2 py-1 text-sm font-normal"
+                  />
+                </label>
+                <label className="space-y-1 text-sm font-medium text-slate-700">
+                  Status
+                  <select
+                    value={actionDraft.status}
+                    onChange={(e) => setActionDraft((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
+                    disabled={bloqueado || actionSaving}
+                    className="w-full rounded border px-2 py-1 text-sm font-normal"
+                  >
+                    {ACTION_STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>{actionStatusLabel[status]}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
-              <textarea
-                value={actionDraft.evidencias}
-                onChange={(e) => setActionDraft((prev) => ({ ...prev, evidencias: e.target.value }))}
-                disabled={bloqueado || actionSaving}
-                className="w-full rounded border px-2 py-1 text-sm"
-                rows={3}
-                placeholder="Evidências da ação"
-              />
+              <label className="space-y-1 text-sm font-medium text-slate-700">
+                Histórico/Observações/Evidências
+                <textarea
+                  value={actionDraft.evidencias}
+                  onChange={(e) => setActionDraft((prev) => ({ ...prev, evidencias: e.target.value }))}
+                   disabled={bloqueado || actionSaving}
+                  className="w-full rounded border px-2 py-1 text-sm font-normal"
+                  rows={3}
+                />
+              </label>
               {actionError ? <p className="text-sm text-rose-700">{actionError}</p> : null}
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={fecharActionModal} className="rounded border border-slate-300 px-3 py-2 text-sm" disabled={actionSaving}>Cancelar</button>
-                <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Salvar alterações' : 'Salvar ação'}</button>
+                <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">Salvar</button>
               </div>
             </form>
           </div>
