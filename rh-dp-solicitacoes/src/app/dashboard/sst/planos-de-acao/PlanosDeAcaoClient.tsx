@@ -73,7 +73,7 @@ export default function PlanosDeAcaoClient() {
       if (status !== 'TODOS') params.set('status', status)
       if (emAtraso) params.set('emAtraso', '1')
 
-      const res = await fetch(`/api/sst/planos-de-acao?${params.toString()}`, { cache: 'no-store' })
+      const res = await fetch(`/api/sst/plano-de-acao?${params.toString()}`, { cache: 'no-store' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Erro ao carregar planos de ação.')
 
