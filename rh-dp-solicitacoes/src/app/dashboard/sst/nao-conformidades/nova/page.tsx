@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GutRadarCard from '@/components/sst/GutRadarCard'
 import { GUT_OPTIONS } from '@/lib/sst/gut'
+import { nonConformityTypeLabel } from '@/lib/sst/serializers'
 
 type CostCenter = { id: string; description: string; code?: string | null }
 
@@ -70,7 +71,7 @@ export default function NovaNaoConformidadePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FieldSelect name="tipoNc" label="Tipo NC" options={['AUDITORIA_CLIENTE', 'AUDITORIA_EXTERNA', 'AUDITORIA_INTERNA', 'OUTROS', 'PROCESSOS', 'NOTIFICACOES_CLIENTE']} />
+             <FieldSelect name="tipoNc" label="Tipo NC" options={['AUDITORIA_CLIENTE', 'AUDITORIA_EXTERNA', 'AUDITORIA_INTERNA', 'OUTROS', 'PROCESSOS', 'NOTIFICACOES_CLIENTE']} labels={nonConformityTypeLabel} />
             <FieldInput name="referenciaSig" label="Referência SIG" required={false} />
             <FieldSelect name="centroQueDetectouId" label="Centro que detectou" options={centers.map((x) => x.id)} labels={centerLabels} />
             <FieldSelect name="centroQueOriginouId" label="Centro que originou" options={centers.map((x) => x.id)} labels={centerLabels} />

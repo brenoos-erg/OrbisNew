@@ -77,7 +77,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const actionId = String(body?.id || '')
     if (!actionId) return NextResponse.json({ error: 'id da ação é obrigatório.' }, { status: 400 })
 
-    const row = await prisma.nonConformityActionItem.update({
+    const existing = await prisma.nonConformityActionItem.findUnique({ where: { id: actionId }, select: { id: true, nonConformityId: true } })
+    if (!existing || existing.nonConformityId !== id) {
+      return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
+    }
+
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.nonConformityActionItem.update({
       where: { id: actionId },
       data: {
         descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
@@ -87,6 +93,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         status: Object.values(NonConformityActionStatus).includes(body?.status) ? body.status : undefined,
         evidencias: body?.evidencias !== undefined ? (body.evidencias ? String(body.evidencias).trim() : null) : undefined,
       },
+      })
+
+      await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'PLANO_ACAO',
+        message: 'Ação atualizada no plano de ação',
+      })
+      return updated
     })
 
     return NextResponse.json(row)
@@ -112,7 +127,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const actionId = String(body?.id || '')
     if (!actionId) return NextResponse.json({ error: 'id da ação é obrigatório.' }, { status: 400 })
 
-    await prisma.nonConformityActionItem.delete({ where: { id: actionId } })
+    const existing = await prisma.nonConformityActionItem.findUnique({ where: { id: actionId }, select: { id: true, nonConformityId: true } })
+    if (!existing || existing.nonConformityId !== id) {
+      return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.nonConformityActionItem.delete({ where: { id: actionId } })
+      await appendNonConformityTimelineEvent(tx, {
+        nonConformityId: id,
+        actorId: me.id,
+        tipo: 'PLANO_ACAO',
+        message: 'Ação removida do plano de ação',
+      })
+    })
     return NextResponse.json({ ok: true })
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao excluir ação.', detail: devErrorDetail(error) }, { status: 500 })

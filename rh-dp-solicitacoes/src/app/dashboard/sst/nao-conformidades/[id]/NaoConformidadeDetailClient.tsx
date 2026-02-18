@@ -1,12 +1,50 @@
 'use client'
 
 import Link from 'next/link'
+import { NonConformityActionStatus } from '@prisma/client'
 import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import GutRadarCard from '@/components/sst/GutRadarCard'
 import { GUT_OPTIONS } from '@/lib/sst/gut'
+import { actionStatusLabel, nonConformityTypeLabel } from '@/lib/sst/serializers'
 
-type Detail = any
-type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'verificacao' | 'comentarios' | 'timeline'
+type ActionItem = {
+  id: string
+  descricao: string
+  responsavelNome?: string | null
+  prazo?: string | null
+  status: NonConformityActionStatus
+  evidencias?: string | null
+}
+
+type Detail = {
+  id: string
+  numeroRnc: string
+  descricao: string
+  evidenciaObjetiva: string
+  empresa: string
+  referenciaSig?: string | null
+  tipoNc: keyof typeof nonConformityTypeLabel
+  acoesImediatas?: string | null
+  prazoAtendimento: string
+  gravidade?: number | null
+  urgencia?: number | null
+  tendencia?: number | null
+  causaRaiz?: string | null
+  estudoCausa?: Array<{ pergunta: string; resposta: string }>
+  verificacaoEficaciaTexto?: string | null
+  status: string
+  aprovadoQualidadeStatus: string
+  anexos?: any[]
+  comentarios?: any[]
+  timeline?: any[]
+  planoDeAcao?: ActionItem[]
+  centroQueDetectou?: { description: string }
+  centroQueOriginou?: { description: string }
+}
+
+type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoAcao' | 'verificacao' | 'comentarios' | 'historico'
+
+const ACTION_STATUS_OPTIONS = Object.values(NonConformityActionStatus)
 
 export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [item, setItem] = useState<Detail | null>(null)
@@ -22,6 +60,10 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
     Array.from({ length: 5 }).map((_, i) => ({ pergunta: `Por quê ${i + 1}?`, resposta: '' })),
   )
+  const [actionDraft, setActionDraft] = useState<{ descricao: string; responsavelNome: string; prazo: string; status: NonConformityActionStatus; evidencias: string }>({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionSaving, setActionSaving] = useState(false)
+  const [editingActionId, setEditingActionId] = useState<string | null>(null)
 
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const bloqueado = !aprovado
@@ -52,6 +94,12 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   }
 
   useEffect(() => { load() }, [id])
+
+  useEffect(() => {
+    if (bloqueado && activeSection !== 'evidencias') {
+      setActiveSection('evidencias')
+    }
+  }, [activeSection, bloqueado])
 
   async function sendComment(e: FormEvent) {
     e.preventDefault()
@@ -118,8 +166,74 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     })
     load()
   }
+   function editAction(action: ActionItem) {
+    setEditingActionId(action.id)
+    setActionDraft({
+      descricao: action.descricao || '',
+      responsavelNome: action.responsavelNome || '',
+      prazo: action.prazo ? action.prazo.slice(0, 10) : '',
+      status: action.status,
+      evidencias: action.evidencias || '',
+    })
+  }
+
+  function resetActionForm() {
+    setEditingActionId(null)
+    setActionDraft({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
+    setActionError(null)
+  }
+
+  async function salvarActionItem(e: FormEvent) {
+    e.preventDefault()
+    if (!actionDraft.descricao.trim()) {
+      setActionError('Descrição da ação é obrigatória.')
+      return
+    }
+
+    setActionSaving(true)
+    setActionError(null)
+
+    const body = {
+      id: editingActionId,
+      descricao: actionDraft.descricao,
+      responsavelNome: actionDraft.responsavelNome,
+      prazo: actionDraft.prazo || null,
+      status: actionDraft.status,
+      evidencias: actionDraft.evidencias,
+    }
+
+    const method = editingActionId ? 'PATCH' : 'POST'
+    const res = await fetch(`/api/sst/nao-conformidades/${id}/plano-de-acao`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setActionError(data?.error || 'Erro ao salvar ação.')
+      setActionSaving(false)
+      return
+    }
+
+    resetActionForm()
+    setActionSaving(false)
+    load()
+  }
+
+  async function removerActionItem(actionId: string) {
+    if (!confirm('Deseja excluir esta ação do plano de ação?')) return
+    await fetch(`/api/sst/nao-conformidades/${id}/plano-de-acao`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: actionId }),
+    })
+    if (editingActionId === actionId) resetActionForm()
+    load()
+  }
 
   function changeSection(section: SectionKey) {
+    if (bloqueado && section !== 'evidencias') return
     setActiveSection(section)
   }
 
@@ -129,11 +243,22 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   if (error && !item) return <p className="text-sm text-rose-700">{error}</p>
   if (!item) return null
 
+  const tabs = [
+    { key: 'naoConformidade', label: 'Não conformidade' },
+    { key: 'evidencias', label: 'Evidências' },
+    { key: 'estudoCausa', label: 'Estudo de causa' },
+    { key: 'planoAcao', label: 'Plano de ação' },
+    { key: 'verificacao', label: 'Verificação de eficácia' },
+    { key: 'comentarios', label: 'Comentários' },
+    { key: 'historico', label: 'Histórico' },
+  ] as const
+
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <div>
-          <p className="text-sm uppercase text-slate-500">Não Conformidades</p>
+          <p className="text-sm uppercase text-slate-500">Não conformidades</p>
           <h1 className="text-2xl font-bold text-slate-900">{item.numeroRnc}</h1>
         </div>
         <Link href="/dashboard/sst/nao-conformidades" className="ml-auto text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
@@ -144,26 +269,22 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
 
       <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'naoConformidade', label: 'Não conformidade' },
-            { key: 'evidencias', label: 'Evidências' },
-            { key: 'estudoCausa', label: 'Estudo de causa (5 porquês)' },
-            { key: 'verificacao', label: 'Verificação de eficácia' },
-            { key: 'comentarios', label: 'Comentários' },
-            { key: 'timeline', label: 'Timeline' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => changeSection(tab.key as SectionKey)}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${activeSection === tab.key
-                ? 'bg-orange-500 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const disabled = bloqueado && tab.key !== 'evidencias'
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                disabled={disabled}
+                onClick={() => changeSection(tab.key as SectionKey)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition ${activeSection === tab.key
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -177,7 +298,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
             <Info label="Centro que originou" value={item.centroQueOriginou?.description || '-'} />
             <Info label="Prazo atendimento" value={new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')} />
             <Info label="Referência SIG" value={item.referenciaSig || '-'} />
-            <Info label="Tipo NC" value={item.tipoNc} />
+             <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
             <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
           </Card>
 
@@ -192,6 +313,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
           </div>
         </section>
       ) : null}
+
       {activeSection === 'evidencias' ? (
         <Card title="Evidências">
           <div
@@ -227,7 +349,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
       ) : null}
 
       {activeSection === 'estudoCausa' ? (
-        <Card title="Estudo de causa (5 porquês)">
+        <Card title="Estudo de causa">
           <form onSubmit={salvarEstudoCausa} className="space-y-2">
             {porques.map((p, idx) => (
               <div key={idx} className="grid gap-2 md:grid-cols-2">
@@ -241,6 +363,79 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
           </form>
         </Card>
       ) : null}
+       {activeSection === 'planoAcao' ? (
+        <Card title="Plano de ação">
+          <form onSubmit={salvarActionItem} className="space-y-2 rounded-md border border-slate-200 p-3">
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                value={actionDraft.descricao}
+                onChange={(e) => setActionDraft((prev) => ({ ...prev, descricao: e.target.value }))}
+                disabled={bloqueado || actionSaving}
+                placeholder="Descrição da ação"
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <input
+                value={actionDraft.responsavelNome}
+                onChange={(e) => setActionDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
+                disabled={bloqueado || actionSaving}
+                placeholder="Responsável"
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <input
+                type="date"
+                value={actionDraft.prazo}
+                onChange={(e) => setActionDraft((prev) => ({ ...prev, prazo: e.target.value }))}
+                disabled={bloqueado || actionSaving}
+                className="rounded border px-2 py-1 text-sm"
+              />
+              <select
+                value={actionDraft.status}
+                onChange={(e) => setActionDraft((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
+                disabled={bloqueado || actionSaving}
+                className="rounded border px-2 py-1 text-sm"
+              >
+                {ACTION_STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status}>{actionStatusLabel[status]}</option>
+                ))}
+              </select>
+            </div>
+            <textarea
+              value={actionDraft.evidencias}
+              onChange={(e) => setActionDraft((prev) => ({ ...prev, evidencias: e.target.value }))}
+              disabled={bloqueado || actionSaving}
+              className="w-full rounded border px-2 py-1 text-sm"
+              rows={3}
+              placeholder="Evidências da ação"
+            />
+            {actionError ? <p className="text-sm text-rose-700">{actionError}</p> : null}
+            <div className="flex gap-2">
+              <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Atualizar ação' : 'Adicionar ação'}</button>
+              {editingActionId ? <button type="button" className="rounded border px-3 py-2 text-sm" onClick={resetActionForm}>Cancelar edição</button> : null}
+            </div>
+          </form>
+
+          {item.planoDeAcao?.length ? (
+            <ul className="space-y-2 text-sm">
+              {item.planoDeAcao.map((action) => (
+                <li key={action.id} className="rounded-md border border-slate-200 p-3">
+                  <p className="font-semibold text-slate-900">{action.descricao}</p>
+                  <p className="text-slate-600">Responsável: {action.responsavelNome || '-'}</p>
+                  <p className="text-slate-600">Prazo: {action.prazo ? new Date(action.prazo).toLocaleDateString('pt-BR') : '-'}</p>
+                  <p className="text-slate-600">Status: {actionStatusLabel[action.status]}</p>
+                  <p className="text-slate-600">Evidências: {action.evidencias || '-'}</p>
+                  <div className="mt-2 flex gap-3">
+                    <button type="button" disabled={bloqueado} onClick={() => editAction(action)} className="text-xs text-orange-700 hover:underline disabled:opacity-50">Editar</button>
+                    <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Nenhuma ação cadastrada.</p>
+          )}
+        </Card>
+      ) : null}
+
 
       {activeSection === 'verificacao' ? (
         <Card title="Verificação de eficácia">
@@ -260,8 +455,8 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
         </Card>
       ) : null}
 
-      {activeSection === 'timeline' ? (
-        <Card title="Timeline">
+        {activeSection === 'historico' ? (
+        <Card title="Histórico">
           {item.timeline?.length ? <ul className="space-y-2">{item.timeline.map((t: any)=><li key={t.id} className="rounded-md border border-slate-200 p-2 text-sm"><p className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString('pt-BR')} · {t.actor?.fullName || 'Sistema'}</p><p className="text-slate-700">{t.message || t.tipo}</p></li>)}</ul> : <p className="text-sm text-slate-500">Sem eventos.</p>}
         </Card>
       ) : null}

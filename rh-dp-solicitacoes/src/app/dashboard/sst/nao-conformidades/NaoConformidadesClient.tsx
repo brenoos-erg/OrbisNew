@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCcw } from 'lucide-react'
+import { nonConformityTypeLabel } from '@/lib/sst/serializers'
 
 type Status = 'ABERTA' | 'AGUARDANDO_APROVACAO_QUALIDADE' | 'APROVADA_QUALIDADE' | 'EM_TRATATIVA' | 'AGUARDANDO_VERIFICACAO' | 'ENCERRADA' | 'CANCELADA'
 
@@ -83,13 +84,13 @@ export default function NaoConformidadesClient() {
             <tr>
               <th className="px-3 py-2">RNC</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Prazo</th><th className="px-3 py-2">Detectou</th><th className="px-3 py-2">Originou</th><th className="px-3 py-2">Solicitante</th><th className="px-3 py-2" />
             </tr>
-          </thead>
+           </thead>
           <tbody className="divide-y divide-slate-100">
             {items.map((item) => (
               <tr key={item.id}>
                 <td className="px-3 py-2 font-semibold text-slate-800">{item.numeroRnc}</td>
                 <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${STATUS_META[item.status].className}`}>{STATUS_META[item.status].label}</span></td>
-                  <td className="px-3 py-2">{item.tipoNc}</td>
+                  <td className="px-3 py-2">{nonConformityTypeLabel[item.tipoNc as keyof typeof nonConformityTypeLabel] || item.tipoNc}</td>
                 <td className="px-3 py-2">{new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')}</td>
                 <td className="px-3 py-2">{item.centroQueDetectou?.description || '-'}</td>
                 <td className="px-3 py-2">{item.centroQueOriginou?.description || '-'}</td>

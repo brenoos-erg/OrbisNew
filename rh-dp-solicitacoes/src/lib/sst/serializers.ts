@@ -1,4 +1,4 @@
-import { NonConformityStatus } from '@prisma/client'
+import { NonConformityActionStatus, NonConformityStatus, NonConformityType } from '@prisma/client'
 
 export const statusLabel: Record<NonConformityStatus, string> = {
   ABERTA: 'Aberta',
@@ -18,4 +18,20 @@ export const statusColor: Record<NonConformityStatus, string> = {
   AGUARDANDO_VERIFICACAO: 'bg-violet-100 text-violet-800',
   ENCERRADA: 'bg-emerald-100 text-emerald-800',
   CANCELADA: 'bg-rose-100 text-rose-800',
+}
+
+export const nonConformityTypeLabel: Record<NonConformityType, string> = {
+  AUDITORIA_CLIENTE: 'Auditoria de cliente',
+  AUDITORIA_EXTERNA: 'Auditoria externa',
+  AUDITORIA_INTERNA: 'Auditoria interna',
+  OUTROS: 'Outros',
+  PROCESSOS: 'Processos',
+  NOTIFICACOES_CLIENTE: 'Notificações de cliente',
+}
+
+export const actionStatusLabel: Record<NonConformityActionStatus, string> = {
+  PENDENTE: 'Pendente',
+  EM_ANDAMENTO: 'Em andamento',
+  CONCLUIDA: 'Concluída',
+  CANCELADA: 'Cancelada',
 }
