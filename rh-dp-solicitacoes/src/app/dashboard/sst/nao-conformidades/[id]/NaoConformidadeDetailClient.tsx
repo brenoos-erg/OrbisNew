@@ -133,7 +133,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <div>
-          <p className="text-sm uppercase text-slate-500">Segurança do Trabalho</p>
+          <p className="text-sm uppercase text-slate-500">Não Conformidades</p>
           <h1 className="text-2xl font-bold text-slate-900">{item.numeroRnc}</h1>
         </div>
         <Link href="/dashboard/sst/nao-conformidades" className="ml-auto text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>

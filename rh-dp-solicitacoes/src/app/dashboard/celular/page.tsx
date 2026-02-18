@@ -32,7 +32,7 @@ const MODULE_CARDS: ModuleCard[] = [
   },
    {
     key: MODULE_KEYS.SST,
-    name: 'Segurança do Trabalho',
+    name: 'Não Conformidades',
     href: '/dashboard/sst/nao-conformidades',
   },
 ]

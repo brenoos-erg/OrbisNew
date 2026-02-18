@@ -10,7 +10,7 @@ export default function NaoConformidadesPage() {
           <ShieldAlert size={20} />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold uppercase text-slate-500">Segurança do Trabalho</p>
+          <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
           <h1 className="text-3xl font-bold text-slate-900">Não Conformidades</h1>
           <p className="max-w-3xl text-slate-600">Gerencie o ciclo completo de identificação, tratativa e verificação de eficácia.</p>
         </div>

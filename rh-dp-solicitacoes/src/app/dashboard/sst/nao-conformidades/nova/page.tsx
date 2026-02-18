@@ -63,7 +63,7 @@ export default function NovaNaoConformidadePage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
-        <p className="text-sm font-semibold uppercase text-slate-500">Segurança do Trabalho</p>
+        <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
         <h1 className="text-2xl font-bold text-slate-900">Nova não conformidade</h1>
       </header>
 

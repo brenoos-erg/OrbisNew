@@ -74,7 +74,7 @@ export default function MyRefusalsClient() {
             <ShieldAlert size={20} />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold uppercase text-slate-500">Segurança do Trabalho</p>
+            <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
             <h1 className="text-3xl font-bold text-slate-900">Meus direitos de recusa</h1>
             <p className="text-slate-600 max-w-3xl">
               Acompanhe as recusas que você registrou, consulte o parecer dos responsáveis e continue o

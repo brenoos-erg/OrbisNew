@@ -1150,7 +1150,7 @@ async function main() {
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
   const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
-  const sstModule = await ensureModule(MODULE_KEYS.SST, 'Segurança do Trabalho')
+  const sstModule = await ensureModule(MODULE_KEYS.SST, 'Não Conformidades')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',

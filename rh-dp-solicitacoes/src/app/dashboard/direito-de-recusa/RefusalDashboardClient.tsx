@@ -94,7 +94,7 @@ export default function RefusalDashboardClient({
             <ShieldAlert size={20} />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold uppercase text-slate-500">Segurança do Trabalho</p>
+            <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
              <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
             <p className="text-slate-600 max-w-3xl">{description}</p>
           </div>

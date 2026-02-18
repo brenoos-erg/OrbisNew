@@ -580,7 +580,7 @@ export default function Sidebar({
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <ShieldAlert className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className={labelBase}>Segurança do Trabalho</span>}
+                {!collapsed && <span className={labelBase}>Não Conformidades</span>}
               </button>
 
               {openSst && !collapsed && (
