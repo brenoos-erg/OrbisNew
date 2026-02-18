@@ -42,7 +42,7 @@ type Detail = {
   centroQueOriginou?: { description: string }
 }
 
-type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoAcao' | 'verificacao' | 'comentarios' | 'historico'
+type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
 const ACTION_STATUS_OPTIONS = Object.values(NonConformityActionStatus)
 
@@ -60,10 +60,11 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
     Array.from({ length: 5 }).map((_, i) => ({ pergunta: `Por quê ${i + 1}?`, resposta: '' })),
   )
-  const [actionDraft, setActionDraft] = useState<{ descricao: string; responsavelNome: string; prazo: string; status: NonConformityActionStatus; evidencias: string }>({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
+   const [actionDraft, setActionDraft] = useState<{ descricao: string; responsavelNome: string; prazo: string; status: NonConformityActionStatus; evidencias: string }>({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSaving, setActionSaving] = useState(false)
   const [editingActionId, setEditingActionId] = useState<string | null>(null)
+  const [actionModalOpen, setActionModalOpen] = useState(false)
 
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const bloqueado = !aprovado
@@ -166,6 +167,10 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     })
     load()
   }
+  function abrirNovaAcaoModal() {
+    resetActionForm()
+    setActionModalOpen(true)
+  }
    function editAction(action: ActionItem) {
     setEditingActionId(action.id)
     setActionDraft({
@@ -175,6 +180,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
       status: action.status,
       evidencias: action.evidencias || '',
     })
+    setActionModalOpen(true)
   }
 
   function resetActionForm() {
@@ -183,8 +189,16 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     setActionError(null)
   }
 
+  function fecharActionModal() {
+    if (actionSaving) return
+    setActionModalOpen(false)
+    resetActionForm()
+  }
+
+
   async function salvarActionItem(e: FormEvent) {
     e.preventDefault()
+    if (bloqueado) return
     if (!actionDraft.descricao.trim()) {
       setActionError('Descrição da ação é obrigatória.')
       return
@@ -217,11 +231,13 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     }
 
     resetActionForm()
+    setActionModalOpen(false)
     setActionSaving(false)
     load()
   }
 
   async function removerActionItem(actionId: string) {
+    if (bloqueado) return
     if (!confirm('Deseja excluir esta ação do plano de ação?')) return
     await fetch(`/api/sst/nao-conformidades/${id}/plano-de-acao`, {
       method: 'DELETE',
@@ -247,11 +263,12 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     { key: 'naoConformidade', label: 'Não conformidade' },
     { key: 'evidencias', label: 'Evidências' },
     { key: 'estudoCausa', label: 'Estudo de causa' },
-    { key: 'planoAcao', label: 'Plano de ação' },
+    { key: 'planoDeAcao', label: 'Ações da Não Conformidade' },
     { key: 'verificacao', label: 'Verificação de eficácia' },
     { key: 'comentarios', label: 'Comentários' },
-    { key: 'historico', label: 'Histórico' },
+    { key: 'timeline', label: 'Histórico' },
   ] as const
+
 
 
   return (
@@ -363,73 +380,52 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
           </form>
         </Card>
       ) : null}
-       {activeSection === 'planoAcao' ? (
-        <Card title="Plano de ação">
-          <form onSubmit={salvarActionItem} className="space-y-2 rounded-md border border-slate-200 p-3">
-            <div className="grid gap-2 md:grid-cols-2">
-              <input
-                value={actionDraft.descricao}
-                onChange={(e) => setActionDraft((prev) => ({ ...prev, descricao: e.target.value }))}
-                disabled={bloqueado || actionSaving}
-                placeholder="Descrição da ação"
-                className="rounded border px-2 py-1 text-sm"
-              />
-              <input
-                value={actionDraft.responsavelNome}
-                onChange={(e) => setActionDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
-                disabled={bloqueado || actionSaving}
-                placeholder="Responsável"
-                className="rounded border px-2 py-1 text-sm"
-              />
-              <input
-                type="date"
-                value={actionDraft.prazo}
-                onChange={(e) => setActionDraft((prev) => ({ ...prev, prazo: e.target.value }))}
-                disabled={bloqueado || actionSaving}
-                className="rounded border px-2 py-1 text-sm"
-              />
-              <select
-                value={actionDraft.status}
-                onChange={(e) => setActionDraft((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
-                disabled={bloqueado || actionSaving}
-                className="rounded border px-2 py-1 text-sm"
-              >
-                {ACTION_STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>{actionStatusLabel[status]}</option>
-                ))}
-              </select>
-            </div>
-            <textarea
-              value={actionDraft.evidencias}
-              onChange={(e) => setActionDraft((prev) => ({ ...prev, evidencias: e.target.value }))}
-              disabled={bloqueado || actionSaving}
-              className="w-full rounded border px-2 py-1 text-sm"
-              rows={3}
-              placeholder="Evidências da ação"
-            />
-            {actionError ? <p className="text-sm text-rose-700">{actionError}</p> : null}
-            <div className="flex gap-2">
-              <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Atualizar ação' : 'Adicionar ação'}</button>
-              {editingActionId ? <button type="button" className="rounded border px-3 py-2 text-sm" onClick={resetActionForm}>Cancelar edição</button> : null}
-            </div>
-          </form>
+        {activeSection === 'planoDeAcao' ? (
+        <Card title="Ações da Não Conformidade">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-slate-600">Gerencie o plano de ação para tratar a não conformidade.</p>
+            <button
+              type="button"
+              onClick={abrirNovaAcaoModal}
+              disabled={bloqueado}
+              className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Nova ação
+            </button>
+          </div>
 
           {item.planoDeAcao?.length ? (
-            <ul className="space-y-2 text-sm">
-              {item.planoDeAcao.map((action) => (
-                <li key={action.id} className="rounded-md border border-slate-200 p-3">
-                  <p className="font-semibold text-slate-900">{action.descricao}</p>
-                  <p className="text-slate-600">Responsável: {action.responsavelNome || '-'}</p>
-                  <p className="text-slate-600">Prazo: {action.prazo ? new Date(action.prazo).toLocaleDateString('pt-BR') : '-'}</p>
-                  <p className="text-slate-600">Status: {actionStatusLabel[action.status]}</p>
-                  <p className="text-slate-600">Evidências: {action.evidencias || '-'}</p>
-                  <div className="mt-2 flex gap-3">
-                    <button type="button" disabled={bloqueado} onClick={() => editAction(action)} className="text-xs text-orange-700 hover:underline disabled:opacity-50">Editar</button>
-                    <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2">Descrição</th>
+                    <th className="px-3 py-2">Responsável</th>
+                    <th className="px-3 py-2">Prazo</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Evidências</th>
+                    <th className="px-3 py-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {item.planoDeAcao.map((action) => (
+                    <tr key={action.id} className="align-top">
+                      <td className="px-3 py-2 font-medium text-slate-800">{action.descricao}</td>
+                      <td className="px-3 py-2 text-slate-700">{action.responsavelNome || '-'}</td>
+                      <td className="px-3 py-2 text-slate-700">{action.prazo ? new Date(action.prazo).toLocaleDateString('pt-BR') : '-'}</td>
+                      <td className="px-3 py-2 text-slate-700">{actionStatusLabel[action.status]}</td>
+                      <td className="px-3 py-2 text-slate-700">{action.evidencias || '-'}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end gap-3">
+                          <button type="button" disabled={bloqueado} onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline disabled:opacity-50">Editar</button>
+                          <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="text-sm text-slate-500">Nenhuma ação cadastrada.</p>
           )}
@@ -455,10 +451,69 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
         </Card>
       ) : null}
 
-        {activeSection === 'historico' ? (
+        {activeSection === 'timeline' ? (
         <Card title="Histórico">
           {item.timeline?.length ? <ul className="space-y-2">{item.timeline.map((t: any)=><li key={t.id} className="rounded-md border border-slate-200 p-2 text-sm"><p className="text-xs text-slate-500">{new Date(t.createdAt).toLocaleString('pt-BR')} · {t.actor?.fullName || 'Sistema'}</p><p className="text-slate-700">{t.message || t.tipo}</p></li>)}</ul> : <p className="text-sm text-slate-500">Sem eventos.</p>}
         </Card>
+      ) : null}
+
+      {actionModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">{editingActionId ? 'Editar ação' : 'Nova ação'}</h3>
+              <button type="button" onClick={fecharActionModal} className="text-sm text-slate-500 hover:text-slate-700">Fechar</button>
+            </div>
+            <form onSubmit={salvarActionItem} className="space-y-3">
+              <div className="grid gap-2 md:grid-cols-2">
+                <input
+                  value={actionDraft.descricao}
+                  onChange={(e) => setActionDraft((prev) => ({ ...prev, descricao: e.target.value }))}
+                  disabled={bloqueado || actionSaving}
+                  placeholder="Descrição da ação"
+                  className="rounded border px-2 py-1 text-sm"
+                />
+                <input
+                  value={actionDraft.responsavelNome}
+                  onChange={(e) => setActionDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
+                  disabled={bloqueado || actionSaving}
+                  placeholder="Responsável"
+                  className="rounded border px-2 py-1 text-sm"
+                />
+                <input
+                  type="date"
+                  value={actionDraft.prazo}
+                  onChange={(e) => setActionDraft((prev) => ({ ...prev, prazo: e.target.value }))}
+                  disabled={bloqueado || actionSaving}
+                  className="rounded border px-2 py-1 text-sm"
+                />
+                <select
+                  value={actionDraft.status}
+                  onChange={(e) => setActionDraft((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
+                  disabled={bloqueado || actionSaving}
+                  className="rounded border px-2 py-1 text-sm"
+                >
+                  {ACTION_STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>{actionStatusLabel[status]}</option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                value={actionDraft.evidencias}
+                onChange={(e) => setActionDraft((prev) => ({ ...prev, evidencias: e.target.value }))}
+                disabled={bloqueado || actionSaving}
+                className="w-full rounded border px-2 py-1 text-sm"
+                rows={3}
+                placeholder="Evidências da ação"
+              />
+              {actionError ? <p className="text-sm text-rose-700">{actionError}</p> : null}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={fecharActionModal} className="rounded border border-slate-300 px-3 py-2 text-sm" disabled={actionSaving}>Cancelar</button>
+                <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Atualizar ação' : 'Adicionar ação'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
     </div>
   )
