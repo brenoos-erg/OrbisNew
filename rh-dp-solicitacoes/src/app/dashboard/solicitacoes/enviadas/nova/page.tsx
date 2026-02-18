@@ -12,6 +12,10 @@ import { useRouter } from 'next/navigation';
 import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
+import {
+  SolicitacoesToastViewport,
+  useSolicitacoesToast,
+} from '@/components/solicitacoes/SolicitacoesToast';
 /* ================================================================
    TYPES
 ================================================================ */
@@ -131,6 +135,7 @@ const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
 
 export default function NovaSolicitacaoPage() {
   const router = useRouter();
+  const { toasts, pushToast, removeToast } = useSolicitacoesToast();
 
   // controle de envio
   const [submitting, setSubmitting] = useState(false);
@@ -155,6 +160,9 @@ export default function NovaSolicitacaoPage() {
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
+  const [step, setStep] = useState<1 | 2>(1);
+
+  const canGoNext = Boolean(departamentoId && tipoId);
 
   /* ============================================================
    1) /api/me
@@ -546,7 +554,10 @@ export default function NovaSolicitacaoPage() {
       const nextUrl = query.toString()
         ? `/dashboard/solicitacoes/enviadas?${query.toString()}`
         : '/dashboard/solicitacoes/enviadas';
-      router.push(nextUrl);
+      pushToast('Solicitação criada com sucesso', 'success');
+      window.setTimeout(() => {
+        router.push(nextUrl);
+      }, 450);
     } catch (err: any) {
       console.error('Erro ao enviar solicitação', err);
       setSubmitError(err?.message ?? 'Erro ao enviar solicitação.');
@@ -560,6 +571,7 @@ export default function NovaSolicitacaoPage() {
   ============================================================ */
   return (
     <main className="min-h-screen bg-slate-50 py-8">
+      <SolicitacoesToastViewport toasts={toasts} onClose={removeToast} />
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 lg:px-0">
         <form
           id="form-solicitacao"
@@ -568,7 +580,7 @@ export default function NovaSolicitacaoPage() {
         >
           {/* HEADER */}
           <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-4">
               <div>
                 <h1 className="text-xl font-semibold text-slate-900">
                   Nova Solicitação
@@ -578,19 +590,22 @@ export default function NovaSolicitacaoPage() {
                 </p>
               </div>
 
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-full bg-orange-500 px-5 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={submitting || !tipoId}
-              >
-                {submitting ? 'Enviando...' : 'Enviar Solicitação'}
-              </button>
+              <div className="flex items-center gap-3">
+                <span className={`h-2.5 w-2.5 rounded-full ${step === 1 ? 'bg-orange-500' : 'bg-slate-300'}`} />
+                <span className="text-xs font-semibold text-slate-700">Passo 1: Dados da solicitação</span>
+                <span className="text-slate-300">•</span>
+                <span className={`h-2.5 w-2.5 rounded-full ${step === 2 ? 'bg-orange-500' : 'bg-slate-300'}`} />
+                <span className="text-xs font-semibold text-slate-700">Passo 2: Campos específicos</span>
+              </div>
             </div>
 
             {submitError && (
               <p className="mt-3 text-xs text-red-600">{submitError}</p>
             )}
           </div>
+
+          {step === 1 && (
+          <>
 
           {/* TOPO: CABEÇALHO + SOLICITANTE */}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
@@ -738,6 +753,13 @@ export default function NovaSolicitacaoPage() {
               )}
             </aside>
           </div>
+
+           </>
+          )}
+
+          {step === 2 && (
+          <>
+          
 
           {/* PARTE DE BAIXO – FORMULÁRIO DO TIPO SELECIONADO */}
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur space-y-5">
@@ -1831,6 +1853,38 @@ export default function NovaSolicitacaoPage() {
                   );
                 })()}
               </>
+            )}
+          </div>
+        </>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              disabled={step === 1 || submitting}
+              className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-50"
+            >
+              Voltar
+            </button>
+
+            {step === 1 ? (
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={!canGoNext || submitting}
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                Avançar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={submitting || !tipoId}
+              >
+                {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+              </button>
             )}
           </div>
         </form>

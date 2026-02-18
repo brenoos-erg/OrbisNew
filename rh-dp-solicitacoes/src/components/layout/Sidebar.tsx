@@ -589,23 +589,12 @@ export default function Sidebar({
                     href="/dashboard/sst/nao-conformidades"
                     className={`${submenuItemBase}
                       ${
-                          pathname.startsWith('/dashboard/sst/nao-conformidades') && !pathname.startsWith('/dashboard/sst/nao-conformidades/nova')
+                          pathname.startsWith('/dashboard/sst/nao-conformidades')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <ClipboardCheck size={16} /> <span className={labelBase}>Ações da Não Conformidade</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/sst/nao-conformidades/nova"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/sst/nao-conformidades/nova')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <ScanLine size={16} /> <span className={labelBase}>Registrar Não Conformidade</span>
+                    <ClipboardCheck size={16} /> <span className={labelBase}>Não Conformidades</span>
                   </Link>
                   <Link
                     href="/dashboard/sst/planos-de-acao"
@@ -618,19 +607,6 @@ export default function Sidebar({
                   >
                     <ClipboardList size={16} /> <span className={labelBase}>Planos de Ações</span>
                   </Link>
-                  {showRefusal && (
-                    <Link
-                      href="/dashboard/direito-de-recusa"
-                      className={`${submenuItemBase}
-                        ${
-                          pathname.startsWith('/dashboard/direito-de-recusa')
-                            ? 'bg-orange-500/90 text-white'
-                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                        }`}
-                    >
-                      <Shield size={16} /> <span className={labelBase}>Direito de Recusa</span>
-                    </Link>
-                  )}
                 </div>
               )}
             </div>
@@ -654,7 +630,7 @@ export default function Sidebar({
                     {pendingRefusalCount}
                   </span>
                 )}
-              </button>
+              </button> 
 
               {openRefusal && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
