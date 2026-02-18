@@ -45,11 +45,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-     await appendNonConformityTimelineEvent(tx, {
+      await appendNonConformityTimelineEvent(tx, {
         nonConformityId: id,
         actorId: me.id,
         tipo: 'PLANO_ACAO',
-        message: 'Ação criada no plano de ação',
+        message: `Ação ${created.id} criada no plano de ação (${created.status})${created.descricao ? ` - ${created.descricao}` : ''}`,
       })
       return created
     })
@@ -83,6 +83,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const row = await prisma.$transaction(async (tx) => {
+      const previous = await tx.nonConformityActionItem.findUnique({
+        where: { id: actionId },
+        select: { id: true, descricao: true, status: true },
+      })
+
       const updated = await tx.nonConformityActionItem.update({
       where: { id: actionId },
       data: {
@@ -99,7 +104,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         nonConformityId: id,
         actorId: me.id,
         tipo: 'PLANO_ACAO',
-        message: 'Ação atualizada no plano de ação',
+        message:
+          previous?.status && previous.status !== updated.status
+            ? `Ação ${updated.id} alterada de ${previous.status} para ${updated.status}${updated.descricao ? ` - ${updated.descricao}` : ''}`
+            : `Ação ${updated.id} atualizada (${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`,
       })
       return updated
     })
@@ -138,7 +146,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         nonConformityId: id,
         actorId: me.id,
         tipo: 'PLANO_ACAO',
-        message: 'Ação removida do plano de ação',
+        message: `Ação ${actionId} removida do plano de ação`,
       })
     })
     return NextResponse.json({ ok: true })

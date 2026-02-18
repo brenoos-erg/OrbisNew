@@ -219,7 +219,7 @@ export default function PlanosDeAcaoClient() {
                     <div className="flex items-center justify-between gap-2">
                       <span>{item.responsavelNome || '-'}</span>
                       <Link
-                        href={`/dashboard/sst/nao-conformidades/${item.nonConformityId}?section=planoDeAcao&actionId=${item.id}`}
+                        href={`/dashboard/sst/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`}
                         className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700"
                       >
                         Abrir plano

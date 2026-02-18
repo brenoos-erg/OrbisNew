@@ -589,7 +589,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
                       <td className="px-3 py-2 text-slate-700">{formatActionDate(action.createdAt)}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-3">
-                          <button type="button" onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline">Visualizar/Editar</button>
+                          <Link href={`/dashboard/sst/nao-conformidades/${id}/acoes/${action.id}`} className="text-xs font-medium text-orange-700 hover:underline">Visualizar/Editar</Link>
                           <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
                         </div>
                       </td>
