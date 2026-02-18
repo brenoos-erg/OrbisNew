@@ -32,7 +32,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const nc = await prisma.nonConformity.findUnique({
       where: { id: (await params).id },
       include: {
-        planoDeAcao: { include: { responsavel: { select: { id: true, fullName: true } } }, orderBy: { createdAt: 'asc' } },
+         planoDeAcao: {
+          select: {
+            id: true,
+            descricao: true,
+            responsavelNome: true,
+            prazo: true,
+            status: true,
+            evidencias: true,
+            createdAt: true,
+            updatedAt: true,
+            responsavel: { select: { id: true, fullName: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         estudoCausa: { orderBy: { ordem: 'asc' } },
         anexos: { include: { createdBy: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'desc' } },
         comentarios: { include: { autor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },

@@ -14,6 +14,8 @@ type ActionItem = {
   prazo?: string | null
   status: NonConformityActionStatus
   evidencias?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
 }
 
 type Detail = {
@@ -45,6 +47,57 @@ type Detail = {
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
 const ACTION_STATUS_OPTIONS = Object.values(NonConformityActionStatus)
+const ACTION_STATUS_FILTER_OPTIONS = ['TODOS', ...ACTION_STATUS_OPTIONS] as const
+
+type ActionFilters = {
+  status: (typeof ACTION_STATUS_FILTER_OPTIONS)[number]
+  responsavelNome: string
+  emAtraso: boolean
+  prazoDe: string
+  prazoAte: string
+}
+
+const DEFAULT_ACTION_FILTERS: ActionFilters = {
+  status: 'TODOS',
+  responsavelNome: '',
+  emAtraso: false,
+  prazoDe: '',
+  prazoAte: '',
+}
+
+function toDateOnly(dateValue?: string | null) {
+  if (!dateValue) return null
+  const date = new Date(dateValue)
+  if (Number.isNaN(date.getTime())) return null
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function isOverdue(action: ActionItem) {
+  const prazo = toDateOnly(action.prazo)
+  if (!prazo) return false
+  if (action.status === NonConformityActionStatus.CONCLUIDA || action.status === NonConformityActionStatus.CANCELADA) return false
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return prazo < today
+}
+
+function formatActionDate(value?: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('pt-BR')
+}
+
+function csvEscape(value: string) {
+  return `"${value.replaceAll('"', '""')}"`
+}
+
+function toPreview(value?: string | null) {
+  if (!value?.trim()) return '-'
+  const raw = value.trim()
+  return raw.length > 70 ? `${raw.slice(0, 70)}...` : raw
+}
 
 export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [item, setItem] = useState<Detail | null>(null)
@@ -60,11 +113,13 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
     Array.from({ length: 5 }).map((_, i) => ({ pergunta: `Por quê ${i + 1}?`, resposta: '' })),
   )
-   const [actionDraft, setActionDraft] = useState<{ descricao: string; responsavelNome: string; prazo: string; status: NonConformityActionStatus; evidencias: string }>({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
+  const [actionDraft, setActionDraft] = useState<{ descricao: string; responsavelNome: string; prazo: string; status: NonConformityActionStatus; evidencias: string }>({ descricao: '', responsavelNome: '', prazo: '', status: NonConformityActionStatus.PENDENTE, evidencias: '' })
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSaving, setActionSaving] = useState(false)
   const [editingActionId, setEditingActionId] = useState<string | null>(null)
   const [actionModalOpen, setActionModalOpen] = useState(false)
+  const [actionFiltersDraft, setActionFiltersDraft] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
+  const [actionFilters, setActionFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
 
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const bloqueado = !aprovado
@@ -168,10 +223,12 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
     load()
   }
   function abrirNovaAcaoModal() {
+    if (bloqueado) return
     resetActionForm()
     setActionModalOpen(true)
   }
-   function editAction(action: ActionItem) {
+
+  function editAction(action: ActionItem) {
     setEditingActionId(action.id)
     setActionDraft({
       descricao: action.descricao || '',
@@ -181,6 +238,62 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
       evidencias: action.evidencias || '',
     })
     setActionModalOpen(true)
+  }
+
+  function pesquisarAcoes() {
+    setActionFilters(actionFiltersDraft)
+  }
+
+  function limparFiltrosAcoes() {
+    setActionFiltersDraft(DEFAULT_ACTION_FILTERS)
+    setActionFilters(DEFAULT_ACTION_FILTERS)
+  }
+
+  const filteredActions = useMemo(() => {
+    const plano = item?.planoDeAcao || []
+    return plano.filter((action) => {
+      if (actionFilters.status !== 'TODOS' && action.status !== actionFilters.status) return false
+
+      if (actionFilters.responsavelNome.trim()) {
+        const filterName = actionFilters.responsavelNome.trim().toLowerCase()
+        const actionName = (action.responsavelNome || '').toLowerCase()
+        if (!actionName.includes(filterName)) return false
+      }
+
+      if (actionFilters.emAtraso && !isOverdue(action)) return false
+
+      const prazoAction = toDateOnly(action.prazo)
+      const prazoDe = toDateOnly(actionFilters.prazoDe)
+      const prazoAte = toDateOnly(actionFilters.prazoAte)
+
+      if (prazoDe && (!prazoAction || prazoAction < prazoDe)) return false
+      if (prazoAte && (!prazoAction || prazoAction > prazoAte)) return false
+
+      return true
+    })
+  }, [actionFilters, item?.planoDeAcao])
+
+  function exportarAcoesCsv() {
+    const headers = ['Status', 'Descrição (O quê)', 'Responsável', 'Prazo', 'Evidências', 'Data criação']
+    const rows = filteredActions.map((action) => [
+      actionStatusLabel[action.status],
+      action.descricao || '-',
+      action.responsavelNome || '-',
+      formatActionDate(action.prazo),
+      action.evidencias || '-',
+      formatActionDate(action.createdAt),
+    ])
+
+    const csvContent = [headers, ...rows].map((row) => row.map((value) => csvEscape(String(value ?? ''))).join(';')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `acoes-nao-conformidade-${item?.numeroRnc || id}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   function resetActionForm() {
@@ -382,42 +495,98 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
       ) : null}
         {activeSection === 'planoDeAcao' ? (
         <Card title="Ações da Não Conformidade">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-600">Gerencie o plano de ação para tratar a não conformidade.</p>
-            <button
-              type="button"
-              onClick={abrirNovaAcaoModal}
-              disabled={bloqueado}
-              className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Nova ação
-            </button>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">
+                Status
+                <select
+                  value={actionFiltersDraft.status}
+                  onChange={(e) => setActionFiltersDraft((prev) => ({ ...prev, status: e.target.value as ActionFilters['status'] }))}
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-2 text-sm font-normal text-slate-800"
+                >
+                  {ACTION_STATUS_FILTER_OPTIONS.map((status) => (
+                    <option key={status} value={status}>{status === 'TODOS' ? 'Todos' : actionStatusLabel[status]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">
+                Responsável
+                <input
+                  value={actionFiltersDraft.responsavelNome}
+                  onChange={(e) => setActionFiltersDraft((prev) => ({ ...prev, responsavelNome: e.target.value }))}
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-2 text-sm font-normal text-slate-800"
+                  placeholder="Filtrar por responsável"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">
+                Prazo de
+                <input
+                  type="date"
+                  value={actionFiltersDraft.prazoDe}
+                  onChange={(e) => setActionFiltersDraft((prev) => ({ ...prev, prazoDe: e.target.value }))}
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-2 text-sm font-normal text-slate-800"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">
+                Prazo até
+                <input
+                  type="date"
+                  value={actionFiltersDraft.prazoAte}
+                  onChange={(e) => setActionFiltersDraft((prev) => ({ ...prev, prazoAte: e.target.value }))}
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-2 text-sm font-normal text-slate-800"
+                />
+              </label>
+              <label className="flex items-center gap-2 self-end rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={actionFiltersDraft.emAtraso}
+                  onChange={(e) => setActionFiltersDraft((prev) => ({ ...prev, emAtraso: e.target.checked }))}
+                />
+                Em atraso
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={pesquisarAcoes} className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white">Pesquisar</button>
+              <button type="button" onClick={limparFiltrosAcoes} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">Limpar</button>
+              <button type="button" onClick={exportarAcoesCsv} className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">Excel/Exportar</button>
+              <button
+                type="button"
+                onClick={abrirNovaAcaoModal}
+                disabled={bloqueado}
+                className="ml-auto rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Nova ação
+              </button>
+            </div>
           </div>
 
-          {item.planoDeAcao?.length ? (
+        {filteredActions.length ? (
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
                   <tr>
+                    <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Descrição</th>
                     <th className="px-3 py-2">Responsável</th>
                     <th className="px-3 py-2">Prazo</th>
-                    <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Evidências</th>
+                    <th className="px-3 py-2">Data criação</th>
                     <th className="px-3 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {item.planoDeAcao.map((action) => (
+                  {filteredActions.map((action) => (
                     <tr key={action.id} className="align-top">
+                      <td className="px-3 py-2 text-slate-700">{actionStatusLabel[action.status]}</td>
                       <td className="px-3 py-2 font-medium text-slate-800">{action.descricao}</td>
                       <td className="px-3 py-2 text-slate-700">{action.responsavelNome || '-'}</td>
-                      <td className="px-3 py-2 text-slate-700">{action.prazo ? new Date(action.prazo).toLocaleDateString('pt-BR') : '-'}</td>
-                      <td className="px-3 py-2 text-slate-700">{actionStatusLabel[action.status]}</td>
-                      <td className="px-3 py-2 text-slate-700">{action.evidencias || '-'}</td>
+                      <td className="px-3 py-2 text-slate-700">{formatActionDate(action.prazo)}</td>
+                      <td className="px-3 py-2 text-slate-700">{toPreview(action.evidencias)}</td>
+                      <td className="px-3 py-2 text-slate-700">{formatActionDate(action.createdAt)}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-3">
-                          <button type="button" disabled={bloqueado} onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline disabled:opacity-50">Editar</button>
+                          <button type="button" onClick={() => editAction(action)} className="text-xs font-medium text-orange-700 hover:underline">{bloqueado ? 'Visualizar' : 'Editar'}</button>
                           <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
                         </div>
                       </td>
@@ -427,7 +596,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Nenhuma ação cadastrada.</p>
+            <p className="text-sm text-slate-500">Nenhuma ação encontrada para os filtros aplicados.</p>
           )}
         </Card>
       ) : null}
@@ -509,7 +678,7 @@ export default function NaoConformidadeDetailClient({ id }: { id: string }) {
               {actionError ? <p className="text-sm text-rose-700">{actionError}</p> : null}
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={fecharActionModal} className="rounded border border-slate-300 px-3 py-2 text-sm" disabled={actionSaving}>Cancelar</button>
-                <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Atualizar ação' : 'Adicionar ação'}</button>
+                <button disabled={bloqueado || actionSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{editingActionId ? 'Salvar alterações' : 'Salvar ação'}</button>
               </div>
             </form>
           </div>
