@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityActionStatus } from '@prisma/client'
+import { ModuleLevel, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
@@ -15,6 +15,51 @@ async function assertEditable(id: string, userId: string, level: ModuleLevel | u
   return null
 }
 
+function toDate(value: unknown) {
+  if (value === undefined) return undefined
+  if (!value) return null
+  return new Date(String(value))
+}
+
+function toOptionalString(value: unknown) {
+  if (value === undefined) return undefined
+  const parsed = String(value || '').trim()
+  return parsed || null
+}
+
+function toOptionalIntBetween(value: unknown, min = 1, max = 5) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return undefined
+  return parsed
+}
+
+function toOptionalDecimal(value: unknown) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return undefined
+  return parsed
+}
+
+function resolveStatusForPatch(currentStatus: NonConformityActionStatus, nextStatus: unknown) {
+  if (!Object.values(NonConformityActionStatus).includes(nextStatus as NonConformityActionStatus)) return undefined
+
+  const typedStatus = nextStatus as NonConformityActionStatus
+  if (typedStatus === NonConformityActionStatus.CONCLUIDA) return typedStatus
+  if (typedStatus === NonConformityActionStatus.CANCELADA) return typedStatus
+
+  if (typedStatus === NonConformityActionStatus.PENDENTE || typedStatus === NonConformityActionStatus.EM_ANDAMENTO) {
+    if (currentStatus === NonConformityActionStatus.CANCELADA || currentStatus === NonConformityActionStatus.CONCLUIDA) {
+      return NonConformityActionStatus.PENDENTE
+    }
+    return typedStatus
+  }
+
+  return undefined
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
@@ -28,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const blocked = await assertEditable(id, me.id, level)
     if (blocked) return NextResponse.json({ error: blocked.error }, { status: blocked.status })
 
-     const body = await req.json().catch(() => ({} as any))
+      const body = await req.json().catch(() => ({} as any))
     const descricao = String(body?.descricao || '').trim()
     if (!descricao) return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
 
@@ -37,6 +82,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: {
           nonConformityId: id,
           descricao,
+          motivoBeneficio: toOptionalString(body?.motivoBeneficio),
+          atividadeComo: toOptionalString(body?.atividadeComo),
+          centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
+          centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
+          centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
+          dataInicioPrevista: toDate(body?.dataInicioPrevista),
+          dataFimPrevista: toDate(body?.dataFimPrevista),
+          custo: toOptionalDecimal(body?.custo),
+          dataConclusao: toDate(body?.dataConclusao),
+          tipo: Object.values(NonConformityActionType).includes(body?.tipo) ? body.tipo : NonConformityActionType.ACAO_CORRETIVA,
+          origem: toOptionalString(body?.origem) ?? 'NÃO CONFORMIDADE',
+          referencia: toOptionalString(body?.referencia),
+          rapidez: toOptionalIntBetween(body?.rapidez),
+          autonomia: toOptionalIntBetween(body?.autonomia),
+          beneficio: toOptionalIntBetween(body?.beneficio),
           responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
           responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
           prazo: body?.prazo ? new Date(body.prazo) : null,
@@ -77,35 +137,66 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const actionId = String(body?.id || '')
     if (!actionId) return NextResponse.json({ error: 'id da ação é obrigatório.' }, { status: 400 })
 
-    const existing = await prisma.nonConformityActionItem.findUnique({ where: { id: actionId }, select: { id: true, nonConformityId: true } })
+   const existing = await prisma.nonConformityActionItem.findUnique({
+      where: { id: actionId },
+      select: { id: true, nonConformityId: true, status: true, evidencias: true },
+    })
     if (!existing || existing.nonConformityId !== id) {
       return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
     }
 
+    const desiredStatus = resolveStatusForPatch(existing.status, body?.status)
+    const observacao = String(body?.observacao || '').trim()
+    const shouldSetConclusion = desiredStatus === NonConformityActionStatus.CONCLUIDA
+    const shouldClearConclusion = desiredStatus === NonConformityActionStatus.PENDENTE || desiredStatus === NonConformityActionStatus.EM_ANDAMENTO
+
     const row = await prisma.$transaction(async (tx) => {
       const previous = await tx.nonConformityActionItem.findUnique({
         where: { id: actionId },
-        select: { id: true, descricao: true, status: true },
+        select: { id: true, descricao: true, status: true, evidencias: true },
       })
+      const baseEvidence = body?.evidencias !== undefined
+        ? (body?.evidencias ? String(body.evidencias).trim() : null)
+        : (previous?.evidencias || null)
+      const evidenciasWithObs = observacao
+        ? `${baseEvidence ? `${baseEvidence}\n\n` : ''}[${new Date().toLocaleString('pt-BR')}] ${me.fullName || me.email}: ${observacao}`
+        : baseEvidence
+
 
       const updated = await tx.nonConformityActionItem.update({
-      where: { id: actionId },
-      data: {
-        descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
-        responsavelId: body?.responsavelId !== undefined ? (body.responsavelId || null) : undefined,
-        responsavelNome: body?.responsavelNome !== undefined ? (body.responsavelNome ? String(body.responsavelNome).trim() : null) : undefined,
-        prazo: body?.prazo !== undefined ? (body.prazo ? new Date(body.prazo) : null) : undefined,
-        status: Object.values(NonConformityActionStatus).includes(body?.status) ? body.status : undefined,
-        evidencias: body?.evidencias !== undefined ? (body.evidencias ? String(body.evidencias).trim() : null) : undefined,
-      },
+       where: { id: actionId },
+        data: {
+          descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
+          motivoBeneficio: toOptionalString(body?.motivoBeneficio),
+          atividadeComo: toOptionalString(body?.atividadeComo),
+          centroImpactadoId: body?.centroImpactadoId !== undefined ? (body?.centroImpactadoId ? String(body.centroImpactadoId) : null) : undefined,
+          centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
+          centroResponsavelId: body?.centroResponsavelId !== undefined ? (body?.centroResponsavelId ? String(body.centroResponsavelId) : null) : undefined,
+          dataInicioPrevista: toDate(body?.dataInicioPrevista),
+          dataFimPrevista: toDate(body?.dataFimPrevista),
+          custo: toOptionalDecimal(body?.custo),
+          dataConclusao: shouldSetConclusion ? (toDate(body?.dataConclusao) ?? new Date()) : shouldClearConclusion ? null : toDate(body?.dataConclusao),
+          tipo: Object.values(NonConformityActionType).includes(body?.tipo) ? body.tipo : undefined,
+          origem: toOptionalString(body?.origem),
+          referencia: toOptionalString(body?.referencia),
+          rapidez: toOptionalIntBetween(body?.rapidez),
+          autonomia: toOptionalIntBetween(body?.autonomia),
+          beneficio: toOptionalIntBetween(body?.beneficio),
+          responsavelId: body?.responsavelId !== undefined ? (body.responsavelId || null) : undefined,
+          responsavelNome: body?.responsavelNome !== undefined ? (body.responsavelNome ? String(body.responsavelNome).trim() : null) : undefined,
+          prazo: body?.prazo !== undefined ? (body.prazo ? new Date(body.prazo) : null) : undefined,
+          status: desiredStatus,
+          evidencias: observacao || body?.evidencias !== undefined ? evidenciasWithObs : undefined,
+        },
       })
 
       await appendNonConformityTimelineEvent(tx, {
         nonConformityId: id,
         actorId: me.id,
         tipo: 'PLANO_ACAO',
-        message:
-          previous?.status && previous.status !== updated.status
+        message: observacao
+          ? `Ação ${updated.id}: observação adicionada - ${observacao}`
+          : previous?.status && previous.status !== updated.status
             ? `Ação ${updated.id} alterada de ${previous.status} para ${updated.status}${updated.descricao ? ` - ${updated.descricao}` : ''}`
             : `Ação ${updated.id} atualizada (${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`,
       })

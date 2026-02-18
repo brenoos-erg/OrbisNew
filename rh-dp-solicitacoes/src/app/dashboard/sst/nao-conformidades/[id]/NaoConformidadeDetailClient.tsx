@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { NonConformityActionStatus } from '@prisma/client'
 import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import GutRadarCard from '@/components/sst/GutRadarCard'
 import { GUT_OPTIONS } from '@/lib/sst/gut'
 import { actionStatusLabel, nonConformityTypeLabel } from '@/lib/sst/serializers'
@@ -100,6 +101,7 @@ function toPreview(value?: string | null) {
 }
 
 export default function NaoConformidadeDetailClient({ id, initialSection }: { id: string; initialSection?: string }) {
+  const router = useRouter()
   const [item, setItem] = useState<Detail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -339,8 +341,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       body: JSON.stringify(body),
     })
 
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
       setActionError(data?.error || 'Erro ao salvar ação.')
       setActionSaving(false)
       return
@@ -349,6 +351,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     resetActionForm()
     setActionModalOpen(false)
     setActionSaving(false)
+    if (!editingActionId && data?.id) {
+      router.push(`/dashboard/sst/nao-conformidades/${id}/acoes/${data.id}`)
+      return
+    }
     load()
   }
 

@@ -100,6 +100,8 @@ model CostCenter {
   tiEquipmentSnapshots      TiEquipment[]
   nonConformitiesDetected   NonConformity[]              @relation("NonConformityDetectedCenter")
   nonConformitiesOriginated NonConformity[]              @relation("NonConformityOriginCenter")
+  ncActionsImpactCenter     NonConformityActionItem[]    @relation("NcActionImpactCenter")
+  ncActionsResponsibleCenter NonConformityActionItem[]   @relation("NcActionResponsibleCenter")
 
   @@map("CostCenter")
 }
@@ -755,6 +757,21 @@ model NonConformityActionItem {
   id              String                    @id @default(cuid())
   nonConformityId String
   descricao       String
+  motivoBeneficio String?                   @db.LongText
+  atividadeComo   String?                   @db.LongText
+  centroImpactadoId String?
+  centroImpactadoDescricao String?
+  centroResponsavelId String?
+  dataInicioPrevista DateTime?
+  dataFimPrevista DateTime?
+  custo          Decimal?                  @db.Decimal(12, 2)
+  dataConclusao  DateTime?
+  tipo           NonConformityActionType   @default(ACAO_CORRETIVA)
+  origem         String?                   @db.VarChar(80)
+  referencia     String?                   @db.VarChar(120)
+  rapidez        Int?
+  autonomia      Int?
+  beneficio      Int?
   responsavelId   String?
   responsavelNome String?
   prazo           DateTime?
@@ -764,6 +781,8 @@ model NonConformityActionItem {
   updatedAt       DateTime                  @updatedAt
   nonConformity   NonConformity             @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
   responsavel     User?                     @relation(fields: [responsavelId], references: [id])
+  centroImpactado CostCenter?               @relation("NcActionImpactCenter", fields: [centroImpactadoId], references: [id])
+  centroResponsavel CostCenter?             @relation("NcActionResponsibleCenter", fields: [centroResponsavelId], references: [id])
 
   @@index([nonConformityId, status])
 }
@@ -945,6 +964,12 @@ enum NonConformityActionStatus {
   EM_ANDAMENTO
   CONCLUIDA
   CANCELADA
+}
+enum NonConformityActionType {
+  ACAO_CORRETIVA
+  ACAO_PREVENTIVA
+  MELHORIAS
+  OUTROS
 }
 
 enum NonConformityApprovalStatus {

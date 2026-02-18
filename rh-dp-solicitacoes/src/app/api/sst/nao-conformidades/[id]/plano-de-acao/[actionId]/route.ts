@@ -42,6 +42,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       where: { id: actionId },
       include: {
         responsavel: { select: { id: true, fullName: true, email: true } },
+         centroImpactado: { select: { id: true, code: true, description: true } },
+        centroResponsavel: { select: { id: true, code: true, description: true } },
       },
     })
 
