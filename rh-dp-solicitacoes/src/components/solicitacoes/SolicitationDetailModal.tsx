@@ -510,7 +510,6 @@ export function SolicitationDetailModal({
   const [descricaoSolucaoSst, setDescricaoSolucaoSst] = useState('')
   const [observacaoSst1, setObservacaoSst1] = useState('')
   const [observacaoSst2, setObservacaoSst2] = useState('')
-  const [prazoProrrogadoSst, setPrazoProrrogadoSst] = useState('')
 
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
@@ -577,12 +576,11 @@ export function SolicitationDetailModal({
     setDpDataDemissao((payloadCampos.dpDataDemissao as string) || '')
     setDpDataPrevistaAcerto((payloadCampos.dpDataPrevistaAcerto as string) || '')
     setDpConsideracoes((payloadCampos.dpConsideracoes as string) || '')
-    const payloadSst = (payload as any)?.sst ?? {}
-    setTipoRespostaSst((payloadSst.tipoRespostaSst as string) || '')
-    setDescricaoSolucaoSst((payloadSst.descricaoSolucaoSst as string) || '')
-    setObservacaoSst1((payloadSst.observacaoSst1 as string) || '')
-    setObservacaoSst2((payloadSst.observacaoSst2 as string) || '')
-    setPrazoProrrogadoSst((payloadSst.prazoProrrogado as string) || '')
+    const payloadSstResposta = (payload as any)?.sstResposta ?? {}
+    setTipoRespostaSst((payloadSstResposta.tipoResposta as string) || '')
+    setDescricaoSolucaoSst((payloadSstResposta.descricaoSolucao as string) || '')
+    setObservacaoSst1((payloadSstResposta.observacao1 as string) || '')
+    setObservacaoSst2((payloadSstResposta.observacao2 as string) || '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
 
@@ -809,6 +807,11 @@ export function SolicitationDetailModal({
   // Se for tela de aprovação não mostramos ações de gestão;
   // se canManage=false (Solicitações Enviadas) também não.
   const showManagementActions = !isApprovalMode && canManage
+  const userIsSstOrAdmin =
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.departmentCode === '19' ||
+    (currentUser?.departments ?? []).some((dept) => dept.code === '19')
+  const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
 
   // ===== AÇÕES =====
   const handleNadaConstaChange = (name: string, value: string) => {
@@ -1135,17 +1138,17 @@ export function SolicitationDetailModal({
 
     try {
       const res = await fetch(`/api/solicitacoes/${solicitationId}/sst-solucao`, {
-        method: 'POST',
+         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipoRespostaSst,
-          descricaoSolucaoSst,
-          observacaoSst1,
-          observacaoSst2,
-          prazoProrrogado: prazoProrrogadoSst || null,
+          tipoResposta: tipoRespostaSst,
+          descricaoSolucao: descricaoSolucaoSst,
+          observacao1: observacaoSst1,
+          observacao2: observacaoSst2,
           finalizar,
         }),
       })
+
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -2070,7 +2073,7 @@ export function SolicitationDetailModal({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                       <label className={LABEL_RO}>Tipo Resposta</label>
-                      {showManagementActions ? (
+                      {canEditSstResposta ? (
                         <select className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={tipoRespostaSst} onChange={(e) => setTipoRespostaSst(e.target.value)}>
                           <option value="">Selecione...</option>
                           <option value="SOLUÇÃO COM ORIENTAÇÃO!">SOLUÇÃO COM ORIENTAÇÃO!</option>
@@ -2081,17 +2084,9 @@ export function SolicitationDetailModal({
                         <input className={INPUT_RO} readOnly value={tipoRespostaSst} />
                       )}
                     </div>
-                    <div>
-                      <label className={LABEL_RO}>Prorrogar Prazo</label>
-                      {showManagementActions ? (
-                        <input type="date" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={prazoProrrogadoSst} onChange={(e) => setPrazoProrrogadoSst(e.target.value)} />
-                      ) : (
-                        <input className={INPUT_RO} readOnly value={prazoProrrogadoSst} />
-                      )}
-                    </div>
                     <div className="md:col-span-2">
                       <label className={LABEL_RO}>Descrição da Solução</label>
-                      {showManagementActions ? (
+                      {canEditSstResposta ? (
                         <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={descricaoSolucaoSst} onChange={(e) => setDescricaoSolucaoSst(e.target.value)} />
                       ) : (
                         <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={descricaoSolucaoSst} />
@@ -2099,18 +2094,18 @@ export function SolicitationDetailModal({
                     </div>
                     <div>
                       <label className={LABEL_RO}>Adicionar Observação</label>
-                      {showManagementActions ? (
-                        <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={observacaoSst1} onChange={(e) => setObservacaoSst1(e.target.value)} />
+                      {canEditSstResposta ? (
+                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={observacaoSst1} onChange={(e) => setObservacaoSst1(e.target.value)} />
                       ) : (
-                        <input className={INPUT_RO} readOnly value={observacaoSst1} />
+                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst1} />
                       )}
                     </div>
                     <div>
                       <label className={LABEL_RO}>Adicionar Observação</label>
-                      {showManagementActions ? (
-                        <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={observacaoSst2} onChange={(e) => setObservacaoSst2(e.target.value)} />
+                      {canEditSstResposta ? (
+                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={observacaoSst2} onChange={(e) => setObservacaoSst2(e.target.value)} />
                       ) : (
-                        <input className={INPUT_RO} readOnly value={observacaoSst2} />
+                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst2} />
                       )}
                     </div>
                   </div>
@@ -2167,7 +2162,7 @@ export function SolicitationDetailModal({
                     </button>
                   )}
 
-                  {isSolicitacaoExames && canFinalizarRh && (
+                   {isSolicitacaoExames && canFinalizarRh && canEditSstResposta && (
                     <button
                       onClick={() => handleSalvarOuFinalizarSst(false)}
                       disabled={closing || isFinalizadaOuCancelada}
@@ -2177,7 +2172,7 @@ export function SolicitationDetailModal({
                     </button>
                   )}
 
-                  {canFinalizarRh && (
+                  {canFinalizarRh && (!isSolicitacaoExames || canEditSstResposta) && (
                     <button
                       onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh())}
                       disabled={closing || isFinalizadaOuCancelada}

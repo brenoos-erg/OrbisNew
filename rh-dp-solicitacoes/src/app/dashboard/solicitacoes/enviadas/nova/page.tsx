@@ -159,6 +159,7 @@ export default function NovaSolicitacaoPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
+  const [extraFiles, setExtraFiles] = useState<Record<string, File[]>>({});
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -312,6 +313,7 @@ export default function NovaSolicitacaoPage() {
   useEffect(() => {
     if (!selectedTipo) {
       setExtras({});
+      setExtraFiles({});
       setCargoId('');
       return;
     }
@@ -328,6 +330,7 @@ export default function NovaSolicitacaoPage() {
     );
 
     setExtras(defaults);
+    setExtraFiles({});
     setCargoId('');
   }, [selectedTipo]);
 
@@ -387,6 +390,19 @@ export default function NovaSolicitacaoPage() {
   const handleCheckboxChange = (name: string, checked: boolean) => {
     handleExtraChange(name, checked ? 'true' : 'false');
   };
+  const handleFileChange = (name: string, files: FileList | null) => {
+    setExtraFiles((prev) => ({
+      ...prev,
+      [name]: files ? Array.from(files) : [],
+    }));
+    handleExtraChange(
+      name,
+      files && files.length > 0
+        ? Array.from(files).map((file) => file.name).join(', ')
+        : '',
+    );
+  };
+
 
   const handleCargoChange = (id: string) => {
     setCargoId(id);
@@ -430,6 +446,29 @@ export default function NovaSolicitacaoPage() {
 
     try {
       let campos: Record<string, string> = {};
+
+      const uploadExtrasFiles = async (solicitacaoId: string) => {
+        const entries = Object.entries(extraFiles).filter(([, files]) => files.length > 0);
+        for (const [fieldName, files] of entries) {
+          const formData = new FormData();
+          files.forEach((file) => formData.append('files', file));
+          formData.append('fieldName', fieldName);
+
+          const uploadRes = await fetch(`/api/solicitacoes/${solicitacaoId}/anexos`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            let msg = `Falha ao enviar anexo (${fieldName}).`;
+            try {
+              const json = await uploadRes.json();
+              if (json?.error) msg = json.error;
+            } catch {}
+            throw new Error(msg);
+          }
+        }
+      };
 
       if (isRQ063) {
         const cargoSelecionado =
@@ -546,6 +585,9 @@ export default function NovaSolicitacaoPage() {
 
       const data = await res.json();
       console.log('Solicitação criada:', data);
+      if (data?.id) {
+        await uploadExtrasFiles(data.id);
+      }
 
       const query = new URLSearchParams();
       if (departamentoId) {
@@ -1809,11 +1851,23 @@ export default function NovaSolicitacaoPage() {
                             </select>
                           )}
 
+                          {campo.type === 'file' && (
+                            <input
+                              id={campo.name}
+                              name={campo.name}
+                              type="file"
+                              multiple
+                              onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
+                              className="w-full border rounded px-3 py-2 text-sm bg-white file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
+                            />
+                          )}
+
                            {!campo.type && <input type="text" {...commonProps} />}
 
                           {campo.type &&
                             campo.type !== 'textarea' &&
-                            campo.type !== 'select' && (
+                            campo.type !== 'select' &&
+                            campo.type !== 'file' && (
                               <input type={campo.type} {...commonProps} />
                             )}
                         </label>

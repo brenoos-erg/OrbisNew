@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { isSolicitacaoExamesSst } from '@/lib/solicitationTypes'
 
-export async function POST(
+export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -19,7 +19,7 @@ export async function POST(
       return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 })
     }
 
-    const { tipoRespostaSst, descricaoSolucaoSst, observacaoSst1, observacaoSst2, prazoProrrogado, finalizar } =
+    const { tipoResposta, descricaoSolucao, observacao1, observacao2, finalizar } =
       body as Record<string, any>
 
     const solicitation = await prisma.solicitation.findUnique({
@@ -37,25 +37,23 @@ export async function POST(
     }
 
     const payloadAtual = (solicitation.payload ?? {}) as Record<string, any>
-    const sstAtual = (payloadAtual.sst ?? {}) as Record<string, any>
-    const prazoFinal = prazoProrrogado ? new Date(`${prazoProrrogado}T23:59:59`) : null
+    const sstRespostaAtual = (payloadAtual.sstResposta ?? {}) as Record<string, any>
 
     const updated = await prisma.solicitation.update({
       where: { id },
       data: {
         status: finalizar ? 'CONCLUIDA' : solicitation.status,
         dataFechamento: finalizar ? new Date() : solicitation.dataFechamento,
-        dataPrevista: prazoFinal ?? solicitation.dataPrevista,
-        payload: {
+         payload: {
           ...payloadAtual,
-          sst: {
-            ...sstAtual,
-            tipoRespostaSst: tipoRespostaSst ?? sstAtual.tipoRespostaSst ?? '',
-            descricaoSolucaoSst: descricaoSolucaoSst ?? sstAtual.descricaoSolucaoSst ?? '',
-            observacaoSst1: observacaoSst1 ?? sstAtual.observacaoSst1 ?? '',
-            observacaoSst2: observacaoSst2 ?? sstAtual.observacaoSst2 ?? '',
-            prazoProrrogado: prazoProrrogado ?? sstAtual.prazoProrrogado ?? null,
-            prazoFinal: (prazoFinal ?? solicitation.dataPrevista)?.toISOString() ?? null,
+          sstResposta: {
+            ...sstRespostaAtual,
+            tipoResposta: tipoResposta ?? sstRespostaAtual.tipoResposta ?? '',
+            descricaoSolucao: descricaoSolucao ?? sstRespostaAtual.descricaoSolucao ?? '',
+            observacao1: observacao1 ?? sstRespostaAtual.observacao1 ?? '',
+            observacao2: observacao2 ?? sstRespostaAtual.observacao2 ?? '',
+            respondedAt: new Date().toISOString(),
+            respondedBy: me.id,
           },
         },
       },
@@ -73,7 +71,7 @@ export async function POST(
 
     return NextResponse.json(updated)
   } catch (error) {
-    console.error('POST /api/solicitacoes/[id]/sst-solucao error', error)
+    console.error('PATCH /api/solicitacoes/[id]/sst-solucao error', error)
     return NextResponse.json({ error: 'Erro ao atualizar resposta/solução SST.' }, { status: 500 })
   }
 }

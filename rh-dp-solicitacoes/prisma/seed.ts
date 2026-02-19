@@ -109,6 +109,7 @@ async function main() {
 
   const rhDepartment = await prisma.department.findUnique({ where: { code: '17' } })
   const dpDepartment = await prisma.department.findUnique({ where: { code: '08' } })
+  const sstDepartment = await prisma.department.findUnique({ where: { code: '19' } })
 
   /* =========================
      TIPOS DE SOLICITAÇÃO BÁSICOS
@@ -530,7 +531,7 @@ async function main() {
         schemaJson: desligamentoSchema,
         updatedAt: new Date(),
       },
-      create: {
+     create: {
         id: 'RQ_247',
         nome: 'RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
@@ -540,19 +541,35 @@ async function main() {
     })
     console.log('✅ Tipo "RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL" ok.')
     
+    if (!sstDepartment) {
+      throw new Error('Departamento SST (code=19) não encontrado.')
+    }
+
     const solicitacaoExamesSstSchema = {
       meta: {
-        departamentos: [dpDepartment.id],
+        departamentos: [sstDepartment.id],
         categoria: 'SERVIÇOS DE SST',
-        centroResponsavel: 'SEGURANÇA DO TRABALHO',
+        centroResponsavelLabel: 'SEGURANÇA DO TRABALHO',
         defaultSlaHours: 24,
-        defaultPrazoLabel: '1 - DIA(S)',
-        defaultDescricaoSolicitacao: 'Formulário para Solicitação de exames ao SST',
-        defaultEmpresa: 'ERG ENGENHARIA',
-        tipoCodigo: 'RQ.092',
-        internalTemplateName: 'SST_PADRAO_EXAMES',
+        defaultPrioridade: 'MEDIA',
       },
       camposEspecificos: [
+        {
+          name: 'anexosSolicitacao',
+          label: 'Anexo(s) Da Solicitação',
+          type: 'file',
+          required: false,
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+        {
+          name: 'anexosSolicitante',
+          label: 'Anexo(s) Do Solicitante',
+          type: 'file',
+          required: false,
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
         {
           name: 'nome',
           label: 'Nome',
@@ -603,7 +620,7 @@ async function main() {
           section: 'Formulário',
         },
         {
-          name: 'contratoMobilizacao',
+           name: 'contratoMobilizadoOuDesmobilizado',
           label: 'Contrato a ser Mobilizado ou Desmobilizado',
           type: 'text',
           stage: 'solicitante',
@@ -618,71 +635,31 @@ async function main() {
         },
         {
           name: 'condutorVeiculo',
-          label: 'Condutor de Veiculo',
+          label: 'Condutor de Veículo',
           type: 'checkbox',
           stage: 'solicitante',
           section: 'Formulário',
         },
         { name: 'admissional', label: 'Admissional', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
-        { name: 'transferencia', label: 'Transferencia', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'transferencia', label: 'Transferência', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
         { name: 'demissional', label: 'Demissional', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
         { name: 'mudancaFuncao', label: 'Mudança de função', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
         { name: 'retornoTrabalho', label: 'Retorno ao Trabalho', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
         { name: 'urgencia', label: 'Esse serviço tem urgência?', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
-        {
-          name: 'prazoProrrogado',
-          label: 'Prorrogar Prazo',
-          type: 'date',
-          stage: 'sst',
-          section: 'Solicitação',
-        },
-        {
-          name: 'tipoRespostaSst',
-          label: 'Tipo Resposta',
-          type: 'select',
-          options: [
-            'SOLUÇÃO COM ORIENTAÇÃO!',
-            'SOLUÇÃO COM AÇÃO EXECUTADA!',
-            'SOLUÇÃO SEM AÇÃO',
-          ],
-          stage: 'sst',
-          section: 'Resposta / Solução (Visível pelo solicitante)',
-        },
-        {
-          name: 'descricaoSolucaoSst',
-          label: 'Descrição da Solução',
-          type: 'textarea',
-          stage: 'sst',
-          section: 'Resposta / Solução (Visível pelo solicitante)',
-        },
-        {
-          name: 'observacaoSst1',
-          label: 'Adicionar Observação',
-          type: 'text',
-          stage: 'sst',
-          section: 'Resposta / Solução (Visível pelo solicitante)',
-        },
-        {
-          name: 'observacaoSst2',
-          label: 'Adicionar Observação',
-          type: 'text',
-          stage: 'sst',
-          section: 'Resposta / Solução (Visível pelo solicitante)',
-        },
-      ],
+         ],
     }
 
     await prisma.tipoSolicitacao.upsert({
       where: { nome: 'RQ.092 SOLICITAÇÃO DE EXAMES' },
       update: {
-        descricao: 'SERVIÇOS DE SST - solicitação de exames',
+        descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
       },
       create: {
         id: 'RQ_092',
         nome: 'RQ.092 SOLICITAÇÃO DE EXAMES',
-        descricao: 'SERVIÇOS DE SST - solicitação de exames',
+        descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
       },
