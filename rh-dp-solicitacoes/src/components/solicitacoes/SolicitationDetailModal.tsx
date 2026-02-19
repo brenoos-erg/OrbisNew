@@ -812,6 +812,9 @@ export function SolicitationDetailModal({
     currentUser?.departmentCode === '19' ||
     (currentUser?.departments ?? []).some((dept) => dept.code === '19')
   const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
+  const contentLayoutClass = isSolicitacaoExames
+    ? 'flex flex-col gap-5 xl:flex-row'
+    : 'flex flex-col gap-5 lg:flex-row'
 
   // ===== AÇÕES =====
   const handleNadaConstaChange = (name: string, value: string) => {
@@ -1137,23 +1140,33 @@ export function SolicitationDetailModal({
     setCloseSuccess(null)
 
     try {
-      const res = await fetch(`/api/solicitacoes/${solicitationId}/sst-solucao`, {
-         method: 'PATCH',
+       const salvarRes = await fetch(`/api/solicitacoes/${solicitationId}/sst-solucao`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tipoResposta: tipoRespostaSst,
           descricaoSolucao: descricaoSolucaoSst,
           observacao1: observacaoSst1,
           observacao2: observacaoSst2,
-          finalizar,
+          finalizar: false,
         }),
       })
 
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
+      if (!salvarRes.ok) {
+        const json = await salvarRes.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Falha ao salvar tratativa do SST.')
       }
+      if (finalizar) {
+        const encerrarRes = await fetch(`/api/solicitacoes/${solicitationId}/encerrar`, {
+          method: 'PATCH',
+        })
+
+        if (!encerrarRes.ok) {
+          const json = await encerrarRes.json().catch(() => ({}))
+          throw new Error(json?.error ?? 'Falha ao encerrar chamado do SST.')
+        }
+      }
+
 
       await refreshDetailFromServer()
       setCloseSuccess(finalizar ? 'Chamado finalizado pelo SST.' : 'Tratativa SST salva com sucesso.')
@@ -1488,7 +1501,7 @@ export function SolicitationDetailModal({
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
-          <div className="flex flex-col gap-5 lg:flex-row">
+          <div className={contentLayoutClass}>
             <div className="min-w-0 flex-1 space-y-5">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">

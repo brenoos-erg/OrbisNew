@@ -618,6 +618,14 @@ export default function NovaSolicitacaoPage() {
         <form
           id="form-solicitacao"
           onSubmit={handleSubmit}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+
+            const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+            if (tag !== 'textarea') {
+              e.preventDefault()
+            }
+          }}
           className="space-y-6"
         >
           {/* HEADER */}

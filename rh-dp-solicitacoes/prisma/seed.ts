@@ -110,6 +110,7 @@ async function main() {
   const rhDepartment = await prisma.department.findUnique({ where: { code: '17' } })
   const dpDepartment = await prisma.department.findUnique({ where: { code: '08' } })
   const sstDepartment = await prisma.department.findUnique({ where: { code: '19' } })
+  if (!sstDepartment) throw new Error('Departamento SST (code=19) não encontrado.')
 
   /* =========================
      TIPOS DE SOLICITAÇÃO BÁSICOS
@@ -571,9 +572,10 @@ async function main() {
           section: 'Anexos',
         },
         {
-          name: 'nome',
+           name: 'nome',
           label: 'Nome',
           type: 'text',
+          required: true,
           stage: 'solicitante',
           section: 'Formulário',
         },
@@ -581,6 +583,7 @@ async function main() {
           name: 'cpf',
           label: 'CPF',
           type: 'text',
+          required: true,
           stage: 'solicitante',
           section: 'Formulário',
         },
@@ -616,6 +619,7 @@ async function main() {
           name: 'email',
           label: 'E-mail',
           type: 'text',
+          required: true,
           stage: 'solicitante',
           section: 'Formulário',
         },
