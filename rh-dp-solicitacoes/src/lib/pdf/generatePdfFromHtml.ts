@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { createRequire } from 'node:module'
+import Handlebars from 'handlebars'
+import { chromium } from 'playwright'
 
 export type TermoTemplateData = {
   protocolo: string
@@ -30,15 +31,6 @@ export class PdfGenerationError extends Error {
   }
 }
 
-const requireFromProject = createRequire(path.join(process.cwd(), 'package.json'))
-
-function getRuntimeModule(moduleName: string): any | null {
-  try {
-    return requireFromProject(moduleName)
-  } catch {
-    return null
-  }
-}
 
 const templatePath = path.resolve(process.cwd(), 'src', 'templates', 'termo_responsabilidade.hbs')
 const logoCandidates = [
@@ -79,33 +71,15 @@ export async function generatePdfFromHtml(data: TermoTemplateData): Promise<Buff
   const templateSource = await readFile(resolvedTemplatePath, 'utf-8')
 
 
-  const handlebars = getRuntimeModule('handlebars')
-  if (!handlebars?.compile) {
-    throw new PdfGenerationError(
-      'Dependência Handlebars não está disponível para renderizar o termo.',
-      500,
-      'Instale com: npm install handlebars',
-    )
-  }
-
   const logoDataUri = data.logoDataUri || (await resolveLogoDataUri())
-  const html = handlebars.compile(templateSource)({
+  const html = Handlebars.compile(templateSource)({
     ...data,
     logoDataUri,
   })
 
-  const playwright = getRuntimeModule('playwright')
-  if (!playwright?.chromium) {
-    throw new PdfGenerationError(
-      'Não foi possível gerar o PDF automaticamente porque o Playwright não está instalado no ambiente.',
-      422,
-      'Instale com: npm install playwright && npx playwright install chromium',
-    )
-  }
-
   let browser: any
   try {
-    browser = await playwright.chromium.launch({ headless: true })
+    browser = await chromium.launch({ headless: true })
   } catch (error: any) {
     throw new PdfGenerationError(
       'Chromium do Playwright indisponível para geração de PDF.',
