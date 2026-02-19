@@ -8,6 +8,7 @@ import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   isSolicitacaoEquipamento,
+  isSolicitacaoExamesSst,
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
@@ -500,11 +501,16 @@ export function SolicitationDetailModal({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
   const [rhDataExameDemissional, setRhDataExameDemissional] = useState('')
-  const [rhDataLiberacaoPpp, setRhDataLiberacaoPpp] = useState('')
+   const [rhDataLiberacaoPpp, setRhDataLiberacaoPpp] = useState('')
   const [rhConsideracoes, setRhConsideracoes] = useState('')
   const [dpDataDemissao, setDpDataDemissao] = useState('')
   const [dpDataPrevistaAcerto, setDpDataPrevistaAcerto] = useState('')
   const [dpConsideracoes, setDpConsideracoes] = useState('')
+  const [tipoRespostaSst, setTipoRespostaSst] = useState('')
+  const [descricaoSolucaoSst, setDescricaoSolucaoSst] = useState('')
+  const [observacaoSst1, setObservacaoSst1] = useState('')
+  const [observacaoSst2, setObservacaoSst2] = useState('')
+  const [prazoProrrogadoSst, setPrazoProrrogadoSst] = useState('')
 
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
@@ -566,11 +572,17 @@ export function SolicitationDetailModal({
     setRhDataExameDemissional(
       (payloadCampos.rhDataExameDemissional as string) || '',
     )
-    setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
+     setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
     setRhConsideracoes((payloadCampos.rhConsideracoes as string) || '')
     setDpDataDemissao((payloadCampos.dpDataDemissao as string) || '')
     setDpDataPrevistaAcerto((payloadCampos.dpDataPrevistaAcerto as string) || '')
     setDpConsideracoes((payloadCampos.dpConsideracoes as string) || '')
+    const payloadSst = (payload as any)?.sst ?? {}
+    setTipoRespostaSst((payloadSst.tipoRespostaSst as string) || '')
+    setDescricaoSolucaoSst((payloadSst.descricaoSolucaoSst as string) || '')
+    setObservacaoSst1((payloadSst.observacaoSst1 as string) || '')
+    setObservacaoSst2((payloadSst.observacaoSst2 as string) || '')
+    setPrazoProrrogadoSst((payloadSst.prazoProrrogado as string) || '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
 
@@ -585,6 +597,7 @@ export function SolicitationDetailModal({
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
+  const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
 
@@ -616,6 +629,7 @@ export function SolicitationDetailModal({
     isSolicitacaoPessoal ||
     isSolicitacaoIncentivo ||
     isDesligamento ||
+    isSolicitacaoExames ||
     isDpChildFromRh
 
   const isFinalizadaOuCancelada =
@@ -1097,7 +1111,7 @@ export function SolicitationDetailModal({
         throw new Error(apiMessage || 'Não foi possível alocar o equipamento.')
       }
 
-      const json = await res.json().catch(() => ({}))
+       const json = await res.json().catch(() => ({}))
       setGeneratedDocumentUrl(json?.documentUrl ?? null)
       setGeneratedSigningUrl(json?.signingUrl ?? null)
       setCloseSuccess('Equipamento alocado, termo gerado e assinatura DocuSign iniciada.')
@@ -1109,6 +1123,46 @@ export function SolicitationDetailModal({
       setClosing(false)
     }
   }
+
+
+  async function handleSalvarOuFinalizarSst(finalizar: boolean) {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/sst-solucao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipoRespostaSst,
+          descricaoSolucaoSst,
+          observacaoSst1,
+          observacaoSst2,
+          prazoProrrogado: prazoProrrogadoSst || null,
+          finalizar,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao salvar tratativa do SST.')
+      }
+
+      await refreshDetailFromServer()
+      setCloseSuccess(finalizar ? 'Chamado finalizado pelo SST.' : 'Tratativa SST salva com sucesso.')
+      if (finalizar) onFinalized?.()
+    } catch (err: any) {
+      console.error('Erro na tratativa SST', err)
+      setCloseError(err?.message ?? 'Erro ao salvar tratativa SST.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
 
   async function handleFinalizarRh() {
     const solicitationId = detail?.id ?? row?.id
@@ -1989,7 +2043,7 @@ export function SolicitationDetailModal({
                             {child.status}
                           </span>
                           <span>
-                            <span className="font-semibold">Abertura:</span>{' '}
+                             <span className="font-semibold">Abertura:</span>{' '}
                             {formatDate(child.dataAbertura)}
                           </span>
                           {child.setorDestino && (
@@ -2007,6 +2061,61 @@ export function SolicitationDetailModal({
                 </div>
               )}
 
+
+              {isSolicitacaoExames && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                    Resposta / Solução (Visível pelo solicitante)
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={LABEL_RO}>Tipo Resposta</label>
+                      {showManagementActions ? (
+                        <select className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={tipoRespostaSst} onChange={(e) => setTipoRespostaSst(e.target.value)}>
+                          <option value="">Selecione...</option>
+                          <option value="SOLUÇÃO COM ORIENTAÇÃO!">SOLUÇÃO COM ORIENTAÇÃO!</option>
+                          <option value="SOLUÇÃO COM AÇÃO EXECUTADA!">SOLUÇÃO COM AÇÃO EXECUTADA!</option>
+                          <option value="SOLUÇÃO SEM AÇÃO">SOLUÇÃO SEM AÇÃO</option>
+                        </select>
+                      ) : (
+                        <input className={INPUT_RO} readOnly value={tipoRespostaSst} />
+                      )}
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Prorrogar Prazo</label>
+                      {showManagementActions ? (
+                        <input type="date" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={prazoProrrogadoSst} onChange={(e) => setPrazoProrrogadoSst(e.target.value)} />
+                      ) : (
+                        <input className={INPUT_RO} readOnly value={prazoProrrogadoSst} />
+                      )}
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Descrição da Solução</label>
+                      {showManagementActions ? (
+                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={descricaoSolucaoSst} onChange={(e) => setDescricaoSolucaoSst(e.target.value)} />
+                      ) : (
+                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={descricaoSolucaoSst} />
+                      )}
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Adicionar Observação</label>
+                      {showManagementActions ? (
+                        <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={observacaoSst1} onChange={(e) => setObservacaoSst1(e.target.value)} />
+                      ) : (
+                        <input className={INPUT_RO} readOnly value={observacaoSst1} />
+                      )}
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Adicionar Observação</label>
+                      {showManagementActions ? (
+                        <input className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={observacaoSst2} onChange={(e) => setObservacaoSst2(e.target.value)} />
+                      ) : (
+                        <input className={INPUT_RO} readOnly value={observacaoSst2} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Comentários / histórico simples */}
               {detail.comentarios && detail.comentarios.length > 0 && (
                 <div>
@@ -2052,15 +2161,25 @@ export function SolicitationDetailModal({
                       onClick={() => setShowContratadoForm((v) => !v)}
                       className="w-full rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                     >
-                      {showContratadoForm
+                       {showContratadoForm
                         ? 'Ocultar dados do contratado'
                         : 'Dados do contratado'}
                     </button>
                   )}
 
+                  {isSolicitacaoExames && canFinalizarRh && (
+                    <button
+                      onClick={() => handleSalvarOuFinalizarSst(false)}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-600 disabled:opacity-60"
+                    >
+                      {closing ? 'Salvando...' : 'Salvar resposta/solução'}
+                    </button>
+                  )}
+
                   {canFinalizarRh && (
                     <button
-                      onClick={handleFinalizarRh}
+                      onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh())}
                       disabled={closing || isFinalizadaOuCancelada}
                       className="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                     >

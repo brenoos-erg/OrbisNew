@@ -14,6 +14,7 @@ import {
   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoEquipamento,
+  isSolicitacaoExamesSst,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
@@ -393,12 +394,12 @@ export const POST = withModuleLevel(
           )
         }
 
-         const protocolo = generateProtocolo()
+          const protocolo = generateProtocolo()
         const titulo = tipo.nome
-        const descricao = null
         const tipoMeta = (tipo.schemaJson as {
-          meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number }
+          meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number; defaultDescricaoSolicitacao?: string }
         } | null)?.meta
+        const descricao = tipoMeta?.defaultDescricaoSolicitacao ?? null
         const prioridade = tipoMeta?.defaultPrioridade
         const dataPrevista =
           typeof tipoMeta?.defaultSlaHours === 'number' &&
@@ -464,6 +465,7 @@ export const POST = withModuleLevel(
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
         const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
+        const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
 
         const rhCostCenter = await prisma.costCenter.findFirst({
           where: {
@@ -484,6 +486,67 @@ export const POST = withModuleLevel(
             ],
           },
         })
+
+        if (isSolicitacaoExames) {
+          const sstDepartment = await prisma.department.findUnique({
+            where: { code: '19' },
+            select: { id: true },
+          })
+
+          if (!sstDepartment) {
+            return NextResponse.json(
+              { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado.' },
+              { status: 400 },
+            )
+          }
+
+          const payloadAtualizado = {
+            ...(payload as Record<string, any>),
+            sst: {
+              categoria: 'SERVIÇOS DE SST',
+              solicitacaoCodigo: 'RQ.092',
+              solicitacaoNome: 'SOLICITAÇÃO DE EXAMES',
+              prazoLabel: '1 - DIA(S)',
+              prazoDias: 1,
+              empresa: 'ERG ENGENHARIA',
+              dataAbertura: created.dataAbertura?.toISOString() ?? new Date().toISOString(),
+              prazoSolucao:
+                dataPrevista?.toISOString() ??
+                new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            },
+          }
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              departmentId: sstDepartment.id,
+              status: 'ABERTA',
+              requiresApproval: false,
+              approvalStatus: 'NAO_PRECISA',
+              payload: payloadAtualizado,
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message:
+                'Solicitação RQ.092 criada e encaminhada automaticamente para SEGURANÇA DO TRABALHO.',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
         /* =====================================================================
            2.5) Agendamento de Férias (auto aprovado e encaminhado ao DP)
            ===================================================================== */

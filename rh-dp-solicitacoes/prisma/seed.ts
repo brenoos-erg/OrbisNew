@@ -539,6 +539,155 @@ async function main() {
       },
     })
     console.log('✅ Tipo "RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL" ok.')
+    
+    const solicitacaoExamesSstSchema = {
+      meta: {
+        departamentos: [dpDepartment.id],
+        categoria: 'SERVIÇOS DE SST',
+        centroResponsavel: 'SEGURANÇA DO TRABALHO',
+        defaultSlaHours: 24,
+        defaultPrazoLabel: '1 - DIA(S)',
+        defaultDescricaoSolicitacao: 'Formulário para Solicitação de exames ao SST',
+        defaultEmpresa: 'ERG ENGENHARIA',
+        tipoCodigo: 'RQ.092',
+        internalTemplateName: 'SST_PADRAO_EXAMES',
+      },
+      camposEspecificos: [
+        {
+          name: 'nome',
+          label: 'Nome',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'cpf',
+          label: 'CPF',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'dataNascimento',
+          label: 'Data de Nascimento',
+          type: 'date',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'cidadeOndeReside',
+          label: 'Cidade onde Reside',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'cargo',
+          label: 'Cargo',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'telefone',
+          label: 'Telefone',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'email',
+          label: 'E-mail',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'contratoMobilizacao',
+          label: 'Contrato a ser Mobilizado ou Desmobilizado',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'rg',
+          label: 'RG',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        {
+          name: 'condutorVeiculo',
+          label: 'Condutor de Veiculo',
+          type: 'checkbox',
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
+        { name: 'admissional', label: 'Admissional', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'transferencia', label: 'Transferencia', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'demissional', label: 'Demissional', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'mudancaFuncao', label: 'Mudança de função', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'retornoTrabalho', label: 'Retorno ao Trabalho', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        { name: 'urgencia', label: 'Esse serviço tem urgência?', type: 'checkbox', stage: 'solicitante', section: 'Formulário' },
+        {
+          name: 'prazoProrrogado',
+          label: 'Prorrogar Prazo',
+          type: 'date',
+          stage: 'sst',
+          section: 'Solicitação',
+        },
+        {
+          name: 'tipoRespostaSst',
+          label: 'Tipo Resposta',
+          type: 'select',
+          options: [
+            'SOLUÇÃO COM ORIENTAÇÃO!',
+            'SOLUÇÃO COM AÇÃO EXECUTADA!',
+            'SOLUÇÃO SEM AÇÃO',
+          ],
+          stage: 'sst',
+          section: 'Resposta / Solução (Visível pelo solicitante)',
+        },
+        {
+          name: 'descricaoSolucaoSst',
+          label: 'Descrição da Solução',
+          type: 'textarea',
+          stage: 'sst',
+          section: 'Resposta / Solução (Visível pelo solicitante)',
+        },
+        {
+          name: 'observacaoSst1',
+          label: 'Adicionar Observação',
+          type: 'text',
+          stage: 'sst',
+          section: 'Resposta / Solução (Visível pelo solicitante)',
+        },
+        {
+          name: 'observacaoSst2',
+          label: 'Adicionar Observação',
+          type: 'text',
+          stage: 'sst',
+          section: 'Resposta / Solução (Visível pelo solicitante)',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ.092 SOLICITAÇÃO DE EXAMES' },
+      update: {
+        descricao: 'SERVIÇOS DE SST - solicitação de exames',
+        schemaJson: solicitacaoExamesSstSchema,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_092',
+        nome: 'RQ.092 SOLICITAÇÃO DE EXAMES',
+        descricao: 'SERVIÇOS DE SST - solicitação de exames',
+        schemaJson: solicitacaoExamesSstSchema,
+        updatedAt: new Date(),
+      },
+    })
+    console.log('✅ Tipo "RQ.092 SOLICITAÇÃO DE EXAMES" ok.')
     const nadaConstaSchema = {
       meta: {
         departamentos: [dpDepartment.id],
