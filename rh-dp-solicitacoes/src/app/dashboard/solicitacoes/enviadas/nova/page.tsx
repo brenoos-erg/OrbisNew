@@ -160,10 +160,12 @@ export default function NovaSolicitacaoPage() {
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
   const [extraFiles, setExtraFiles] = useState<Record<string, File[]>>({});
+  const [openingFiles, setOpeningFiles] = useState<File[]>([]);
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
 
   const canGoNext = Boolean(departamentoId && tipoId);
+
 
   /* ============================================================
    1) /api/me
@@ -449,6 +451,24 @@ export default function NovaSolicitacaoPage() {
       let campos: Record<string, string> = {};
 
       const uploadExtrasFiles = async (solicitacaoId: string) => {
+         if (openingFiles.length > 0) {
+          const openingFormData = new FormData();
+          openingFiles.forEach((file) => openingFormData.append('files', file));
+
+          const openingUploadRes = await fetch(`/api/solicitacoes/${solicitacaoId}/anexos`, {
+            method: 'POST',
+            body: openingFormData,
+          });
+
+          if (!openingUploadRes.ok) {
+            let msg = 'Falha ao enviar anexos da abertura do chamado.';
+            try {
+              const json = await openingUploadRes.json();
+              if (json?.error) msg = json.error;
+            } catch {}
+            throw new Error(msg);
+          }
+        }
         const entries = Object.entries(extraFiles).filter(([, files]) => files.length > 0);
         for (const [fieldName, files] of entries) {
           const formData = new FormData();
@@ -652,6 +672,26 @@ export default function NovaSolicitacaoPage() {
 
             {submitError && (
               <p className="mt-3 text-xs text-red-600">{submitError}</p>
+            )}
+            {selectedTipo && (
+              <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Anexos da abertura do chamado
+                </h3>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e: InputChange) =>
+                    setOpeningFiles(e.target.files ? Array.from(e.target.files) : [])
+                  }
+                  className="w-full border rounded px-3 py-2 text-sm bg-white file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
+                />
+                {openingFiles.length > 0 && (
+                  <p className="text-xs text-slate-500">
+                    {openingFiles.length} arquivo(s) selecionado(s).
+                  </p>
+                )}
+              </section>
             )}
           </div>
 
@@ -1790,6 +1830,13 @@ export default function NovaSolicitacaoPage() {
 
                   const renderCampo = (campo: CampoEspecifico) => {
                     const value = extras[campo.name] ?? '';
+                    const shouldShowEnderecoEnvio =
+                      campo.name !== 'enderecoEnvio' ||
+                      extras.comoSeraEntrega === 'Será enviado';
+
+                    if (!shouldShowEnderecoEnvio) {
+                      return null;
+                    }
 
                     if (campo.type === 'checkbox') {
                       return (
@@ -1861,14 +1908,19 @@ export default function NovaSolicitacaoPage() {
                           )}
 
                           {campo.type === 'file' && (
-                            <input
-                              id={campo.name}
-                              name={campo.name}
-                              type="file"
-                              multiple
-                              onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
-                              className="w-full border rounded px-3 py-2 text-sm bg-white file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
-                            />
+                            <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50/40 p-3">
+                              <input
+                                id={campo.name}
+                                name={campo.name}
+                                type="file"
+                                multiple
+                                onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
+                                className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                              />
+                              <p className="mt-2 text-xs font-medium text-orange-700">
+                                Arraste arquivos ou clique em “Escolher arquivos” para anexar.
+                              </p>
+                            </div>
                           )}
 
                            {!campo.type && <input type="text" {...commonProps} />}

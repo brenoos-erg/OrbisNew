@@ -827,9 +827,7 @@ export function SolicitationDetailModal({
   const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
-  const camposTratativaEpi = isSolicitacaoEpiUniformeTipo
-    ? camposSchema.filter((campo) => campo.stage === 'sst' || campo.stage === 'logistica')
-    : []
+  
   // ===== AÇÕES =====
   const handleNadaConstaChange = (name: string, value: string) => {
     setNadaConstaCampos((prev) => ({
@@ -1894,6 +1892,40 @@ export function SolicitationDetailModal({
                   </div>
                 )
               )}
+               {showManagementActions && !isFinalizadaOuCancelada && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
+                    Anexar documento para tratativa/aprovação
+                  </p>
+
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => setFilesToUpload(e.target.files)}
+                      className="mt-1 block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={handleUploadAnexos}
+                        disabled={uploading}
+                        className="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-60"
+                      >
+                        {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
+                      </button>
+
+                      {uploadSuccess && (
+                        <span className="text-emerald-600">{uploadSuccess}</span>
+                      )}
+                      {uploadError && (
+                        <span className="text-red-600">{uploadError}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
                {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && !showManagementActions && (
@@ -2232,35 +2264,7 @@ export function SolicitationDetailModal({
                       </div>
                     </div>
                   )}
- {isSolicitacaoEpiUniformeTipo && (
-                    <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                        Tratativas SST / Logística
-                      </p>
-                      {camposTratativaEpi.length > 0 ? (
-                        <div className="space-y-3 text-xs">
-                          {camposTratativaEpi.map((campo) => {
-                            const rawValue = payloadCampos[campo.name]
-                            return (
-                              <div key={campo.name}>
-                                <label className={LABEL_RO}>{campo.label}</label>
-                                <input
-                                  className={INPUT_RO}
-                                  readOnly
-                                  value={rawValue !== undefined ? String(rawValue) : ''}
-                                />
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-600">
-                          Sem campos operacionais adicionais configurados no schema para SST/Logística.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {isSolicitacaoEquipamentoTi && (
+ {isSolicitacaoEquipamentoTi && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
                         Inventário TI e decisão de atendimento

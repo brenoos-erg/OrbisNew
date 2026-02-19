@@ -753,18 +753,7 @@ export const POST = withModuleLevel(
             )
           }
 
-          const approver = await findLevel3SolicitacoesApprover('19')
-          if (!approver?.id) {
-            return NextResponse.json(
-              {
-                error:
-                  'Não há aprovadores SST nível 3 cadastrados para o módulo de solicitações.',
-              },
-              { status: 400 },
-            )
-          }
-
-          const payloadAtualizado = {
+         const payloadAtualizado = {
             ...(payload as Record<string, any>),
             epiUniforme: {
               categoria: 'SERVIÇOS DE LOGÍSTICA',
@@ -780,10 +769,10 @@ export const POST = withModuleLevel(
             data: {
               departmentId: sstDepartment.id,
               payload: payloadAtualizado,
-              requiresApproval: true,
-              approvalStatus: 'PENDENTE',
-              approverId: approver.id,
-              status: 'AGUARDANDO_APROVACAO',
+              requiresApproval: false,
+              approvalStatus: 'NAO_PRECISA',
+              approverId: null,
+              status: 'ABERTA',
             },
           })
 
@@ -791,17 +780,17 @@ export const POST = withModuleLevel(
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
-              actorId: approver.id,
-              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+              actorId: solicitanteId,
+              tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
             },
           })
 
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO',
+              status: 'AGUARDANDO_ATENDIMENTO',
               message:
-                'Solicitação de EPI/Uniformes criada e encaminhada ao SST para aprovação.',
+                'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
             },
           })
 
