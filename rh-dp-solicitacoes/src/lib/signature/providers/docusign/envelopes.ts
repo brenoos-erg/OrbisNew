@@ -110,3 +110,26 @@ export async function downloadCertificateOfCompletion(envelopeId: string) {
   const arr = await response.arrayBuffer()
   return Buffer.from(arr)
 }
+
+export async function downloadCombinedSignedDocument(envelopeId: string) {
+  const config = getDocuSignConfig()
+  const accessToken = await getDocuSignAccessToken()
+
+  const response = await fetch(
+    `${config.basePath}/v2.1/accounts/${config.accountId}/envelopes/${envelopeId}/documents/combined`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    },
+  )
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Falha ao baixar PDF assinado (${response.status}): ${text}`)
+  }
+
+  const arr = await response.arrayBuffer()
+  return Buffer.from(arr)
+}
+

@@ -2,12 +2,14 @@ import { prisma } from '@/lib/prisma'
 import { getSiteUrl } from '@/lib/site-url'
 import { createEnvelopeFromPdfBuffer } from '@/lib/signature/providers/docusign/envelopes'
 import { createRecipientView } from '@/lib/signature/providers/docusign/recipientView'
+import { generateAndUploadTermoResponsabilidadePdf } from '@/lib/documents/termoResponsabilidade'
 
 type CreateEmbeddedSigningForAssignmentInput = {
   assignmentId: string
   signerName: string
   signerEmail: string
   fileName: string
+  vistoriaObservacoes?: string
 }
 
 async function downloadPdfBuffer(url: string) {
@@ -26,7 +28,7 @@ export async function createEmbeddedSigningForAssignment(input: CreateEmbeddedSi
   const assignment = await prisma.documentAssignment.findUnique({
     where: { id: input.assignmentId },
     include: {
-      document: { select: { pdfUrl: true, title: true } },
+      document: { select: { id: true, type: true, pdfUrl: true, title: true } },
     },
   })
 
@@ -34,17 +36,44 @@ export async function createEmbeddedSigningForAssignment(input: CreateEmbeddedSi
     throw new Error('Atribuição de documento não encontrada para assinatura.')
   }
 
-  const returnUrl = assignment.signingReturnUrl || `${getSiteUrl()}/meus-documentos`
+  const returnUrl = assignment.signingReturnUrl || `${getSiteUrl()}/dashboard/meus-documentos/return?assignmentId=${assignment.id}`
   const clientUserId = assignment.userId
 
   let envelopeId = assignment.signingExternalId
 
+  let pdfSourceUrl = assignment.document.pdfUrl
+
+  if (assignment.document.type === 'TERMO_RESPONSABILIDADE' && input.vistoriaObservacoes?.trim()) {
+    const regenerated = await generateAndUploadTermoResponsabilidadePdf({
+      assignmentId: assignment.id,
+      documentId: assignment.document.id,
+      vistoriaObservacoes: input.vistoriaObservacoes,
+    })
+
+    await prisma.document.update({
+      where: { id: assignment.document.id },
+      data: { pdfUrl: regenerated.url },
+    })
+    pdfSourceUrl = regenerated.url
+
+    await prisma.documentAssignment.update({
+      where: { id: assignment.id },
+      data: {
+        vistoriaObservacoes: input.vistoriaObservacoes.trim(),
+        signingUrl: null,
+        signingExternalId: null,
+      },
+    })
+
+    envelopeId = null
+  }
+
   if (!envelopeId) {
-     if (!assignment.document.pdfUrl) {
+    if (!pdfSourceUrl) {
       throw new Error('Documento sem PDF disponível para iniciar assinatura DocuSign.')
     }
 
-    const pdfBuffer = await downloadPdfBuffer(assignment.document.pdfUrl)
+    const pdfBuffer = await downloadPdfBuffer(pdfSourceUrl)
 
     const envelope = await createEnvelopeFromPdfBuffer({
       pdfBuffer,

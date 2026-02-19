@@ -9,17 +9,10 @@ import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
 import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
 import { PdfGenerationError, generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
+import { DEFAULT_TERMO_CLAUSES } from '@/lib/documents/termoResponsabilidade'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
 import { createEnvelopeFromPdfBuffer } from '@/lib/signature/providers/docusign/envelopes'
 import { createRecipientView } from '@/lib/signature/providers/docusign/recipientView'
-
-const DEFAULT_CLAUSES = [
-  'Utilizar o equipamento exclusivamente para fins profissionais autorizados pela empresa.',
-  'Preservar a integridade física e lógica do equipamento, comunicando imediatamente qualquer incidente.',
-  'Não instalar softwares sem autorização prévia da área de TI.',
-  'Devolver o equipamento quando solicitado ou no desligamento, com todos os acessórios recebidos.',
-]
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -137,8 +130,9 @@ export async function POST(
         equipamentoNome: equipment.name,
         equipamentoModelo: equipment.serialNumber || equipment.category || '-',
         patrimonio: equipment.patrimonio,
-        regras: DEFAULT_CLAUSES,
+        regras: DEFAULT_TERMO_CLAUSES,
         aceite: 'Declaro que li, compreendi e concordo integralmente com as regras acima.',
+        vistoriaObservacoes: '-',
       })
 
       const fileName = `termo-responsabilidade-${solicitation.protocolo}-${equipment.patrimonio}-${Date.now()}.pdf`

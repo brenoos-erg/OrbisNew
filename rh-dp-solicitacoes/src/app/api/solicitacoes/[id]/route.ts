@@ -51,6 +51,20 @@ export async function GET(
           },
           orderBy: { dataAbertura: 'asc' },
         },
+        documents: {
+          include: {
+            assignments: {
+              select: {
+                id: true,
+                userId: true,
+                status: true,
+                signedAt: true,
+                vistoriaObservacoes: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     })
 
@@ -164,6 +178,21 @@ export async function GET(
         dataAbertura: child.dataAbertura.toISOString(),
         tipo: child.tipo ? { nome: child.tipo.nome } : null,
         setorDestino: (child as any).department?.name ?? null,
+      })),
+      documents: item.documents.map((doc) => ({
+        id: doc.id,
+        type: doc.type,
+        title: doc.title,
+        pdfUrl: doc.pdfUrl,
+        signedPdfUrl: doc.signedPdfUrl,
+        createdAt: doc.createdAt.toISOString(),
+        assignments: doc.assignments.map((assignment) => ({
+          id: assignment.id,
+          userId: assignment.userId,
+          status: assignment.status,
+          signedAt: assignment.signedAt?.toISOString() ?? null,
+          vistoriaObservacoes: assignment.vistoriaObservacoes,
+        })),
       })),
     }
 

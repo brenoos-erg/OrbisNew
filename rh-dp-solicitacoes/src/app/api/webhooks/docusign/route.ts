@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
-import { downloadCertificateOfCompletion } from '@/lib/signature/providers/docusign/envelopes'
+import { downloadCertificateOfCompletion, downloadCombinedSignedDocument } from '@/lib/signature/providers/docusign/envelopes'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
 import { finalizeSolicitationIfNoPending } from '@/lib/signature/finalizeSolicitationIfNoPending'
 
@@ -65,10 +65,17 @@ export async function POST(req: NextRequest) {
 
     if (status === 'completed') {
       const certificate = await downloadCertificateOfCompletion(envelopeId)
+      const signedPdf = await downloadCombinedSignedDocument(envelopeId)
       const certFile = `docusign-certificate-${assignment.id}-${Date.now()}.pdf`
+      const signedFile = `signed-termo-${assignment.documentId}-${Date.now()}.pdf`
       const uploaded = await uploadGeneratedFile({
         fileName: certFile,
         buffer: certificate,
+        contentType: 'application/pdf',
+      })
+      const uploadedSigned = await uploadGeneratedFile({
+        fileName: signedFile,
+        buffer: signedPdf,
         contentType: 'application/pdf',
       })
 
@@ -83,6 +90,10 @@ export async function POST(req: NextRequest) {
             auditTrailUrl: uploaded.url,
             auditTrailHash: auditHash,
           },
+        })
+        await tx.document.update({
+          where: { id: assignment.documentId },
+          data: { signedPdfUrl: uploadedSigned.url },
         })
 
         if (assignment.document.solicitationId) {

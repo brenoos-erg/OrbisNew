@@ -50,6 +50,7 @@ export async function GET() {
           type: row.document.type,
           title: row.document.title,
           pdfUrl: row.document.pdfUrl,
+          signedPdfUrl: row.document.signedPdfUrl,
           createdAt: row.document.createdAt,
           createdBy: row.document.createdBy,
           solicitation: row.document.solicitation,

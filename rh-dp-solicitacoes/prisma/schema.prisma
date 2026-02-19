@@ -228,6 +228,7 @@ model Document {
   type           DocumentType
   title          String
   pdfUrl         String?              @db.Text
+  signedPdfUrl   String?              @db.Text
   createdAt      DateTime             @default(now())
   createdById    String
   solicitation   Solicitation?        @relation(fields: [solicitationId], references: [id], onDelete: SetNull)
@@ -247,6 +248,7 @@ model DocumentAssignment {
   signingExternalId String?                  @db.Text
   signingReturnUrl  String?                  @db.Text
   signedAt          DateTime?
+  vistoriaObservacoes String?         @db.LongText
   auditTrailUrl     String?                  @db.Text
   auditTrailHash    String?
   createdAt         DateTime                 @default(now())

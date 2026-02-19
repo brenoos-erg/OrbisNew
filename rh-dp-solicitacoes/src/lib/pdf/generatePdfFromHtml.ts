@@ -16,6 +16,7 @@ export type TermoTemplateData = {
   patrimonio: string
   regras: string[]
   aceite: string
+  vistoriaObservacoes?: string
   logoDataUri?: string
 }
 

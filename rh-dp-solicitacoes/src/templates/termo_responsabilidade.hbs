@@ -23,6 +23,7 @@
       ul { margin: 0; padding-left: 18px; }
       li { margin-bottom: 4px; }
       .obs-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .obs-text { white-space: pre-line; }
       .check { width: 11px; height: 11px; border: 1px solid #111827; display: inline-block; margin-left: 6px; }
       .signatures { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
       .signature-block { text-align: center; }
@@ -91,18 +92,13 @@
       <section class="box">
         <h3>Observações de vistoria</h3>
         <div class="content">
-          <div class="obs-row">Tela riscada? <span class="check"></span> Sim <span class="check"></span> Não</div>
-          <div class="obs-row">Avaria aparente? <span class="check"></span> Sim <span class="check"></span> Não</div>
-          <div class="obs-row">Carregador original entregue? <span class="check"></span> Sim <span class="check"></span> Não</div>
+         <p class="obs-text">{{vistoriaObservacoes}}</p>
         </div>
       </section>
 
       <section class="signatures">
         <div class="signature-block">
           <div class="line">Assinatura do colaborador</div>
-        </div>
-        <div class="signature-block">
-          <div class="line">Responsável de TI</div>
         </div>
       </section>
 

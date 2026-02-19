@@ -29,17 +29,19 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}))
-    const { assignmentId } = body as { assignmentId?: string }
+    const { assignmentId, vistoriaObservacoes } = body as { assignmentId?: string; vistoriaObservacoes?: string }
 
     if (!assignmentId) {
       return NextResponse.json({ error: 'assignmentId é obrigatório.' }, { status: 400 })
     }
 
+    const observacoes = (vistoriaObservacoes || '').trim()
+
     const assignment = await prisma.documentAssignment.findFirst({
       where: { id: assignmentId, documentId: (await params).id, userId: me.id },
       include: {
         user: { select: { fullName: true, email: true } },
-        document: { select: { title: true } },
+        document: { select: { type: true, title: true } },
       },
     })
 
@@ -47,10 +49,15 @@ export async function POST(
       return NextResponse.json({ error: 'Atribuição de documento não encontrada.' }, { status: 404 })
     }
 
+    if (assignment.document.type === 'TERMO_RESPONSABILIDADE' && observacoes.length < 5) {
+      return NextResponse.json({ error: 'Informe as observações de vistoria (mínimo 5 caracteres).' }, { status: 400 })
+    }
+
     if (
       assignment.signingProvider === 'DOCUSIGN' &&
       assignment.signingUrl &&
-      assignment.status === 'AGUARDANDO_ASSINATURA'
+      assignment.status === 'AGUARDANDO_ASSINATURA' &&
+      assignment.document.type !== 'TERMO_RESPONSABILIDADE'
     ) {
       return NextResponse.json({ assignment, signingUrl: assignment.signingUrl })
     }
