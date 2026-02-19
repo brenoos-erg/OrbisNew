@@ -163,6 +163,7 @@ export default function NovaSolicitacaoPage() {
   const [openingFiles, setOpeningFiles] = useState<File[]>([]);
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
+  const [step2ReadyAt, setStep2ReadyAt] = useState<number | null>(null);
 
   const canGoNext = Boolean(departamentoId && tipoId);
 
@@ -439,6 +440,11 @@ export default function NovaSolicitacaoPage() {
     e.preventDefault();
 
     if (step !== 2) return;
+    if (step2ReadyAt && Date.now() < step2ReadyAt) {
+      setSubmitError('Revise os dados antes de enviar a solicitação.');
+      return;
+    }
+
 
     if (isRQ063 && !cargoId) {
       setSubmitError('Selecione o cargo para continuar.');
@@ -628,6 +634,12 @@ export default function NovaSolicitacaoPage() {
       setSubmitting(false);
     }
   };
+  const handleNextStep = () => {
+    setSubmitError(null);
+    setStep(2);
+    setStep2ReadyAt(Date.now() + 700);
+  };
+
 
   /* ============================================================
    RENDER
@@ -673,21 +685,24 @@ export default function NovaSolicitacaoPage() {
             {submitError && (
               <p className="mt-3 text-xs text-red-600">{submitError}</p>
             )}
-            {selectedTipo && (
-              <section className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+            {selectedTipo && step === 2 && (
+              <section className="space-y-3 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/70 p-4 shadow-sm">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-orange-700">
                   Anexos da abertura do chamado
                 </h3>
+                <p className="text-xs text-orange-700/80">
+                  Inclua aqui os arquivos da solicitação (ex.: comprovantes, documentos e formulários).
+                </p>
                 <input
                   type="file"
                   multiple
                   onChange={(e: InputChange) =>
                     setOpeningFiles(e.target.files ? Array.from(e.target.files) : [])
                   }
-                  className="w-full border rounded px-3 py-2 text-sm bg-white file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700"
+                  className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border file:border-orange-300 file:bg-orange-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-orange-800 hover:file:bg-orange-200"
                 />
                 {openingFiles.length > 0 && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs font-medium text-orange-700">
                     {openingFiles.length} arquivo(s) selecionado(s).
                   </p>
                 )}
@@ -1986,7 +2001,7 @@ export default function NovaSolicitacaoPage() {
             {step === 1 ? (
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                   onClick={handleNextStep}
                 disabled={!canGoNext || submitting}
                 className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
               >
