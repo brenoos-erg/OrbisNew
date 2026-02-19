@@ -542,9 +542,6 @@ async function main() {
     })
     console.log('✅ Tipo "RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL" ok.')
     
-    if (!sstDepartment) {
-      throw new Error('Departamento SST (code=19) não encontrado.')
-    }
 
     const solicitacaoExamesSstSchema = {
       meta: {

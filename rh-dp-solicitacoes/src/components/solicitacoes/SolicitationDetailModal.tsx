@@ -704,7 +704,9 @@ export function SolicitationDetailModal({
     ? 'Finalizar chamado'
     : isSolicitacaoPessoal || isDesligamento
       ? 'Enviar para o DP'
-      : 'Finalizar no RH'
+      : isSolicitacaoExames
+        ? 'Finalizar'
+        : 'Finalizar no RH'
   const canEditRhSection =
     isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
@@ -2078,52 +2080,7 @@ export function SolicitationDetailModal({
               )}
 
 
-              {isSolicitacaoExames && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                    Resposta / Solução (Visível pelo solicitante)
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div>
-                      <label className={LABEL_RO}>Tipo Resposta</label>
-                      {canEditSstResposta ? (
-                        <select className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={tipoRespostaSst} onChange={(e) => setTipoRespostaSst(e.target.value)}>
-                          <option value="">Selecione...</option>
-                          <option value="SOLUÇÃO COM ORIENTAÇÃO!">SOLUÇÃO COM ORIENTAÇÃO!</option>
-                          <option value="SOLUÇÃO COM AÇÃO EXECUTADA!">SOLUÇÃO COM AÇÃO EXECUTADA!</option>
-                          <option value="SOLUÇÃO SEM AÇÃO">SOLUÇÃO SEM AÇÃO</option>
-                        </select>
-                      ) : (
-                        <input className={INPUT_RO} readOnly value={tipoRespostaSst} />
-                      )}
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className={LABEL_RO}>Descrição da Solução</label>
-                      {canEditSstResposta ? (
-                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={descricaoSolucaoSst} onChange={(e) => setDescricaoSolucaoSst(e.target.value)} />
-                      ) : (
-                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={descricaoSolucaoSst} />
-                      )}
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Adicionar Observação</label>
-                      {canEditSstResposta ? (
-                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={observacaoSst1} onChange={(e) => setObservacaoSst1(e.target.value)} />
-                      ) : (
-                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst1} />
-                      )}
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Adicionar Observação</label>
-                      {canEditSstResposta ? (
-                        <textarea className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[90px]" value={observacaoSst2} onChange={(e) => setObservacaoSst2(e.target.value)} />
-                      ) : (
-                        <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst2} />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+             
               {/* Comentários / histórico simples */}
               {detail.comentarios && detail.comentarios.length > 0 && (
                 <div>
@@ -2193,6 +2150,71 @@ export function SolicitationDetailModal({
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
                     </button>
+                  )}
+                   {isSolicitacaoExames && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                        Preenchimento SST (Visível pelo solicitante)
+                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className={LABEL_RO}>Tipo Resposta</label>
+                          {canEditSstResposta ? (
+                            <select
+                              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              value={tipoRespostaSst}
+                              onChange={(e) => setTipoRespostaSst(e.target.value)}
+                            >
+                              <option value="">Selecione...</option>
+                              <option value="SOLUÇÃO COM ORIENTAÇÃO!">SOLUÇÃO COM ORIENTAÇÃO!</option>
+                              <option value="SOLUÇÃO COM AÇÃO EXECUTADA!">SOLUÇÃO COM AÇÃO EXECUTADA!</option>
+                              <option value="SOLUÇÃO SEM AÇÃO">SOLUÇÃO SEM AÇÃO</option>
+                            </select>
+                          ) : (
+                            <input className={INPUT_RO} readOnly value={tipoRespostaSst} />
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={LABEL_RO}>Descrição da Solução</label>
+                          {canEditSstResposta ? (
+                            <textarea
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              value={descricaoSolucaoSst}
+                              onChange={(e) => setDescricaoSolucaoSst(e.target.value)}
+                            />
+                          ) : (
+                            <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={descricaoSolucaoSst} />
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={LABEL_RO}>Adicionar Observação</label>
+                          {canEditSstResposta ? (
+                            <textarea
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              value={observacaoSst1}
+                              onChange={(e) => setObservacaoSst1(e.target.value)}
+                            />
+                          ) : (
+                            <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst1} />
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={LABEL_RO}>Adicionar Observação</label>
+                          {canEditSstResposta ? (
+                            <textarea
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              value={observacaoSst2}
+                              onChange={(e) => setObservacaoSst2(e.target.value)}
+                            />
+                          ) : (
+                            <textarea className={`${INPUT_RO} min-h-[90px]`} readOnly value={observacaoSst2} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {isSolicitacaoEquipamentoTi && (
