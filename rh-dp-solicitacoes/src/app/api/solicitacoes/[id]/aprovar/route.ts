@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
-import { isSolicitacaoDesligamento } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 
 
 export async function POST(
@@ -48,6 +48,40 @@ export async function POST(
     const isSolicitacaoIncentivo =
       solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
       const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
+    const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solic.tipo)
+
+    if (isSolicitacaoEpi) {
+      const [hasNivel3Solicitacoes, userSstLink] = await Promise.all([
+        prisma.userModuleAccess.findFirst({
+          where: {
+            userId: me.id,
+            level: 'NIVEL_3',
+            module: { key: 'solicitacoes' },
+          },
+          select: { id: true },
+        }),
+        prisma.userDepartment.findFirst({
+          where: {
+            userId: me.id,
+            department: { code: '19' },
+          },
+          select: { id: true },
+        }),
+      ])
+      const isSstUser =
+        me.department?.code === '19' ||
+        Boolean(userSstLink)
+
+      if (!hasNivel3Solicitacoes || !isSstUser) {
+        return NextResponse.json(
+          {
+            error:
+              'Somente aprovadores nível 3 de solicitações do departamento SST podem aprovar esta solicitação.',
+          },
+          { status: 403 },
+        )
+      }
+    }
 
     if (isSolicitacaoIncentivo) {
       const allowedCostCenters = new Set<string>()
@@ -104,6 +138,20 @@ export async function POST(
 
     const rhDepartmentId =
       rhCostCenter?.departmentId ?? solic.costCenter?.departmentId ?? solic.departmentId
+       let logisticaDepartment = null
+    if (isSolicitacaoEpi) {
+      logisticaDepartment = await prisma.department.findUnique({
+        where: { code: '11' },
+        select: { id: true, name: true },
+      })
+
+      if (!logisticaDepartment) {
+        return NextResponse.json(
+          { error: 'Departamento LOGÍSTICA não encontrado para encaminhamento.' },
+          { status: 400 },
+        )
+      }
+    }
 
     if (rhCostCenter && !rhDepartmentId) {
       return NextResponse.json(
@@ -131,6 +179,19 @@ export async function POST(
               departmentId: rhDepartmentId,
             }
           : {}),
+          ...(isSolicitacaoEpi && logisticaDepartment
+          ? {
+              departmentId: logisticaDepartment.id,
+              payload: {
+                ...((solic.payload as Record<string, any> | null) ?? {}),
+                epiUniforme: {
+                  ...(((solic.payload as Record<string, any> | null)?.epiUniforme as
+                    Record<string, any> | undefined) ?? {}),
+                  centroResponsavelLabel: logisticaDepartment.name,
+                },
+              },
+            }
+          : {}),
       },
     })
 
@@ -138,6 +199,8 @@ export async function POST(
 
     if (approvalComment && approvalComment.length > 0) {
       timelineMessage = approvalComment
+       } else if (isSolicitacaoEpi && logisticaDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
     } else if (rhCostCenter) {
       const rhName = rhCostCenter.description ?? rhCostCenter.code ?? rhCostCenter.id
       timelineMessage = `Solicitação aprovada e encaminhada para o RH (${rhName}).`

@@ -7,6 +7,7 @@ export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
+export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
 
 export type NadaConstaSetorKey =
   | 'DP'
@@ -233,4 +234,11 @@ export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {
   if (id === SOLICITACAO_EXAMES_SST_TIPO_ID) return true
   const nome = tipo.nome?.trim().toUpperCase() ?? ''
   return nome.includes('RQ.092') || nome.includes('SOLICITACAO DE EXAMES')
+}
+export function isSolicitacaoEpiUniforme(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === SOLICITACAO_EPI_UNIFORME_TIPO_ID) return true
+  const nome = tipo.nome?.trim().toUpperCase() ?? ''
+  return nome.includes('RQ.043') || nome.includes('REQUISICAO DE EPI')
 }

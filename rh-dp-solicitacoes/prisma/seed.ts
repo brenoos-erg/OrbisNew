@@ -666,6 +666,106 @@ async function main() {
       },
     })
     console.log('✅ Tipo "RQ.092 SOLICITAÇÃO DE EXAMES" ok.')
+     const requisicaoEpiUniformesSchema = {
+      meta: {
+        departamentos: [sstDepartment.id],
+        categoria: 'SERVIÇOS DE LOGÍSTICA',
+        centroResponsavelLabel: 'SEGURANÇA DO TRABALHO',
+        requiresApproval: true,
+      },
+      camposEspecificos: [
+        {
+          name: 'funcionario',
+          label: 'Funcionário',
+          type: 'text',
+          required: true,
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'matricula',
+          label: 'Matrícula',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'funcao',
+          label: 'Função',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'contrato',
+          label: 'Contrato',
+          type: 'text',
+          stage: 'solicitante',
+          section: 'Dados do colaborador',
+        },
+        {
+          name: 'itensSolicitados',
+          label: 'EPI/EPC/Uniformes solicitados',
+          type: 'textarea',
+          required: true,
+          stage: 'solicitante',
+          section: 'Itens solicitados',
+        },
+        {
+          name: 'justificativa',
+          label: 'Justificativa',
+          type: 'textarea',
+          stage: 'solicitante',
+          section: 'Itens solicitados',
+        },
+        {
+          name: 'prioridadeAtendimento',
+          label: 'Prioridade',
+          type: 'select',
+          options: ['Baixa', 'Média', 'Alta'],
+          stage: 'solicitante',
+          section: 'Itens solicitados',
+        },
+        {
+          name: 'sstParecer',
+          label: 'Parecer SST',
+          type: 'textarea',
+          stage: 'sst',
+          section: 'Tratativa SST',
+        },
+        {
+          name: 'sstDocumentoReferencia',
+          label: 'Documento de referência SST',
+          type: 'text',
+          stage: 'sst',
+          section: 'Tratativa SST',
+        },
+        {
+          name: 'logisticaAtendimento',
+          label: 'Atendimento Logística',
+          type: 'textarea',
+          stage: 'logistica',
+          section: 'Tratativa Logística',
+        },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES' },
+      update: {
+        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
+        schemaJson: requisicaoEpiUniformesSchema,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_043',
+        nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES',
+        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
+        schemaJson: requisicaoEpiUniformesSchema,
+        updatedAt: new Date(),
+      },
+    })
+    console.log('✅ Tipo "RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES" ok.')
     const nadaConstaSchema = {
       meta: {
         departamentos: [dpDepartment.id],

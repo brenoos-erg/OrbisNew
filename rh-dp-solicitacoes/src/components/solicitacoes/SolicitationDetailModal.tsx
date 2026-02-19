@@ -8,12 +8,14 @@ import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   isSolicitacaoEquipamento,
+  isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+
 
 const LABEL_RO =
   'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
@@ -122,6 +124,7 @@ type CurrentUser = {
   departmentCode?: string | null
   departmentName?: string | null
   departments?: { code?: string | null; name?: string | null }[]
+  moduleLevels?: Record<string, string>
 }
 const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
   if (!user) return []
@@ -596,6 +599,7 @@ export function SolicitationDetailModal({
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
+  const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
 
 
@@ -814,10 +818,18 @@ export function SolicitationDetailModal({
     currentUser?.departmentCode === '19' ||
     (currentUser?.departments ?? []).some((dept) => dept.code === '19')
   const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
-  const contentLayoutClass = isSolicitacaoExames
+  const canApproveEpiUniforme =
+    currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' && userIsSstOrAdmin
+  const shouldUseWideTwoColumnLayout = isSolicitacaoExames || isSolicitacaoEpiUniformeTipo
+  const contentLayoutClass = shouldUseWideTwoColumnLayout
     ? 'flex flex-col gap-5 xl:flex-row'
     : 'flex flex-col gap-5 lg:flex-row'
-
+  const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
+    ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
+    : camposSchema
+  const camposTratativaEpi = isSolicitacaoEpiUniformeTipo
+    ? camposSchema.filter((campo) => campo.stage === 'sst' || campo.stage === 'logistica')
+    : []
   // ===== AÇÕES =====
   const handleNadaConstaChange = (name: string, value: string) => {
     setNadaConstaCampos((prev) => ({
@@ -1414,7 +1426,7 @@ export function SolicitationDetailModal({
 
           <div className="flex items-center gap-2">
             {/* Modo de aprovação (tela do gestor) */}
-            {isApprovalMode && (
+             {isApprovalMode && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && (
               <>
                 <button
                   onClick={() => handleStartApproval('APROVAR')}
@@ -1434,7 +1446,11 @@ export function SolicitationDetailModal({
               </>
             )}
 
-            
+            {isApprovalMode && isSolicitacaoEpiUniformeTipo && !canApproveEpiUniforme && (
+              <span className="text-[11px] font-semibold text-amber-700">
+                Aprovação disponível apenas para nível 3 de solicitações no SST.
+              </span>
+            )}
 
             <button
               onClick={onClose}
@@ -1445,7 +1461,7 @@ export function SolicitationDetailModal({
           </div>
         </div>
 
-        {isApprovalMode && approvalAction && (
+         {isApprovalMode && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && approvalAction && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 space-y-2">
@@ -1859,8 +1875,8 @@ export function SolicitationDetailModal({
                       Formulário do tipo de solicitação
                     </p>
 
-                    <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                      {camposSchema.map((campo) => (
+                     <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                      {camposFormSolicitante.map((campo) => (
                         <div key={campo.name}>
                           <label className={LABEL_RO}>{campo.label}</label>
                           <input
@@ -2216,7 +2232,34 @@ export function SolicitationDetailModal({
                       </div>
                     </div>
                   )}
-
+ {isSolicitacaoEpiUniformeTipo && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                        Tratativas SST / Logística
+                      </p>
+                      {camposTratativaEpi.length > 0 ? (
+                        <div className="space-y-3 text-xs">
+                          {camposTratativaEpi.map((campo) => {
+                            const rawValue = payloadCampos[campo.name]
+                            return (
+                              <div key={campo.name}>
+                                <label className={LABEL_RO}>{campo.label}</label>
+                                <input
+                                  className={INPUT_RO}
+                                  readOnly
+                                  value={rawValue !== undefined ? String(rawValue) : ''}
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-600">
+                          Sem campos operacionais adicionais configurados no schema para SST/Logística.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {isSolicitacaoEquipamentoTi && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">

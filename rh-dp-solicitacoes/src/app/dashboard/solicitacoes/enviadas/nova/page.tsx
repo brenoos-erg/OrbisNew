@@ -436,6 +436,8 @@ export default function NovaSolicitacaoPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    if (step !== 2) return;
+
     if (isRQ063 && !cargoId) {
       setSubmitError('Selecione o cargo para continuar.');
       return;
@@ -443,7 +445,6 @@ export default function NovaSolicitacaoPage() {
 
     setSubmitError(null);
     setSubmitting(true);
-
     try {
       let campos: Record<string, string> = {};
 

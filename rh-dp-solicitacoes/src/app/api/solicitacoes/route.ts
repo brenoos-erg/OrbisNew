@@ -14,6 +14,7 @@ import {
   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoEquipamento,
+  isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
@@ -394,6 +395,7 @@ export const POST = withModuleLevel(
           )
         }
 
+          
           const protocolo = generateProtocolo()
         const titulo = tipo.nome
         const tipoMeta = (tipo.schemaJson as {
@@ -407,6 +409,7 @@ export const POST = withModuleLevel(
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
          const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
+         const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(tipo)
 
         const tiDepartment = await prisma.department.findUnique({
           where: { code: '20' },
@@ -419,10 +422,23 @@ export const POST = withModuleLevel(
             { status: 400 },
           )
         }
+         const sstDepartmentForCreation = await prisma.department.findUnique({
+          where: { code: '19' },
+          select: { id: true },
+        })
+
+        if (isSolicitacaoEpiUniformeTipo && !sstDepartmentForCreation) {
+          return NextResponse.json(
+            { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado para este tipo de solicitação.' },
+            { status: 400 },
+          )
+        }
         const resolvedDepartmentId =
-          isSolicitacaoEquipamentoTi && tiDepartment
-            ? tiDepartment.id
-            : departmentId
+          isSolicitacaoEpiUniformeTipo && sstDepartmentForCreation
+            ? sstDepartmentForCreation.id
+            : isSolicitacaoEquipamentoTi && tiDepartment
+              ? tiDepartment.id
+              : departmentId
         const resolvedCostCenterId = costCenterId || me.costCenterId || null
 
 
@@ -466,6 +482,7 @@ export const POST = withModuleLevel(
           tipo.nome === 'Solicitação de Abono Educacional'
         const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
         const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
+        const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
 
         const rhCostCenter = await prisma.costCenter.findFirst({
           where: {
@@ -487,11 +504,16 @@ export const POST = withModuleLevel(
           },
         })
 
+        const sstDepartment = await prisma.department.findUnique({
+          where: { code: '19' },
+          select: { id: true, name: true },
+        })
+        const logisticaDepartment = await prisma.department.findUnique({
+          where: { code: '11' },
+          select: { id: true, name: true },
+        })
+
         if (isSolicitacaoExames) {
-          const sstDepartment = await prisma.department.findUnique({
-            where: { code: '19' },
-            select: { id: true },
-          })
 
           if (!sstDepartment) {
             return NextResponse.json(
@@ -723,6 +745,69 @@ export const POST = withModuleLevel(
 
     return NextResponse.json(updated, { status: 201 })
         }
+        if (isSolicitacaoEpi) {
+          if (!sstDepartment) {
+            return NextResponse.json(
+              { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado.' },
+              { status: 400 },
+            )
+          }
+
+          const approver = await findLevel3SolicitacoesApprover('19')
+          if (!approver?.id) {
+            return NextResponse.json(
+              {
+                error:
+                  'Não há aprovadores SST nível 3 cadastrados para o módulo de solicitações.',
+              },
+              { status: 400 },
+            )
+          }
+
+          const payloadAtualizado = {
+            ...(payload as Record<string, any>),
+            epiUniforme: {
+              categoria: 'SERVIÇOS DE LOGÍSTICA',
+              solicitacaoCodigo: 'RQ.043',
+              solicitacaoNome: 'REQUISIÇÃO DE EPI S/UNIFORMES',
+              centroResponsavelLabel: sstDepartment.name,
+              logisticaDepartmentId: logisticaDepartment?.id ?? null,
+            },
+          }
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              departmentId: sstDepartment.id,
+              payload: payloadAtualizado,
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId: approver.id,
+              status: 'AGUARDANDO_APROVACAO',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: approver.id,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_APROVACAO',
+              message:
+                'Solicitação de EPI/Uniformes criada e encaminhada ao SST para aprovação.',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
+
 
       /* =====================================================================
            4) RQ_091 - Solicitação de Incentivo à Educação

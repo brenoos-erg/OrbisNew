@@ -2,7 +2,7 @@ import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 
-export async function findLevel3SolicitacoesApprover() {
+export async function findLevel3SolicitacoesApprover(departmentCode?: string) {
   const approverAccess = await prisma.userModuleAccess.findFirst({
     where: {
       level: ModuleLevel.NIVEL_3,
@@ -11,7 +11,21 @@ export async function findLevel3SolicitacoesApprover() {
       },
       user: {
         status: 'ATIVO',
-      },
+        ...(departmentCode
+          ? {
+              OR: [
+                { department: { code: departmentCode } },
+                {
+                  userDepartments: {
+                    some: {
+                      department: { code: departmentCode },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+       },
     },
     orderBy: {
       user: {
@@ -24,6 +38,10 @@ export async function findLevel3SolicitacoesApprover() {
   })
 
   if (approverAccess?.user) return approverAccess.user
+
+  if (departmentCode) {
+    return null
+  }
 
   return prisma.user.findFirst({
     where: { status: 'ATIVO' },
