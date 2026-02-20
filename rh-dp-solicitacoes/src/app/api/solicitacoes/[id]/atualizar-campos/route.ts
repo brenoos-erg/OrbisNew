@@ -82,13 +82,9 @@ export async function POST(
       }
     }
 
-    const isDpOrAdmin =
-      me.role === 'ADMIN' ||
-      me.role === 'DP' ||
-      me.department?.code === '08' ||
-      departmentLinks.some((link) => link.department?.code === '08')
+    const isAdmin = me.role === 'ADMIN'
 
-    if (!isDpOrAdmin && !userSetores.has(normalizedSetor)) {
+    if (!isAdmin && !userSetores.has(normalizedSetor)) {
       return NextResponse.json(
         { error: 'Acesso negado para atualizar este setor.' },
         { status: 403 },

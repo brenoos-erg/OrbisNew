@@ -148,14 +148,10 @@ const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
   return Array.from(sectors)
 }
 
-const getUserIsDpOrAdmin = (user: CurrentUser | null) => {
+const getUserIsAdmin = (user: CurrentUser | null) => {
   if (!user) return false
-  return (
-    user.role === 'ADMIN' ||
-    user.role === 'DP' ||
-    user.departmentCode === '08' ||
-    (user.departments ?? []).some((dept) => dept.code === '08')
-  )
+  return user.role === 'ADMIN'
+
 }
 
 
@@ -689,14 +685,14 @@ export function SolicitationDetailModal({
     () => new Set(userSectors),
     [userSectors],
   )
-  const userIsDpOrAdmin = useMemo(
-    () => getUserIsDpOrAdmin(currentUser),
+  const userIsAdmin = useMemo(
+    () => getUserIsAdmin(currentUser),
     [currentUser],
   )
 
   const canEditNadaConstaSetor =
     Boolean(activeSector) &&
-    (userIsDpOrAdmin ||
+    (userIsAdmin ||
       userSectorKeys.has(activeSector as NadaConstaSetorKey)) &&
     !isFinalizadaOuCancelada &&
     !isSetorConcluido
