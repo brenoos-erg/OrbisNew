@@ -20,7 +20,7 @@ import {
 const LABEL_RO =
   'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
 const INPUT_RO =
-  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700 focus:outline-none cursor-default'
+  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-base text-slate-700 focus:outline-none cursor-default lg:text-sm'
 
 // ===== Tipos que a página de lista já usa =====
 export type Row = {
@@ -742,10 +742,20 @@ export function SolicitationDetailModal({
   }, [activeSector, setoresNadaConsta])
   const defaultActiveSector = useMemo(() => {
     if (!isNadaConsta) return null
-    return (
-      visibleSetoresNadaConsta[0]?.key ?? userSectors[0] ?? null
+   
+    const setorDoUsuario = visibleSetoresNadaConsta.find((setor) =>
+      userSectorKeys.has(setor.key),
     )
-  }, [isNadaConsta, userSectors, visibleSetoresNadaConsta])
+
+    if (setorDoUsuario) return setorDoUsuario.key
+
+    return visibleSetoresNadaConsta[0]?.key ?? userSectors[0] ?? null
+  }, [
+    isNadaConsta,
+    userSectorKeys,
+    userSectors,
+    visibleSetoresNadaConsta,
+  ])
 
 
   useEffect(() => {
@@ -817,10 +827,6 @@ export function SolicitationDetailModal({
   const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
   const canApproveEpiUniforme =
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' && userIsSstOrAdmin
-  const shouldUseWideTwoColumnLayout = isSolicitacaoExames || isSolicitacaoEpiUniformeTipo
-  const contentLayoutClass = shouldUseWideTwoColumnLayout
-    ? 'flex flex-col gap-5 xl:flex-row'
-    : 'flex flex-col gap-5 lg:flex-row'
   const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
@@ -905,7 +911,7 @@ export function SolicitationDetailModal({
   const renderNadaConstaCampo = (campo: CampoEspecifico) => {
     const value = nadaConstaCampos[campo.name] ?? ''
     const baseClass =
-      'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm'
+      'w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-base lg:text-sm'
       const isDisabled = !canEditNadaConstaSetor
     const isConstaField = campo.name === constaFieldName
 
@@ -1448,10 +1454,10 @@ async function handleEncaminharAprovacaoComAnexo() {
   if (!isOpen || !row) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="flex max-h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 lg:items-center">
+      <div className="flex w-full h-full flex-col overflow-hidden rounded-none bg-white shadow-xl lg:h-auto lg:max-h-[90vh] lg:max-w-6xl lg:rounded-xl">
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-800">
               Detalhes da Solicitação
@@ -1464,14 +1470,14 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
             {/* Modo de aprovação (tela do gestor) */}
              {isApprovalMode && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && (
               <>
                 <button
                   onClick={() => handleStartApproval('APROVAR')}
                   disabled={closing}
-                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                  className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                 >
                   Aprovar
                 </button>
@@ -1479,7 +1485,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                 <button
                   onClick={() => handleStartApproval('REPROVAR')}
                   disabled={closing}
-                  className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-60"
+                    className="w-full rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                 >
                   Reprovar
                 </button>
@@ -1494,7 +1500,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
             <button
               onClick={onClose}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
             >
               Fechar
             </button>
@@ -1522,7 +1528,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Comentário {approvalAction === 'REPROVAR' && '(obrigatório)'}
                   </label>
                   <textarea
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 lg:text-sm"
                     rows={3}
                     value={approvalComment}
                     onChange={(e) => setApprovalComment(e.target.value)}
@@ -1535,11 +1541,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-start">
+              <div className="flex w-full flex-col items-stretch gap-2 self-end sm:self-start lg:w-auto">
                 <button
                   onClick={handleConfirmApprovalAction}
                   disabled={closing}
-                  className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                  className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                 >
                   {approvalAction === 'APROVAR'
                     ? 'Confirmar aprovação'
@@ -1548,7 +1554,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                 <button
                   onClick={handleCancelApprovalAction}
-                  className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="w-full rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
                 >
                   Cancelar
                 </button>
@@ -1559,8 +1565,8 @@ async function handleEncaminharAprovacaoComAnexo() {
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
-          <div className={contentLayoutClass}>
-            <div className="min-w-0 flex-1 space-y-5">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="min-w-0 space-y-5 lg:col-span-2">
           {/* TIMELINE NO TOPO */}
           <div className="mb-3 flex flex-col gap-2">
             <div className="flex gap-4">
@@ -1613,7 +1619,7 @@ async function handleEncaminharAprovacaoComAnexo() {
           {detail && (
             <>
               {/* Informações principais */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className={LABEL_RO}>Status</label>
                   <input
@@ -1743,7 +1749,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <label className={LABEL_RO}>E-mail</label>
                       <input
@@ -1762,7 +1768,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <label className={LABEL_RO}>Telefone</label>
                       <input
@@ -1915,7 +1921,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       Formulário do tipo de solicitação
                     </p>
 
-                     <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                       {camposFormSolicitante.map((campo) => (
                         <div key={campo.name}>
                           <label className={LABEL_RO}>{campo.label}</label>
@@ -1943,11 +1949,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Dados do contratado
                   </p>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <label className={LABEL_RO}>Nome completo</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={candidatoNome}
                         onChange={(e) => setCandidatoNome(e.target.value)}
                         placeholder="Nome do contratado"
@@ -1957,7 +1963,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Documento (CPF)</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={candidatoDocumento}
                         onChange={(e) =>
                           setCandidatoDocumento(e.target.value)
@@ -1972,7 +1978,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </label>
                       <input
                         type="date"
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={dataAdmissaoPrevista}
                         onChange={(e) =>
                           setDataAdmissaoPrevista(e.target.value)
@@ -1983,7 +1989,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Cargo</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={cargo}
                         onChange={(e) => setCargo(e.target.value)}
                         placeholder="Cargo do contratado"
@@ -1993,7 +1999,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Salário</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={salario}
                         onChange={(e) => setSalario(e.target.value)}
                         placeholder="Ex: 3500,00"
@@ -2014,7 +2020,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           type="button"
                           onClick={handleUploadAnexos}
                           disabled={uploading}
-                          className="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-60"
+                          className="w-full rounded-md bg-blue-600 px-4 py-3 text-base text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                         >
                           {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
                         </button>
@@ -2040,13 +2046,13 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Informações para incentivo à educação
                   </p>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <label className={LABEL_RO}>
                         Nome do colaborador/aluno
                       </label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={candidatoNome}
                         onChange={(e) => setCandidatoNome(e.target.value)}
                         placeholder="Nome completo"
@@ -2058,7 +2064,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         Duração do curso (meses)
                       </label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={duracaoCursoMeses}
                         onChange={(e) => setDuracaoCursoMeses(e.target.value)}
                         placeholder="Ex.: 12"
@@ -2068,7 +2074,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Valor mensal (R$)</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                         value={valorMensalCurso}
                         onChange={(e) => setValorMensalCurso(e.target.value)}
                         placeholder="Ex.: 500,00"
@@ -2162,12 +2168,11 @@ async function handleEncaminharAprovacaoComAnexo() {
             </div>
 
             {showManagementActions && detail && (
-              <aside className="w-full shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:w-[390px] lg:max-h-[72vh] lg:overflow-y-auto">
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                  Painel de Tratativas
-                </p>
-
-                <div className="space-y-4">
+              <aside className="w-full lg:col-span-1">
+                <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6 lg:max-h-[72vh] lg:overflow-y-auto">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    Painel de Tratativas
+                  </p>
                   {!isFinalizadaOuCancelada && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
@@ -2187,7 +2192,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={handleUploadAnexos}
                             disabled={uploading}
-                            className="rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-500 disabled:opacity-60"
+                            className="w-full rounded-md bg-blue-600 px-4 py-3 text-base text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                           >
                             {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
                           </button>
@@ -2205,7 +2210,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   {!isDpDestino && canFinalizarRh && isSolicitacaoPessoal && (
                     <button
                       onClick={() => setShowContratadoForm((v) => !v)}
-                      className="w-full rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                      className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 lg:w-auto lg:text-sm"
                     >
                        {showContratadoForm
                         ? 'Ocultar dados do contratado'
@@ -2217,7 +2222,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => handleSalvarOuFinalizarSst(false)}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-600 disabled:opacity-60"
+                      className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Salvando...' : 'Salvar resposta/solução'}
                     </button>
@@ -2227,7 +2232,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh())}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
                     </button>
@@ -2242,7 +2247,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Tipo Resposta</label>
                           {canEditSstResposta ? (
                             <select
-                              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                               value={tipoRespostaSst}
                               onChange={(e) => setTipoRespostaSst(e.target.value)}
                             >
@@ -2260,7 +2265,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Descrição da Solução</label>
                           {canEditSstResposta ? (
                             <textarea
-                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                               value={descricaoSolucaoSst}
                               onChange={(e) => setDescricaoSolucaoSst(e.target.value)}
                             />
@@ -2273,7 +2278,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Adicionar Observação</label>
                           {canEditSstResposta ? (
                             <textarea
-                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                               value={observacaoSst1}
                               onChange={(e) => setObservacaoSst1(e.target.value)}
                             />
@@ -2286,7 +2291,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Adicionar Observação</label>
                           {canEditSstResposta ? (
                             <textarea
-                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                             className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                               value={observacaoSst2}
                               onChange={(e) => setObservacaoSst2(e.target.value)}
                             />
@@ -2309,7 +2314,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             Equipamento disponível (IN_STOCK)
                           </span>
                           <select
-                            className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                            className="w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                             value={selectedEquipmentId}
                             onChange={(e) => setSelectedEquipmentId(e.target.value)}
                             disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
@@ -2329,14 +2334,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                         <button
                           onClick={handleTiAlocarEquipamento}
                           disabled={closing || isFinalizadaOuCancelada}
-                          className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+                         className="w-full rounded-md bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                         >
                           {closing ? 'Processando...' : 'Alocar equipamento e gerar termo'}
                         </button>
                         <button
                           onClick={handleTiSemEstoque}
                           disabled={closing || isFinalizadaOuCancelada}
-                          className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
+                          className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:w-auto lg:text-sm"
                         >
                           Sem estoque → encaminhar para aprovação
                         </button>
@@ -2394,7 +2399,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={() => handleSalvarNadaConsta(false)}
                             disabled={savingNadaConsta}
-                            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                          className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 lg:w-auto lg:text-sm"
                           >
                             {savingNadaConsta ? 'Salvando...' : 'Salvar'}
                           </button>
@@ -2402,7 +2407,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={() => handleSalvarNadaConsta(true)}
                             disabled={savingNadaConsta}
-                            className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                            className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                           >
                             Finalizar setor
                           </button>
@@ -2417,7 +2422,7 @@ async function handleEncaminharAprovacaoComAnexo() {
         </div>
 
         {/* Rodapé */}
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
+         <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="text-xs">
             {closeError && <p className="text-red-600">{closeError}</p>}
             {closeSuccess && (
@@ -2425,12 +2430,12 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:flex-row lg:items-center">
              {showManagementActions && canAssumir && (
               <button
                 onClick={handleAssumirChamado}
                 disabled={assumindo || isFinalizadaOuCancelada}
-                className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60 lg:w-auto lg:text-sm"
               >
                 {assumindo ? 'Assumindo...' : 'Assumir chamado'}
               </button>
@@ -2440,7 +2445,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <button
                 onClick={handleEncaminharAprovacaoComAnexo}
                 disabled={encaminhandoAprovacao}
-                className="rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
+                className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:w-auto lg:text-sm"
               >
                 {encaminhandoAprovacao
                   ? 'Encaminhando...'
@@ -2449,7 +2454,7 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
             <button
               onClick={onClose}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
             >
               Fechar
             </button>
@@ -2523,7 +2528,7 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Informações básicas
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Cargo</label>
             <input className={INPUT_RO} readOnly value={get('cargoNome')} />
@@ -2597,7 +2602,7 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Requisitos acadêmicos
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Escolaridade</label>
             <input className={INPUT_RO} readOnly value={get('escolaridade')} />
@@ -2608,7 +2613,7 @@ function RQ063ResumoCampos({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2 mt-3">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3 mt-3">
           <div>
             <label className={LABEL_RO}>Escolaridade completa?</label>
             <input
@@ -2671,7 +2676,7 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Solicitações para o novo funcionário
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+       <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>
               Crachá / República / Uniforme / Outros
@@ -2701,7 +2706,7 @@ function RQ063ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Preenchimento RH
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Nome do profissional</label>
             <input
@@ -2813,7 +2818,7 @@ function RQ247ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Dados do gestor solicitante
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Nome</label>
             <input className={INPUT_RO} readOnly value={get('gestorNome')} />
@@ -2833,7 +2838,7 @@ function RQ247ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Motivo do desligamento
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Motivos selecionados</label>
             <input className={INPUT_RO} readOnly value={motivos || '-'} />
@@ -2865,7 +2870,7 @@ function RQ247ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Dados do funcionário
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Nome</label>
             <input
@@ -2929,13 +2934,13 @@ function RQ247ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Informações gerais RH (preenchimento RH)
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Data exame demissional</label>
             {rhEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                 value={rhDataExameValue}
                 onChange={(e) =>
                   onRhDataExameDemissionalChange(e.target.value)
@@ -2950,7 +2955,7 @@ function RQ247ResumoCampos({
             {rhEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                 value={rhDataLiberacaoValue}
                 onChange={(e) => onRhDataLiberacaoPppChange(e.target.value)}
               />
@@ -2966,7 +2971,7 @@ function RQ247ResumoCampos({
             <label className={LABEL_RO}>Considerações</label>
             {rhEditable ? (
               <textarea
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[70px]"
+               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm min-h-[70px]"
                 value={rhConsideracoesValue}
                 onChange={(e) => onRhConsideracoesChange(e.target.value)}
               />
@@ -2985,13 +2990,13 @@ function RQ247ResumoCampos({
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
           Informações gerais DP (preenchimento DP)
         </p>
-        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={LABEL_RO}>Data demissão</label>
             {dpEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                 value={dpDataDemissaoValue}
                 onChange={(e) => onDpDataDemissaoChange(e.target.value)}
               />
@@ -3004,7 +3009,7 @@ function RQ247ResumoCampos({
             {dpEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
                 value={dpDataPrevistaValue}
                 onChange={(e) => onDpDataPrevistaAcertoChange(e.target.value)}
               />
@@ -3020,7 +3025,7 @@ function RQ247ResumoCampos({
             <label className={LABEL_RO}>Considerações</label>
             {dpEditable ? (
               <textarea
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm min-h-[70px]"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm min-h-[70px]"
                 value={dpConsideracoesValue}
                 onChange={(e) => onDpConsideracoesChange(e.target.value)}
               />
