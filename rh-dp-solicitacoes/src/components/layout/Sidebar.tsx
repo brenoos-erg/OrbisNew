@@ -118,6 +118,7 @@ export default function Sidebar({
   const inSst = pathname.startsWith('/dashboard/sst')
   const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
   const inMyDocuments = pathname.startsWith('/dashboard/meus-documentos')
+  const inDocumentsControl = pathname.startsWith('/dashboard/controle-documentos')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
@@ -125,6 +126,7 @@ export default function Sidebar({
   const [openRefusal, setOpenRefusal] = useState(inRefusal)
   const [openSst, setOpenSst] = useState(inSst)
   const [openEquipment, setOpenEquipment] = useState(inEquipment)
+  const [openDocumentsControl, setOpenDocumentsControl] = useState(inDocumentsControl)
 
   // quando mudar de rota, abre o grupo correspondente e fecha o outro
   useEffect(() => {
@@ -135,13 +137,15 @@ export default function Sidebar({
       setOpenRefusal(false)
       setOpenSst(false)
       setOpenEquipment(false)
+      setOpenDocumentsControl(false)
     } else if (inConfig) {
       setOpenConfig(true)
       setOpenSolic(false)
       setOpenFleet(false)
       setOpenRefusal(false)
       setOpenSst(false)
-      setOpenEquipment(false)
+        setOpenEquipment(false)
+      setOpenDocumentsControl(false)
     } else if (inFleet) {
       setOpenFleet(true)
       setOpenSolic(false)
@@ -149,6 +153,7 @@ export default function Sidebar({
       setOpenRefusal(false)
       setOpenSst(false)
       setOpenEquipment(false)
+      setOpenDocumentsControl(false)
     } else if (inRefusal) {
       setOpenRefusal(true)
       setOpenSst(false)
@@ -156,6 +161,7 @@ export default function Sidebar({
       setOpenSolic(false)
       setOpenConfig(false)
       setOpenEquipment(false)
+      setOpenDocumentsControl(false)
     } else if (inSst) {
       setOpenSst(true)
       setOpenRefusal(false)
@@ -163,6 +169,7 @@ export default function Sidebar({
       setOpenSolic(false)
       setOpenConfig(false)
       setOpenEquipment(false)
+      setOpenDocumentsControl(false)
     } else if (inEquipment) {
       setOpenEquipment(true)
       setOpenSst(false)
@@ -170,8 +177,19 @@ export default function Sidebar({
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenDocumentsControl(false)
+    } else if (inDocumentsControl) {
+      setOpenDocumentsControl(true)
+      setOpenEquipment(false)
+      setOpenSst(false)
+      setOpenRefusal(false)
+      setOpenFleet(false)
+      setOpenSolic(false)
+      setOpenConfig(false)
+    } else {
+      setOpenDocumentsControl(false)
     }
-  }, [inSolic, inConfig, inFleet, inRefusal, inSst, inEquipment])
+  }, [inSolic, inConfig, inFleet, inRefusal, inSst, inEquipment, inDocumentsControl])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -349,17 +367,113 @@ export default function Sidebar({
             </Link>
           )}
            {showMyDocuments && (
-            <Link
-              href="/dashboard/controle-documentos/publicados"
-              className={`${baseSection} ${
-                pathname.startsWith('/dashboard/controle-documentos') ? activeSection : inactiveSection
-              }`}
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
-                <ClipboardList className="h-5 w-5 shrink-0" />
-              </span>
-              {!collapsed && <span className={labelBase}>Controle de Documentos</span>}
-            </Link>
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenDocumentsControl((v) => !v)}
+                className={`${baseSection} ${
+                  inDocumentsControl ? activeSection : inactiveSection
+                }`}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <ClipboardList className="h-5 w-5 shrink-0" />
+                </span>
+                {!collapsed && <span className={labelBase}>Controle de Documentos</span>}
+              </button>
+
+              {openDocumentsControl && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  <Link
+                    href="/dashboard/controle-documentos/publicados"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/publicados')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Documentos Publicados</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/aprovacao"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/aprovacao')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Documentos Para Aprovação</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/qualidade"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/qualidade')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Docs. Em Análise Qualidade</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/revisao"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/revisao')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Documentos Em Revisão</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/processo-publicacao"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/processo-publicacao')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Publicação de Documento</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/downloads"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/downloads')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Controle de Download</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/cadastros/tipos"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/cadastros/tipos')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Cadastros &gt; Tipos de Documento</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/controle-documentos/cadastros/grupos"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname.startsWith('/dashboard/controle-documentos/cadastros/grupos')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <span className={labelBase}>Cadastros &gt; Grupos Aprovadores</span>
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
 
 

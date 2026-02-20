@@ -22,10 +22,26 @@ export default function DocumentsGrid({ endpoint, title }: Props) {
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
   const [pendingVersionId, setPendingVersionId] = useState<string | null>(null)
 
+  const parseJsonSafely = async <T,>(res: Response): Promise<T | null> => {
+    const body = await res.text()
+    if (!body) return null
+
+    try {
+      return JSON.parse(body) as T
+    } catch {
+      return null
+    }
+  }
+
   const load = async () => {
     const res = await fetch(`${endpoint}?tab=${tab}`, { cache: 'no-store' })
-    const data = await res.json()
-    setItems(data.items ?? data)
+    const data = await parseJsonSafely<{ items?: GridRow[] } | GridRow[]>(res)
+    if (!res.ok || !data) {
+      setItems([])
+      return
+    }
+
+    setItems(Array.isArray(data) ? data : (data.items ?? []))
   }
 
   useEffect(() => {
@@ -34,15 +50,18 @@ export default function DocumentsGrid({ endpoint, title }: Props) {
 
   const requestDownload = async (versionId: string) => {
     const res = await fetch(`/api/documents/versions/${versionId}/download`, { cache: 'no-store' })
+    const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
+
+    if (!data) return
+
     if (res.status === 403) {
-      const data = await res.json()
       if (data.requiresTerm) {
-        setTerm(data.term)
+        if (data.term) setTerm(data.term)
         setPendingVersionId(versionId)
         return
       }
     }
-    const data = await res.json()
+
     if (data.url) window.open(data.url, '_blank')
   }
 
