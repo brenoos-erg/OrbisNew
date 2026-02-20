@@ -1,5 +1,5 @@
-import DocumentsGrid from '@/components/documents/DocumentsGrid'
+import { redirect } from 'next/navigation'
 
 export default function Page() {
-  return <DocumentsGrid endpoint="/api/documents/in-quality" title="Documentos para Análise da Qualidade" />
+  redirect('/dashboard/controle-documentos/em-analise-qualidade')
 }

@@ -10,5 +10,5 @@ export async function GET(req: NextRequest) {
   }
   const parsed = parseGridParams(req.nextUrl.searchParams)
   parsed.filters.status = DocumentVersionStatus.EM_ANALISE_QUALIDADE
-  return NextResponse.json(await fetchGrid(buildVersionWhere(parsed.filters), parsed.page, parsed.pageSize))
+  return NextResponse.json(await fetchGrid(buildVersionWhere(parsed.filters), parsed.page, parsed.pageSize, parsed.sortBy, parsed.sortOrder))
 }

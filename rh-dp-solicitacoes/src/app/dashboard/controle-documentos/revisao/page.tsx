@@ -1,5 +1,5 @@
-import DocumentsGrid from '@/components/documents/DocumentsGrid'
+import { redirect } from 'next/navigation'
 
 export default function Page() {
-  return <DocumentsGrid endpoint="/api/documents/in-review" title="Documentos em Processo de Revisão" />
+  redirect('/dashboard/controle-documentos/em-revisao')
 }
