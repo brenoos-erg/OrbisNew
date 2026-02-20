@@ -29,6 +29,12 @@ type CostCenter = {
   code?: string | null
   externalCode?: string | null
 }
+type DepartmentOption = {
+  id: string
+  label: string
+  description?: string | null
+}
+
 
 // labels mais escuros para melhor leitura no fundo claro
 const LABEL =
@@ -42,6 +48,83 @@ function ccLabel(cc: CostCenter) {
   // prioriza código externo, depois interno
   const num = cc.externalCode || cc.code || ''
   return num ? `${num} - ${cc.description}` : cc.description
+}
+function departmentLabel(dept: DepartmentOption) {
+  return dept.description ? `${dept.description} - ${dept.label}` : dept.label
+}
+
+type DepartmentComboProps = {
+  label: string
+  valueId: string
+  onChangeId: (id: string) => void
+  departments: DepartmentOption[]
+}
+
+function DepartmentCombo({
+  label,
+  valueId,
+  onChangeId,
+  departments,
+}: DepartmentComboProps) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    const selected = departments.find((d) => d.id === valueId)
+    setQuery(selected ? departmentLabel(selected) : '')
+  }, [valueId, departments])
+
+  const options = useMemo(
+    () =>
+      departments.filter((dept) => {
+        const text = `${dept.description ?? ''} ${dept.label ?? ''}`.toLowerCase()
+        return text.includes(query.toLowerCase())
+      }),
+    [departments, query],
+  )
+
+  function handleSelect(dept: DepartmentOption) {
+    onChangeId(dept.id)
+    setQuery(departmentLabel(dept))
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <label className={LABEL}>{label}</label>
+      <input
+        className={INPUT}
+        placeholder="Digite código ou nome..."
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          setTimeout(() => setOpen(false), 150)
+        }}
+      />
+
+      {open && options.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow">
+          {options.map((dept) => (
+            <button
+              key={dept.id}
+              type="button"
+              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-100"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                handleSelect(dept)
+              }}
+            >
+              {departmentLabel(dept)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Combobox de Centro de Custo (um campo só)
@@ -173,7 +256,7 @@ export default function Page() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [costCenterId, setCostCenterId] = useState('') // FK
+  const [departmentId, setDepartmentId] = useState('')
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [firstAccess, setFirstAccess] = useState(false)
@@ -199,13 +282,14 @@ export default function Page() {
   // ------- listagem -------
   const [rows, setRows] = useState<UserRow[]>([])
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
+  const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [bulkCreating, setBulkCreating] = useState(false)
   const [processingBulk, setProcessingBulk] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkCreateFirstAccess, setBulkCreateFirstAccess] = useState(true)
-  const [bulkCostCenterId, setBulkCostCenterId] = useState('')
+  const [bulkDepartmentId, setBulkDepartmentId] = useState('')
   const [bulkResults, setBulkResults] = useState<
     {
       line: number
@@ -305,6 +389,26 @@ export default function Page() {
       active = false
     }
   }, [])
+  useEffect(() => {
+    let active = true
+
+    const loadDepartments = async () => {
+      try {
+        const res = await fetch('/api/departments', { cache: 'no-store' })
+        if (!res.ok) throw new Error(`GET /api/departments -> ${res.status}`)
+        const arr: DepartmentOption[] = await res.json()
+        if (active) setDepartments(arr)
+      } catch (e) {
+        console.error('loadDepartments() error', e)
+        if (active) setDepartments([])
+      }
+    }
+
+    loadDepartments()
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -322,7 +426,7 @@ export default function Page() {
             email: email.trim().toLowerCase(),
             login: login.trim().toLowerCase(),
             phone: phone.trim(),
-            costCenterId: costCenterId || null,
+            departmentId: departmentId || null,
           password,
             firstAccess,
           }),
@@ -334,7 +438,7 @@ export default function Page() {
       setFullName('')
       setEmail('')
       setPhone('')
-      setCostCenterId('')
+      setDepartmentId('')
       setLogin('')
       setPassword('')
       setFirstAccess(false)
@@ -518,7 +622,7 @@ export default function Page() {
             email: emailValue,
             login: loginValue,
             phone: phoneInput || '',
-            costCenterId: bulkCostCenterId || null,
+             departmentId: bulkDepartmentId || null,
             password: passwordValue,
             firstAccess: bulkCreateFirstAccess,
           }),
@@ -662,11 +766,11 @@ export default function Page() {
             </div>
 
             <div>
-              <CostCenterCombo
-                label="Centro de Custo"
-                valueId={costCenterId}
-                onChangeId={setCostCenterId}
-                centers={costCenters}
+              <DepartmentCombo
+                label="Departamento"
+                valueId={departmentId}
+                onChangeId={setDepartmentId}
+                departments={departments}
               />
             </div>
           </div>
@@ -1011,11 +1115,11 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
               </div>
 
               <div className="flex flex-col items-start gap-3 sm:items-end sm:w-80 w-full">
-                <CostCenterCombo
-                  label="Centro de Custo (opcional)"
-                  valueId={bulkCostCenterId}
-                  onChangeId={setBulkCostCenterId}
-                  centers={costCenters}
+               <DepartmentCombo
+                  label="Departamento (opcional)"
+                  valueId={bulkDepartmentId}
+                  onChangeId={setBulkDepartmentId}
+                  departments={departments}
                 />
                 <p className="-mt-1 text-[11px] text-slate-500">
                   Aplicado a todos os usuários criados nesta lista.

@@ -11,6 +11,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { Action } from '@prisma/client'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { hashPassword } from '@/lib/auth-local'
+import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 
 export async function GET(req: NextRequest) { /* unchanged list */
 
@@ -43,16 +44,18 @@ export async function POST(req: NextRequest) {
     const login = (body.login ?? '').trim().toLowerCase()
     const phone = (body.phone ?? '').trim() || null
     const costCenterId = body.costCenterId || null
+    const departmentId = body.departmentId || null
     const rawPassword = (body.password ?? '').trim() || `${login || fullName.split(' ')[0] || 'User'}@123`
     const mustChangePassword = !!body.firstAccess
     if (!fullName || !email || !login) return NextResponse.json({ error: 'Nome, e-mail e login são obrigatórios.' }, { status: 400 })
 
-       const appUser = await prisma.user.create({
-      data: { fullName, email, login, phone, costCenterId, status: 'ATIVO', role: 'COLABORADOR', passwordHash: await hashPassword(rawPassword), mustChangePassword },
+    const appUser = await prisma.user.create({
+      data: { fullName, email, login, phone, costCenterId, departmentId, status: 'ATIVO', role: 'COLABORADOR', passwordHash: await hashPassword(rawPassword), mustChangePassword },
       select: { id: true, fullName: true, email: true, login: true },
     })
 
     if (costCenterId) await prisma.userCostCenter.upsert({ where: { userId_costCenterId: { userId: appUser.id, costCenterId } }, create: { userId: appUser.id, costCenterId }, update: {} })
+    if (departmentId) await ensureUserDepartmentLink(appUser.id, departmentId)
     await ensureDefaultModuleAccess(appUser.id)
     return NextResponse.json({ ...appUser, message: 'Usuário local criado com sucesso.' }, { status: 201 })
   } catch (e: any) {

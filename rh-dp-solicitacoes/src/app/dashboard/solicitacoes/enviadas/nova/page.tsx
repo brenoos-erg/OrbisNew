@@ -160,7 +160,6 @@ export default function NovaSolicitacaoPage() {
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
   const [extraFiles, setExtraFiles] = useState<Record<string, File[]>>({});
-  const [openingFiles, setOpeningFiles] = useState<File[]>([]);
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
   const [step2ReadyAt, setStep2ReadyAt] = useState<number | null>(null);
@@ -488,24 +487,6 @@ export default function NovaSolicitacaoPage() {
       let campos: Record<string, string> = {};
 
       const uploadExtrasFiles = async (solicitacaoId: string) => {
-         if (openingFiles.length > 0) {
-          const openingFormData = new FormData();
-          openingFiles.forEach((file) => openingFormData.append('files', file));
-
-          const openingUploadRes = await fetch(`/api/solicitacoes/${solicitacaoId}/anexos`, {
-            method: 'POST',
-            body: openingFormData,
-          });
-
-          if (!openingUploadRes.ok) {
-            let msg = 'Falha ao enviar anexos da abertura do chamado.';
-            try {
-              const json = await openingUploadRes.json();
-              if (json?.error) msg = json.error;
-            } catch {}
-            throw new Error(msg);
-          }
-        }
         const entries = Object.entries(extraFiles).filter(([, files]) => files.length > 0);
         for (const [fieldName, files] of entries) {
           const formData = new FormData();
@@ -756,48 +737,6 @@ useEffect(() => {
 
             {submitError && (
               <p className="mt-3 text-xs text-red-600">{submitError}</p>
-            )}
-            {selectedTipo && step === 2 && (
-              <section className="space-y-3 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50/70 p-4 shadow-sm">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-                  Anexos da abertura do chamado
-                </h3>
-                <p className="text-xs text-orange-700/80">
-                  Inclua aqui os arquivos da solicitação (ex.: comprovantes, documentos e formulários).
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e: InputChange) =>
-                    setOpeningFiles(e.target.files ? Array.from(e.target.files) : [])
-                  }
-                  className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border file:border-orange-300 file:bg-orange-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-orange-800 hover:file:bg-orange-200"
-                />
-                {openingFiles.length > 0 && (
-                    <div className="space-y-2">
-                    <p className="text-xs font-medium text-orange-700">
-                      {openingFiles.length} arquivo(s) selecionado(s).
-                    </p>
-                    <div className="space-y-1">
-                      {openingFiles.map((file) => (
-                        <div
-                          key={`${file.name}-${file.lastModified}`}
-                          className="flex items-center justify-between gap-3 rounded-md bg-white/80 px-2 py-1"
-                        >
-                          <span className="truncate text-xs text-slate-700">{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handlePreviewFile(file)}
-                            className="text-xs font-semibold text-orange-700 hover:text-orange-800"
-                          >
-                            Pré-visualizar
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
             )}
           </div>
 
