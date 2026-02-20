@@ -348,6 +348,20 @@ export default function Sidebar({
               {!collapsed && <span className={labelBase}>Meus documentos</span>}
             </Link>
           )}
+           {showMyDocuments && (
+            <Link
+              href="/dashboard/controle-documentos/publicados"
+              className={`${baseSection} ${
+                pathname.startsWith('/dashboard/controle-documentos') ? activeSection : inactiveSection
+              }`}
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                <ClipboardList className="h-5 w-5 shrink-0" />
+              </span>
+              {!collapsed && <span className={labelBase}>Controle de Documentos</span>}
+            </Link>
+          )}
+
 
           {showFleet && (
             <div>
