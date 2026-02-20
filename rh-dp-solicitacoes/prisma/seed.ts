@@ -31,6 +31,18 @@ async function main() {
   // PrismaClient usa apenas DATABASE_URL
   const prisma = new PrismaClient()
 
+  const hasTable = async (tableName: string) => {
+    const result = await prisma.$queryRaw<Array<{ total: bigint | number }>>`
+      SELECT COUNT(*) AS total
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND LOWER(table_name) = LOWER(${tableName})
+    `
+
+    const total = Number(result[0]?.total ?? 0)
+    return total > 0
+  }
+
   
 
   /* =========================
@@ -1704,58 +1716,80 @@ async function main() {
 
 
   console.log('✅ Features e permissões por feature cadastradas.')
-  const documentTypes = ['MAN', 'RQ', 'DA', 'PG', 'IT', 'POL', 'DD', 'COD', 'DOCEXT', 'LEG']
-  for (const code of documentTypes) {
-    await prisma.documentTypeCatalog.upsert({
-      where: { code },
-      update: { description: `Tipo ${code}` },
-      create: { code, description: `Tipo ${code}` },
-    })
+  const requiredIsoTables = [
+    'DocumentTypeCatalog',
+    'ApproverGroup',
+    'DocumentTypeApprovalFlow',
+    'DocumentResponsibilityTerm',
+  ]
+  const missingIsoTables: string[] = []
+
+  for (const table of requiredIsoTables) {
+    if (!(await hasTable(table))) {
+      missingIsoTables.push(table)
+    }
+
   }
 
-  const qualityDepartment = await prisma.department.findUnique({ where: { code: '16' } })
-  const sigDepartment = await prisma.department.findUnique({ where: { code: '18' } })
+   if (missingIsoTables.length > 0) {
+    console.warn(
+      `⚠️ Seed do módulo ISO ignorada. Tabelas ausentes: ${missingIsoTables.join(', ')}. Execute as migrations do módulo ISO para habilitar esta etapa.`,
+    )
+  } else {
+    const isoPrisma = prisma as any
+    const documentTypes = ['MAN', 'RQ', 'DA', 'PG', 'IT', 'POL', 'DD', 'COD', 'DOCEXT', 'LEG']
+    for (const code of documentTypes) {
+      await isoPrisma.documentTypeCatalog.upsert({
+        where: { code },
+        update: { description: `Tipo ${code}` },
+        create: { code, description: `Tipo ${code}` },
+      })
+    }
 
-  const qualityGroup =
-    (await prisma.approverGroup.findFirst({ where: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } })) ??
-    (await prisma.approverGroup.create({ data: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } }))
+   const qualityDepartment = await prisma.department.findUnique({ where: { code: '16' } })
+    const sigDepartment = await prisma.department.findUnique({ where: { code: '18' } })
 
-  const sigGroup =
-    (await prisma.approverGroup.findFirst({ where: { name: 'SIG', departmentId: sigDepartment?.id } })) ??
-    (await prisma.approverGroup.create({ data: { name: 'SIG', departmentId: sigDepartment?.id } }))
+    const qualityGroup =
+      (await isoPrisma.approverGroup.findFirst({ where: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } })) ??
+      (await isoPrisma.approverGroup.create({ data: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } }))
 
-  const genericApproval =
-    (await prisma.approverGroup.findFirst({ where: { name: 'APROVAÇÃO', departmentId: null } })) ??
-    (await prisma.approverGroup.create({ data: { name: 'APROVAÇÃO' } }))
+    const sigGroup =
+      (await isoPrisma.approverGroup.findFirst({ where: { name: 'SIG', departmentId: sigDepartment?.id } })) ??
+      (await isoPrisma.approverGroup.create({ data: { name: 'SIG', departmentId: sigDepartment?.id } }))
 
-  const allCatalogTypes = await prisma.documentTypeCatalog.findMany()
-  for (const type of allCatalogTypes) {
-    await prisma.documentTypeApprovalFlow.deleteMany({ where: { documentTypeId: type.id } })
-    await prisma.documentTypeApprovalFlow.createMany({
-      data: [
-        { documentTypeId: type.id, order: 1, stepType: 'REVIEW', approverGroupId: genericApproval.id, active: true },
-        { documentTypeId: type.id, order: 2, stepType: 'QUALITY', approverGroupId: qualityGroup.id, active: true },
-        { documentTypeId: type.id, order: 3, stepType: 'SIG', approverGroupId: sigGroup.id, active: true },
-      ],
+    const genericApproval =
+      (await isoPrisma.approverGroup.findFirst({ where: { name: 'APROVAÇÃO', departmentId: null } })) ??
+      (await isoPrisma.approverGroup.create({ data: { name: 'APROVAÇÃO' } }))
+
+    const allCatalogTypes = await isoPrisma.documentTypeCatalog.findMany()
+    for (const type of allCatalogTypes) {
+      await isoPrisma.documentTypeApprovalFlow.deleteMany({ where: { documentTypeId: type.id } })
+      await isoPrisma.documentTypeApprovalFlow.createMany({
+        data: [
+          { documentTypeId: type.id, order: 1, stepType: 'REVIEW', approverGroupId: genericApproval.id, active: true },
+          { documentTypeId: type.id, order: 2, stepType: 'QUALITY', approverGroupId: qualityGroup.id, active: true },
+          { documentTypeId: type.id, order: 3, stepType: 'SIG', approverGroupId: sigGroup.id, active: true },
+        ],
+      })
+    }
+
+    await isoPrisma.documentResponsibilityTerm.upsert({
+      where: { id: 'default-iso-term' },
+      update: {
+        title: 'Termo de Responsabilidade pelo uso e divulgação de documentos',
+        active: true,
+      },
+      create: {
+        id: 'default-iso-term',
+        title: 'Termo de Responsabilidade pelo uso e divulgação de documentos',
+        content:
+          'Declaro que estou ciente das responsabilidades pelo uso e divulgação dos documentos do SGI, comprometendo-me com confidencialidade e uso adequado.',
+        active: true,
+      },
     })
+
+    console.log('✅ Seed do módulo ISO aplicada.')
   }
-
-  await prisma.documentResponsibilityTerm.upsert({
-    where: { id: 'default-iso-term' },
-    update: {
-      title: 'Termo de Responsabilidade pelo uso e divulgação de documentos',
-      active: true,
-    },
-    create: {
-      id: 'default-iso-term',
-      title: 'Termo de Responsabilidade pelo uso e divulgação de documentos',
-      content:
-        'Declaro que estou ciente das responsabilidades pelo uso e divulgação dos documentos do SGI, comprometendo-me com confidencialidade e uso adequado.',
-      active: true,
-    },
-  })
-
-  console.log('✅ Seed do módulo ISO aplicada.')
 
 
   console.log('🎉 Seed concluído com sucesso!')
