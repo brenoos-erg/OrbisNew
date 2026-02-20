@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
-import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
+import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
 import {
   SolicitacoesToastViewport,
   useSolicitacoesToast,
@@ -164,6 +164,11 @@ export default function NovaSolicitacaoPage() {
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
   const [step2ReadyAt, setStep2ReadyAt] = useState<number | null>(null);
+  const [previewFile, setPreviewFile] = useState<{
+    name: string;
+    url: string;
+    type: string;
+  } | null>(null);
 
   const canGoNext = Boolean(departamentoId && tipoId);
 
@@ -272,10 +277,16 @@ export default function NovaSolicitacaoPage() {
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
 
+  const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
+
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
-  const camposSolicitante = camposEspecificos.filter(
-    (campo) => !campo.stage || campo.stage === 'solicitante',
-  );
+  const camposSolicitante = camposEspecificos.filter((campo) => {
+    if (campo.stage && campo.stage !== 'solicitante') return false;
+    if (isSolicitacaoEpi && ['emailSolicitante', 'local', 'data'].includes(campo.name)) {
+      return false;
+    }
+    return true;
+  });
   const camposSolicitanteComTi = useMemo(() => {
     if (!isSolicitacaoEquipamentoTi) return camposSolicitante;
 
@@ -405,6 +416,26 @@ export default function NovaSolicitacaoPage() {
         : '',
     );
   };
+  const handlePreviewFile = (file: File) => {
+    const nextUrl = URL.createObjectURL(file);
+
+    setPreviewFile((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return {
+        name: file.name,
+        type: file.type,
+        url: nextUrl,
+      };
+    });
+  };
+
+  const closePreview = () => {
+    setPreviewFile((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
 
 
   const handleCargoChange = (id: string) => {
@@ -639,6 +670,13 @@ export default function NovaSolicitacaoPage() {
     setStep(2);
     setStep2ReadyAt(Date.now() + 700);
   };
+useEffect(() => {
+    return () => {
+      if (previewFile?.url) {
+        URL.revokeObjectURL(previewFile.url);
+      }
+    };
+  }, [previewFile]);
 
 
   /* ============================================================
@@ -661,6 +699,40 @@ export default function NovaSolicitacaoPage() {
           }}
           className="space-y-6"
         >
+           {previewFile && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div className="w-full max-w-xl rounded-xl bg-white p-4 shadow-2xl">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    Pré-visualização: {previewFile.name}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={closePreview}
+                    className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Fechar
+                  </button>
+                </div>
+
+                <div className="h-[340px] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  {previewFile.type.startsWith('image/') ? (
+                    <img
+                      src={previewFile.url}
+                      alt={previewFile.name}
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <iframe
+                      src={previewFile.url}
+                      title={`Pré-visualização de ${previewFile.name}`}
+                      className="h-full w-full"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {/* HEADER */}
           <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
             <div className="space-y-4">
@@ -702,9 +774,28 @@ export default function NovaSolicitacaoPage() {
                   className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border file:border-orange-300 file:bg-orange-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-orange-800 hover:file:bg-orange-200"
                 />
                 {openingFiles.length > 0 && (
-                  <p className="text-xs font-medium text-orange-700">
-                    {openingFiles.length} arquivo(s) selecionado(s).
-                  </p>
+                    <div className="space-y-2">
+                    <p className="text-xs font-medium text-orange-700">
+                      {openingFiles.length} arquivo(s) selecionado(s).
+                    </p>
+                    <div className="space-y-1">
+                      {openingFiles.map((file) => (
+                        <div
+                          key={`${file.name}-${file.lastModified}`}
+                          className="flex items-center justify-between gap-3 rounded-md bg-white/80 px-2 py-1"
+                        >
+                          <span className="truncate text-xs text-slate-700">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handlePreviewFile(file)}
+                            className="text-xs font-semibold text-orange-700 hover:text-orange-800"
+                          >
+                            Pré-visualizar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </section>
             )}
@@ -1924,7 +2015,7 @@ export default function NovaSolicitacaoPage() {
 
                           {campo.type === 'file' && (
                             <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50/40 p-3">
-                              <input
+                               <input
                                 id={campo.name}
                                 name={campo.name}
                                 type="file"
@@ -1935,6 +2026,25 @@ export default function NovaSolicitacaoPage() {
                               <p className="mt-2 text-xs font-medium text-orange-700">
                                 Arraste arquivos ou clique em “Escolher arquivos” para anexar.
                               </p>
+                              {(extraFiles[campo.name]?.length ?? 0) > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {extraFiles[campo.name].map((file) => (
+                                    <div
+                                      key={`${campo.name}-${file.name}-${file.lastModified}`}
+                                      className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1"
+                                    >
+                                      <span className="truncate text-xs text-slate-700">{file.name}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePreviewFile(file)}
+                                        className="text-xs font-semibold text-orange-700 hover:text-orange-800"
+                                      >
+                                        Pré-visualizar
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
 
