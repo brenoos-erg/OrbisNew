@@ -733,11 +733,10 @@ export function SolicitationDetailModal({
       }
     })
   })()
-  const visibleSetoresNadaConsta = useMemo(() => {
-    if (userIsDpOrAdmin) return setoresNadaConsta
-    if (userSectorKeys.size === 0) return []
-    return setoresNadaConsta.filter((setor) => userSectorKeys.has(setor.key))
-  }, [setoresNadaConsta, userIsDpOrAdmin, userSectorKeys])
+ const visibleSetoresNadaConsta = useMemo(
+    () => setoresNadaConsta,
+    [setoresNadaConsta],
+  )
 
 
   const selectedSetorLabel = useMemo(() => {
