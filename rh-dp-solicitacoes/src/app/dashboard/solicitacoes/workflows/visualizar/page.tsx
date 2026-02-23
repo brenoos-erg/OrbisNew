@@ -66,9 +66,8 @@ export default function VisualizarWorkflowPage() {
           <h1 className="text-xl font-semibold">Visualizar Fluxo de Solicitação</h1>
           <p className="text-sm text-slate-600">Selecione tipo e departamento para ver o workflow configurado.</p>
         </div>
-        <Link className="rounded border px-3 py-2 text-sm" href="/dashboard/solicitacoes/workflows">Voltar ao editor</Link>
+        <Link className="rounded border px-3 py-2 text-sm" href="/dashboard/solicitacoes/fluxos">Voltar ao editor</Link>
       </div>
-
       <div className="grid gap-2 md:grid-cols-2">
         <select className="rounded border px-3 py-2" value={tipoId} onChange={(e) => setTipoId(e.target.value)}>
           <option value="">Tipo de solicitação</option>

@@ -20,6 +20,7 @@ import {
   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 
 
 
@@ -375,10 +376,10 @@ export const POST = withModuleLevel(
         const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
 
-        if (!tipoId || !departmentId) {
+        if (!tipoId) {
           return NextResponse.json(
             {
-              error: 'Tipo e departamento são obrigatórios.',
+              error: 'Tipo é obrigatório.',
             },
             { status: 400 },
           )
@@ -408,37 +409,19 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
-         const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
-         const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(tipo)
-
-        const tiDepartment = await prisma.department.findUnique({
-          where: { code: '20' },
-          select: { id: true },
-        })
-
-        if (isSolicitacaoEquipamentoTi && !tiDepartment) {
-          return NextResponse.json(
-            { error: 'Departamento de TI não encontrado para este tipo de solicitação.' },
-            { status: 400 },
-          )
-        }
-         const sstDepartmentForCreation = await prisma.department.findUnique({
-          where: { code: '19' },
-          select: { id: true },
-        })
-
-        if (isSolicitacaoEpiUniformeTipo && !sstDepartmentForCreation) {
-          return NextResponse.json(
-            { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado para este tipo de solicitação.' },
-            { status: 400 },
-          )
-        }
+        const routing = await resolveResponsibleDepartmentsByTipo(tipoId)
         const resolvedDepartmentId =
-          isSolicitacaoEpiUniformeTipo && sstDepartmentForCreation
-            ? sstDepartmentForCreation.id
-            : isSolicitacaoEquipamentoTi && tiDepartment
-              ? tiDepartment.id
-              : departmentId
+          routing.mainDepartmentId ?? departmentId ?? me.departmentId ?? null
+
+        if (!resolvedDepartmentId) {
+          return NextResponse.json(
+            {
+              error:
+                'Não foi possível identificar o departamento responsável. Configure meta.departamentos no tipo de solicitação.',
+            },
+            { status: 400 },
+          )
+        }
         const resolvedCostCenterId = costCenterId || me.costCenterId || null
 
 
@@ -482,6 +465,7 @@ export const POST = withModuleLevel(
           tipo.nome === 'Solicitação de Abono Educacional'
         const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
         const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
+        const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
         const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
 
         const rhCostCenter = await prisma.costCenter.findFirst({
@@ -881,13 +865,19 @@ export const POST = withModuleLevel(
         /* =====================================================================
            4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
            ===================================================================== */
-        if (isNadaConsta) {
+        if (isNadaConsta || routing.multiSetor) {
+          const setoresDestino =
+            routing.targetSetorKeys.length > 0
+              ? routing.targetSetorKeys
+              : NADA_CONSTA_SETORES.map((setor) => setor.key)
+
           await prisma.solicitacaoSetor.createMany({
-            data: NADA_CONSTA_SETORES.map((setor) => ({
+            data: setoresDestino.map((setor) => ({
               solicitacaoId: created.id,
-              setor: setor.key,
+              setor,
               status: 'PENDENTE',
             })),
+            skipDuplicates: true,
           })
 
           await prisma.solicitationTimeline.create({

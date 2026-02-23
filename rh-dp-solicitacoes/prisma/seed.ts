@@ -135,7 +135,7 @@ async function main() {
       nome: 'Vale-transporte',
       descricao: 'Inclusão/alteração de rotas de vale-transporte',
       schemaJson: {
-        meta: { centros: [], departamentos: [] },
+        meta: { centros: [], departamentos: rhDepartment ? [rhDepartment.id] : [] },
         camposEspecificos: [
           { name: 'linha', label: 'Linha de ônibus', type: 'text', required: true },
           { name: 'empresa', label: 'Empresa de transporte', type: 'text' },
