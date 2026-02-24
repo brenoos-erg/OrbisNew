@@ -131,8 +131,9 @@ async function main() {
 
   if (rhDepartment) {
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ_063 - Solicitação de Pessoal' },
+      where: { id: 'RQ_063' },
       update: {
+        nome: 'RQ_063 - Solicitação de Pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
         updatedAt: new Date(),
@@ -149,8 +150,9 @@ async function main() {
 
   if (logisticaDepartment) {
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ.088 - Solicitação de Veículos' },
+      where: { id: 'RQ_088' },
       update: {
+        nome: 'RQ.088 - Solicitação de Veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
         schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
         updatedAt: new Date(),
@@ -188,8 +190,9 @@ async function main() {
   })
  console.log('✅ Tipo "Vale-transporte" ok.')
   await prisma.tipoSolicitacao.upsert({
-    where: { nome: 'RQ.089 - Solicitação de Equipamento' },
+    where: { id: 'RQ_089' },
     update: {
+      nome: 'RQ.089 - Solicitação de Equipamento',
       descricao: 'Solicitação para fornecimento de equipamento de TI',
       schemaJson: {
         meta: { departamentos: [tiDepartment.id] },
@@ -390,8 +393,9 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-       where: { nome: 'Solicitação de Férias' },
+       where: { id: 'AGENDAMENTO_DE_FERIAS' },
       update: {
+        nome: 'Solicitação de Férias',
         descricao: 'SERVIÇOS DE DP - agendamento de férias',
         schemaJson: agendamentoFeriasSchema,
         updatedAt: new Date(),
@@ -579,8 +583,9 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-       where: { nome: 'RQ_247 - Desligamento de Pessoal' },
+       where: { id: 'RQ_247' },
       update: {
+        nome: 'RQ_247 - Desligamento de Pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
         updatedAt: new Date(),
@@ -704,8 +709,9 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ.092 SOLICITAÇÃO DE EXAMES' },
+      where: { id: 'RQ_092' },
       update: {
+        nome: 'RQ.092 SOLICITAÇÃO DE EXAMES',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
@@ -830,8 +836,9 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES' },
+      where: { id: 'RQ_043' },
       update: {
+        nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
@@ -1406,9 +1413,10 @@ async function main() {
       ],
     }
 
-    await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ.300 NADA CONSTA' },
+     await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_300' },
       update: {
+        nome: 'RQ.300 NADA CONSTA',
         descricao: 'Solicitação de nada consta (Departamento Pessoal)',
         schemaJson: nadaConstaSchema,
         updatedAt: new Date(),
