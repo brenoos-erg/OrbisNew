@@ -403,19 +403,30 @@ export const POST = withModuleLevel(
           const protocolo = generateProtocolo()
         const titulo = tipo.nome
         const tipoMeta = (tipo.schemaJson as {
-          meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number; defaultDescricaoSolicitacao?: string }
+          meta?: {
+            defaultPrioridade?: SolicitationPriority
+            defaultSlaHours?: number
+            defaultDescricaoSolicitacao?: string
+            prazoPadraoDias?: number
+            departamentos?: string[]
+          }
         } | null)?.meta
         const descricao = tipoMeta?.defaultDescricaoSolicitacao ?? null
         const prioridade = tipoMeta?.defaultPrioridade
         const dataPrevista =
-          typeof tipoMeta?.defaultSlaHours === 'number' &&
-          Number.isFinite(tipoMeta.defaultSlaHours)
-            ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
-            : undefined
+          typeof tipoMeta?.prazoPadraoDias === 'number' &&
+          Number.isFinite(tipoMeta.prazoPadraoDias)
+            ? new Date(Date.now() + tipoMeta.prazoPadraoDias * 24 * 60 * 60 * 1000)
+            : typeof tipoMeta?.defaultSlaHours === 'number' &&
+                Number.isFinite(tipoMeta.defaultSlaHours)
+              ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
+              : undefined
         const routing = await resolveResponsibleDepartmentsByTipo(tipoId)
+        const metaDepartmentId = Array.isArray(tipoMeta?.departamentos)
+          ? tipoMeta.departamentos[0]
+          : null
         const resolvedDepartmentId =
-          routing.mainDepartmentId ?? departmentId ?? me.departmentId ?? null
-
+          metaDepartmentId ?? routing.mainDepartmentId ?? departmentId ?? me.departmentId ?? null
         if (!resolvedDepartmentId) {
           return NextResponse.json(
             {
@@ -966,6 +977,24 @@ export const POST = withModuleLevel(
         // ======================================================================
         // 6) Demais tipos: segue fluxo simples, sem aprovação especial
         // ======================================================================
+         if (tipo.id === 'RQ_DP_049') {
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message: 'Solicitação encaminhada para LOGÍSTICA.',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'ENCAMINHADA_LOGISTICA',
+            },
+          })
+        }
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
         console.error('POST /api/solicitacoes error', e)

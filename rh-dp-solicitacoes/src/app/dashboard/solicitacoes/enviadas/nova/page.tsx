@@ -61,6 +61,11 @@ type TipoSolicitacao = {
   id: string;
   nome: string;
   descricao?: string;
+  meta?: {
+    templateDownload?: string;
+    requiresAttachment?: boolean;
+    destinos?: Array<{ value: string; label: string }>;
+  };
   camposEspecificos?: CampoEspecifico[];
 };
 
@@ -277,6 +282,13 @@ export default function NovaSolicitacaoPage() {
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
+  const tipoMeta = selectedTipo?.meta;
+  const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
+  const templateDownload = tipoMeta?.templateDownload;
+  const destinoOptions = useMemo(
+    () => (tipoMeta?.destinos ?? []).map((item) => item.label),
+    [tipoMeta?.destinos],
+  );
 
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
   const camposSolicitante = camposEspecificos.filter((campo) => {
@@ -287,7 +299,16 @@ export default function NovaSolicitacaoPage() {
     return true;
   });
   const camposSolicitanteComTi = useMemo(() => {
-    if (!isSolicitacaoEquipamentoTi) return camposSolicitante;
+    const baseCampos = camposSolicitante.map((campo) => {
+      if (campo.name !== 'destinadoPara') return campo;
+
+      return {
+        ...campo,
+        options: destinoOptions,
+      };
+    });
+
+    if (!isSolicitacaoEquipamentoTi) return baseCampos;
 
     const equipmentTypeOptions = Object.keys(TI_EQUIPMENT_CONFIGS);
     const selectedEquipmentType = extras.tipoEquipamentoTi ?? '';
@@ -313,9 +334,10 @@ export default function NovaSolicitacaoPage() {
       },
     ];
 
-    const existingNames = new Set(camposSolicitante.map((campo) => campo.name));
-    return [...camposSolicitante, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
-  }, [camposSolicitante, extras.tipoEquipamentoTi, isSolicitacaoEquipamentoTi]);
+     const existingNames = new Set(baseCampos.map((campo) => campo.name));
+    return [...baseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
+  }, [camposSolicitante, destinoOptions, extras.tipoEquipamentoTi, isSolicitacaoEquipamentoTi]);
+
 
   useEffect(() => {
     if (!isAbonoEducacional) {
@@ -585,10 +607,26 @@ export default function NovaSolicitacaoPage() {
           setSubmitting(false);
           return;
         }
+         const placaValue = (extras.placaVeiculo ?? '').trim().toUpperCase();
+        if (extras.placaVeiculo !== undefined && !/^[A-Z0-9]{7,}$/.test(placaValue)) {
+          setSubmitError('Placa do veículo inválida. Use formato alfanumérico com ao menos 7 caracteres.');
+          setSubmitting(false);
+          return;
+        }
+
+        if (requiresAttachment) {
+          const hasAttachment = Object.values(extraFiles).some((files) => files.length > 0);
+          if (!hasAttachment) {
+            setSubmitError('Anexe o documento referente à multa para prosseguirmos.');
+            setSubmitting(false);
+            return;
+          }
+        }
 
         campos = camposSolicitanteComTi.reduce<Record<string, string>>(
-          (acc, campo) => {
-            acc[campo.name] = extras[campo.name] ?? '';
+         (acc, campo) => {
+            const nextValue = extras[campo.name] ?? '';
+            acc[campo.name] = campo.name === 'placaVeiculo' ? nextValue.trim().toUpperCase() : nextValue;
             return acc;
           },
           {},
@@ -2018,6 +2056,23 @@ useEffect(() => {
 
                   return (
                     <div className="space-y-6">
+                       {templateDownload && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                          <a
+                            href={templateDownload}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold underline"
+                          >
+                            Baixar formulário (RQ.DP.049.xls)
+                          </a>
+                        </div>
+                      )}
+                      {requiresAttachment && (
+                        <p className="text-xs text-orange-700">
+                          Anexe o documento referente à multa para prosseguirmos.
+                        </p>
+                      )}
                       {Object.entries(grouped).map(([section, campos]) => (
                         <section key={section} className="space-y-3">
                           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">

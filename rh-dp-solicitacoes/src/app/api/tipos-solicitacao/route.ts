@@ -16,9 +16,19 @@ type CampoEspecifico = {
   stage?: string
 }
 
+type TipoDestino = {
+  value: string
+  label: string
+}
+
 type TipoMeta = {
   centros?: string[]
   departamentos?: string[]
+  requiresApproval?: boolean
+  prazoPadraoDias?: number
+  templateDownload?: string
+  requiresAttachment?: boolean
+  destinos?: TipoDestino[]
 }
 
 type SchemaJson = {
@@ -92,6 +102,7 @@ export async function GET(request: Request) {
           nome: tipo.nome,
           descricao: tipo.descricao ?? undefined,
           camposEspecificos: campos,
+          meta: schema?.meta ?? {},
         }
       })
 
@@ -104,4 +115,3 @@ export async function GET(request: Request) {
     )
   }
 }
-

@@ -128,6 +128,249 @@ async function main() {
   const rhTipoDepartamentos = [rhDepartment?.id, dpDepartment?.id].filter(
     (value): value is string => Boolean(value),
   )
+  if (rhDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_RH_103' },
+      update: {
+        nome: 'AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA',
+        descricao: 'Solicitação de avaliação do período de experiência.',
+        schemaJson: {
+          meta: {
+            departamentos: [rhDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_RH_103',
+        nome: 'AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA',
+        descricao: 'Solicitação de avaliação do período de experiência.',
+        schemaJson: {
+          meta: {
+            departamentos: [rhDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+  if (dpDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_106' },
+      update: {
+        nome: 'EXCLUSÃO NO PLANO SAÚDE/ODONTO PARA DEPENDENTES',
+        descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_106',
+        nome: 'EXCLUSÃO NO PLANO SAÚDE/ODONTO PARA DEPENDENTES',
+        descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_115' },
+      update: {
+        nome: 'RENÚNCIA DE BENEFÍCIO',
+        descricao: 'Solicitação de renúncia de benefício.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_115',
+        nome: 'RENÚNCIA DE BENEFÍCIO',
+        descricao: 'Solicitação de renúncia de benefício.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_240' },
+      update: {
+        nome: 'TRANSFERÊNCIA DE FUNCIONÁRIO',
+        descricao: 'Solicitação de transferência de funcionário.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_240',
+        nome: 'TRANSFERÊNCIA DE FUNCIONÁRIO',
+        descricao: 'Solicitação de transferência de funcionário.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+          },
+        },
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+  if (logisticaDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_DP_049' },
+      update: {
+        nome: 'IDENTIFICAÇÃO DO CONDUTOR INFRATOR MULTA DE TRÂNSITO',
+        descricao: 'FORMULÁRIO DE IDENTIFICAÇÃO DE MULTA DE TRÂNSITO',
+        schemaJson: {
+          meta: {
+            departamentos: [logisticaDepartment.id],
+            requiresApproval: false,
+            prazoPadraoDias: 7,
+            templateDownload: '/templates/rq-dp-049.xls',
+            requiresAttachment: true,
+            destinos: [
+              { value: 'LOGISTICA', label: 'Logística' },
+              { value: 'DP', label: 'Departamento Pessoal' },
+              { value: 'RH', label: 'Recursos Humanos' },
+            ],
+          },
+          camposEspecificos: [
+            {
+              name: 'destinadoPara',
+              label: 'Destinado para',
+              type: 'select',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'nomeInfrator',
+              label: 'Nome do infrator',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'gestorImediato',
+              label: 'Gestor imediato',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'centroCusto',
+              label: 'Centro de custo',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'placaVeiculo',
+              label: 'Placa do veículo',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'observacoes',
+              label: 'Observações',
+              type: 'textarea',
+              section: 'Identificação da multa',
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_DP_049',
+        nome: 'IDENTIFICAÇÃO DO CONDUTOR INFRATOR MULTA DE TRÂNSITO',
+        descricao: 'FORMULÁRIO DE IDENTIFICAÇÃO DE MULTA DE TRÂNSITO',
+        schemaJson: {
+          meta: {
+            departamentos: [logisticaDepartment.id],
+            requiresApproval: false,
+            prazoPadraoDias: 7,
+            templateDownload: '/templates/rq-dp-049.xls',
+            requiresAttachment: true,
+            destinos: [
+              { value: 'LOGISTICA', label: 'Logística' },
+              { value: 'DP', label: 'Departamento Pessoal' },
+              { value: 'RH', label: 'Recursos Humanos' },
+            ],
+          },
+          camposEspecificos: [
+            {
+              name: 'destinadoPara',
+              label: 'Destinado para',
+              type: 'select',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'nomeInfrator',
+              label: 'Nome do infrator',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'gestorImediato',
+              label: 'Gestor imediato',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'centroCusto',
+              label: 'Centro de custo',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'placaVeiculo',
+              label: 'Placa do veículo',
+              type: 'text',
+              required: true,
+              section: 'Identificação da multa',
+            },
+            {
+              name: 'observacoes',
+              label: 'Observações',
+              type: 'textarea',
+              section: 'Identificação da multa',
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+  }
+
 
   if (rhDepartment) {
     await prisma.tipoSolicitacao.upsert({
