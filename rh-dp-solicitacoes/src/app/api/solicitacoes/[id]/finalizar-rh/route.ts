@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
-import { isSolicitacaoDesligamento, isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
 
 function generateProtocolo() {
   const now = new Date()
@@ -92,8 +92,7 @@ export async function POST(
     })
 
 
-    const isSolicitacaoPessoal =
-      solicitation.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+    const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solicitation.tipo)
     const isSolicitacaoIncentivo =
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
@@ -119,7 +118,7 @@ export async function POST(
     const vemDeRh = Boolean(payloadOrigem?.origem?.rhSolicitationId)
 
     if (
-      !isSolicitacaoPessoal &&
+      !isSolicitacaoPessoalTipo &&
       !isSolicitacaoIncentivo &&
       !isAdmissaoGerada &&
       !isDesligamento &&
@@ -416,11 +415,11 @@ export async function POST(
         },
       })
 
-      await tx.solicitationTimeline.create({
+        await tx.solicitationTimeline.create({
         data: {
           solicitationId: solicitation.id,
           status: 'CONCLUIDA',
-          message: isSolicitacaoPessoal
+          message: isSolicitacaoPessoalTipo
             ? `Finalizada no RH por ${me.fullName ?? me.id} e encaminhada para o DP.`
            : isSolicitacaoIncentivo
               ? `Finalizada no RH por ${me.fullName ?? me.id} e enviada ao DP.`
@@ -429,6 +428,7 @@ export async function POST(
               : `Finalizada no RH por ${me.fullName ?? me.id}.`,
         },
       })
+
 
       await tx.event.create({
         data: {
@@ -441,7 +441,7 @@ export async function POST(
 
       let dpSolicitation: any = null
 
-      if (isSolicitacaoPessoal) {
+      if (isSolicitacaoPessoalTipo) {
         // Tipo de solicitação do DP
         const tipoAdmissao = await tx.tipoSolicitacao.findFirst({
           where: { nome: 'Solicitação de Admissão' },

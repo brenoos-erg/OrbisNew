@@ -317,10 +317,14 @@ export default function SentRequestsPage() {
     setDetailLoading(true)
 
     try {
-      const res = await fetch(`/api/solicitacoes/${row.id}`, { cache: 'no-store' })
+     const [res, timelineRes] = await Promise.all([
+        fetch(`/api/solicitacoes/${row.id}`, { cache: 'no-store' }),
+        fetch(`/api/solicitacoes/${row.id}/timeline`, { cache: 'no-store' }),
+      ])
       if (!res.ok) throw new Error('Erro ao carregar detalhes da solicitação.')
       const json = (await res.json()) as SolicitationDetail
-      setDetail(json)
+      const timelineJson = timelineRes.ok ? await timelineRes.json() : []
+      setDetail({ ...json, timelines: Array.isArray(timelineJson) ? timelineJson : json.timelines })
     } catch (e: any) {
       console.error('Erro ao buscar detalhe da solicitação', e)
       setDetailError(e?.message ?? 'Erro ao carregar detalhes.')

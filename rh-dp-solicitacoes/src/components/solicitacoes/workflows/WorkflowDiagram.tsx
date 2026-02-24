@@ -17,6 +17,7 @@ type WorkflowStep = {
   requiresApproval: boolean
   canAssume: boolean
   canFinalize: boolean
+  notificationEmails?: string[]
 }
 
 type WorkflowTransition = {
@@ -153,6 +154,9 @@ function WorkflowNode({ data }: { data: WorkflowStep }) {
           <p>
             Aprovador: {[data.approverGroup?.name, data.approverUser?.fullName ?? data.approverUser?.name].filter(Boolean).join(' / ')}
           </p>
+        )}
+        {Array.isArray(data.notificationEmails) && data.notificationEmails.length > 0 && (
+          <p>E-mails: {data.notificationEmails.join(', ')}</p>
         )}
       </div>
     </div>

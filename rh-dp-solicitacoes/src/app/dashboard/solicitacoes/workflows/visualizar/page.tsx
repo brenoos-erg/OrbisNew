@@ -58,6 +58,7 @@ export default function VisualizarWorkflowPage() {
   }, [])
 
   const selected = useMemo(() => pickWorkflow(rows, tipoId, departmentId), [rows, tipoId, departmentId])
+  const sortedSteps = useMemo(() => (selected ? [...selected.steps].sort((a, b) => a.order - b.order) : []), [selected])
 
   return (
     <div className="space-y-4 rounded-xl border bg-white p-4">
@@ -93,6 +94,21 @@ export default function VisualizarWorkflowPage() {
             <strong>{selected.name}</strong> • Tipo: {selected.tipo?.nome ?? '-'} • Departamento: {selected.department?.name ?? 'Fallback geral'}
           </div>
           <WorkflowDiagram workflow={selected} />
+          <div className="rounded-xl border p-3">
+            <h2 className="mb-2 text-sm font-semibold">Linha do tempo do fluxo</h2>
+            <ol className="space-y-2">
+              {sortedSteps.map((step) => (
+                <li key={step.stepKey} className="rounded border p-2 text-sm">
+                  <div className="font-medium">{step.order}. {step.label}</div>
+                  <div className="text-xs text-slate-600">{step.stepKey} • {step.kind}</div>
+                  {step.approverUser?.fullName && <div className="text-xs">Aprovador: {step.approverUser.fullName}</div>}
+                  {Array.isArray((step as any).notificationEmails) && (step as any).notificationEmails.length > 0 && (
+                    <div className="text-xs">E-mails notificados: {(step as any).notificationEmails.join(', ')}</div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
         </>
       )}
     </div>

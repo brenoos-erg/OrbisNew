@@ -14,6 +14,7 @@ type StepDraft = {
   requiresApproval?: boolean
   approverGroupId?: string | null
   approverUserId?: string | null
+  notificationEmails?: string[]
   canAssume?: boolean
   canFinalize?: boolean
 }
@@ -36,14 +37,140 @@ const emptyDraft: WorkflowDraft = {
   departmentId: null,
   active: true,
   steps: [
-    { order: 1, stepKey: 'INICIO', label: 'Setor inicial', kind: 'DEPARTAMENTO', canAssume: true },
-    { order: 2, stepKey: 'APROVACAO', label: 'Aprovação', kind: 'APROVACAO', requiresApproval: true },
-    { order: 3, stepKey: 'FIM', label: 'Fim', kind: 'FIM', canFinalize: true },
+    { order: 1, stepKey: 'INICIO', label: 'Setor inicial', kind: 'DEPARTAMENTO', canAssume: true, notificationEmails: [] },
+    { order: 2, stepKey: 'APROVACAO', label: 'Aprovação', kind: 'APROVACAO', requiresApproval: true, notificationEmails: [] },
+    { order: 3, stepKey: 'FIM', label: 'Fim', kind: 'FIM', canFinalize: true, notificationEmails: [] },
   ],
   transitions: [
     { fromStepKey: 'INICIO', toStepKey: 'APROVACAO' },
     { fromStepKey: 'APROVACAO', toStepKey: 'FIM' },
   ],
+}
+function toStep(order: number, stepKey: string, label: string, kind: Kind, defaults?: Partial<StepDraft>): StepDraft {
+  return {
+    order,
+    stepKey,
+    label,
+    kind,
+    notificationEmails: [],
+    ...defaults,
+  }
+}
+
+function buildWorkflowTemplates(tipos: RefItem[]): WorkflowDraft[] {
+  const tipoByName = (needle: string) => tipos.find((tipo) => (tipo.nome ?? '').toUpperCase().includes(needle.toUpperCase()))?.id
+  const tipoById = (id: string) => tipos.find((tipo) => tipo.id === id)?.id
+
+  return [
+    {
+      name: 'RQ.063 - Solicitação de Pessoal',
+      tipoId: tipoById('RQ_063') ?? tipoByName('RQ.063') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'VALIDA_CONTRATO', 'Validação: vaga prevista em contrato?', 'APROVACAO', { requiresApproval: true }),
+        toStep(3, 'APROVACAO_GESTAO', 'Aprovação de gestão (quando não prevista)', 'APROVACAO', { requiresApproval: true }),
+        toStep(4, 'RH_PREENCHIMENTO', 'RH preenche dados do funcionário', 'DEPARTAMENTO'),
+        toStep(5, 'DP_ADMISSAO', 'DP recebe Solicitação de Admissão', 'DEPARTAMENTO', { canFinalize: true }),
+        toStep(6, 'FIM', 'Finalização DP', 'FIM', { canFinalize: true }),
+      ],
+      transitions: [
+        { fromStepKey: 'USUARIO_ABRE', toStepKey: 'VALIDA_CONTRATO' },
+        { fromStepKey: 'VALIDA_CONTRATO', toStepKey: 'RH_PREENCHIMENTO' },
+        { fromStepKey: 'VALIDA_CONTRATO', toStepKey: 'APROVACAO_GESTAO' },
+        { fromStepKey: 'APROVACAO_GESTAO', toStepKey: 'RH_PREENCHIMENTO' },
+        { fromStepKey: 'RH_PREENCHIMENTO', toStepKey: 'DP_ADMISSAO' },
+        { fromStepKey: 'DP_ADMISSAO', toStepKey: 'FIM' },
+      ],
+    },
+    {
+      name: 'RQ.247 - Desligamento de Pessoal',
+      tipoId: tipoById('RQ_247') ?? tipoByName('RQ.247') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'APROVACAO_USUARIO', 'Aprovação obrigatória', 'APROVACAO', { requiresApproval: true }),
+        toStep(3, 'DP_COPIA', 'Cópia enviada ao Departamento Pessoal', 'DEPARTAMENTO'),
+        toStep(4, 'DP_TRATATIVA', 'Departamento Pessoal trata e finaliza', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [
+        { fromStepKey: 'USUARIO_ABRE', toStepKey: 'APROVACAO_USUARIO' },
+        { fromStepKey: 'APROVACAO_USUARIO', toStepKey: 'DP_COPIA' },
+        { fromStepKey: 'DP_COPIA', toStepKey: 'DP_TRATATIVA' },
+      ],
+    },
+    {
+      name: 'RQ.088 - Solicitação de Veículos',
+      tipoId: tipoById('RQ_088') ?? tipoByName('RQ.088') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'APROVACAO_GESTOR', 'Gestor do departamento aprova', 'APROVACAO', { requiresApproval: true }),
+        toStep(3, 'LOGISTICA', 'Chamado direcionado para Logística', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [
+        { fromStepKey: 'USUARIO_ABRE', toStepKey: 'APROVACAO_GESTOR' },
+        { fromStepKey: 'APROVACAO_GESTOR', toStepKey: 'LOGISTICA' },
+      ],
+    },
+    {
+      name: 'Solicitação de Férias',
+      tipoId: tipoById('AGENDAMENTO_DE_FERIAS') ?? tipoByName('FÉRIAS') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'APROVACAO_GESTOR', 'Gestor do departamento aprova', 'APROVACAO', { requiresApproval: true }),
+        toStep(3, 'DP', 'Direciona para Departamento Pessoal', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [
+        { fromStepKey: 'USUARIO_ABRE', toStepKey: 'APROVACAO_GESTOR' },
+        { fromStepKey: 'APROVACAO_GESTOR', toStepKey: 'DP' },
+      ],
+    },
+    {
+      name: 'RQ.092 - Solicitação de Exames',
+      tipoId: tipoById('RQ_092') ?? tipoByName('RQ.092') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'SST', 'Segurança do Trabalho trata', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [{ fromStepKey: 'USUARIO_ABRE', toStepKey: 'SST' }],
+    },
+    {
+      name: 'RQ.043 - Requisição de EPI / Uniformes',
+      tipoId: tipoById('RQ_043') ?? tipoByName('RQ.043') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'SST_VALIDA_ANEXO', 'SST valida se há anexo / anexa quando necessário', 'DEPARTAMENTO'),
+        toStep(3, 'APROVADOR_SETOR', 'Aprovador do setor aprova', 'APROVACAO', { requiresApproval: true }),
+        toStep(4, 'LOGISTICA', 'Logística recebe chamado', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [
+        { fromStepKey: 'USUARIO_ABRE', toStepKey: 'SST_VALIDA_ANEXO' },
+        { fromStepKey: 'SST_VALIDA_ANEXO', toStepKey: 'APROVADOR_SETOR' },
+        { fromStepKey: 'APROVADOR_SETOR', toStepKey: 'LOGISTICA' },
+      ],
+    },
+    {
+      name: 'RQ.089 - Solicitação de Equipamento',
+      tipoId: tipoById('RQ_089') ?? tipoByName('RQ.089') ?? '',
+      departmentId: null,
+      active: true,
+      steps: [
+        toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
+        toStep(2, 'TI', 'Chamado direcionado para Tecnologia da Informação', 'DEPARTAMENTO', { canFinalize: true }),
+      ],
+      transitions: [{ fromStepKey: 'USUARIO_ABRE', toStepKey: 'TI' }],
+    },
+  ].filter((item) => item.tipoId)
 }
 
 export default function FluxosSolicitacoesPage() {
@@ -71,21 +198,29 @@ export default function FluxosSolicitacoesPage() {
 
   const nodes = useMemo(() => [...draft.steps].sort((a, b) => a.order - b.order), [draft.steps])
 
-  async function saveWorkflow() {
+  async function saveWorkflow(model = draft) {
     setSaving(true)
-    const url = draft.id ? `/api/solicitation-workflows/${draft.id}` : '/api/solicitation-workflows'
-    const method = draft.id ? 'PUT' : 'POST'
+    const url = model.id ? `/api/solicitation-workflows/${model.id}` : '/api/solicitation-workflows'
+    const method = model.id ? 'PUT' : 'POST'
 
     await fetch(url, {
       method,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(draft),
+      body: JSON.stringify(model),
     })
 
     await loadData()
-    if (!draft.id) setDraft(emptyDraft)
+    if (!model.id) setDraft(emptyDraft)
     setSaving(false)
   }
+  async function applyPresetFlows() {
+    const templates = buildWorkflowTemplates(tipos)
+    for (const template of templates) {
+      const existing = workflows.find((wf) => wf.tipoId === template.tipoId)
+      await saveWorkflow(existing ? { ...template, id: existing.id } : template)
+    }
+  }
+
 
   return (
     <div className="space-y-4 rounded-xl border bg-white p-4">
@@ -97,10 +232,36 @@ export default function FluxosSolicitacoesPage() {
           <option value="">Tipo de solicitação</option>
           {tipos.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>)}
         </select>
-        <select className="rounded border px-3 py-2" value={draft.departmentId ?? ''} onChange={(e) => setDraft((prev) => ({ ...prev, departmentId: e.target.value || null }))}>
-          <option value="">Fallback geral</option>
-          {departments.map((dep) => <option key={dep.id} value={dep.id}>{dep.name}</option>)}
-        </select>
+        </div>
+
+      <div className="rounded-xl border border-slate-200 p-3">
+        <p className="mb-2 text-sm font-medium">Aprovadores e e-mails por etapa (regra padrão de disparo)</p>
+        <div className="space-y-3">
+          {nodes.map((step, idx) => (
+            <div key={step.stepKey} className="grid gap-2 rounded border p-2 md:grid-cols-2">
+              <div className="text-sm font-medium">{idx + 1}. {step.label} ({step.kind})</div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder="ID do aprovador"
+                  value={step.approverUserId ?? ''}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, steps: prev.steps.map((s) => s.stepKey === step.stepKey ? { ...s, approverUserId: e.target.value || null } : s) }))}
+                />
+                <input
+                  className="rounded border px-2 py-1 text-sm"
+                  placeholder="emails@empresa.com, outro@empresa.com"
+                  value={(step.notificationEmails ?? []).join(', ')}
+                  onChange={(e) => setDraft((prev) => ({
+                    ...prev,
+                    steps: prev.steps.map((s) => s.stepKey === step.stepKey
+                      ? { ...s, notificationEmails: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) }
+                      : s),
+                  }))}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -129,8 +290,11 @@ export default function FluxosSolicitacoesPage() {
       </div>
 
       <div className="flex gap-2">
-        <button className="rounded bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={saving || !draft.name || !draft.tipoId} onClick={saveWorkflow}>
+       <button className="rounded bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-50" disabled={saving || !draft.name || !draft.tipoId} onClick={() => saveWorkflow()}>
           {saving ? 'Salvando...' : draft.id ? 'Atualizar workflow' : 'Salvar workflow'}
+        </button>
+        <button className="rounded border px-4 py-2 text-sm disabled:opacity-50" disabled={saving || tipos.length === 0} onClick={applyPresetFlows}>
+          Aplicar fluxos padrão solicitados
         </button>
       </div>
 

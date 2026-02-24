@@ -2,9 +2,17 @@ type TipoSolicitacaoLike = {
   id?: string | null
   nome?: string | null
 }
+function normalizeSolicitacaoName(value?: string | null) {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+}
 export const AGENDAMENTO_FERIAS_TIPO_ID = 'AGENDAMENTO_DE_FERIAS'
 export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'
+export const SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT = 'RQ_089'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
 export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
@@ -216,29 +224,44 @@ export function isSolicitacaoAgendamentoFerias(
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === AGENDAMENTO_FERIAS_TIPO_ID) return true
-  const nome = tipo.nome?.trim().toUpperCase() ?? ''
-  return nome === AGENDAMENTO_FERIAS_TIPO_NOME
+ const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('FERIAS')
 }
 
 export function isSolicitacaoEquipamento(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
-  if (id === SOLICITACAO_EQUIPAMENTO_TIPO_ID) return true
-  const nome = tipo.nome?.trim().toUpperCase() ?? ''
-  return nome === SOLICITACAO_EQUIPAMENTO_TIPO_NOME
+  if (id === SOLICITACAO_EQUIPAMENTO_TIPO_ID || id === SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT) return true
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('SOLICITACAO DE EQUIPAMENTO')
 }
 
 export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EXAMES_SST_TIPO_ID) return true
-  const nome = tipo.nome?.trim().toUpperCase() ?? ''
-  return nome.includes('RQ.092') || nome.includes('SOLICITACAO DE EXAMES')
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('RQ.092') || nome.includes('RQ_092') || nome.includes('SOLICITACAO DE EXAMES')
 }
 export function isSolicitacaoEpiUniforme(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EPI_UNIFORME_TIPO_ID) return true
-  const nome = tipo.nome?.trim().toUpperCase() ?? ''
-  return nome.includes('RQ.043') || nome.includes('REQUISICAO DE EPI')
+   const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('RQ.043') || nome.includes('RQ_043') || nome.includes('REQUISICAO DE EPI')
 }
+
+export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === 'RQ_063') return true
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('RQ_063') || nome.includes('RQ.063') || nome.includes('SOLICITACAO DE PESSOAL')
+}
+
+export function isSolicitacaoVeiculos(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === 'RQ_088') return true
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('RQ.088') || nome.includes('RQ_088') || nome.includes('SOLICITACAO DE VEICULO')}

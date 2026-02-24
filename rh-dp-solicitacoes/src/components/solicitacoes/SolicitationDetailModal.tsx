@@ -10,6 +10,7 @@ import {
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
+  isSolicitacaoPessoal,
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
@@ -198,6 +199,7 @@ export type SolicitationDetail = {
   comentarios?: Comment[]
   children?: ChildSolicitation[]
   solicitacaoSetores?: SolicitacaoSetor[]
+  timelines?: { id: string; status: string; message?: string | null; createdAt: string }[]
 }
 
 // ===== Timeline =====
@@ -589,8 +591,7 @@ export function SolicitationDetailModal({
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
 
     // Fluxos especiais
-  const isSolicitacaoPessoal =
-    detail?.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+ const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(detail?.tipo)
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
@@ -626,7 +627,7 @@ export function SolicitationDetailModal({
       : null
 
   const followsRhFinalizationFlow =
-    isSolicitacaoPessoal ||
+    isSolicitacaoPessoalTipo ||
     isSolicitacaoIncentivo ||
     isDesligamento ||
     isSolicitacaoExames ||
@@ -704,7 +705,7 @@ export function SolicitationDetailModal({
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
   const finalizarLabel = isDpDestino
     ? 'Finalizar chamado'
-    : isSolicitacaoPessoal || isDesligamento
+    : isSolicitacaoPessoalTipo || isDesligamento
       ? 'Enviar para o DP'
       : isSolicitacaoExames
         ? 'Finalizar'
@@ -1319,7 +1320,7 @@ async function handleEncaminharAprovacaoComAnexo() {
       await refreshDetailFromServer()
 
       setCloseSuccess(
-        isSolicitacaoPessoal
+        isSolicitacaoPessoalTipo
           ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
           : isDesligamento && isDpDestino
             ? 'Solicitação finalizada pelo DP.'
@@ -1602,6 +1603,20 @@ async function handleEncaminharAprovacaoComAnexo() {
               </p>
             )}
           </div>
+           {detail?.timelines && detail.timelines.length > 0 && (
+            <section className="rounded-lg border border-slate-200 p-3">
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Linha do tempo</h3>
+              <ul className="space-y-2">
+                {detail.timelines.map((item) => (
+                  <li key={item.id} className="rounded-md bg-slate-50 p-2">
+                    <p className="text-[11px] text-slate-500">{format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm')}</p>
+                    <p className="text-xs font-medium text-slate-700">{item.status}</p>
+                    <p className="text-xs text-slate-600">{item.message || '-'}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {loading && (
             <p className="text-xs text-slate-500">
@@ -1894,7 +1909,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   )}
                 </div>
-              ) : isSolicitacaoPessoal ? (
+              ) : isSolicitacaoPessoalTipo ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
                   ) : isDesligamento ? (
                 <RQ247ResumoCampos
@@ -2207,7 +2222,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </div>
                     </div>                  )}
 
-                  {!isDpDestino && canFinalizarRh && isSolicitacaoPessoal && (
+                   {!isDpDestino && canFinalizarRh && isSolicitacaoPessoalTipo && (
                     <button
                       onClick={() => setShowContratadoForm((v) => !v)}
                       className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 lg:w-auto lg:text-sm"

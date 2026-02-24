@@ -123,6 +123,47 @@ async function main() {
   const dpDepartment = await prisma.department.findUnique({ where: { code: '08' } })
   const sstDepartment = await prisma.department.findUnique({ where: { code: '19' } })
   if (!sstDepartment) throw new Error('Departamento SST (code=19) não encontrado.')
+     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' } })
+
+  const rhTipoDepartamentos = [rhDepartment?.id, dpDepartment?.id].filter(
+    (value): value is string => Boolean(value),
+  )
+
+  if (rhDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ_063 - Solicitação de Pessoal' },
+      update: {
+        descricao: 'Solicitação de pessoal com fluxo RH e DP',
+        schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_063',
+        nome: 'RQ_063 - Solicitação de Pessoal',
+        descricao: 'Solicitação de pessoal com fluxo RH e DP',
+        schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+  if (logisticaDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { nome: 'RQ.088 - Solicitação de Veículos' },
+      update: {
+        descricao: 'Solicitação de veículos com aprovação e envio à Logística',
+        schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_088',
+        nome: 'RQ.088 - Solicitação de Veículos',
+        descricao: 'Solicitação de veículos com aprovação e envio à Logística',
+        schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
+        updatedAt: new Date(),
+      },
+    })
+  }
 
   /* =========================
      TIPOS DE SOLICITAÇÃO BÁSICOS
@@ -145,9 +186,9 @@ async function main() {
       updatedAt: new Date(),
     },
   })
-  console.log('✅ Tipo "Vale-transporte" ok.')
+ console.log('✅ Tipo "Vale-transporte" ok.')
   await prisma.tipoSolicitacao.upsert({
-    where: { nome: 'SOLICITAÇÃO DE EQUIPAMENTO' },
+    where: { nome: 'RQ.089 - Solicitação de Equipamento' },
     update: {
       descricao: 'Solicitação para fornecimento de equipamento de TI',
       schemaJson: {
@@ -173,9 +214,9 @@ async function main() {
       },
       updatedAt: new Date(),
     },
-    create: {
-      id: 'SOLICITACAO_EQUIPAMENTO',
-      nome: 'SOLICITAÇÃO DE EQUIPAMENTO',
+     create: {
+      id: 'RQ_089',
+      nome: 'RQ.089 - Solicitação de Equipamento',
       descricao: 'Solicitação para fornecimento de equipamento de TI',
       schemaJson: {
         meta: { departamentos: [tiDepartment.id] },
@@ -201,7 +242,7 @@ async function main() {
       updatedAt: new Date(),
     },
   })
-  console.log('✅ Tipo "SOLICITAÇÃO DE EQUIPAMENTO" ok.')
+  console.log('✅ Tipo "RQ.089 - Solicitação de Equipamento" ok.')
 
   /* =========================
      DP: Solicitação de Admissão
@@ -349,7 +390,7 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'AGENDAMENTO DE FÉRIAS' },
+       where: { nome: 'Solicitação de Férias' },
       update: {
         descricao: 'SERVIÇOS DE DP - agendamento de férias',
         schemaJson: agendamentoFeriasSchema,
@@ -357,13 +398,13 @@ async function main() {
       },
       create: {
         id: 'AGENDAMENTO_DE_FERIAS',
-        nome: 'AGENDAMENTO DE FÉRIAS',
+        nome: 'Solicitação de Férias',
         descricao: 'SERVIÇOS DE DP - agendamento de férias',
         schemaJson: agendamentoFeriasSchema,
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "AGENDAMENTO DE FÉRIAS" ok.')
+    console.log('✅ Tipo "Solicitação de Férias" ok.')
     const desligamentoSchema = {
       meta: {
         departamentos: [dpDepartment.id],
@@ -538,7 +579,7 @@ async function main() {
     }
 
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL' },
+       where: { nome: 'RQ_247 - Desligamento de Pessoal' },
       update: {
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
@@ -546,13 +587,13 @@ async function main() {
       },
      create: {
         id: 'RQ_247',
-        nome: 'RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL',
+        nome: 'RQ_247 - Desligamento de Pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "RQ.247 SOLICITAÇÃO DE DESLIGAMENTO DE PESSOAL" ok.')
+    console.log('✅ Tipo "RQ_247 - Desligamento de Pessoal" ok.')
     
 
     const solicitacaoExamesSstSchema = {
@@ -680,7 +721,7 @@ async function main() {
     console.log('✅ Tipo "RQ.092 SOLICITAÇÃO DE EXAMES" ok.')
     const requisicaoEpiUniformesSchema = {
       meta: {
-        departamentos: [sstDepartment.id],
+          departamentos: [sstDepartment.id, ...(logisticaDepartment ? [logisticaDepartment.id] : [])],
         categoria: 'SERVIÇOS DE LOGÍSTICA',
         centroResponsavelLabel: 'SEGURANÇA DO TRABALHO',
         requiresApproval: true,

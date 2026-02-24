@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
-import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 
 
 export async function POST(
@@ -43,11 +43,12 @@ export async function POST(
       )
     }
 
-    const isSolicitacaoPessoal =
-      solic.tipo?.nome === 'RQ_063 - Solicitação de Pessoal'
+   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
     const isSolicitacaoIncentivo =
       solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
-      const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
+    const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
+    const isFerias = isSolicitacaoAgendamentoFerias(solic.tipo)
+    const isVeiculos = isSolicitacaoVeiculos(solic.tipo)    
     const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solic.tipo)
 
     if (isSolicitacaoEpi) {
@@ -112,7 +113,7 @@ export async function POST(
 
     let rhCostCenter = null
 
-    if (isSolicitacaoPessoal || isDesligamento) {
+     if (isSolicitacaoPessoalTipo) {
       rhCostCenter = await prisma.costCenter.findFirst({
         where: {
           OR: [
@@ -138,21 +139,6 @@ export async function POST(
 
     const rhDepartmentId =
       rhCostCenter?.departmentId ?? solic.costCenter?.departmentId ?? solic.departmentId
-       let logisticaDepartment = null
-    if (isSolicitacaoEpi) {
-      logisticaDepartment = await prisma.department.findUnique({
-        where: { code: '11' },
-        select: { id: true, name: true },
-      })
-
-      if (!logisticaDepartment) {
-        return NextResponse.json(
-          { error: 'Departamento LOGÍSTICA não encontrado para encaminhamento.' },
-          { status: 400 },
-        )
-      }
-    }
-
     if (rhCostCenter && !rhDepartmentId) {
       return NextResponse.json(
         {
@@ -162,50 +148,85 @@ export async function POST(
         { status: 400 },
       )
     }
+     const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
+    const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
+
+
+    const updateData: Record<string, any> = {
+      approvalStatus: 'APROVADO',
+      approvalAt: new Date(),
+      approverId: me.id,
+      approvalComment: approvalComment ?? null,
+      status: 'ABERTA',
+    }
+
+    if (isSolicitacaoPessoalTipo && rhCostCenter) {
+      updateData.costCenterId = rhCostCenter.id
+      updateData.departmentId = rhDepartmentId
+    } else if (isFerias && dpDepartment) {
+      updateData.departmentId = dpDepartment.id
+    } else if ((isVeiculos || isSolicitacaoEpi) && logisticaDepartment) {
+      updateData.departmentId = logisticaDepartment.id
+    }
+
+    if (isSolicitacaoEpi && logisticaDepartment) {
+      updateData.payload = {
+        ...((solic.payload as Record<string, any> | null) ?? {}),
+        epiUniforme: {
+          ...(((solic.payload as Record<string, any> | null)?.epiUniforme as Record<string, any> | undefined) ?? {}),
+          centroResponsavelLabel: logisticaDepartment.name,
+        },
+      }
+    }
 
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
-      data: {
-        approvalStatus: 'APROVADO',
-        approvalAt: new Date(),
-        approverId: me.id,
-        approvalComment: approvalComment ?? null,
-        // Depois de aprovado, volta para ABERTA,
-        // e o front interpreta como "Aguardando atendimento"
-        status: 'ABERTA',
-        ...(rhCostCenter
-          ? {
-              costCenterId: rhCostCenter.id,
-              departmentId: rhDepartmentId,
-            }
-          : {}),
-          ...(isSolicitacaoEpi && logisticaDepartment
-          ? {
-              departmentId: logisticaDepartment.id,
-              payload: {
-                ...((solic.payload as Record<string, any> | null) ?? {}),
-                epiUniforme: {
-                  ...(((solic.payload as Record<string, any> | null)?.epiUniforme as
-                    Record<string, any> | undefined) ?? {}),
-                  centroResponsavelLabel: logisticaDepartment.name,
-                },
-              },
-            }
-          : {}),
-      },
+      data: updateData,
     })
 
-    let timelineMessage: string
+     let timelineMessage: string
 
     if (approvalComment && approvalComment.length > 0) {
       timelineMessage = approvalComment
-       } else if (isSolicitacaoEpi && logisticaDepartment) {
+    } else if (isDesligamento && dpDepartment) {
+      timelineMessage = `Solicitação aprovada. Cópia enviada para ${dpDepartment.name}.`
+    } else if (isFerias && dpDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para ${dpDepartment.name}.`
+    } else if (isVeiculos && logisticaDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
-    } else if (rhCostCenter) {
+    } else if (isSolicitacaoEpi && logisticaDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
+    } else if (isSolicitacaoPessoalTipo && rhCostCenter) {
       const rhName = rhCostCenter.description ?? rhCostCenter.code ?? rhCostCenter.id
       timelineMessage = `Solicitação aprovada e encaminhada para o RH (${rhName}).`
     } else {
       timelineMessage = `Solicitação aprovada por ${me.fullName ?? me.id}.`
+    }
+     if (isDesligamento && dpDepartment) {
+      const child = await prisma.solicitation.create({
+        data: {
+          protocolo: `COPIA-${Date.now()}`,
+          tipoId: solic.tipoId,
+          titulo: `${solic.titulo} (Cópia DP)`,
+          descricao: solic.descricao,
+          payload: solic.payload as any,
+          solicitanteId: solic.solicitanteId,
+          parentId: solic.id,
+          departmentId: dpDepartment.id,
+          costCenterId: null,
+          status: 'ABERTA',
+          requiresApproval: false,
+          approvalStatus: 'NAO_PRECISA',
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: child.id,
+          status: 'ABERTA',
+          message: 'Cópia criada automaticamente para tratamento do Departamento Pessoal.',
+        },
+      })
     }
 
 

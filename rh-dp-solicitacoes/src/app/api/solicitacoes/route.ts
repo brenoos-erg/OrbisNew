@@ -17,10 +17,13 @@ import {
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
   isSolicitacaoNadaConsta,
+  isSolicitacaoPessoal,
+  isSolicitacaoVeiculos,
   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
+
 
 
 
@@ -455,8 +458,15 @@ export const POST = withModuleLevel(
           },
         })
 
-        const isSolicitacaoPessoal =
-          tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+        await prisma.solicitationTimeline.create({
+          data: {
+            solicitationId: created.id,
+            status: 'ABERTA',
+            message: 'Solicitação criada pelo solicitante.',
+          },
+        })
+
+        const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
         const isSolicitacaoIncentivo =
           tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
         const isDesligamento = isSolicitacaoDesligamento(tipo)
@@ -464,6 +474,7 @@ export const POST = withModuleLevel(
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
         const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
+        const isSolicitacaoVeiculosTipo = isSolicitacaoVeiculos(tipo)
         const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
         const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
         const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
@@ -554,24 +565,19 @@ export const POST = withModuleLevel(
           return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
-           2.5) Agendamento de Férias (auto aprovado e encaminhado ao DP)
+           2.5) Agendamento de Férias (aguarda aprovação do gestor e segue para DP)
            ===================================================================== */
         if (isAgendamentoFerias) {
-          const dpDepartment = await prisma.department.findUnique({
-            where: { code: '08' },
-            select: { id: true },
-          })
+          const approver = await findLevel3SolicitacoesApprover()
+          const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              requiresApproval: false,
-              approvalStatus: 'APROVADO',
-              approvalAt: new Date(),
-              approverId: null,
-              status: 'ABERTA',
-              costCenterId: created.costCenterId,
-              departmentId: dpDepartment?.id ?? resolvedDepartmentId,
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
             },
           })
 
@@ -580,18 +586,16 @@ export const POST = withModuleLevel(
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'APROVACAO_AUTOMATICA',
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
           })
-
 
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
-              message:
-                'Solicitação aprovada automaticamente e encaminhada para a fila do Departamento Pessoal.',
+              status: 'AGUARDANDO_APROVACAO',
+              message: 'Solicitação de férias aguardando aprovação do gestor.',
             },
           })
 
@@ -640,7 +644,7 @@ export const POST = withModuleLevel(
          /* =====================================================================
            3) RQ_063 - Solicitação de Pessoal
            ===================================================================== */
-        if (isSolicitacaoPessoal) {
+       if (isSolicitacaoPessoalTipo) {
           const rawCampo =
             (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
             (payload?.campos?.vagaPrevista as string | undefined) ??
@@ -771,10 +775,45 @@ export const POST = withModuleLevel(
 
           await prisma.solicitationTimeline.create({
             data: {
-              solicitationId: created.id,
+               solicitationId: created.id,
               status: 'AGUARDANDO_ATENDIMENTO',
               message:
                 'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
+
+
+        if (isSolicitacaoVeiculosTipo) {
+          const approver = await findLevel3SolicitacoesApprover()
+          const approverId = approver?.id ?? null
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_APROVACAO',
+              message: 'Solicitação de veículos aguardando aprovação do gestor.',
             },
           })
 
@@ -832,14 +871,16 @@ export const POST = withModuleLevel(
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
            ===================================================================== */
         if (isDesligamento) {
+          const approver = await findLevel3SolicitacoesApprover()
+          const approverId = approver?.id ?? null
+
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              requiresApproval: false,
-              approvalStatus: 'APROVADO',
-              approvalAt: new Date(),
-              approverId: null,
-              status: 'ABERTA',
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId,
+              status: 'AGUARDANDO_APROVACAO',
             },
           })
 
@@ -847,17 +888,16 @@ export const POST = withModuleLevel(
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'APROVACAO_AUTOMATICA',
+              actorId: approverId ?? solicitanteId,
+              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
           })
 
           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
-              message:
-                'Solicitação aprovada automaticamente e enviada ao centro de custo responsável.',
+              status: 'AGUARDANDO_APROVACAO',
+              message: 'Solicitação de desligamento aguardando aprovação do gestor.',
             },
           })
           return NextResponse.json(updated, { status: 201 })

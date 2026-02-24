@@ -15,6 +15,7 @@ export type WorkflowStepDraft = {
   requiresApproval?: boolean
   canAssume?: boolean
   canFinalize?: boolean
+  notificationEmails?: string[]
 }
 
 export type WorkflowTransitionDraft = {
