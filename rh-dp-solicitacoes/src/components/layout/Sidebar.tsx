@@ -53,6 +53,7 @@ type Props = {
     recebidas: boolean
     aprovacao: boolean
     cadastros: boolean
+    fluxos: boolean
   }
   fleetFeatures: {
     veiculos: boolean

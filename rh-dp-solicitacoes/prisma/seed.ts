@@ -1610,6 +1610,7 @@ async function main() {
         { key: FEATURE_KEYS.SOLICITACOES.RECEBIDAS, name: 'Solicitações Recebidas' },
         { key: FEATURE_KEYS.SOLICITACOES.APROVACAO, name: 'Aprovação de Solicitações' },
         { key: FEATURE_KEYS.SOLICITACOES.CADASTROS, name: 'Cadastros' },
+        { key: FEATURE_KEYS.SOLICITACOES.FLUXOS, name: 'Fluxo de Solicitações' },
       ],
     },
     {

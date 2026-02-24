@@ -1,0 +1,108 @@
+[
+  {
+    "name": "Fluxo padrão",
+    "tipoId": "AGENDAMENTO_DE_FERIAS",
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO"
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO"
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO"
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM"
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      },
+      {
+        "fromStepKey": "SETOR_DESTINO",
+        "toStepKey": "FIM"
+      }
+    ],
+    "id": "c7784366-4199-4d1b-968f-5d1166f6c825",
+    "departmentId": null
+  },
+  {
+    "id": "84c001c7-d0ea-4334-892e-d0cd179795fb",
+    "name": "Fluxo padrão",
+    "tipoId": "RQ_043",
+    "departmentId": null,
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 80
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 280,
+        "posY": 80
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 520,
+        "posY": 80
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 760,
+        "posY": 80
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      },
+      {
+        "fromStepKey": "SETOR_DESTINO",
+        "toStepKey": "FIM"
+      }
+    ]
+  }
+]

@@ -117,6 +117,7 @@ export default async function DashboardLayout({
     recebidas: false,
     aprovacao: false,
     cadastros: false,
+    fluxos: false,
   }
   let fleetFeatures = {
     veiculos: false,
@@ -174,6 +175,7 @@ export default async function DashboardLayout({
         canViewSolicRecebidas,
         canViewSolicAprovacao,
         canViewSolicCadastros,
+        canViewSolicFluxos,
         canViewFleetVeiculos,
         canViewFleetCheckins,
         canViewFleetDeslocamentoCheckin,
@@ -204,6 +206,7 @@ export default async function DashboardLayout({
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.CADASTROS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.FLUXOS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.VEICULOS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.CHECKINS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.FROTAS, FEATURE_KEYS.FROTAS.DESLOCAMENTO_CHECKIN, Action.VIEW),
@@ -284,6 +287,7 @@ export default async function DashboardLayout({
         recebidas: canViewSolicRecebidas,
         aprovacao: canViewSolicAprovacao,
         cadastros: canViewSolicCadastros,
+        fluxos: canViewSolicFluxos,
       }
 
       fleetFeatures = {
