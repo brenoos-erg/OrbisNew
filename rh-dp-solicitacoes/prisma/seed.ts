@@ -125,7 +125,7 @@ async function main() {
   if (!sstDepartment) throw new Error('Departamento SST (code=19) não encontrado.')
      const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' } })
 
-  const rhTipoDepartamentos = [rhDepartment?.id, dpDepartment?.id].filter(
+ const rhTipoDepartamentos = [rhDepartment?.id].filter(
     (value): value is string => Boolean(value),
   )
   if (rhDepartment) {
@@ -413,25 +413,15 @@ async function main() {
   /* =========================
      TIPOS DE SOLICITAÇÃO BÁSICOS
      ========================= */
-  await prisma.tipoSolicitacao.upsert({
-    where: { nome: 'Vale-transporte' },
-    update: {},
-    create: {
-      id: randomUUID(),
-      nome: 'Vale-transporte',
-      descricao: 'Inclusão/alteração de rotas de vale-transporte',
-      schemaJson: {
-        meta: { centros: [], departamentos: rhDepartment ? [rhDepartment.id] : [] },
-        camposEspecificos: [
-          { name: 'linha', label: 'Linha de ônibus', type: 'text', required: true },
-          { name: 'empresa', label: 'Empresa de transporte', type: 'text' },
-          { name: 'valor', label: 'Valor mensal estimado', type: 'number' },
-        ],
-      },
-      updatedAt: new Date(),
+  await prisma.tipoSolicitacao.deleteMany({
+    where: {
+      OR: [
+        { id: 'VALE_TRANSPORTE' },
+        { nome: { contains: 'Vale-transporte' } },
+      ],
     },
   })
- console.log('✅ Tipo "Vale-transporte" ok.')
+
   await prisma.tipoSolicitacao.upsert({
     where: { id: 'RQ_089' },
     update: {
@@ -495,18 +485,30 @@ async function main() {
      ========================= */
   if (dpDepartment) {
     await prisma.tipoSolicitacao.upsert({
-      where: { nome: 'Solicitação de Admissão' },
+         where: { id: 'SOLICITACAO_ADMISSAO' },
       update: {
+        nome: 'Solicitação de Admissão',
         descricao: 'Solicitação de admissão (Departamento Pessoal)',
-        schemaJson: { meta: { departamentos: [dpDepartment.id] }, camposEspecificos: [] },
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            hiddenFromCreate: true,
+          },
+          camposEspecificos: [],
+        },
         updatedAt: new Date(),
       },
       create: {
-        id: randomUUID(),
+        id: 'SOLICITACAO_ADMISSAO',
         nome: 'Solicitação de Admissão',
         descricao: 'Solicitação de admissão (Departamento Pessoal)',
-        schemaJson: { meta: { departamentos: [dpDepartment.id] }, camposEspecificos: [] },
-        updatedAt: new Date(),
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            hiddenFromCreate: true,
+          },
+          camposEspecificos: [],
+        },        updatedAt: new Date(),
       },
     })
     console.log('✅ Tipo "Solicitação de Admissão" ok.')
@@ -970,10 +972,12 @@ async function main() {
     console.log('✅ Tipo "RQ.092 SOLICITAÇÃO DE EXAMES" ok.')
     const requisicaoEpiUniformesSchema = {
       meta: {
-          departamentos: [sstDepartment.id, ...(logisticaDepartment ? [logisticaDepartment.id] : [])],
+          departamentos: [sstDepartment.id],
         categoria: 'SERVIÇOS DE LOGÍSTICA',
         centroResponsavelLabel: 'SEGURANÇA DO TRABALHO',
         requiresApproval: true,
+        destinoAposAprovacao: logisticaDepartment?.id,
+        requiresAttachment: false,
       },
       camposEspecificos: [
         {

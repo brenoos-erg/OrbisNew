@@ -318,13 +318,13 @@ export async function POST(
         },
       })
 
-      return NextResponse.json({ dp: updated }, { status: 200 })
+       return NextResponse.json({ dp: updated }, { status: 200 })
     }
 
 /*
     // 2) Tipo de solicitação do DP
     const tipoAdmissao = await prisma.tipoSolicitacao.findFirst({
-      where: { nome: 'Solicitação de Admissão' },
+      where: { id: 'SOLICITACAO_ADMISSAO' },
     })
 
     if (!tipoAdmissao) {
@@ -439,12 +439,19 @@ export async function POST(
         },
       })
 
-      let dpSolicitation: any = null
+       let dpSolicitation: any = null
 
       if (isSolicitacaoPessoalTipo) {
+        await tx.solicitationTimeline.create({
+          data: {
+            solicitationId: solicitation.id,
+            status: 'SUBCHAMADO_CRIADO_DP',
+            message: 'Subchamado de Solicitação de Admissão criado para o Departamento Pessoal.',
+          },
+        })
         // Tipo de solicitação do DP
         const tipoAdmissao = await tx.tipoSolicitacao.findFirst({
-          where: { nome: 'Solicitação de Admissão' },
+          where: { id: 'SOLICITACAO_ADMISSAO' },
         })
 
         if (!tipoAdmissao) {
@@ -466,7 +473,7 @@ export async function POST(
         const deptDp = await tx.department.findFirst({
           where: {
             OR: [
-              { code: 'DP' },
+              { code: '08' },
               { name: { contains: 'Pessoal' } },
             ],
           },
@@ -529,9 +536,17 @@ export async function POST(
       await tx.solicitationTimeline.create({
           data: {
             solicitationId: dpSolicitation.id,
-             status: 'AGUARDANDO_ATENDIMENTO',
+             status: 'CRIADA',
             message:
-              `Solicitação de admissão criada automaticamente a partir da ${solicitation.protocolo} e aguardando atendimento do DP.`,
+              `Subchamado de admissão criado automaticamente a partir da ${solicitation.protocolo}.`,
+          },
+        })
+
+        await tx.solicitationTimeline.create({
+          data: {
+            solicitationId: dpSolicitation.id,
+            status: 'ENCAMINHADA_DP',
+            message: 'Subchamado encaminhado para atendimento do Departamento Pessoal.',
           },
         })
 
@@ -584,7 +599,7 @@ export async function POST(
         const deptDp = await tx.department.findFirst({
           where: {
             OR: [
-              { code: 'DP' },
+           { code: '08' },
               { name: { contains: 'Pessoal' } },
             ],
           },

@@ -51,38 +51,7 @@ export async function POST(
     const isVeiculos = isSolicitacaoVeiculos(solic.tipo)    
     const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solic.tipo)
 
-    if (isSolicitacaoEpi) {
-      const [hasNivel3Solicitacoes, userSstLink] = await Promise.all([
-        prisma.userModuleAccess.findFirst({
-          where: {
-            userId: me.id,
-            level: 'NIVEL_3',
-            module: { key: 'solicitacoes' },
-          },
-          select: { id: true },
-        }),
-        prisma.userDepartment.findFirst({
-          where: {
-            userId: me.id,
-            department: { code: '19' },
-          },
-          select: { id: true },
-        }),
-      ])
-      const isSstUser =
-        me.department?.code === '19' ||
-        Boolean(userSstLink)
-
-      if (!hasNivel3Solicitacoes || !isSstUser) {
-        return NextResponse.json(
-          {
-            error:
-              'Somente aprovadores nível 3 de solicitações do departamento SST podem aprovar esta solicitação.',
-          },
-          { status: 403 },
-        )
-      }
-    }
+    
 
     if (isSolicitacaoIncentivo) {
       const allowedCostCenters = new Set<string>()
@@ -230,13 +199,31 @@ export async function POST(
     }
 
 
-    await prisma.solicitationTimeline.create({
-      data: {
-        solicitationId,
-        status: 'AGUARDANDO_ATENDIMENTO',
-        message: timelineMessage,
-      },
-    })
+     if (isSolicitacaoEpi && logisticaDepartment) {
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId,
+          status: 'APROVADO_SETOR',
+          message: `Solicitação aprovada por ${me.fullName ?? me.id}.`,
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId,
+          status: 'ENCAMINHADA_LOGISTICA',
+          message: `Solicitação encaminhada para ${logisticaDepartment.name} após aprovação do setor.`,
+        },
+      })
+    } else {
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId,
+          status: 'AGUARDANDO_ATENDIMENTO',
+          message: timelineMessage,
+        },
+      })
+    }
 
     await prisma.event.create({
       data: {

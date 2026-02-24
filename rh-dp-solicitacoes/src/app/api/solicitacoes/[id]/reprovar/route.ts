@@ -7,8 +7,10 @@ import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 
 type RouteParams = { params: Promise<{ id: string }> }
+
 
 // 🔒 Somente NIVEL_3 no módulo "solicitacoes"
 export const POST = withModuleLevel<RouteParams>(
@@ -30,6 +32,7 @@ export const POST = withModuleLevel<RouteParams>(
 
       const solicit = await prisma.solicitation.findUnique({
         where: { id: solicitationId },
+        include: { tipo: true },
       })
 
       if (!solicit) {
@@ -39,9 +42,10 @@ export const POST = withModuleLevel<RouteParams>(
         )
       }
 
-      const isPendingApproval =
-        solicit.approvalStatus === 'PENDENTE' ||
-        solicit.status === 'AGUARDANDO_APROVACAO'
+      const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solicit.tipo)
+      const sstDepartment = isSolicitacaoEpi
+        ? await prisma.department.findUnique({ where: { code: '19' }, select: { id: true } })
+        : null
 
       const updated = await prisma.solicitation.update({
         where: { id: solicitationId },
@@ -51,8 +55,19 @@ export const POST = withModuleLevel<RouteParams>(
           approvalComment: comment,
           requiresApproval: false,
           status: 'CANCELADA',
+          ...(isSolicitacaoEpi && sstDepartment ? { departmentId: sstDepartment.id } : {}),
         },
       })
+
+      if (isSolicitacaoEpi) {
+        await prisma.solicitationTimeline.create({
+          data: {
+            solicitationId,
+            status: 'REPROVADO_SETOR',
+            message: `Solicitação reprovada pelo aprovador do setor: ${comment}`,
+          },
+        })
+      }
 
       await prisma.event.create({
         data: {

@@ -28,6 +28,7 @@ type TipoMeta = {
   prazoPadraoDias?: number
   templateDownload?: string
   requiresAttachment?: boolean
+  hiddenFromCreate?: boolean
   destinos?: TipoDestino[]
 }
 
@@ -63,7 +64,7 @@ const shouldIncludeTipo = ({
     departamentosPermitidos.length === 0 ||
     departamentosPermitidos.includes(departamentoId)
 
-  return centroPermitido && departamentoPermitido
+  return centroPermitido && departamentoPermitido && schema?.meta?.hiddenFromCreate !== true
 }
 export async function GET(request: Request) {
   try {

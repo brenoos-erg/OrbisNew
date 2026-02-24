@@ -653,9 +653,9 @@ export const POST = withModuleLevel(
 
 
          /* =====================================================================
-           3) RQ_063 - Solicitação de Pessoal
+          3) RQ_063 - Solicitação de Pessoal
            ===================================================================== */
-       if (isSolicitacaoPessoalTipo) {
+        if (isSolicitacaoPessoalTipo) {
           const rawCampo =
             (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
             (payload?.campos?.vagaPrevista as string | undefined) ??
@@ -669,6 +669,7 @@ export const POST = withModuleLevel(
                 .trim()
                 .toUpperCase()
             : ''
+
 
           const isSim = normalized === 'SIM' || normalized === 'S'
 
@@ -709,9 +710,9 @@ export const POST = withModuleLevel(
             await prisma.solicitationTimeline.create({
               data: {
                 solicitationId: created.id,
-                status: 'AGUARDANDO_ATENDIMENTO',
+                 status: 'ENCAMINHADA_RH',
                 message:
-                  'Solicitação aprovada automaticamente e encaminhada para o RH preencher os dados do candidato.',
+                  'Solicitação de pessoal com vaga prevista em contrato encaminhada diretamente para o RH.',
               },
             })
 
@@ -733,12 +734,21 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.event.create({
+           await prisma.event.create({
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
               actorId: approverId ?? solicitanteId,
               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_APROVACAO_SETOR',
+              message:
+                'Solicitação de pessoal aguardando aprovação do aprovador do setor para encaminhamento ao RH.',
             },
           })
 
@@ -768,10 +778,10 @@ export const POST = withModuleLevel(
             data: {
               departmentId: sstDepartment.id,
               payload: payloadAtualizado,
-              requiresApproval: false,
-              approvalStatus: 'NAO_PRECISA',
-              approverId: null,
-              status: 'ABERTA',
+               requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId: (await findLevel3SolicitacoesApprover())?.id ?? null,
+              status: 'AGUARDANDO_APROVACAO',
             },
           })
 
@@ -787,9 +797,17 @@ export const POST = withModuleLevel(
           await prisma.solicitationTimeline.create({
             data: {
                solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
+              status: 'ENCAMINHADA_SST',
               message:
                 'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
+            },
+          })
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_APROVACAO_SETOR',
+              message:
+                'SST encaminhou a solicitação para aprovação do aprovador do setor.',
             },
           })
 
