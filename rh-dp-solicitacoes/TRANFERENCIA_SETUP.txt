@@ -1,0 +1,267 @@
+GUIA DE TRANSFERÊNCIA E SETUP - rh-dp-solicitacoes
+===================================================
+
+1) PRÉ-REQUISITOS
+-----------------
+- Node.js LTS recomendado: 20.x (conforme setup do projeto: Node.js 20+).
+- npm recomendado: versão que acompanha Node 20 LTS (normalmente npm 10+).
+- Git instalado e disponível no PATH.
+- MySQL recomendado: 8.4 (imagem usada no setup atual: mysql:8.4).
+- Portas padrão do projeto:
+  - Aplicação Next.js (DEV): 3000
+  - MySQL (padrão do projeto): 3306
+
+Observações Windows/Linux:
+- Windows:
+  - Se ocorrer erro Prisma EPERM (query_engine-windows.dll.node), feche node/VSCode, remova node_modules\\.prisma e rode: npx prisma generate.
+  - Pode ser necessário adicionar exclusão do diretório no Windows Defender/antivírus.
+- Linux:
+  - Garanta permissões de leitura/escrita na pasta do projeto e acesso às portas 3000/3306.
+  - Se usar firewall, liberar acesso local às portas necessárias.
+
+
+2) CLONAR E INSTALAR DEPENDÊNCIAS
+----------------------------------
+Use os comandos abaixo (copiar/colar):
+
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd rh-dp-solicitacoes
+npm install
+```
+
+
+3) BANCO DE DADOS (MySQL)
+-------------------------
+3.1 Subir MySQL (exemplo com Docker, padrão do projeto)
+
+```bash
+docker run --name orbis-mysql \
+  -e MYSQL_ROOT_PASSWORD=<ROOT_PASSWORD> \
+  -e MYSQL_DATABASE=orbis \
+  -e MYSQL_USER=<APP_DB_USER> \
+  -e MYSQL_PASSWORD=<APP_DB_PASSWORD> \
+  -p 3306:3306 \
+  -d mysql:8.4
+```
+
+3.2 Criar banco e usuário manualmente (SQL)
+
+```sql
+CREATE DATABASE orbis;
+CREATE USER '<APP_DB_USER>'@'%' IDENTIFIED BY '<APP_DB_PASSWORD>';
+GRANT ALL PRIVILEGES ON orbis.* TO '<APP_DB_USER>'@'%';
+FLUSH PRIVILEGES;
+```
+
+3.3 Configurar host/porta
+- Host local: localhost
+- Porta padrão: 3306
+- Exemplo de URL:
+  - mysql://<APP_DB_USER>:<APP_DB_PASSWORD>@localhost:3306/orbis
+
+3.4 Validar conexão
+
+```bash
+mysql -h localhost -P 3306 -u <APP_DB_USER> -p -e "USE orbis; SELECT 1;"
+```
+
+
+4) VARIÁVEIS DE AMBIENTE (.env)
+--------------------------------
+Crie um arquivo `.env` na raiz de `rh-dp-solicitacoes`.
+
+ATENÇÃO:
+- NUNCA commitar `.env` no Git.
+- O `.gitignore` do projeto já ignora `.env*`.
+
+Exemplo de .env
+
+```env
+# Banco
+DATABASE_URL="mysql://<APP_DB_USER>:<APP_DB_PASSWORD>@localhost:3306/orbis"
+
+# Autenticação
+JWT_SECRET="<SEGREDO_FORTE_JWT>"
+AUTH_SECRET="<SEGREDO_FORTE_AUTH_OPCIONAL>"
+SUPERADMIN_PASSWORD="<SENHA_SUPERADMIN>"
+
+# URL da aplicação (links enviados por e-mail / integração)
+APP_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+APP_BASE_URL="http://localhost:3000"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+
+# Storage
+STORAGE_DRIVER="LOCAL"
+
+# SMTP (prioritário no envio de e-mail)
+SMTP_HOST="smtp.office365.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="<EMAIL_SMTP>"
+SMTP_PASS="<SENHA_SMTP>"
+SMTP_FROM="ERG Engenharia <no-reply@seudominio.com>"
+
+# Remetentes por canal (opcional)
+MAIL_FROM="ERG Engenharia <no-reply@seudominio.com>"
+MAIL_FROM_ALERTS="ERG Engenharia <alertas@seudominio.com>"
+MAIL_FROM_NOTIFICATIONS="ERG Engenharia <notificacoes@seudominio.com>"
+MAIL_FROM_SYSTEM="ERG Engenharia <sistema@seudominio.com>"
+
+# Provedor alternativo de e-mail (opcional)
+RESEND_API_KEY=""
+
+# DocuSign (se usar assinatura DocuSign)
+DOCUSIGN_OAUTH_BASE_PATH="account-d.docusign.com"
+DOCUSIGN_BASE_PATH="https://demo.docusign.net/restapi"
+DOCUSIGN_ACCOUNT_ID="<DOCUSIGN_ACCOUNT_ID>"
+DOCUSIGN_CLIENT_ID="<DOCUSIGN_CLIENT_ID>"
+DOCUSIGN_USER_ID="<DOCUSIGN_USER_ID>"
+DOCUSIGN_PRIVATE_KEY="<CHAVE_PRIVADA_DOCUSIGN>"
+DOCUSIGN_PRIVATE_KEY_PATH=""
+DOCUSIGN_CONNECT_HMAC_SECRET="<DOCUSIGN_CONNECT_HMAC_SECRET>"
+DOCUSIGN_WEBHOOK_SECRET="<DOCUSIGN_WEBHOOK_SECRET_OPCIONAL>"
+
+# Flags opcionais
+ALLOW_INTERNAL_SIGNATURE="false"
+PRISMA_QUERY_METRICS="false"
+SKIP_PRISMA_DB="false"
+SKIP_PRISMA_GENERATE="false"
+SKIP_PRISMA_MIGRATE="false"
+SKIP_PRISMA_SEED="false"
+```
+
+Observação SMTP Office365/Outlook:
+- Usar `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`.
+- O Nodemailer fará STARTTLS/TLS na conexão (porta 587).
+- Em caso de bloqueio por segurança/MFA, usar senha de app ou ajuste de política do tenant.
+
+
+5) PRISMA / MIGRATIONS / SEED
+-----------------------------
+Comandos exatos (copiar/colar):
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+Fluxo equivalente utilizado no runtime:
+- DEV (`npm run dev`):
+  - aplica migrations com `prisma migrate deploy` (ou `prisma db push` quando `SKIP_PRISMA_MIGRATE=true`),
+  - executa seed (`prisma db seed`) automaticamente, salvo `SKIP_PRISMA_SEED=true`,
+  - gera client Prisma (salvo `SKIP_PRISMA_GENERATE=true`).
+- PRODUÇÃO (`npm start`):
+  - executa `prisma migrate deploy` antes de subir o Next.js.
+
+O que o seed faz (resumo prático):
+- Cadastra/normaliza departamentos oficiais.
+- Cria/atualiza superadmin local:
+  - Email: superadmin@ergengenharia.com.br
+  - Senha: `SUPERADMIN_PASSWORD` (fallback: `SuperAdmin@123`).
+- Popula tipos de solicitação, módulos, features e permissões.
+- Aplica dados iniciais adicionais (incluindo partes de ISO, quando as tabelas existem).
+
+Reset seguro do banco em DEV (APAGA dados):
+
+```bash
+npx prisma migrate reset --force --schema ./prisma/schema.prisma
+npm run prisma:generate
+npm run prisma:seed
+```
+
+Erros comuns do Prisma e resolução:
+- `P2021` / `P2022` (tabela/coluna ausente):
+  - Rode `npm run prisma:migrate` e depois `npm run prisma:generate`.
+  - Verifique se todas as migrations foram aplicadas.
+- Seed falhando por conexão:
+  - Validar `DATABASE_URL`, host, porta e credenciais.
+- Windows `EPERM` no Prisma generate:
+  - Fechar processos node/VSCode, remover `node_modules\\.prisma`, rodar `npx prisma generate`.
+
+
+6) RODAR EM DEV
+---------------
+Comando:
+
+```bash
+npm run dev
+```
+
+Acesso:
+- http://localhost:3000
+
+Superadmin (via seed):
+- Usuário: `superadmin@ergengenharia.com.br`
+- Senha: valor de `SUPERADMIN_PASSWORD` no `.env`
+  - fallback se ausente: `SuperAdmin@123`
+
+Teste de envio de e-mail:
+1. Com app rodando, acessar:
+   - `GET http://localhost:3000/api/email-example`
+2. Confirmar no retorno JSON se `provider` veio como `smtp` (ou `resend` / `dev`).
+3. Se SMTP estiver ativo, verificar caixa de entrada e também spam/lixo eletrônico.
+
+
+7) RODAR EM PRODUÇÃO
+--------------------
+Comandos:
+
+```bash
+npm run build
+npm start
+```
+
+Notas de produção:
+- `npm start` já executa migration deploy antes do servidor (`prisma migrate deploy && next start`).
+- Defina `APP_URL` / `APP_BASE_URL` / `NEXT_PUBLIC_APP_URL` com domínio real.
+- Use processo gerenciado (ex.: PM2) ou serviço systemd.
+- Configure proxy reverso (Nginx) + HTTPS (TLS) em frente ao app.
+
+Checklist rápido de produção:
+- [ ] Variáveis sensíveis definidas por ambiente (não em código).
+- [ ] Banco com backup automático e rotina de restore testada.
+- [ ] Logs centralizados (app + proxy + banco).
+- [ ] Monitoramento de saúde (ex.: `/api/health`).
+- [ ] SMTP/DocuSign validados em ambiente final.
+
+
+8) TROUBLESHOOTING (PRÁTICO)
+----------------------------
+A) Porta ocupada (3000 ou 3306)
+- Troque a porta do processo conflitante ou encerre o processo.
+- Exemplo de teste da app em outra porta:
+
+```bash
+npx next dev -p 3001
+```
+
+B) `prisma migrate` / `seed` falhando
+- Validar `DATABASE_URL`.
+- Verificar se MySQL está ativo e acessível.
+- Rodar em sequência:
+
+```bash
+npm run prisma:migrate
+npm run prisma:generate
+npm run prisma:seed
+```
+
+C) SMTP 535 / credenciais inválidas
+- Revisar `SMTP_USER` / `SMTP_PASS`.
+- Em Office365, confirmar política de autenticação SMTP e app password/MFA.
+- Conferir `SMTP_PORT=587` e `SMTP_SECURE=false`.
+
+D) Links em e-mail apontando para localhost
+- Definir corretamente `APP_URL`, `APP_BASE_URL` e `NEXT_PUBLIC_APP_URL` com domínio real.
+
+E) Problemas de permissão/roles
+- Confirmar que o seed foi executado.
+- Validar se usuário está no departamento correto e com níveis de módulo/permissões apropriados.
+- Se necessário, relogar para refletir alterações de permissão.
+
+
+FIM
+---
