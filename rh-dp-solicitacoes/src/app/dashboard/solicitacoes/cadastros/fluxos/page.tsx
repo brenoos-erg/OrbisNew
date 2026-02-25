@@ -15,6 +15,7 @@ type ApiNode = {
   notificationTemplate?: { subject: string; body: string }
   approverUserIds?: string[]
   approvalTemplate?: { subject: string; body: string }
+  defaultDepartmentId?: string | null
 }
 
 type ApiWorkflow = {

@@ -14,6 +14,30 @@ function fillTemplate(template: string, values: Record<string, string>) {
   return template.replace(PLACEHOLDER_REGEX, (_, key: string) => values[key] ?? '')
 }
 
+
+async function resolveDepartmentRecipients(step: WorkflowStepDraft) {
+  const manual = step.notificationEmails ?? []
+  const auto = step.defaultDepartmentId
+    ? await prisma.user.findMany({
+        where: {
+          status: 'ATIVO',
+          OR: [
+            { departmentId: step.defaultDepartmentId },
+            { userDepartments: { some: { departmentId: step.defaultDepartmentId } } },
+          ],
+        },
+        select: { email: true },
+      })
+    : []
+
+  return Array.from(
+    new Set([
+      ...manual,
+      ...auto.map((user) => user.email),
+    ].map((x) => x?.trim()).filter(Boolean) as string[]),
+  )
+}
+
 function pickTargetStep(steps: WorkflowStepDraft[], preferredKind?: WorkflowStepKind, preferredDepartmentId?: string | null) {
   if (preferredKind === 'APROVACAO') {
     return steps.find((s) => s.kind === 'APROVACAO')
@@ -66,7 +90,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     subjectTemplate = targetStep.approvalTemplate?.subject || DEFAULT_TEMPLATE.subject
     bodyTemplate = targetStep.approvalTemplate?.body || DEFAULT_TEMPLATE.body
   } else {
-    recipients = targetStep.notificationEmails ?? []
+    recipients = await resolveDepartmentRecipients(targetStep)
     subjectTemplate = targetStep.notificationTemplate?.subject || DEFAULT_TEMPLATE.subject
     bodyTemplate = targetStep.notificationTemplate?.body || DEFAULT_TEMPLATE.body
   }

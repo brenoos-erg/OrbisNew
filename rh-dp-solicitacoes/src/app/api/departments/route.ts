@@ -4,11 +4,15 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
+import { OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartments'
 
 export async function GET() {
   return withRequestMetrics('GET /api/departments', async () => {
     try {
       const data = await prisma.department.findMany({
+        where: {
+          code: { in: OFFICIAL_DEPARTMENT_CODES as string[] },
+        },
         select: {
           id: true,
           code: true,

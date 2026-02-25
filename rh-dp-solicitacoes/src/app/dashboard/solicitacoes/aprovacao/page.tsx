@@ -17,6 +17,7 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [allowedDepartmentIds, setAllowedDepartmentIds] = useState<string[]>([])
 
   // estado do modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -51,6 +52,22 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     loadApprovals()
+  }, [])
+
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/me', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json()
+        const ids = [json.departmentId, ...(Array.isArray(json.departments) ? json.departments.map((d: any) => d.id) : [])]
+          .filter(Boolean) as string[]
+        setAllowedDepartmentIds(Array.from(new Set(ids)))
+      } catch {
+        setAllowedDepartmentIds([])
+      }
+    })()
   }, [])
 
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
@@ -204,7 +221,9 @@ export default function ApprovalsPage() {
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+                rows.map((row) => {
+                const canApproveRow = !!row.departmentId && allowedDepartmentIds.includes(row.departmentId)
+                return (
                 <tr
                    key={row.id}
                   onClick={() => handleOpenPreview(row)}
@@ -229,19 +248,21 @@ export default function ApprovalsPage() {
                   <td className="px-3 py-2 text-right text-xs">
                     <button
                       onClick={(e) => handleApprove(e, row)}
-                      className="mr-2 rounded bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500"
+                       disabled={!canApproveRow}
+                      className="mr-2 rounded bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Aprovar
                     </button>
                     <button
                       onClick={(e) => handleReject(e, row)}
-                      className="rounded bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-500"
+                      disabled={!canApproveRow}
+                      className="rounded bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Reprovar
                     </button>
                   </td>
                 </tr>
-              ))
+              )})
             )}
           </tbody>
         </table>

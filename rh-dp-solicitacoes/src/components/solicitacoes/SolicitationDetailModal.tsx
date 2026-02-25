@@ -39,6 +39,7 @@ export type Row = {
   requiresApproval?: boolean
   approvalStatus?: string | null
   costCenterId?: string | null
+  departmentId?: string | null
 }
 type TiInventoryItem = {
   id: string
@@ -124,7 +125,8 @@ type CurrentUser = {
   role?: string | null
   departmentCode?: string | null
   departmentName?: string | null
-  departments?: { code?: string | null; name?: string | null }[]
+  departmentId?: string | null
+  departments?: { id?: string | null; code?: string | null; name?: string | null }[]
   moduleLevels?: Record<string, string>
 }
 const getUserSectors = (user: CurrentUser | null): NadaConstaSetorKey[] => {
@@ -823,11 +825,25 @@ export function SolicitationDetailModal({
   const showManagementActions = !isApprovalMode && canManage
   const userIsSstOrAdmin =
     currentUser?.role === 'ADMIN' ||
-    currentUser?.departmentCode === '19' ||
+   currentUser?.departmentCode === '19' ||
     (currentUser?.departments ?? []).some((dept) => dept.code === '19')
   const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
   const canApproveEpiUniforme =
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' && userIsSstOrAdmin
+
+  const currentUserDepartmentIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (currentUser?.departmentId) ids.add(currentUser.departmentId)
+    for (const dept of currentUser?.departments ?? []) {
+      if (dept?.id) ids.add(dept.id)
+    }
+    return ids
+  }, [currentUser])
+
+  const canApproveByDepartment =
+    currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' &&
+    !!detail?.department?.id &&
+    currentUserDepartmentIds.has(detail.department.id)
   const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
@@ -1473,7 +1489,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
           <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
             {/* Modo de aprovação (tela do gestor) */}
-             {isApprovalMode && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && (
+               {isApprovalMode && canApproveByDepartment && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && (
               <>
                 <button
                   onClick={() => handleStartApproval('APROVAR')}
@@ -1493,7 +1509,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               </>
             )}
 
-            {isApprovalMode && isSolicitacaoEpiUniformeTipo && !canApproveEpiUniforme && (
+             {isApprovalMode && (!canApproveByDepartment || (isSolicitacaoEpiUniformeTipo && !canApproveEpiUniforme)) && (
               <span className="text-[11px] font-semibold text-amber-700">
                 Aprovação disponível apenas para nível 3 de solicitações no SST.
               </span>
@@ -1508,7 +1524,7 @@ async function handleEncaminharAprovacaoComAnexo() {
           </div>
         </div>
 
-         {isApprovalMode && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && approvalAction && (
+         {isApprovalMode && canApproveByDepartment && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && approvalAction && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 space-y-2">

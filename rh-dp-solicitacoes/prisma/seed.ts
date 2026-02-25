@@ -2,6 +2,7 @@
 
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartments'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 
@@ -48,65 +49,58 @@ async function main() {
   /* =========================
      DEPARTAMENTOS
      ========================= */
-     const siglasOficiais: Record<string, string> = {
-    '17': 'RH',
-    '08': 'DP',
-    '19': 'SST',
-    '11': 'LOG',
-    '20': 'TI',
-  }
-  const departamentos = [
-    { code: '01', name: 'ADMINISTRATIVO' },
-    { code: '02', name: 'APOIO/COPA' },
-    { code: '03', name: 'COMERCIAL' },
-    { code: '04', name: 'COMPRAS' },
-    { code: '05', name: 'COMUNICAÇÃO' },
-    { code: '06', name: 'CONTÁBIL/FISCAL' },
-    { code: '07', name: 'CUSTOS E CONTRATOS' },
-    { code: '08', name: 'DEPARTAMENTO PESSOAL' },
-    { code: '09', name: 'ENGENHARIA' },
-    { code: '10', name: 'FINANCEIRO' },
-    { code: '11', name: 'LOGÍSTICA' },
-    { code: '12', name: 'MEDIÇÃO' },
-    { code: '13', name: 'MEIO AMBIENTE' },
-    { code: '14', name: 'PRAD' },
-    { code: '15', name: 'PROJETOS' },
-    { code: '16', name: 'QUALIDADE' },
-    { code: '17', name: 'RECURSOS HUMANOS' },
-    { code: '18', name: 'SIG' },
-    { code: '19', name: 'SEGURANÇA DO TRABALHO' },
-    { code: '20', name: 'TECNOLOGIA DA INFORMAÇÃO' },
-    { code: '21', name: 'TOPOGRAFIA' },
-    { code: '22', name: 'GEOTECNOLOGIAS' },
-    { code: '23', name: 'LASER SCANNER' },
-    { code: '24', name: 'GEOTECNIA' },
-    { code: '25', name: 'CONTROLE TECNOLÓGICO' },
-    { code: '26', name: 'GESTÃO DE FAUNA' },
-    { code: '27', name: 'GEOREFERENCIAMENTO' },
-    { code: '28', name: 'FERROVIA' },
-    { code: '29', name: 'GEOLOGIA' },
-  ]
-
-  for (const d of departamentos) {
+    for (const d of OFFICIAL_DEPARTMENTS) {
     await prisma.department.upsert({
       where: { code: d.code },
-       update: {
+      update: {
         name: d.name,
-        sigla: (siglasOficiais[d.code] ?? `D${d.code}`).toUpperCase(),
+        sigla: d.sigla,
       },
       create: {
         code: d.code,
         name: d.name,
-        sigla: (siglasOficiais[d.code] ?? `D${d.code}`).toUpperCase(),
+        sigla: d.sigla,
       },
     })
   }
-  console.log('✅ Departamentos cadastrados.')
 
-  const tiDepartment = await prisma.department.findUnique({
+ const tiDepartment = await prisma.department.findUnique({
     where: { code: '20' },
   })
   if (!tiDepartment) throw new Error('Departamento TI (code=20) não encontrado.')
+
+  await prisma.user.updateMany({
+    where: {
+      department: {
+        code: {
+          notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+        },
+      },
+    },
+    data: {
+      departmentId: tiDepartment.id,
+    },
+  })
+
+  await prisma.userDepartment.deleteMany({
+    where: {
+      department: {
+        code: {
+          notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+        },
+      },
+    },
+  })
+
+  await prisma.department.deleteMany({
+    where: {
+      code: {
+        notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+      },
+    },
+  })
+
+  console.log('✅ Departamentos cadastrados.')
 
   const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin@123'
   const superAdminUser = await prisma.user.upsert({
@@ -2165,6 +2159,51 @@ async function main() {
       },
     })
   }
+
+
+
+  const tiposToNormalize = await prisma.tipoSolicitacao.findMany({
+    select: { id: true, schemaJson: true },
+  })
+
+  for (const tipo of tiposToNormalize) {
+    const schema = (tipo.schemaJson ?? {}) as Record<string, any>
+    const campos = Array.isArray(schema.camposEspecificos)
+      ? schema.camposEspecificos
+      : Array.isArray(schema.campos)
+        ? schema.campos
+        : []
+
+    let changed = false
+    const normalizedCampos = campos.map((campo: any) => {
+      const name = String(campo?.name ?? '')
+      const lowered = name.toLowerCase()
+      const shouldBeCostCenter =
+        campo?.type === 'cost_center' ||
+        lowered.includes('centrocusto') ||
+        lowered.includes('costcenter')
+
+      if (shouldBeCostCenter && campo?.type !== 'cost_center') {
+        changed = true
+        return { ...campo, type: 'cost_center' }
+      }
+
+      return campo
+    })
+
+    if (!changed) continue
+
+    await prisma.tipoSolicitacao.update({
+      where: { id: tipo.id },
+      data: {
+        schemaJson: {
+          ...schema,
+          camposEspecificos: normalizedCampos,
+        },
+      },
+    })
+  }
+
 
 
 

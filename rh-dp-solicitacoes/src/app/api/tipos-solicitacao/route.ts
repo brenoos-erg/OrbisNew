@@ -42,6 +42,23 @@ const asStringArray = (value: unknown): string[] => {
   return value.filter((item): item is string => typeof item === 'string')
 }
 
+
+const normalizeCampo = (campo: CampoEspecifico): CampoEspecifico => {
+  const normalizedName = campo.name.toLowerCase()
+  const isCostCenterField =
+    campo.type === 'cost_center' ||
+    normalizedName.includes('centrocusto') ||
+    normalizedName.includes('costcenter')
+
+  const autoFillFromMe = ['emailsolicitante', 'nomesolicitante', 'telefonesolicitante', 'departamentosolicitante', 'cargosolicitante'].some((token) => normalizedName.includes(token))
+
+  return {
+    ...campo,
+    type: isCostCenterField ? 'cost_center' : campo.type,
+    ...(autoFillFromMe ? { defaultValue: '' } : {}),
+  }
+}
+
 const shouldIncludeTipo = ({
   schema,
   centroCustoId,
@@ -101,9 +118,9 @@ export async function GET(request: Request) {
           departamentoId,
         }),
       )
-      .map((tipo) => {
+       .map((tipo) => {
         const schema = tipo.schemaJson as SchemaJson
-        const campos = schema?.camposEspecificos ?? schema?.campos ?? []
+        const campos = (schema?.camposEspecificos ?? schema?.campos ?? []).map(normalizeCampo)
 
         return {
           id: tipo.id,

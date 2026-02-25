@@ -7,6 +7,7 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
 
 
 export async function POST(
@@ -41,6 +42,14 @@ export async function POST(
       return NextResponse.json(
         { error: 'Esta solicitação não está pendente de aprovação.' },
         { status: 400 },
+      )
+    }
+
+    const canApprove = await canNivel3ApproveSolicitation(me.id, solic.departmentId)
+    if (!canApprove) {
+      return NextResponse.json(
+        { error: 'Você não pode aprovar solicitações deste departamento.' },
+        { status: 403 },
       )
     }
 

@@ -11,7 +11,7 @@ import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
-   isSolicitacaoAgendamentoFerias,
+     isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
@@ -24,6 +24,7 @@ import {
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import { getNivel3DepartmentIds } from '@/lib/solicitationApprovalPermissions'
 
 
 
@@ -268,8 +269,12 @@ export const GET = withModuleLevel(
         } else if (scope === 'to-approve') {
           where.requiresApproval = true
           where.approvalStatus = 'PENDENTE'
-          // se quiser filtrar por aprovador:
-          // where.approverId = me.id
+          const allowedDepartmentIds = await getNivel3DepartmentIds(me.id)
+          if (allowedDepartmentIds.length === 0) {
+            where.id = '__never__' as any
+          } else {
+            where.departmentId = { in: allowedDepartmentIds }
+          }
         }
 
         const listStartedAt = performance.now()
@@ -307,8 +312,9 @@ export const GET = withModuleLevel(
 
   sla: null,
 
-  setorDestino:
+   setorDestino:
     formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
+  departmentId: s.departmentId,
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,

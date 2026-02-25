@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -39,6 +40,14 @@ export const POST = withModuleLevel<RouteParams>(
         return NextResponse.json(
           { error: 'Solicitação não encontrada.' },
           { status: 404 },
+        )
+      }
+
+      const canApprove = await canNivel3ApproveSolicitation(me.id, solicit.departmentId)
+      if (!canApprove) {
+        return NextResponse.json(
+          { error: 'Você não pode reprovar solicitações deste departamento.' },
+          { status: 403 },
         )
       }
 

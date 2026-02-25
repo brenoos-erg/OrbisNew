@@ -8,10 +8,11 @@ import {
   useState,
   ChangeEvent,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import * as Select from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { fetchMe } from '@/lib/me-cache';
+import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
 import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
 import {
   SolicitacoesToastViewport,
@@ -126,9 +127,6 @@ function getTipoDisplayName(nome: string) {
   return trimmed === trimmed.toUpperCase()
     ? toSentenceCaseWithAcronyms(trimmed)
     : trimmed.replace(/^RQ[_.]?\d+\s*-\s*/i, '');
-}
-function formatCostCenterOption(cc: CostCenterOption) {
-  return [cc.code, cc.description].filter(Boolean).join(' - ');
 }
 
 const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
@@ -297,6 +295,17 @@ export default function NovaSolicitacaoPage() {
   const selectedTipoLabel = selectedTipo
     ? getTipoOptionLabel(selectedTipo)
     : '';
+    useEffect(() => {
+    if (!me || !selectedTipo) return;
+    setExtras((prev) => {
+      const next = { ...prev };
+      for (const campo of selectedTipo.camposEspecificos ?? []) {
+        const auto = getAutoFillValueFromMe(campo.name);
+        if (auto !== null) next[campo.name] = auto;
+      }
+      return next;
+    });
+  }, [me, selectedTipo]);
 
   const isRQ063 =
     !!selectedTipo &&
@@ -441,6 +450,18 @@ export default function NovaSolicitacaoPage() {
       [name]: value,
     }));
   };
+  const getAutoFillValueFromMe = (fieldName: string): string | null => {
+    if (!me) return null;
+
+    const normalized = fieldName.toLowerCase();
+    if (normalized.includes('emailsolicitante')) return me.email ?? '';
+    if (normalized.includes('nomesolicitante')) return me.fullName ?? '';
+    if (normalized.includes('telefonesolicitante')) return me.phone ?? '';
+    if (normalized.includes('departamentosolicitante')) return me.departmentName ?? '';
+    if (normalized.includes('cargosolicitante')) return me.positionName ?? '';
+    if (normalized.includes('centrocusto')) return me.costCenterName ?? '';
+    return null;
+  };
 
   const handleAbonoChange = (name: string, value: string) => {
     setAbonoCampos((prev) => ({
@@ -525,11 +546,6 @@ export default function NovaSolicitacaoPage() {
     }
 
 
-    if (isRQ063 && !cargoId) {
-      setSubmitError('Selecione o cargo para continuar.');
-      return;
-    }
-
     setSubmitError(null);
     setSubmitting(true);
     try {
@@ -559,8 +575,6 @@ export default function NovaSolicitacaoPage() {
       };
 
       if (isRQ063) {
-        const cargoSelecionado =
-          positions.find((p) => p.id === cargoId)?.name ?? '';
 
         const motivoParts: string[] = [];
         if (extras.motivoSubstituicao === 'true')
@@ -588,7 +602,7 @@ export default function NovaSolicitacaoPage() {
 
         campos = {
           ...extras,
-          cargo: cargoSelecionado,
+          cargo: extras.cargo ?? '',
           setorProjeto: extras.setorProjeto ?? '',
           localTrabalho: extras.localTrabalho ?? '',
           horarioTrabalho: extras.horarioTrabalho ?? '',
@@ -604,6 +618,7 @@ export default function NovaSolicitacaoPage() {
           competenciasComportamentais: extras.competenciasComportamentais ?? '',
           enxoval: enxovalParts.join(' / '),
           outros: extras.solicitacaoOutros ?? '',
+          centroCustoId: extras.centroCustoForm ?? me?.costCenterName ?? '',
           observacoes: extras.observacoesRh ?? '',
         };
       } else if (isAbonoEducacional) {
@@ -1069,21 +1084,14 @@ useEffect(() => {
                     <label className={labelClass}>
                       Cargo <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      className={selectClass}
-                      value={cargoId}
-                      onChange={(e: SelectChange) =>
-                        handleCargoChange(e.target.value)
+                    <input
+                      className={inputClass}
+                      value={extras.cargo ?? ''}
+                      onChange={(e: InputChange) =>
+                        handleExtraChange('cargo', e.target.value)
                       }
                       required
-                    >
-                      <option value="">Selecione o cargo...</option>
-                      {positions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1154,21 +1162,18 @@ useEffect(() => {
                       />
                     </div>
 
-                    {/* Centro de Custo (texto livre – pode repetir o do topo) */}
+                     {/* Centro de Custo */}
                     <div>
                       <label className={labelClass}>
                         Centro de Custo{' '}
                         <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className={inputClass}
-                        value={
-                          extras.centroCustoForm ?? me?.costCenterName ?? ''
-                        }
-                        onChange={(e: InputChange) =>
-                          handleExtraChange('centroCustoForm', e.target.value)
-                        }
+                      <CostCenterSelect
+                        value={extras.centroCustoForm ?? ''}
+                        options={costCenters}
+                        onValueChange={(nextValue) => handleExtraChange('centroCustoForm', nextValue)}
                         required
+                        name="centroCustoForm"
                       />
                     </div>
                   </div>
@@ -1750,13 +1755,16 @@ useEffect(() => {
                         Centro de custo{' '}
                         <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        className={inputClass}
-                        value={abonoCampos.centroCusto ?? ''}
-                        onChange={(e: InputChange) =>
-                          handleAbonoChange('centroCusto', e.target.value)
-                        }
+                      <CostCenterSelect
+                        value={abonoCampos.centroCustoId ?? ''}
+                        options={costCenters}
+                        onValueChange={(nextValue) => {
+                          handleAbonoChange('centroCustoId', nextValue)
+                          const selectedOption = costCenters.find((cc) => cc.id === nextValue)
+                          handleAbonoChange('centroCusto', selectedOption ? [selectedOption.code, selectedOption.description].filter(Boolean).join(' - ') : '')
+                        }}
                         required
+                        name="centroCustoId"
                       />
                     </div>
                     <div>
@@ -2019,7 +2027,12 @@ useEffect(() => {
                   );
 
                   const renderCampo = (campo: CampoEspecifico) => {
-                    const value = extras[campo.name] ?? '';
+                    const autoFillValue = getAutoFillValueFromMe(campo.name);
+                    const isAutoFilled = autoFillValue !== null;
+                    const hasCostCenterName = /centro\s*custo|centrocusto/i.test(campo.name);
+                    const normalizedType =
+                      campo.type === 'cost_center' || hasCostCenterName ? 'cost_center' : campo.type;
+                    const value = isAutoFilled ? (autoFillValue ?? '') : (extras[campo.name] ?? '');
                     const shouldShowEnderecoEnvio =
                       campo.name !== 'enderecoEnvio' ||
                       extras.entregaTipo === 'Será enviado';
@@ -2067,6 +2080,8 @@ useEffect(() => {
                       ) => handleExtraChange(campo.name, e.target.value),
                       className:
                         'w-full border rounded px-3 py-2 text-sm bg-white',
+                      readOnly: isAutoFilled,
+                      disabled: isAutoFilled || campo.disabled,
                     };
 
                     return (
@@ -2079,14 +2094,14 @@ useEffect(() => {
                             )}
                           </span>
 
-                          {campo.type === 'textarea' && (
+                          {normalizedType === 'textarea' && (
                             <textarea
                               {...commonProps}
                               className={`${commonProps.className} min-h-[80px]`}
                             />
                           )}
 
-                          {campo.type === 'select' && campo.options && (
+                           {normalizedType === 'select' && campo.options && (
                              <select {...(commonProps as any)} disabled={campo.disabled}>
                               <option value="">Selecione...</option>
                               {campo.options.map((opt) => (
@@ -2096,69 +2111,25 @@ useEffect(() => {
                               ))}
                             </select>
                           )}
-                           {campo.type === 'cost_center' && (
-                            <Select.Root
+                           {normalizedType === 'cost_center' && (
+                            <CostCenterSelect
                               value={value}
-                              onValueChange={(nextValue) =>
-                                handleExtraChange(campo.name, nextValue)
-                              }
-                            >
-                              <Select.Trigger
-                                className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70"
-                                title={
-                                  value
-                                    ? formatCostCenterOption(
-                                        costCenters.find((cc) => cc.id === value) ?? {
-                                          id: value,
-                                          description: value,
-                                        },
-                                      )
-                                    : ''
+                              options={costCenters}
+                              onValueChange={(nextValue) => {
+                                handleExtraChange(campo.name, nextValue);
+                                const selectedOption = costCenters.find((cc) => cc.id === nextValue);
+                                if (selectedOption) {
+                                  handleExtraChange(`${campo.name}Label`, [selectedOption.code, selectedOption.description].filter(Boolean).join(' - '));
                                 }
-                              >
-                                <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-                                  <Select.Value placeholder="Selecione..." />
-                                </span>
-                                <Select.Icon>
-                                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-                                </Select.Icon>
-                              </Select.Trigger>
-                              <Select.Portal>
-                                <Select.Content
-                                  position="popper"
-                                  sideOffset={4}
-                                  className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
-                                >
-                                  <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
-                                    {costCenters.map((cc) => {
-                                      const optionLabel = formatCostCenterOption(cc);
-                                      return (
-                                        <Select.Item
-                                          key={cc.id}
-                                          value={cc.id}
-                                          className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
-                                        >
-                                          <Select.ItemText>
-                                            <span
-                                              className="block whitespace-nowrap overflow-hidden text-ellipsis"
-                                              title={optionLabel}
-                                            >
-                                              {optionLabel}
-                                            </span>
-                                          </Select.ItemText>
-                                          <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
-                                            <Check className="h-4 w-4" />
-                                          </Select.ItemIndicator>
-                                        </Select.Item>
-                                      );
-                                    })}
-                                  </Select.Viewport>
-                                </Select.Content>
-                              </Select.Portal>
-                            </Select.Root>
+                              }}
+                              required={campo.required}
+                              disabled={commonProps.disabled}
+                              name={campo.name}
+                            />
+
                           )}
 
-                          {campo.type === 'file' && (
+                           {normalizedType === 'file' && (
                             <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50/40 p-3">
                                <input
                                 id={campo.name}
@@ -2193,13 +2164,14 @@ useEffect(() => {
                             </div>
                           )}
 
-                           {!campo.type && <input type="text" {...commonProps} />}
+                           {!normalizedType && <input type="text" {...commonProps} />}
 
-                          {campo.type &&
-                            campo.type !== 'textarea' &&
-                            campo.type !== 'select' &&
-                            campo.type !== 'file' && (
-                              <input type={campo.type} {...commonProps} />
+                          {normalizedType &&
+                            normalizedType !== 'textarea' &&
+                            normalizedType !== 'select' &&
+                            normalizedType !== 'cost_center' &&
+                            normalizedType !== 'file' && (
+                              <input type={normalizedType} {...commonProps} />
                             )}
                         </label>
                       </div>
