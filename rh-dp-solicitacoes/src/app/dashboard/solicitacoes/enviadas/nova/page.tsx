@@ -11,7 +11,6 @@ import {
 import { useRouter } from 'next/navigation';
 import * as Select from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
-import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
 import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
 import {
@@ -34,12 +33,6 @@ type UserMe = {
   costCenterName: string | null;
 };
 
-type CostCenter = {
-  id: string;
-  code: string | null;
-  externalCode?: string | null;
-  description: string;
-};
 
 type Departamento = {
   id: string;
@@ -174,12 +167,10 @@ export default function NovaSolicitacaoPage() {
   const [meLoading, setMeLoading] = useState(true);
   const [meError, setMeError] = useState<string | null>(null);
 
-  // ---------- CAMPOS DO CABEÇALHO ----------
-  const [centros, setCentros] = useState<CostCenter[]>([]);
+// ---------- CAMPOS DO CABEÇALHO ----------
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([]);
 
-  const [centroId, setCentroId] = useState('');
   const [departamentoId, setDepartamentoId] = useState('');
   const [tipoId, setTipoId] = useState('');
 
@@ -223,23 +214,9 @@ export default function NovaSolicitacaoPage() {
   }, []);
 
   /* ============================================================
-   2) /api/cost-centers e /api/departments
+   2) /api/departments
   ============================================================ */
   useEffect(() => {
-    async function loadCostCenters() {
-      try {
-        const res = await fetch('/api/cost-centers?pageSize=200');
-        if (!res.ok) throw new Error('Erro ao buscar centros de custo');
-
-        const json = await res.json();
-        const items = (json?.items ?? []) as CostCenter[];
-        setCentros(items);
-      } catch (err) {
-        console.error(err);
-        setCentros([]);
-      }
-    }
-
     async function loadDepartments() {
       try {
         const res = await fetch('/api/departments');
@@ -253,12 +230,11 @@ export default function NovaSolicitacaoPage() {
       }
     }
 
-    loadCostCenters();
-    loadDepartments();
+     loadDepartments();
   }, []);
 
   /* ============================================================
-   3) /api/tipos-solicitacao?centroCustoId=&departamentoId=
+   3) /api/tipos-solicitacao?departamentoId=
   ============================================================ */
   useEffect(() => {
     if (!departamentoId) {
@@ -270,9 +246,6 @@ export default function NovaSolicitacaoPage() {
     async function loadTipos() {
       try {
         const params = new URLSearchParams({ departamentoId });
-        if (centroId) {
-          params.set('centroCustoId', centroId);
-        }
 
         const res = await fetch(`/api/tipos-solicitacao?${params}`);
         if (!res.ok) throw new Error('Erro ao buscar tipos de solicitação');
@@ -287,14 +260,26 @@ export default function NovaSolicitacaoPage() {
     }
 
     loadTipos();
-  }, [centroId, departamentoId]);
+  }, [departamentoId]);
+
+  const selectedDepartamento =
+    departamentos.find((d) => d.id === departamentoId)?.label ?? '';
+  const getTipoOptionLabel = (tipo: TipoSolicitacao) => {
+    const parts = [
+      selectedDepartamento,
+      tipo.codigo,
+      getTipoDisplayName(tipo.nome),
+    ].filter(Boolean);
+
+    return parts.join(' - ');
+  };
 
   const selectedTipo = useMemo(
     () => tipos.find((t) => t.id === tipoId) ?? null,
     [tipos, tipoId],
   );
   const selectedTipoLabel = selectedTipo
-    ? `${selectedTipo.codigo} - ${getTipoDisplayName(selectedTipo.nome)}`
+    ? getTipoOptionLabel(selectedTipo)
     : '';
 
   const isRQ063 =
@@ -661,7 +646,6 @@ export default function NovaSolicitacaoPage() {
 
       const body = {
         solicitanteId: me?.id ?? null,
-        costCenterId: centroId || null,
         departmentId: departamentoId,
         tipoId,
         campos,
@@ -809,58 +793,77 @@ useEffect(() => {
 
           {/* TOPO: CABEÇALHO + SOLICITANTE */}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            {/* ESQUERDA – Centro / Depto / Tipo */}
+             {/* ESQUERDA – Depto / Tipo */}
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
               <h2 className="mb-2 text-sm font-semibold text-slate-800">
                 Dados da solicitação
               </h2>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass}>
-                    CENTRO DE CUSTO{' '}
-                    <span className="text-slate-400">(opcional)</span>
-                  </label>
-                  <select
-                    className={selectClass}
-                    value={centroId}
-                    onChange={(e: SelectChange) => {
-                      setCentroId(e.target.value);
-                      setTipoId('');
-                    }}
-                  >
-                    <option value="">Selecione...</option>
-                    {centros.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {formatCostCenterLabel(c)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="lg:col-span-1">
                   <label className={labelClass}>
                     DEPARTAMENTO <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className={selectClass}
+                  <Select.Root
                     value={departamentoId}
-                    onChange={(e: SelectChange) => {
-                      setDepartamentoId(e.target.value);
+                    onValueChange={(value: string) => {
+                      setDepartamentoId(value);
                       setTipoId('');
                     }}
                     required
                   >
-                    <option value="">Selecione...</option>
-                    {departamentos.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    <Select.Trigger
+                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    >
+                      <Select.Value asChild>
+                        <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-slate-900">
+                          {selectedDepartamento || 'Selecione...'}
+                        </span>
+                      </Select.Value>
+                      <Select.Icon>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                      </Select.Icon>
+                    </Select.Trigger>
 
-                <div className="sm:col-span-2 lg:col-span-1">
+                    <Select.Portal>
+                      <Select.Content
+                        position="popper"
+                        sideOffset={4}
+                        className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
+                      >
+                        <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
+                          {departamentos.map((d) => (
+                            <Select.Item
+                              key={d.id}
+                              value={d.id}
+                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                            >
+                              <Select.ItemText>
+                                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                                  {d.label}
+                                </span>
+                              </Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
+                                <Check className="h-4 w-4" />
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                          ))}
+                        </Select.Viewport>
+                      </Select.Content>
+                    </Select.Portal>
+                  </Select.Root>
+                  <input
+                    type="text"
+                    tabIndex={-1}
+                    value={departamentoId}
+                    onChange={() => undefined}
+                    required
+                    className="sr-only"
+                    aria-hidden
+                  />
+                                   </div>
+
+                <div>
                   <label className={labelClass}>
                     TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
@@ -870,9 +873,11 @@ useEffect(() => {
                       title={selectedTipoLabel}
                       className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                     >
-                      <div className="min-w-0 flex-1 truncate">
-                        <Select.Value placeholder="Selecione..." />
-                      </div>
+                      <Select.Value asChild>
+                        <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                          {selectedTipoLabel || 'Selecione...'}
+                        </span>
+                      </Select.Value>
                       <Select.Icon>
                         <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                       </Select.Icon>
