@@ -293,6 +293,9 @@ export default function NovaSolicitacaoPage() {
     () => tipos.find((t) => t.id === tipoId) ?? null,
     [tipos, tipoId],
   );
+  const selectedTipoLabel = selectedTipo
+    ? `${selectedTipo.codigo} - ${getTipoDisplayName(selectedTipo.nome)}`
+    : '';
 
   const isRQ063 =
     !!selectedTipo &&
@@ -862,15 +865,14 @@ useEffect(() => {
                     TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
                   </label>
-                   <Select.Root value={tipoId} onValueChange={setTipoId} disabled={!departamentoId}>
-                    <Select.Trigger className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
-                      <Select.Value placeholder="Selecione..." asChild>
-                        <span className={`block min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis ${tipoId ? 'text-slate-900' : 'text-slate-400'}`}>
-                          {selectedTipo
-                            ? `${selectedTipo.codigo} - ${getTipoDisplayName(selectedTipo.nome)}`
-                            : 'Selecione...'}
-                        </span>
-                      </Select.Value>
+                    <Select.Root value={tipoId} onValueChange={setTipoId} disabled={!departamentoId}>
+                    <Select.Trigger
+                      title={selectedTipoLabel}
+                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      <div className="min-w-0 flex-1 truncate">
+                        <Select.Value placeholder="Selecione..." />
+                      </div>
                       <Select.Icon>
                         <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                       </Select.Icon>
@@ -880,20 +882,18 @@ useEffect(() => {
                       <Select.Content
                         position="popper"
                         sideOffset={4}
-                        className="z-20 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl"
+                      className="z-20 min-w-[420px] max-w-[700px] overflow-x-auto rounded-md border border-slate-200 bg-white shadow-xl"
                       >
-                        <Select.Viewport className="max-h-64 overflow-auto p-1 text-sm">
+                        <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {tipos.map((t) => (
                             <Select.Item
                               key={t.id}
                               value={t.id}
-                              className="relative flex cursor-pointer select-none items-center rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-900"
+                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-900"
                             >
-                              <Select.ItemText asChild>
-                                <span className="block min-w-0 flex-1 max-w-full truncate">
-                                  {`${t.codigo} - ${getTipoDisplayName(t.nome)}`}
-                                </span>
-                                 </Select.ItemText>
+                              <Select.ItemText>
+                                {`${t.codigo} - ${getTipoDisplayName(t.nome)}`}
+                              </Select.ItemText>
                               <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600">
                                 <Check className="h-4 w-4" />
                               </Select.ItemIndicator>
