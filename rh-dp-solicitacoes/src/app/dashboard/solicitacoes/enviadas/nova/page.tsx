@@ -812,14 +812,13 @@ useEffect(() => {
                     }}
                     required
                   >
-                    <Select.Trigger
+                   <Select.Trigger
+                      title={selectedDepartamento}
                       className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
-                      <Select.Value asChild>
-                        <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-slate-900">
-                          {selectedDepartamento || 'Selecione...'}
-                        </span>
-                      </Select.Value>
+                      <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-slate-900">
+                        <Select.Value placeholder="Selecione..." />
+                      </span>
                       <Select.Icon>
                         <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                       </Select.Icon>
@@ -861,7 +860,7 @@ useEffect(() => {
                     className="sr-only"
                     aria-hidden
                   />
-                                   </div>
+                </div>
 
                 <div>
                   <label className={labelClass}>
@@ -873,11 +872,9 @@ useEffect(() => {
                       title={selectedTipoLabel}
                       className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                     >
-                      <Select.Value asChild>
-                        <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-                          {selectedTipoLabel || 'Selecione...'}
-                        </span>
-                      </Select.Value>
+                     <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                        <Select.Value placeholder="Selecione..." />
+                      </span>
                       <Select.Icon>
                         <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                       </Select.Icon>
@@ -887,19 +884,21 @@ useEffect(() => {
                       <Select.Content
                         position="popper"
                         sideOffset={4}
-                      className="z-20 min-w-[420px] max-w-[700px] overflow-x-auto rounded-md border border-slate-200 bg-white shadow-xl"
+                      className="z-20 min-w-[420px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
                       >
                         <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {tipos.map((t) => (
                             <Select.Item
                               key={t.id}
                               value={t.id}
-                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-900"
+                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
                             >
                               <Select.ItemText>
-                                {`${t.codigo} - ${getTipoDisplayName(t.nome)}`}
+                                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                                  {getTipoOptionLabel(t)}
+                                </span>
                               </Select.ItemText>
-                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600">
+                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
                                 <Check className="h-4 w-4" />
                               </Select.ItemIndicator>
                             </Select.Item>
