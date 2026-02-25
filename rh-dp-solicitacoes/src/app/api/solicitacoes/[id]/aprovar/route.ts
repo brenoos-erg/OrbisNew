@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
+import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 
 
 export async function POST(
@@ -232,6 +233,11 @@ export async function POST(
         actorId: me.id,
         tipo: 'APROVACAO_GESTOR',
       },
+    })
+
+    await notifyWorkflowStepEntry({
+      solicitationId,
+      preferredDepartmentId: updated.departmentId,
     })
 
     return NextResponse.json(updated)

@@ -11,7 +11,7 @@ import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
-  isSolicitacaoAgendamentoFerias,
+   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
@@ -23,6 +23,8 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
+import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+
 
 
 
@@ -576,6 +578,12 @@ export const POST = withModuleLevel(
             },
           })
 
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
           return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
@@ -605,12 +613,18 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.solicitationTimeline.create({
+           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
               status: 'AGUARDANDO_APROVACAO',
               message: 'Solicitação de férias aguardando aprovação do gestor.',
             },
+          })
+
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
           })
 
           return NextResponse.json(updated, { status: 201 })
@@ -642,7 +656,7 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.event.create({
+           await prisma.event.create({
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
@@ -651,10 +665,14 @@ export const POST = withModuleLevel(
             },
           })
 
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
           return NextResponse.json(updated, { status: 201 })
         }
-
-
          /* =====================================================================
           3) RQ_063 - Solicitação de Pessoal
            ===================================================================== */
@@ -719,7 +737,13 @@ export const POST = withModuleLevel(
               },
             })
 
-            return NextResponse.json(updated, { status: 201 })
+           await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
+          return NextResponse.json(updated, { status: 201 })
           }
 
           // qualquer coisa diferente de SIM exige aprovação
@@ -755,7 +779,13 @@ export const POST = withModuleLevel(
             },
           })
 
-    return NextResponse.json(updated, { status: 201 })
+     await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
+          return NextResponse.json(updated, { status: 201 })
         }
         if (isSolicitacaoEpi) {
           if (!sstDepartment) {
@@ -805,13 +835,19 @@ export const POST = withModuleLevel(
                 'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
             },
           })
-          await prisma.solicitationTimeline.create({
+           await prisma.solicitationTimeline.create({
             data: {
               solicitationId: created.id,
               status: 'AGUARDANDO_APROVACAO_SETOR',
               message:
                 'SST encaminhou a solicitação para aprovação do aprovador do setor.',
             },
+          })
+
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
           })
 
           return NextResponse.json(updated, { status: 201 })
@@ -845,8 +881,14 @@ export const POST = withModuleLevel(
             data: {
               solicitationId: created.id,
               status: 'AGUARDANDO_APROVACAO',
-              message: 'Solicitação de veículos aguardando aprovação do gestor.',
+               message: 'Solicitação de veículos aguardando aprovação do gestor.',
             },
+          })
+
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
           })
 
           return NextResponse.json(updated, { status: 201 })
@@ -897,7 +939,13 @@ export const POST = withModuleLevel(
             },
           })
 
-       return NextResponse.json(updated, { status: 201 })
+        await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
+          return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
@@ -932,6 +980,12 @@ export const POST = withModuleLevel(
               message: 'Solicitação de desligamento aguardando aprovação do gestor.',
             },
           })
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
+          })
+
           return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
@@ -961,7 +1015,13 @@ export const POST = withModuleLevel(
             },
           })
 
-          return NextResponse.json(created, { status: 201 })
+         await notifyWorkflowStepEntry({
+            solicitationId: created.id,
+            preferredDepartmentId: created.departmentId,
+          })
+
+
+        return NextResponse.json(created, { status: 201 })
         }
 
 
@@ -987,9 +1047,15 @@ export const POST = withModuleLevel(
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
-              actorId: approverId ?? solicitanteId,
+             actorId: approverId ?? solicitanteId,
               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
             },
+          })
+
+          await notifyWorkflowStepEntry({
+            solicitationId: updated.id,
+            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+            preferredDepartmentId: updated.departmentId,
           })
 
           return NextResponse.json(updated, { status: 201 })
@@ -1007,7 +1073,7 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.event.create({
+            await prisma.event.create({
             data: {
               id: crypto.randomUUID(),
               solicitationId: created.id,
@@ -1016,6 +1082,11 @@ export const POST = withModuleLevel(
             },
           })
         }
+        await notifyWorkflowStepEntry({
+          solicitationId: created.id,
+          preferredDepartmentId: created.departmentId,
+        })
+
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
         console.error('POST /api/solicitacoes error', e)

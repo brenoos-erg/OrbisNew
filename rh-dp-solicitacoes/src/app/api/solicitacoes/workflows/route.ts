@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import {
+  DEFAULT_TEMPLATE,
   createWorkflowRow,
   readWorkflowRows,
   updateWorkflowRow,
@@ -18,6 +19,11 @@ type ApiPayload = {
     posX?: number
     posY?: number
     departmentId?: string | null
+    notificationEmails?: string[]
+    notificationTemplate?: { subject?: string; body?: string }
+    approverUserIds?: string[]
+    approverUserId?: string | null
+    approvalTemplate?: { subject?: string; body?: string }
   }>
   edges?: Array<{ id?: string; source: string; target: string }>
 }
@@ -54,9 +60,13 @@ function rowToApi(row: WorkflowDraft) {
       id: step.stepKey,
       label: step.label,
       kind: toApiKind(step.kind),
-      posX: Number((step as WorkflowDraft['steps'][number] & { posX?: number }).posX ?? index * 240 + 40),
+     posX: Number((step as WorkflowDraft['steps'][number] & { posX?: number }).posX ?? index * 240 + 40),
       posY: Number((step as WorkflowDraft['steps'][number] & { posY?: number }).posY ?? 80),
       departmentId: step.defaultDepartmentId ?? null,
+      notificationEmails: step.notificationEmails ?? [],
+      notificationTemplate: step.notificationTemplate ?? DEFAULT_TEMPLATE,
+      approverUserIds: step.approverUserIds ?? (step.approverUserId ? [step.approverUserId] : []),
+      approvalTemplate: step.approvalTemplate ?? DEFAULT_TEMPLATE,
     })),
     edges: row.transitions.map((transition, index) => ({
       id: `${row.id ?? 'wf'}-e-${index + 1}`,
@@ -120,6 +130,16 @@ export async function PUT(req: Request) {
       label: node.label ?? node.id,
       kind: toStoreKind(node.kind),
       defaultDepartmentId: node.departmentId ?? null,
+      notificationEmails: node.notificationEmails ?? [],
+      notificationTemplate: {
+        subject: node.notificationTemplate?.subject ?? DEFAULT_TEMPLATE.subject,
+        body: node.notificationTemplate?.body ?? DEFAULT_TEMPLATE.body,
+      },
+      approverUserIds: node.approverUserIds ?? (node.approverUserId ? [node.approverUserId] : []),
+      approvalTemplate: {
+        subject: node.approvalTemplate?.subject ?? DEFAULT_TEMPLATE.subject,
+        body: node.approvalTemplate?.body ?? DEFAULT_TEMPLATE.body,
+      },
       posX: Number(node.posX ?? 0),
       posY: Number(node.posY ?? 0),
     })) as WorkflowDraft['steps'],

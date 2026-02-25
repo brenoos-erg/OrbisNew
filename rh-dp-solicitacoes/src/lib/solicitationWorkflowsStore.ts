@@ -4,6 +4,11 @@ import crypto from 'node:crypto'
 
 export type WorkflowStepKind = 'DEPARTAMENTO' | 'APROVACAO' | 'FIM'
 
+export type WorkflowTemplateDraft = {
+  subject: string
+  body: string
+}
+
 export type WorkflowStepDraft = {
   order: number
   stepKey: string
@@ -12,10 +17,13 @@ export type WorkflowStepDraft = {
   defaultDepartmentId?: string | null
   approverGroupId?: string | null
   approverUserId?: string | null
+  approverUserIds?: string[]
   requiresApproval?: boolean
   canAssume?: boolean
   canFinalize?: boolean
   notificationEmails?: string[]
+  notificationTemplate?: WorkflowTemplateDraft
+  approvalTemplate?: WorkflowTemplateDraft
 }
 
 export type WorkflowTransitionDraft = {
@@ -35,6 +43,31 @@ export type WorkflowDraft = {
 
 const DB_FILE = path.join(process.cwd(), 'data', 'solicitation-workflows.json')
 
+export const DEFAULT_TEMPLATE: WorkflowTemplateDraft = {
+  subject: '[{tipoCodigo}] Nova etapa: {departamentoAtual}',
+  body: 'Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}',
+}
+
+function normalizeTemplate(input?: Partial<WorkflowTemplateDraft> | null): WorkflowTemplateDraft {
+  const subject = input?.subject?.trim() || DEFAULT_TEMPLATE.subject
+  const body = input?.body?.trim() || DEFAULT_TEMPLATE.body
+  return { subject, body }
+}
+
+function normalizeStep(step: WorkflowStepDraft): WorkflowStepDraft {
+  const ids = step.approverUserIds?.filter(Boolean) ?? []
+  const fallbackLegacy = step.approverUserId ? [step.approverUserId] : []
+  const approverUserIds = Array.from(new Set([...ids, ...fallbackLegacy]))
+
+  return {
+    ...step,
+    notificationEmails: Array.from(new Set((step.notificationEmails ?? []).map((x) => x.trim()).filter(Boolean))),
+    approverUserIds,
+    notificationTemplate: normalizeTemplate(step.notificationTemplate),
+    approvalTemplate: normalizeTemplate(step.approvalTemplate),
+  }
+}
+
 async function ensureDb() {
   await fs.mkdir(path.dirname(DB_FILE), { recursive: true })
   try {
@@ -48,7 +81,11 @@ export async function readWorkflowRows() {
   await ensureDb()
   const raw = await fs.readFile(DB_FILE, 'utf8')
   const parsed = JSON.parse(raw)
-  return Array.isArray(parsed) ? (parsed as WorkflowDraft[]) : []
+  const rows = Array.isArray(parsed) ? (parsed as WorkflowDraft[]) : []
+  return rows.map((row) => ({
+    ...row,
+    steps: [...(row.steps ?? [])].sort((a, b) => a.order - b.order).map(normalizeStep),
+  }))
 }
 
 async function writeWorkflowRows(rows: WorkflowDraft[]) {
@@ -63,7 +100,7 @@ export async function createWorkflowRow(input: WorkflowDraft) {
     ...input,
     id: nowId,
     departmentId: input.departmentId ?? null,
-    steps: [...input.steps].sort((a, b) => a.order - b.order),
+    steps: [...input.steps].sort((a, b) => a.order - b.order).map(normalizeStep),
   }
   rows.push(row)
   await writeWorkflowRows(rows)
@@ -77,8 +114,8 @@ export async function updateWorkflowRow(id: string, input: WorkflowDraft) {
   rows[idx] = {
     ...input,
     id,
-    departmentId: input.departmentId ?? null,
-    steps: [...input.steps].sort((a, b) => a.order - b.order),
+     departmentId: input.departmentId ?? null,
+    steps: [...input.steps].sort((a, b) => a.order - b.order).map(normalizeStep),
   }
   await writeWorkflowRows(rows)
   return rows[idx]
