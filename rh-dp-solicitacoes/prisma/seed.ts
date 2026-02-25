@@ -2,9 +2,10 @@
 
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartments'
+import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartment'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
+
 
 async function hashPassword(plain: string) {
   return bcrypt.hash(plain, 12)

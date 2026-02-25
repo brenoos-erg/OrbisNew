@@ -4,7 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
-import { OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartments'
+import { OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartment'
 
 export async function GET() {
   return withRequestMetrics('GET /api/departments', async () => {
