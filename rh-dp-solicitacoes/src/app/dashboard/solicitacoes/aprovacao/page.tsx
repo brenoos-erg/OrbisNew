@@ -217,7 +217,7 @@ export default function ApprovalsPage() {
                     {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {row.tipo?.nome ?? '—'}
+                    {row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">{row.titulo}</td>
                   <td className="px-3 py-2 text-xs">

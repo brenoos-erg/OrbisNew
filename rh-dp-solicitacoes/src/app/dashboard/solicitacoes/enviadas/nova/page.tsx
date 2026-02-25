@@ -9,7 +9,7 @@ import {
   ChangeEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { Listbox } from '@headlessui/react';
+import * as Select from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
@@ -862,43 +862,47 @@ useEffect(() => {
                     TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
                   </label>
-                  <Listbox value={tipoId} onChange={setTipoId} disabled={!departamentoId}>
-                    <div className="relative">
-                      <Listbox.Button
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        <span className={tipoId ? 'text-slate-900' : 'text-slate-400'}>
+                   <Select.Root value={tipoId} onValueChange={setTipoId} disabled={!departamentoId}>
+                    <Select.Trigger className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
+                      <Select.Value placeholder="Selecione..." asChild>
+                        <span className={`block min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis ${tipoId ? 'text-slate-900' : 'text-slate-400'}`}>
                           {selectedTipo
                             ? `${selectedTipo.codigo} - ${getTipoDisplayName(selectedTipo.nome)}`
                             : 'Selecione...'}
                         </span>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                      </Listbox.Button>
+                      </Select.Value>
+                      <Select.Icon>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                      </Select.Icon>
+                    </Select.Trigger>
 
-                      <Listbox.Options className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
-                        {tipos.map((t) => (
-                          <Listbox.Option
-                            key={t.id}
-                            value={t.id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-2 pl-9 pr-8 ${active ? 'bg-orange-50 text-orange-900' : 'text-slate-900'}`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                    <Select.Portal>
+                      <Select.Content
+                        position="popper"
+                        sideOffset={4}
+                        className="z-20 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl"
+                      >
+                        <Select.Viewport className="max-h-64 overflow-auto p-1 text-sm">
+                          {tipos.map((t) => (
+                            <Select.Item
+                              key={t.id}
+                              value={t.id}
+                              className="relative flex cursor-pointer select-none items-center rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-900"
+                            >
+                              <Select.ItemText asChild>
+                                <span className="block min-w-0 flex-1 max-w-full truncate">
                                   {`${t.codigo} - ${getTipoDisplayName(t.nome)}`}
                                 </span>
-                                {selected && (
-                                  <Check className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-orange-600" />
-                                )}
-                              </>
-                            )}
-                          </Listbox.Option>
-                        ))}
-                      </Listbox.Options>
-                    </div>
-                  </Listbox>
+                                 </Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600">
+                                <Check className="h-4 w-4" />
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                          ))}
+                        </Select.Viewport>
+                      </Select.Content>
+                    </Select.Portal>
+                  </Select.Root>
                   <input
                     type="text"
                     tabIndex={-1}
