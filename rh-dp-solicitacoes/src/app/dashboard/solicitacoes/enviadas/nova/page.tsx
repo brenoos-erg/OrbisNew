@@ -39,6 +39,12 @@ type Departamento = {
   label: string;
   description: string;
 };
+type CostCenterOption = {
+  id: string;
+  code?: string | null;
+  description: string;
+  externalCode?: string | null;
+};
 
 type CampoEspecifico = {
   name: string;
@@ -121,6 +127,9 @@ function getTipoDisplayName(nome: string) {
     ? toSentenceCaseWithAcronyms(trimmed)
     : trimmed.replace(/^RQ[_.]?\d+\s*-\s*/i, '');
 }
+function formatCostCenterOption(cc: CostCenterOption) {
+  return [cc.code, cc.description].filter(Boolean).join(' - ');
+}
 
 const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
   'Linhas telefônicas': [
@@ -170,6 +179,7 @@ export default function NovaSolicitacaoPage() {
 // ---------- CAMPOS DO CABEÇALHO ----------
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([]);
 
   const [departamentoId, setDepartamentoId] = useState('');
   const [tipoId, setTipoId] = useState('');
@@ -231,6 +241,12 @@ export default function NovaSolicitacaoPage() {
     }
 
      loadDepartments();
+  }, []);
+  useEffect(() => {
+    fetch('/api/cost-centers/select', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setCostCenters(Array.isArray(data) ? data : []))
+      .catch(() => setCostCenters([]));
   }, []);
 
   /* ============================================================
@@ -621,6 +637,33 @@ export default function NovaSolicitacaoPage() {
          const placaValue = (extras.placaVeiculo ?? '').trim().toUpperCase();
         if (extras.placaVeiculo !== undefined && !/^[A-Z0-9]{7,}$/.test(placaValue)) {
           setSubmitError('Placa do veículo inválida. Use formato alfanumérico com ao menos 7 caracteres.');
+          setSubmitting(false);
+          return;
+        }
+        if (selectedTipo?.id === 'RQ_043' && extras.entregaTipo === 'Será enviado' && !extras.enderecoEnvio) {
+          setSubmitError('Informe o endereço de envio quando a entrega for enviada.');
+          setSubmitting(false);
+          return;
+        }
+
+        if (selectedTipo?.id === 'RQ_115') {
+          const anyBeneficio = ['renunciaValeTransporte', 'renunciaPlanoOdontologico', 'renunciaPlanoMedico'].some(
+            (k) => extras[k] === 'true',
+          );
+          if (!anyBeneficio && !(extras.renunciaOutros ?? '').trim()) {
+            setSubmitError('Marque ao menos um benefício de renúncia ou preencha "Outros".');
+            setSubmitting(false);
+            return;
+          }
+          if ((extraFiles.anexosSolicitante?.length ?? 0) < 1) {
+            setSubmitError('Anexe a carta de próprio punho para continuar.');
+            setSubmitting(false);
+            return;
+          }
+        }
+
+        if (selectedTipo?.id === 'RQ_106' && (extraFiles.anexosSolicitante?.length ?? 0) < 1) {
+          setSubmitError('Anexe o formulário RQ.106 na solicitação.');
           setSubmitting(false);
           return;
         }
@@ -1979,7 +2022,7 @@ useEffect(() => {
                     const value = extras[campo.name] ?? '';
                     const shouldShowEnderecoEnvio =
                       campo.name !== 'enderecoEnvio' ||
-                      extras.comoSeraEntrega === 'Será enviado';
+                      extras.entregaTipo === 'Será enviado';
 
                     if (!shouldShowEnderecoEnvio) {
                       return null;
@@ -2052,6 +2095,67 @@ useEffect(() => {
                                 </option>
                               ))}
                             </select>
+                          )}
+                           {campo.type === 'cost_center' && (
+                            <Select.Root
+                              value={value}
+                              onValueChange={(nextValue) =>
+                                handleExtraChange(campo.name, nextValue)
+                              }
+                            >
+                              <Select.Trigger
+                                className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70"
+                                title={
+                                  value
+                                    ? formatCostCenterOption(
+                                        costCenters.find((cc) => cc.id === value) ?? {
+                                          id: value,
+                                          description: value,
+                                        },
+                                      )
+                                    : ''
+                                }
+                              >
+                                <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                                  <Select.Value placeholder="Selecione..." />
+                                </span>
+                                <Select.Icon>
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                                </Select.Icon>
+                              </Select.Trigger>
+                              <Select.Portal>
+                                <Select.Content
+                                  position="popper"
+                                  sideOffset={4}
+                                  className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
+                                >
+                                  <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
+                                    {costCenters.map((cc) => {
+                                      const optionLabel = formatCostCenterOption(cc);
+                                      return (
+                                        <Select.Item
+                                          key={cc.id}
+                                          value={cc.id}
+                                          className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                                        >
+                                          <Select.ItemText>
+                                            <span
+                                              className="block whitespace-nowrap overflow-hidden text-ellipsis"
+                                              title={optionLabel}
+                                            >
+                                              {optionLabel}
+                                            </span>
+                                          </Select.ItemText>
+                                          <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
+                                            <Check className="h-4 w-4" />
+                                          </Select.ItemIndicator>
+                                        </Select.Item>
+                                      );
+                                    })}
+                                  </Select.Viewport>
+                                </Select.Content>
+                              </Select.Portal>
+                            </Select.Root>
                           )}
 
                           {campo.type === 'file' && (

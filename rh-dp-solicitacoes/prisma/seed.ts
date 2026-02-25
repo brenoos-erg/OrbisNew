@@ -297,7 +297,7 @@ async function main() {
               required: true,
               section: 'Identificação da multa',
             },
-            {
+             {
               name: 'gestorImediato',
               label: 'Gestor imediato',
               type: 'text',
@@ -305,9 +305,9 @@ async function main() {
               section: 'Identificação da multa',
             },
             {
-              name: 'centroCusto',
+              name: 'centroCustoId',
               label: 'Centro de custo',
-              type: 'text',
+              type: 'cost_center',
               required: true,
               section: 'Identificação da multa',
             },
@@ -369,9 +369,9 @@ async function main() {
               section: 'Identificação da multa',
             },
             {
-              name: 'centroCusto',
+              name: 'centroCustoId',
               label: 'Centro de custo',
-              type: 'text',
+              type: 'cost_center',
               required: true,
               section: 'Identificação da multa',
             },
@@ -394,6 +394,7 @@ async function main() {
       },
     })
   }
+
 
 
  if (rhDepartment) {
@@ -715,30 +716,7 @@ async function main() {
         },
       },
       camposEspecificos: [
-        {
-          name: 'gestorNome',
-          label: 'Nome do gestor solicitante',
-          type: 'text',
-          required: true,
-          stage: 'solicitante',
-          section: 'Dados do gestor solicitante',
-        },
-        {
-          name: 'gestorCargo',
-          label: 'Cargo do gestor solicitante',
-          type: 'text',
-          required: true,
-          stage: 'solicitante',
-          section: 'Dados do gestor solicitante',
-        },
-        {
-          name: 'gestorData',
-          label: 'Data',
-          type: 'date',
-          required: true,
-          stage: 'solicitante',
-          section: 'Dados do gestor solicitante',
-        },
+        
         {
           name: 'motivoPedidoDemissao',
           label: 'Pedido de demissão',
@@ -804,9 +782,9 @@ async function main() {
           section: 'Dados do funcionário',
         },
         {
-          name: 'funcionarioCentroCusto',
-          label: 'Centro de custo (texto)',
-          type: 'text',
+          name: 'funcionarioCostCenterId',
+          label: 'Centro de custo',
+          type: 'cost_center',
           stage: 'solicitante',
           section: 'Dados do funcionário',
         },
@@ -969,9 +947,9 @@ async function main() {
           section: 'Formulário',
         },
         {
-          name: 'email',
+           name: 'email',
           label: 'E-mail',
-          type: 'text',
+          type: 'email',
           required: true,
           stage: 'solicitante',
           section: 'Formulário',
@@ -1035,6 +1013,28 @@ async function main() {
         requiresAttachment: false,
       },
       camposEspecificos: [
+         {
+          name: 'anexosSolicitacao',
+          label: 'Anexo(s) da solicitação',
+          type: 'file',
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+        {
+          name: 'anexosSolicitante',
+          label: 'Anexo(s) do solicitante',
+          type: 'file',
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+        {
+          name: 'funcionarioStatus',
+          label: 'Funcionário novo ou antigo?',
+          type: 'select',
+          options: ['NOVO', 'ANTIGO'],
+          stage: 'solicitante',
+          section: 'Formulário',
+        },
         {
           name: 'estoque',
           label: 'Estoque',
@@ -1050,14 +1050,14 @@ async function main() {
           section: 'Formulário',
         },
         {
-          name: 'centroCusto',
+          name: 'centroCustoId',
           label: 'Centro de Custo',
-           type: 'text',
+           type: 'cost_center',
           stage: 'solicitante',
           section: 'Formulário',
         },
         {
-          name: 'funcionario',
+          name: 'funcionarioNome',
           label: 'Funcionário',
           type: 'text',
           stage: 'solicitante',
@@ -1106,8 +1106,8 @@ async function main() {
           section: 'PREENCHIMENTO RH',
         },
         {
-          name: 'comoSeraEntrega',
-          label: 'Como será a entrega?',
+            name: 'entregaTipo',
+          label: 'Tipo de entrega',
           type: 'select',
           options: ['Retirar na sede', 'Será enviado'],
           stage: 'solicitante',
@@ -1179,7 +1179,7 @@ async function main() {
           section: 'Dados do colaborador',
         },
         {
-          name: 'funcionario',
+         name: 'funcionarioNome',
           label: 'Funcionário',
           type: 'text',
           required: true,
@@ -1736,6 +1736,103 @@ async function main() {
       },
     })
     console.log('✅ Tipo "RQ.300 NADA CONSTA" ok.')
+    const avaliacaoExperienciaSchema = {
+      meta: {
+        departamentos: [rhDepartment?.id].filter((value): value is string => Boolean(value)),
+        requiresApproval: false,
+      },
+      camposEspecificos: [
+        { name: 'colaboradorAvaliado', label: 'Colaborador avaliado', type: 'text', stage: 'solicitante', section: 'Dados' },
+        { name: 'contratoSetor', label: 'Contrato/Setor', type: 'text', stage: 'solicitante', section: 'Dados' },
+        { name: 'gestorImediatoAvaliador', label: 'Gestor imediato avaliador', type: 'text', stage: 'solicitante', section: 'Dados' },
+        { name: 'cargoColaborador', label: 'Cargo do colaborador', type: 'text', stage: 'solicitante', section: 'Dados' },
+        { name: 'dataAdmissao', label: 'Data de admissão', type: 'date', stage: 'solicitante', section: 'Dados' },
+        { name: 'cargoAvaliador', label: 'Cargo do avaliador', type: 'text', stage: 'solicitante', section: 'Dados' },
+        ...[
+          'relacionamentoNota', 'comunicacaoNota', 'atitudeNota', 'saudeSegurancaNota',
+          'dominioTecnicoProcessosNota', 'adaptacaoMudancaNota', 'autogestaoGestaoPessoasNota',
+        ].map((name) => ({
+          name,
+          label: name,
+          type: 'select',
+          options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
+          stage: 'solicitante',
+          section: 'Avaliação',
+        })),
+        { name: 'comentarioFinal', label: 'Comentário final', type: 'textarea', stage: 'solicitante', section: 'Comentários' },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.update({ where: { id: 'RQ_RH_103' }, data: { schemaJson: avaliacaoExperienciaSchema, updatedAt: new Date() } })
+
+    await prisma.tipoSolicitacao.update({
+      where: { id: 'RQ_106' },
+      data: {
+        schemaJson: {
+          meta: { departamentos: [dpDepartment.id], requiresApproval: false },
+          camposEspecificos: [
+            { name: 'nomeSolicitante', label: 'Nome do solicitante', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
+            { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
+            { name: 'observacoes', label: 'Observações', type: 'textarea', stage: 'solicitante', section: 'Dados' },
+            { name: 'anexosSolicitante', label: 'Anexos do solicitante', type: 'file', required: true, stage: 'solicitante', section: 'Anexos' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.update({
+      where: { id: 'RQ_115' },
+      data: {
+        schemaJson: {
+          meta: { departamentos: [dpDepartment.id], requiresApproval: false },
+          camposEspecificos: [
+            { name: 'anexosSolicitante', label: 'Carta de próprio punho (anexo)', type: 'file', required: true, stage: 'solicitante', section: 'Anexos' },
+            { name: 'nome', label: 'Nome', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
+            { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
+            { name: 'renunciaValeTransporte', label: 'Renúncia vale transporte', type: 'checkbox', stage: 'solicitante', section: 'Benefícios' },
+            { name: 'renunciaPlanoOdontologico', label: 'Renúncia plano odontológico', type: 'checkbox', stage: 'solicitante', section: 'Benefícios' },
+            { name: 'renunciaPlanoMedico', label: 'Renúncia plano médico', type: 'checkbox', stage: 'solicitante', section: 'Benefícios' },
+            { name: 'renunciaOutros', label: 'Outros', type: 'text', stage: 'solicitante', section: 'Benefícios' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.update({
+      where: { id: 'RQ_240' },
+      data: {
+        nome: 'Transferência / mobilização entre centros de custo',
+        schemaJson: {
+          meta: { departamentos: [dpDepartment.id], requiresApproval: false },
+          camposEspecificos: [
+            { name: 'anexosSolicitante', label: 'Anexos do solicitante', type: 'file', stage: 'solicitante', section: 'Anexos' },
+            { name: 'anexosSolicitacao', label: 'Anexos da solicitação', type: 'file', stage: 'solicitante', section: 'Anexos' },
+            { name: 'itens', label: 'Colaboradores (JSON)', type: 'textarea', required: true, stage: 'solicitante', section: 'Colaboradores' },
+            { name: 'centroCustoDestinoId', label: 'Centro de custo destino', type: 'cost_center', required: true, stage: 'solicitante', section: 'Destino' },
+            { name: 'dataInicio', label: 'Data início', type: 'date', stage: 'solicitante', section: 'Período' },
+            { name: 'dataFim', label: 'Data fim', type: 'date', stage: 'solicitante', section: 'Período' },
+            { name: 'motivoTransferencia', label: 'Motivo da transferência', type: 'textarea', required: true, stage: 'solicitante', section: 'Motivo' },
+            { name: 'alterouJornada', label: 'Alterou jornada?', type: 'select', options: ['SIM', 'NÃO'], stage: 'solicitante', section: 'Motivo' },
+            { name: 'requerTreinamentosObrigatorios', label: 'Requer treinamentos obrigatórios', type: 'checkbox', stage: 'solicitante', section: 'SST' },
+            { name: 'quaisTreinamentos', label: 'Quais treinamentos', type: 'text', stage: 'solicitante', section: 'SST' },
+            { name: 'requerEpisEspecificos', label: 'Requer EPIs específicos', type: 'checkbox', stage: 'solicitante', section: 'SST' },
+            { name: 'quaisEpis', label: 'Quais EPIs', type: 'text', stage: 'solicitante', section: 'SST' },
+            { name: 'requerExamesComplementares', label: 'Requer exames complementares', type: 'checkbox', stage: 'solicitante', section: 'SST' },
+            { name: 'quaisExames', label: 'Quais exames', type: 'text', stage: 'solicitante', section: 'SST' },
+            { name: 'transferirVeiculo', label: 'Transferir veículo', type: 'checkbox', stage: 'solicitante', section: 'Logística' },
+            { name: 'placaDescricaoVeiculo', label: 'Placa/Descrição veículo', type: 'text', stage: 'solicitante', section: 'Logística' },
+            { name: 'transferirEquipamento', label: 'Transferir equipamento', type: 'checkbox', stage: 'solicitante', section: 'Almoxarifado' },
+            { name: 'patrimonioDescricaoEquipamento', label: 'Patrimônio/Descrição equipamento', type: 'text', stage: 'solicitante', section: 'Almoxarifado' },
+            { name: 'transferirEquipamentoTI', label: 'Transferir equipamento TI', type: 'checkbox', stage: 'solicitante', section: 'TI' },
+            { name: 'descricaoEquipamentoTI', label: 'Marca-Modelo + Patrimônio', type: 'text', stage: 'solicitante', section: 'TI' },
+            { name: 'numeroLinhaModeloAparelhoPatrimonio', label: 'Número linha/modelo/aparelho/patrimônio', type: 'text', stage: 'solicitante', section: 'TI' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
   }
 
   /* =========================

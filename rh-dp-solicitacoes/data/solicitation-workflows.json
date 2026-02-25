@@ -1,25 +1,91 @@
 [
   {
-     "id": "91f7f9f4-87db-4679-a2b8-f2f674f0134f",
+    "id": "91f7f9f4-87db-4679-a2b8-f2f674f0134f",
     "name": "RQ_063 - Solicitação de pessoal",
     "tipoId": "RQ_063",
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "CONTRATO_PREVISTO", "label": "Vaga prevista em contrato?", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "APROVACAO_GESTOR", "label": "Aprovação (quando vaga não prevista)", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 560, "posY": 240 },
-      { "order": 4, "stepKey": "RH", "label": "RH preenche dados e finaliza", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 560, "posY": 80 },
-      { "order": 5, "stepKey": "DP", "label": "Departamento Pessoal (Solicitação de admissão)", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 820, "posY": 120 },
-      { "order": 6, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 1080, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "CONTRATO_PREVISTO",
+        "label": "Vaga prevista em contrato?",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "APROVACAO_GESTAO",
+        "label": "Aprovação gestão (quando NÃO prevista)",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 240
+      },
+      {
+        "order": 4,
+        "stepKey": "RH",
+        "label": "RH trata e finaliza",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 80
+      },
+      {
+        "order": 5,
+        "stepKey": "DP_SUBCHAMADO",
+        "label": "Subchamado automático: Solicitação de Admissão (DP)",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      },
+      {
+        "order": 6,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 1080,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "CONTRATO_PREVISTO" },
-      { "fromStepKey": "CONTRATO_PREVISTO", "toStepKey": "RH" },
-      { "fromStepKey": "CONTRATO_PREVISTO", "toStepKey": "APROVACAO_GESTOR" },
-      { "fromStepKey": "APROVACAO_GESTOR", "toStepKey": "RH" },
-      { "fromStepKey": "RH", "toStepKey": "DP" },
-      { "fromStepKey": "DP", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "CONTRATO_PREVISTO"
+      },
+      {
+        "fromStepKey": "CONTRATO_PREVISTO",
+        "toStepKey": "RH"
+      },
+      {
+        "fromStepKey": "CONTRATO_PREVISTO",
+        "toStepKey": "APROVACAO_GESTAO"
+      },
+      {
+        "fromStepKey": "APROVACAO_GESTAO",
+        "toStepKey": "RH"
+      },
+      {
+        "fromStepKey": "RH",
+        "toStepKey": "DP_SUBCHAMADO"
+      },
+      {
+        "fromStepKey": "DP_SUBCHAMADO",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -29,15 +95,56 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "APROVACAO", "label": "Aprovação obrigatória", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "DP", "label": "Departamento Pessoal recebe cópia e trata", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 560, "posY": 120 },
-      { "order": 4, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 820, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVACAO",
+        "label": "Aprovação obrigatória",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "DP",
+        "label": "Departamento Pessoal recebe cópia e trata",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "APROVACAO" },
-      { "fromStepKey": "APROVACAO", "toStepKey": "DP" },
-      { "fromStepKey": "DP", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "APROVACAO"
+      },
+      {
+        "fromStepKey": "APROVACAO",
+        "toStepKey": "DP"
+      },
+      {
+        "fromStepKey": "DP",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -47,15 +154,56 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "APROVACAO_GESTOR", "label": "Gestor do departamento aprova", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "LOGISTICA", "label": "Logística", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 560, "posY": 120 },
-      { "order": 4, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 820, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVACAO_GESTOR",
+        "label": "Gestor do departamento aprova",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "LOGISTICA",
+        "label": "Logística",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "APROVACAO_GESTOR" },
-      { "fromStepKey": "APROVACAO_GESTOR", "toStepKey": "LOGISTICA" },
-      { "fromStepKey": "LOGISTICA", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "APROVACAO_GESTOR"
+      },
+      {
+        "fromStepKey": "APROVACAO_GESTOR",
+        "toStepKey": "LOGISTICA"
+      },
+      {
+        "fromStepKey": "LOGISTICA",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -65,15 +213,56 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "APROVACAO_GESTOR", "label": "Gestor do departamento aprova", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "DP", "label": "Departamento Pessoal", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 560, "posY": 120 },
-      { "order": 4, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 820, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVACAO_GESTOR",
+        "label": "Gestor do departamento aprova",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "DP",
+        "label": "Departamento Pessoal",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "APROVACAO_GESTOR" },
-      { "fromStepKey": "APROVACAO_GESTOR", "toStepKey": "DP" },
-      { "fromStepKey": "DP", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "APROVACAO_GESTOR"
+      },
+      {
+        "fromStepKey": "APROVACAO_GESTOR",
+        "toStepKey": "DP"
+      },
+      {
+        "fromStepKey": "DP",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -83,13 +272,43 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "SST", "label": "Segurança do Trabalho trata", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 560, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "SST",
+        "label": "SST trata e finaliza",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "SST" },
-      { "fromStepKey": "SST", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "SST"
+      },
+      {
+        "fromStepKey": "SST",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -99,22 +318,69 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "SST", "label": "Segurança do Trabalho", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "ANEXO", "label": "Documento anexado?", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 560, "posY": 120 },
-      { "order": 4, "stepKey": "SST_ANEXA", "label": "SST anexa documento (se necessário)", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 560, "posY": 240 },
-      { "order": 5, "stepKey": "APROVADOR_SETOR", "label": "Aprovador do setor", "kind": "APROVACAO", "defaultDepartmentId": null, "posX": 820, "posY": 120 },
-      { "order": 6, "stepKey": "LOGISTICA", "label": "Logística", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 1080, "posY": 120 },
-      { "order": 7, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 1340, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "SST",
+        "label": "SST valida e anexa documento quando necessário",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "APROVADOR",
+        "label": "Aprovação",
+        "kind": "APROVACAO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      },
+      {
+        "order": 4,
+        "stepKey": "LOGISTICA",
+        "label": "Logística finaliza",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      },
+      {
+        "order": 5,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 1080,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "SST" },
-      { "fromStepKey": "SST", "toStepKey": "ANEXO" },
-      { "fromStepKey": "ANEXO", "toStepKey": "APROVADOR_SETOR" },
-      { "fromStepKey": "ANEXO", "toStepKey": "SST_ANEXA" },
-      { "fromStepKey": "SST_ANEXA", "toStepKey": "APROVADOR_SETOR" },
-      { "fromStepKey": "APROVADOR_SETOR", "toStepKey": "LOGISTICA" },
-      { "fromStepKey": "LOGISTICA", "toStepKey": "FIM" }
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "SST"
+      },
+      {
+        "fromStepKey": "SST",
+        "toStepKey": "APROVADOR"
+      },
+      {
+        "fromStepKey": "APROVADOR",
+        "toStepKey": "LOGISTICA"
+      },
+      {
+        "fromStepKey": "LOGISTICA",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -124,14 +390,43 @@
     "departmentId": null,
     "active": true,
     "steps": [
-      { "order": 1, "stepKey": "USUARIO", "label": "Usuário abre chamado", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 40, "posY": 120 },
-      { "order": 2, "stepKey": "TI", "label": "Tecnologia da Informação", "kind": "DEPARTAMENTO", "defaultDepartmentId": null, "posX": 300, "posY": 120 },
-      { "order": 3, "stepKey": "FIM", "label": "Fim", "kind": "FIM", "defaultDepartmentId": null, "posX": 560, "posY": 120 }
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "TI",
+        "label": "Tecnologia da Informação",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 300,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      }
     ],
     "transitions": [
-      { "fromStepKey": "USUARIO", "toStepKey": "TI" },
-      { "fromStepKey": "TI", "toStepKey": "FIM" }
-
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "TI"
+      },
+      {
+        "fromStepKey": "TI",
+        "toStepKey": "FIM"
+      }
     ]
   },
   {
@@ -226,6 +521,125 @@
       }
     ],
     "id": "9dbfe785-c203-4271-9691-3c77203cc630",
+    "departmentId": null
+  },
+  {
+    "id": "wf-rq-240-transfer",
+    "name": "RQ_240 - Transferência / Mobilização entre Centros de Custo",
+    "tipoId": "RQ_240",
+    "departmentId": null,
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "USUARIO",
+        "label": "Usuário abre chamado",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 40,
+        "posY": 120
+      },
+      {
+        "order": 2,
+        "stepKey": "DP",
+        "label": "DP analisa",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 280,
+        "posY": 120
+      },
+      {
+        "order": 3,
+        "stepKey": "SETORES_CONDICIONAIS",
+        "label": "SST/LOG/ALMOX/TI quando aplicável",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 560,
+        "posY": 120
+      },
+      {
+        "order": 4,
+        "stepKey": "DP_FINAL",
+        "label": "DP finaliza",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "posX": 820,
+        "posY": 120
+      },
+      {
+        "order": 5,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM",
+        "defaultDepartmentId": null,
+        "posX": 1080,
+        "posY": 120
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "USUARIO",
+        "toStepKey": "DP"
+      },
+      {
+        "fromStepKey": "DP",
+        "toStepKey": "SETORES_CONDICIONAIS"
+      },
+      {
+        "fromStepKey": "SETORES_CONDICIONAIS",
+        "toStepKey": "DP_FINAL"
+      },
+      {
+        "fromStepKey": "DP_FINAL",
+        "toStepKey": "FIM"
+      }
+    ]
+  },
+  {
+    "name": "Fluxo padrão",
+    "tipoId": "RQ_RH_103",
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO"
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO"
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO"
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Fim",
+        "kind": "FIM"
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      },
+      {
+        "fromStepKey": "SETOR_DESTINO",
+        "toStepKey": "FIM"
+      }
+    ],
+    "id": "0daf6dcf-ec52-413f-baa8-f87e6000f7a8",
     "departmentId": null
   }
 ]

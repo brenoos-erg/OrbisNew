@@ -2831,21 +2831,10 @@ function RQ247ResumoCampos({
 
       <section className="mb-4">
         <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Dados do gestor solicitante
+         Gestor solicitante
         </p>
-         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className={LABEL_RO}>Nome</label>
-            <input className={INPUT_RO} readOnly value={get('gestorNome')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Cargo</label>
-            <input className={INPUT_RO} readOnly value={get('gestorCargo')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Data</label>
-            <input className={INPUT_RO} readOnly value={get('gestorData')} />
-          </div>
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+          {get('gestorSolicitanteInfo') || 'Identificação do gestor vinculada automaticamente ao solicitante autenticado.'}
         </div>
       </section>
 
@@ -2915,7 +2904,7 @@ function RQ247ResumoCampos({
             <input
               className={INPUT_RO}
               readOnly
-              value={get('funcionarioCentroCusto')}
+              value={get('funcionarioCostCenterId') || get('funcionarioCentroCusto')}
             />
           </div>
           <div>

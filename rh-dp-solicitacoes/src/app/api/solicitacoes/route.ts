@@ -441,6 +441,9 @@ export const POST = withModuleLevel(
 
 
         // monta o payload com dados do solicitante + campos do formulário
+         if (isSolicitacaoDesligamento(tipo)) {
+          campos.gestorSolicitanteInfo = `${me.fullName ?? me.login} / Cargo: gestor solicitante / Data: ${new Date().toISOString().slice(0, 10)}`
+        }
         const payload: any = await buildPayload(solicitanteId, campos)
 
         // 1) cria a solicitação básica
