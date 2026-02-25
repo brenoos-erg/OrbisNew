@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-type NodeKind = 'DEPARTMENT' | 'APPROVERS' | 'END'
+type NodeKind = 'DEPARTMENT' | 'APPROVERS'
+type LegacyNodeKind = NodeKind | 'END'
 
 type ApiNode = {
   id: string
@@ -19,7 +20,12 @@ type ApiNode = {
 type ApiWorkflow = {
   workflowId: string
   nodes: ApiNode[]
+  edges: Array<{ id: string; source: string; target: string }>
+}
 
+type RawApiWorkflow = {
+  workflowId: string
+  nodes: Array<Omit<ApiNode, 'kind'> & { kind: LegacyNodeKind }>
   edges: Array<{ id: string; source: string; target: string }>
 }
 
@@ -32,7 +38,51 @@ const DEFAULT_TEMPLATE = {
 }
 
 const PLACEHOLDERS = ['{protocolo}', '{tipoCodigo}', '{tipoNome}', '{solicitante}', '{departamentoAtual}', '{link}']
+function normalizeWorkflowGraph(workflow: RawApiWorkflow | ApiWorkflow): ApiWorkflow {
+  const normalizedNodes = workflow.nodes.map((node, index) => {
+    const normalizedKind: NodeKind = node.kind === 'APPROVERS' ? 'APPROVERS' : 'DEPARTMENT'
+    const normalizedLabel = node.kind === 'END' && node.label.trim().toLowerCase() === 'fim' ? 'Departamento final' : node.label
+    return {
+      ...node,
+      kind: normalizedKind,
+      label: normalizedLabel,
+      posX: Number(node.posX ?? index * 240 + 40),
+      posY: Number(node.posY ?? 80),
+    }
+  })
 
+  const existingIds = new Set(normalizedNodes.map((node) => node.id))
+  const normalizedEdges = [...workflow.edges]
+  if (normalizedNodes.length > 0 && normalizedNodes[normalizedNodes.length - 1]?.kind === 'APPROVERS') {
+    let finalId = 'SETOR_DESTINO'
+    let suffix = 1
+    while (existingIds.has(finalId)) {
+      finalId = `SETOR_DESTINO_${suffix}`
+      suffix += 1
+    }
+
+    const lastNode = normalizedNodes[normalizedNodes.length - 1]
+    normalizedNodes.push({
+      id: finalId,
+      label: 'Setor Destino',
+      kind: 'DEPARTMENT',
+      posX: Number(lastNode.posX ?? 40) + 240,
+      posY: Number(lastNode.posY ?? 80),
+      notificationEmails: [],
+      notificationTemplate: { ...DEFAULT_TEMPLATE },
+      approverUserIds: [],
+      approvalTemplate: { ...DEFAULT_TEMPLATE },
+    })
+    normalizedEdges.push({ id: `auto-${finalId}`, source: lastNode.id, target: finalId })
+  }
+
+  const validIds = new Set(normalizedNodes.map((node) => node.id))
+  return {
+    ...workflow,
+    nodes: normalizedNodes,
+    edges: normalizedEdges.filter((edge) => validIds.has(edge.source) && validIds.has(edge.target)),
+  }
+}
 export default function FluxosSolicitacoesCadastroPage() {
   const [typeId, setTypeId] = useState('')
   const [types, setTypes] = useState<Tipo[]>([])
@@ -58,10 +108,11 @@ export default function FluxosSolicitacoesCadastroPage() {
     if (!typeId) return
     ;(async () => {
       const response = await fetch(`/api/solicitacoes/workflows?typeId=${encodeURIComponent(typeId)}`, { cache: 'no-store' })
-      const data: ApiWorkflow = await response.json()
-      setWorkflowId(data.workflowId)
-      setNodes(data.nodes)
-      setEdges(data.edges)
+       const data: RawApiWorkflow = await response.json()
+      const normalized = normalizeWorkflowGraph(data)
+      setWorkflowId(normalized.workflowId)
+      setNodes(normalized.nodes)
+      setEdges(normalized.edges)
     })()
   }, [typeId])
 
@@ -83,12 +134,12 @@ export default function FluxosSolicitacoesCadastroPage() {
   }, [edges])
 
   const onSave = async () => {
-   const payload = { typeId, nodes, edges }
+   const payload = normalizeWorkflowGraph({ workflowId, nodes, edges })
 
     const response = await fetch('/api/solicitacoes/workflows', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ typeId, nodes: payload.nodes, edges: payload.edges }),
     })
 
     if (!response.ok) {
@@ -154,11 +205,9 @@ export default function FluxosSolicitacoesCadastroPage() {
               >
                 <div className="text-xs text-slate-500">{node.kind}</div>
                 <div className="font-medium">{node.label}</div>
-                {node.kind !== 'END' && (
-                  <div className="mt-1 text-xs text-slate-500">
-                    {(node.notificationEmails ?? []).length} e-mails • {(node.approverUserIds ?? []).length} aprovadores
-                  </div>
-                )}
+               <div className="mt-1 text-xs text-slate-500">
+                  {(node.notificationEmails ?? []).length} e-mails • {(node.approverUserIds ?? []).length} aprovadores
+                </div>
               </button>
                {(edgesBySource.get(node.id) ?? []).length > 0 ? <span className="text-slate-500">→</span> : null}
             </div>

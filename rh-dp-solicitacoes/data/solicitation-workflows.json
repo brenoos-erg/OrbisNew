@@ -8,82 +8,98 @@
     "steps": [
       {
         "order": 1,
-        "stepKey": "USUARIO",
-        "label": "Usuário abre chamado",
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
+        "notificationEmails": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approverUserIds": [],
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "canFinalize": false,
         "posX": 40,
-        "posY": 120
-      },
-      {
-        "order": 2,
-        "stepKey": "CONTRATO_PREVISTO",
-        "label": "Vaga prevista em contrato?",
-        "kind": "APROVACAO",
-        "defaultDepartmentId": null,
-        "posX": 300,
-        "posY": 120
-      },
-      {
-        "order": 3,
-        "stepKey": "APROVACAO_GESTAO",
-        "label": "Aprovação gestão (quando NÃO prevista)",
-        "kind": "APROVACAO",
-        "defaultDepartmentId": null,
-        "posX": 560,
-        "posY": 240
-      },
-      {
-        "order": 4,
-        "stepKey": "RH",
-        "label": "RH trata e finaliza",
-        "kind": "DEPARTAMENTO",
-        "defaultDepartmentId": null,
-        "posX": 560,
         "posY": 80
       },
       {
-        "order": 5,
-        "stepKey": "DP_SUBCHAMADO",
-        "label": "Subchamado automático: Solicitação de Admissão (DP)",
-        "kind": "DEPARTAMENTO",
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO",
         "defaultDepartmentId": null,
-        "posX": 820,
-        "posY": 120
+        "notificationEmails": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approverUserIds": [
+          "d0e2742e-8a5e-4185-8ff3-1a0fca646095"
+        ],
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "canFinalize": false,
+        "posX": 280,
+        "posY": 80
       },
       {
-        "order": 6,
-        "stepKey": "FIM",
-        "label": "Fim",
-        "kind": "FIM",
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
-        "posX": 1080,
-        "posY": 120
+        "notificationEmails": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approverUserIds": [],
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "canFinalize": false,
+        "posX": 520,
+        "posY": 80
+      },
+      {
+        "order": 4,
+        "stepKey": "FIM",
+        "label": "Departamento final",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
+        "notificationEmails": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approverUserIds": [],
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "canFinalize": true,
+        "posX": 760,
+        "posY": 80
       }
     ],
     "transitions": [
       {
-        "fromStepKey": "USUARIO",
-        "toStepKey": "CONTRATO_PREVISTO"
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
       },
       {
-        "fromStepKey": "CONTRATO_PREVISTO",
-        "toStepKey": "RH"
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
       },
       {
-        "fromStepKey": "CONTRATO_PREVISTO",
-        "toStepKey": "APROVACAO_GESTAO"
-      },
-      {
-        "fromStepKey": "APROVACAO_GESTAO",
-        "toStepKey": "RH"
-      },
-      {
-        "fromStepKey": "RH",
-        "toStepKey": "DP_SUBCHAMADO"
-      },
-      {
-        "fromStepKey": "DP_SUBCHAMADO",
+        "fromStepKey": "SETOR_DESTINO",
         "toStepKey": "FIM"
       }
     ]
@@ -102,7 +118,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -111,7 +137,17 @@
         "kind": "APROVACAO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -120,7 +156,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
@@ -129,7 +175,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 820,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -161,7 +217,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -170,7 +236,17 @@
         "kind": "APROVACAO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -179,7 +255,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
@@ -188,7 +274,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 820,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -220,7 +316,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -229,7 +335,17 @@
         "kind": "APROVACAO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -238,7 +354,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
@@ -247,7 +373,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 820,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -279,7 +415,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -288,7 +434,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -297,7 +453,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -325,7 +491,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -334,7 +510,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -343,7 +529,17 @@
         "kind": "APROVACAO",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
@@ -352,7 +548,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 820,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 5,
@@ -361,7 +567,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 1080,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -397,7 +613,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -406,7 +632,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 300,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -415,7 +651,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -438,25 +684,65 @@
         "order": 1,
         "stepKey": "SETOR_ORIGEM",
         "label": "Setor Origem",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
         "stepKey": "APROVADORES",
         "label": "Aprovadores",
-        "kind": "APROVACAO"
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
         "stepKey": "SETOR_DESTINO",
         "label": "Setor Destino",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
         "stepKey": "FIM",
         "label": "Fim",
-        "kind": "FIM"
+        "kind": "FIM",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -485,25 +771,65 @@
         "order": 1,
         "stepKey": "SETOR_ORIGEM",
         "label": "Setor Origem",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
         "stepKey": "APROVADORES",
         "label": "Aprovadores",
-        "kind": "APROVACAO"
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
         "stepKey": "SETOR_DESTINO",
         "label": "Setor Destino",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
         "stepKey": "FIM",
         "label": "Fim",
-        "kind": "FIM"
+        "kind": "FIM",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -537,7 +863,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 40,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
@@ -546,7 +882,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 280,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
@@ -555,7 +901,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 560,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
@@ -564,7 +920,17 @@
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 820,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 5,
@@ -573,7 +939,17 @@
         "kind": "FIM",
         "defaultDepartmentId": null,
         "posX": 1080,
-        "posY": 120
+        "posY": 120,
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
@@ -604,25 +980,65 @@
         "order": 1,
         "stepKey": "SETOR_ORIGEM",
         "label": "Setor Origem",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 2,
         "stepKey": "APROVADORES",
         "label": "Aprovadores",
-        "kind": "APROVACAO"
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 3,
         "stepKey": "SETOR_DESTINO",
         "label": "Setor Destino",
-        "kind": "DEPARTAMENTO"
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       },
       {
         "order": 4,
         "stepKey": "FIM",
         "label": "Fim",
-        "kind": "FIM"
+        "kind": "FIM",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
       }
     ],
     "transitions": [
