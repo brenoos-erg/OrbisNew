@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { hashPassword, setAuthCookie, signSession } from '@/lib/auth-local'
+import { hashPassword, isSecureRequest, setAuthCookie, signSession } from '@/lib/auth-local'
 
 function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex')
 }
-
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   const token = String(body?.token ?? '').trim()
@@ -36,8 +35,8 @@ export async function POST(req: Request) {
       resetTokenExpiresAt: null,
     },
   })
-
+const secure = isSecureRequest(req)
   const res = NextResponse.json({ ok: true })
-  setAuthCookie(res, signSession(user.id))
+  setAuthCookie(res, signSession(user.id), secure)
   return res
 }

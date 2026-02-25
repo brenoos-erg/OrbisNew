@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { setAuthCookie, signSession, verifyPassword } from '@/lib/auth-local'
+import { isSecureRequest, setAuthCookie, signSession, verifyPassword } from '@/lib/auth-local'
 import { findUserByIdentifier, normalizeIdentifier } from '@/lib/auth-identifier'
+
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
@@ -48,9 +49,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Usuário inativo.' }, { status: 403 })
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
 
+  const secure = isSecureRequest(req)
   const res = NextResponse.json({ ok: true, mustChangePassword: user.mustChangePassword })
-  setAuthCookie(res, signSession(user.id))
+  setAuthCookie(res, signSession(user.id), secure)
   return res
 }

@@ -73,10 +73,17 @@ export async function readSessionFromCookies() {
   return { userId: payload.sub, issuedAt: payload.iat }
 }
 
-export function setAuthCookie(response: NextResponse, token: string) {
-  response.cookies.set(AUTH_COOKIE_NAME, token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: AUTH_MAX_AGE_SECONDS })
+export function isSecureRequest(req: Request) {
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
+  const protocol = forwardedProto || new URL(req.url).protocol.replace(':', '').toLowerCase()
+  return protocol === 'https'
 }
 
-export function clearAuthCookie(response: NextResponse) {
-  response.cookies.set(AUTH_COOKIE_NAME, '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 0 })
+export function setAuthCookie(response: NextResponse, token: string, secure: boolean) {
+  // Secure deve depender do protocolo da requisição; NODE_ENV=production também pode rodar em HTTP local/rede.
+  response.cookies.set(AUTH_COOKIE_NAME, token, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: AUTH_MAX_AGE_SECONDS })
+}
+
+export function clearAuthCookie(response: NextResponse, secure: boolean) {
+  response.cookies.set(AUTH_COOKIE_NAME, '', { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 0 })
 }

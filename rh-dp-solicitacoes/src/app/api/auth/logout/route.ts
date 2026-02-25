@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { clearAuthCookie } from '@/lib/auth-local'
+import { clearAuthCookie, isSecureRequest } from '@/lib/auth-local'
 
-export async function POST() {
+export async function POST(req: Request) {
+  const secure = isSecureRequest(req)
   const res = NextResponse.json({ ok: true })
-  clearAuthCookie(res)
+  clearAuthCookie(res, secure)
   return res
 }
