@@ -11,6 +11,7 @@ export default function PrimeiroAcessoPage() {
 function PrimeiroAcessoContent() {
   const router = useRouter()
   const search = useSearchParams()
+  const token = search.get('token')
   const nextUrl = search.get('next') || '/dashboard'
   const [pwd1, setPwd1] = useState('')
   const [pwd2, setPwd2] = useState('')
@@ -23,7 +24,7 @@ function PrimeiroAcessoContent() {
     if (pwd1.length < 6) return setError('A nova senha deve ter ao menos 6 caracteres.')
     if (pwd1 !== pwd2) return setError('As senhas não coincidem.')
     setSaving(true)
-     const res = token
+    const res = token
       ? await fetch('/api/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

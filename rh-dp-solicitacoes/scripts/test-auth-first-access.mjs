@@ -3,23 +3,46 @@ import assert from 'node:assert/strict'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
-const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
+const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3000'
 
 function tokenHash(token) {
   return createHash('sha256').update(token).digest('hex')
 }
 
+function isConnectionRefused(error) {
+  return (
+    error?.cause?.code === 'ECONNREFUSED'
+    || error?.code === 'ECONNREFUSED'
+    || error?.message?.includes('ECONNREFUSED')
+  )
+}
+
 async function postJson(path, body) {
-  const response = await fetch(`${baseUrl}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const payload = await response.json().catch(() => ({}))
-  return { response, payload }
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json().catch(() => ({}))
+    return { response, payload }
+  } catch (error) {
+    if (isConnectionRefused(error)) {
+      throw new Error(
+        `Não foi possível conectar em ${baseUrl}. Inicie a aplicação (ex.: npm run dev) e tente novamente.`,
+        { cause: error },
+      )
+    }
+
+    throw error
+  }
 }
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('A variável DATABASE_URL é obrigatória para executar este script.')
+  }
+
   const unique = randomUUID().slice(0, 8)
   const email = `first-access-${unique}@example.com`
   const login = `firstaccess${unique}`
