@@ -514,8 +514,15 @@ async function main() {
      DP: Solicitação de Admissão
      ========================= */
   if (dpDepartment) {
+    const existingAdmissionByName = await prisma.tipoSolicitacao.findUnique({
+      where: { nome: 'Solicitação de Admissão' },
+      select: { id: true },
+    })
+
+    const admissionTypeId = existingAdmissionByName?.id ?? 'SOLICITACAO_ADMISSAO'
+
     await prisma.tipoSolicitacao.upsert({
-         where: { id: 'SOLICITACAO_ADMISSAO' },
+      where: { id: admissionTypeId },
       update: {
         codigo: 'RQ.DP.001',
         nome: 'Solicitação de Admissão',
