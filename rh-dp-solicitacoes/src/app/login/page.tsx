@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, Loader2 } from 'lucide-react'
+import { clearSessionMeCache } from '@/lib/session-cache'
 
 export default function LoginPage() {
   return (
@@ -16,6 +17,7 @@ function LoginPageContent() {
   const router = useRouter()
   const search = useSearchParams()
   const nextUrl = search.get('next') || '/dashboard'
+  const isLogoutRequest = search.get('logout') === '1'
   const [loading, setLoading] = useState(false)
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -23,12 +25,25 @@ function LoginPageContent() {
   const [showReset, setShowReset] = useState(false)
   const [resetIdentifier, setResetIdentifier] = useState('')
   const [resetMsg, setResetMsg] = useState<string | null>(null)
+  const [logoutMessage, setLogoutMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/session/bootstrap', { cache: 'no-store' }).then((res) => {
-      if (res.ok) router.replace(nextUrl)
-    }).catch(() => null)
-  }, [nextUrl, router])
+    if (isLogoutRequest) {
+      fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' })
+        .then(() => {
+          clearSessionMeCache()
+          setLogoutMessage('Você saiu da conta com sucesso.')
+        })
+        .catch(() => null)
+      return
+    }
+
+    fetch('/api/session/bootstrap', { cache: 'no-store' })
+      .then((res) => {
+        if (res.ok) router.replace(nextUrl)
+      })
+      .catch(() => null)
+  }, [isLogoutRequest, nextUrl, router])
 
   async function handleLogin() {
     setLoading(true)
@@ -40,7 +55,7 @@ function LoginPageContent() {
     }).catch(() => null)
 
     if (!res) {
-      setLoading(false)
+       setLoading(false)
       setLoginError('Não foi possível conectar ao servidor de autenticação.')
       return
     }
@@ -49,6 +64,13 @@ function LoginPageContent() {
     setLoading(false)
 
     if (!res.ok) {
+      if ((res.status === 428 || res.status === 409) && payload?.reason === 'NO_PASSWORD') {
+        setShowReset(true)
+        setResetIdentifier(identifier)
+        setLoginError('Usuário ainda não possui senha. Clique em “Esqueci minha senha” para criar.')
+        return
+      }
+
       const statusMessage: Record<number, string> = {
         400: 'Identificador e senha são obrigatórios.',
         401: 'Credenciais inválidas.',
@@ -72,7 +94,7 @@ function LoginPageContent() {
     const res = await fetch('/api/auth/request-password-reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: resetIdentifier || identifier }),
+      body: JSON.stringify({ identifier: resetIdentifier || identifier, next: nextUrl }),
     })
     if (res.ok) setResetMsg('Se o usuário existir, o token de redefinição foi gerado.')
   }
@@ -80,6 +102,7 @@ function LoginPageContent() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-xl rounded-3xl border-2 border-orange-300 bg-white p-10">
+        {logoutMessage && <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">{logoutMessage}</div>}
         {loginError && <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{loginError}</div>}
         <div className="mb-8 flex flex-col items-center gap-2 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-orange-300 bg-orange-50">

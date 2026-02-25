@@ -4,9 +4,9 @@ export const revalidate = 0
 export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
-import { prisma } from '@/lib/prisma'
 import { isDbUnavailableError } from '@/lib/db-unavailable'
 import { jsonApiError } from '@/lib/api-error'
+import { findUserByIdentifier } from '@/lib/auth-identifier'
 
 const isDbDisabled = process.env.SKIP_PRISMA_DB === 'true'
 export async function GET(req: NextRequest) {
@@ -32,20 +32,9 @@ export async function GET(req: NextRequest) {
         requestId,
       })
     }
-    const user = await prisma.user.findFirst({
-      where: {
-        status: 'ATIVO',
-        OR: [
-          { login: { equals: identifier } },
-          { email: { equals: identifier } },
-        ],
-      },
-      select: {
-        email: true,
-      },
-    })
+    const user = await findUserByIdentifier(identifier)
 
-    if (!user) {
+    if (!user || user.status !== 'ATIVO') {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 

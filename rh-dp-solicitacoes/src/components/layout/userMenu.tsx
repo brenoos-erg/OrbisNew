@@ -31,7 +31,7 @@ export default function UserMenu({ collapsed, user }: Props) {
     user?.email?.toString()?.trim() ||
     'Usuário'
 
-       const login = user?.login?.toString()?.trim() || user?.email?.toString()?.trim() || ''
+        const login = user?.login?.toString()?.trim() || user?.email?.toString()?.trim() || ''
   const email = user?.email?.toString()?.trim() || ''
 
   async function handleSignOut() {
@@ -39,7 +39,7 @@ export default function UserMenu({ collapsed, user }: Props) {
       await fetch('/api/auth/signout', { method: 'POST', cache: 'no-store' })
     } catch {}
     clearSessionMeCache()
-    window.location.href = '/login'
+    window.location.href = '/login?logout=1'
   }
 
   return (

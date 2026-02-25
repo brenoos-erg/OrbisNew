@@ -23,11 +23,17 @@ function PrimeiroAcessoContent() {
     if (pwd1.length < 6) return setError('A nova senha deve ter ao menos 6 caracteres.')
     if (pwd1 !== pwd2) return setError('As senhas não coincidem.')
     setSaving(true)
-    const res = await fetch('/api/me/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newPassword: pwd1 }),
-    })
+     const res = token
+      ? await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password: pwd1 }),
+        })
+      : await fetch('/api/me/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPassword: pwd1 }),
+        })
     const payload = await res.json().catch(() => ({}))
     setSaving(false)
     if (!res.ok) return setError(payload?.error || 'Falha ao atualizar senha.')

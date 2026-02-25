@@ -1,25 +1,42 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { setAuthCookie, signSession, verifyPassword } from '@/lib/auth-local'
+import { findUserByIdentifier, normalizeIdentifier } from '@/lib/auth-identifier'
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
-  const identifier = String(body?.identifier ?? '').trim().toLowerCase()
+  const identifier = normalizeIdentifier(body?.identifier)
   const password = String(body?.password ?? '')
 
   if (!identifier || !password) {
     return NextResponse.json({ error: 'Identificador e senha são obrigatórios.' }, { status: 400 })
   }
 
-  const user = await prisma.user.findFirst({
-    where: identifier.includes('@')
-      ? { email: { equals: identifier } }
-      : { login: { equals: identifier } },
-    select: { id: true, passwordHash: true, status: true, mustChangePassword: true },
-  })
+  const user = await findUserByIdentifier(identifier)
 
-  if (!user || !user.passwordHash) {
-    return NextResponse.json({ error: 'Credenciais inválidas.' }, { status: 401 })
+  if (process.env.NODE_ENV !== 'production') {
+    console.info('[auth/login] lookup', {
+      identifier,
+      userFound: !!user,
+      passwordHashExists: !!user?.passwordHash,
+      mustChangePassword: !!user?.mustChangePassword,
+    })
+  }
+
+  if (!user) {
+     return NextResponse.json({ error: 'Credenciais inválidas.' }, { status: 401 })
+  }
+
+  if (!user.passwordHash) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: 'NO_PASSWORD',
+        mustChangePassword: true,
+        error: 'Usuário ainda não possui senha cadastrada.',
+      },
+      { status: 428 },
+    )
   }
 
   const valid = await verifyPassword(password, user.passwordHash)

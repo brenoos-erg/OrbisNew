@@ -128,7 +128,7 @@ export async function PATCH(
       where: { id },
       data: {
         fullName,
-        login: login ?? null,
+        login: login ? login.trim().toLowerCase() : null,
         phone: phone ?? null,
         status, // enum UserStatus (ATIVO / INATIVO)
       },
