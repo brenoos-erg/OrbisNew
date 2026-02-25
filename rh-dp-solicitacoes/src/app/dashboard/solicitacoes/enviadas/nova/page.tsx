@@ -9,6 +9,8 @@ import {
   ChangeEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { Listbox } from '@headlessui/react';
+import { Check, ChevronDown } from 'lucide-react';
 import { formatCostCenterLabel } from '@/lib/costCenter';
 import { fetchMe } from '@/lib/me-cache';
 import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
@@ -107,6 +109,26 @@ const inputClass =
 const textareaClass =
   'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
 const selectClass = inputClass;
+const ACRONYM_TOKENS = ['DP', 'RH', 'TI', 'SST', 'LOG'];
+
+function toSentenceCaseWithAcronyms(value: string) {
+  const lowered = value.toLowerCase();
+  const sentence = lowered.charAt(0).toUpperCase() + lowered.slice(1);
+
+  return sentence.replace(/\b[a-z]{2,3}\b/g, (word) => {
+    const upper = word.toUpperCase();
+    return ACRONYM_TOKENS.includes(upper) ? upper : word;
+  });
+}
+
+function getTipoDisplayName(nome: string) {
+  const trimmed = nome.trim();
+  if (!trimmed) return '';
+  return trimmed === trimmed.toUpperCase()
+    ? toSentenceCaseWithAcronyms(trimmed)
+    : trimmed.replace(/^RQ[_.]?\d+\s*-\s*/i, '');
+}
+
 const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
   'Linhas telefônicas': [
     'Ramais internos',
@@ -840,20 +862,53 @@ useEffect(() => {
                     TIPO DE SOLICITAÇÃO{' '}
                     <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className={selectClass}
+                  <Listbox value={tipoId} onChange={setTipoId} disabled={!departamentoId}>
+                    <div className="relative">
+                      <Listbox.Button
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <span className={tipoId ? 'text-slate-900' : 'text-slate-400'}>
+                          {selectedTipo
+                            ? `${selectedTipo.codigo} - ${getTipoDisplayName(selectedTipo.nome)}`
+                            : 'Selecione...'}
+                        </span>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </Listbox.Button>
+
+                      <Listbox.Options className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg">
+                        {tipos.map((t) => (
+                          <Listbox.Option
+                            key={t.id}
+                            value={t.id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 pl-9 pr-8 ${active ? 'bg-orange-50 text-orange-900' : 'text-slate-900'}`
+                            }
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={selected ? 'font-semibold' : 'font-normal'}>
+                                  {`${t.codigo} - ${getTipoDisplayName(t.nome)}`}
+                                </span>
+                                {selected && (
+                                  <Check className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-orange-600" />
+                                )}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        ))}
+                      </Listbox.Options>
+                    </div>
+                  </Listbox>
+                  <input
+                    type="text"
+                    tabIndex={-1}
                     value={tipoId}
-                    onChange={(e: SelectChange) => setTipoId(e.target.value)}
-                    disabled={!departamentoId}
+                   onChange={() => undefined}
                     required
-                  >
-                    <option value="">Selecione...</option>
-                    {tipos.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {`${t.codigo} - ${t.nome}`}
-                      </option>
-                    ))}
-                  </select>
+                    disabled={!departamentoId}
+                    className="sr-only"
+                    aria-hidden
+                  />
                 </div>
               </div>
             </div>

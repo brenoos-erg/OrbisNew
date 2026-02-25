@@ -75,6 +75,13 @@ export async function GET(request: Request) {
 
     
      const tipos = await prisma.tipoSolicitacao.findMany({
+      where: {
+        NOT: {
+          codigo: {
+            startsWith: 'RQ.LEG.',
+          },
+        },
+      },
       select: {
         id: true,
         codigo: true,
@@ -86,7 +93,6 @@ export async function GET(request: Request) {
         nome: 'asc',
       },
     })
-
     const resposta = tipos
       .filter((tipo) =>
         shouldIncludeTipo({

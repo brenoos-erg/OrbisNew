@@ -147,7 +147,7 @@ async function main() {
       where: { id: 'RQ_RH_103' },
       update: {
         codigo: 'RQ.RH.002',
-        nome: 'AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA',
+        nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
         schemaJson: {
           meta: {
@@ -160,7 +160,7 @@ async function main() {
       create: {
         id: 'RQ_RH_103',
         codigo: 'RQ.RH.002',
-        nome: 'AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA',
+        nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
         schemaJson: {
           meta: {
@@ -178,7 +178,7 @@ async function main() {
       where: { id: 'RQ_106' },
       update: {
         codigo: 'RQ.DP.004',
-        nome: 'EXCLUSÃO NO PLANO SAÚDE/ODONTO PARA DEPENDENTES',
+       nome: 'Exclusão no plano saúde/odonto para dependentes',
         descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
         schemaJson: {
           meta: {
@@ -191,7 +191,7 @@ async function main() {
       create: {
         id: 'RQ_106',
         codigo: 'RQ.DP.004',
-        nome: 'EXCLUSÃO NO PLANO SAÚDE/ODONTO PARA DEPENDENTES',
+        nome: 'Exclusão no plano saúde/odonto para dependentes',
         descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
         schemaJson: {
           meta: {
@@ -207,7 +207,7 @@ async function main() {
       where: { id: 'RQ_115' },
       update: {
         codigo: 'RQ.DP.005',
-        nome: 'RENÚNCIA DE BENEFÍCIO',
+         nome: 'Renúncia de benefício',
         descricao: 'Solicitação de renúncia de benefício.',
         schemaJson: {
           meta: {
@@ -220,7 +220,7 @@ async function main() {
       create: {
         id: 'RQ_115',
         codigo: 'RQ.DP.005',
-        nome: 'RENÚNCIA DE BENEFÍCIO',
+        nome: 'Renúncia de benefício',
         descricao: 'Solicitação de renúncia de benefício.',
         schemaJson: {
           meta: {
@@ -236,7 +236,7 @@ async function main() {
       where: { id: 'RQ_240' },
       update: {
         codigo: 'RQ.DP.006',
-        nome: 'TRANSFERÊNCIA DE FUNCIONÁRIO',
+        nome: 'Transferência de funcionário',
         descricao: 'Solicitação de transferência de funcionário.',
         schemaJson: {
           meta: {
@@ -249,7 +249,7 @@ async function main() {
       create: {
         id: 'RQ_240',
         codigo: 'RQ.DP.006',
-        nome: 'TRANSFERÊNCIA DE FUNCIONÁRIO',
+        nome: 'Transferência de funcionário',
         descricao: 'Solicitação de transferência de funcionário.',
         schemaJson: {
           meta: {
@@ -267,7 +267,7 @@ async function main() {
       where: { id: 'RQ_DP_049' },
       update: {
         codigo: 'RQ.LOG.002',
-        nome: 'IDENTIFICAÇÃO DO CONDUTOR INFRATOR MULTA DE TRÂNSITO',
+        nome: 'Identificação do condutor infrator multa de trânsito',
         descricao: 'FORMULÁRIO DE IDENTIFICAÇÃO DE MULTA DE TRÂNSITO',
         schemaJson: {
           meta: {
@@ -331,7 +331,7 @@ async function main() {
       create: {
         id: 'RQ_DP_049',
         codigo: 'RQ.LOG.002',
-        nome: 'IDENTIFICAÇÃO DO CONDUTOR INFRATOR MULTA DE TRÂNSITO',
+        nome: 'Identificação do condutor infrator multa de trânsito',
         descricao: 'FORMULÁRIO DE IDENTIFICAÇÃO DE MULTA DE TRÂNSITO',
         schemaJson: {
           meta: {
@@ -401,7 +401,7 @@ async function main() {
       where: { id: 'RQ_063' },
       update: {
         codigo: 'RQ.RH.001',
-        nome: 'RQ_063 - Solicitação de Pessoal',
+        nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
         updatedAt: new Date(),
@@ -409,7 +409,7 @@ async function main() {
       create: {
         id: 'RQ_063',
         codigo: 'RQ.RH.001',
-        nome: 'RQ_063 - Solicitação de Pessoal',
+        nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
         updatedAt: new Date(),
@@ -422,7 +422,7 @@ async function main() {
       where: { id: 'RQ_088' },
       update: {
         codigo: 'RQ.LOG.001',
-        nome: 'RQ.088 - Solicitação de Veículos',
+        nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
         schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
         updatedAt: new Date(),
@@ -430,7 +430,7 @@ async function main() {
       create: {
         id: 'RQ_088',
         codigo: 'RQ.LOG.001',
-        nome: 'RQ.088 - Solicitação de Veículos',
+        nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
         schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
         updatedAt: new Date(),
@@ -450,11 +450,21 @@ async function main() {
     },
   })
 
+  await prisma.tipoSolicitacao.deleteMany({
+    where: {
+      OR: [
+        { codigo: { startsWith: 'RQ.LEG.' } },
+        { codigo: 'RQ.LEG.SOLICITACAO_EQUIPAMENTO' },
+        { id: 'SOLICITACAO_EQUIPAMENTO' },
+      ],
+    },
+  })
+
   await prisma.tipoSolicitacao.upsert({
     where: { id: 'RQ_089' },
     update: {
       codigo: 'RQ.TI.001',
-      nome: 'RQ.089 - Solicitação de Equipamento',
+      nome: 'Solicitação de equipamento',
       descricao: 'Solicitação para fornecimento de equipamento de TI',
       schemaJson: {
         meta: { departamentos: [tiDepartment.id] },
@@ -482,7 +492,7 @@ async function main() {
      create: {
       id: 'RQ_089',
         codigo: 'RQ.TI.001',
-      nome: 'RQ.089 - Solicitação de Equipamento',
+       nome: 'Solicitação de equipamento',
       descricao: 'Solicitação para fornecimento de equipamento de TI',
       schemaJson: {
         meta: { departamentos: [tiDepartment.id] },
@@ -515,7 +525,7 @@ async function main() {
      ========================= */
   if (dpDepartment) {
     const existingAdmissionByName = await prisma.tipoSolicitacao.findUnique({
-      where: { nome: 'Solicitação de Admissão' },
+     where: { nome: 'Solicitação de admissão' },
       select: { id: true },
     })
 
@@ -525,7 +535,7 @@ async function main() {
       where: { id: admissionTypeId },
       update: {
         codigo: 'RQ.DP.001',
-        nome: 'Solicitação de Admissão',
+        nome: 'Solicitação de admissão',
         descricao: 'Solicitação de admissão (Departamento Pessoal)',
         schemaJson: {
           meta: {
@@ -539,7 +549,7 @@ async function main() {
       create: {
         id: 'SOLICITACAO_ADMISSAO',
         codigo: 'RQ.DP.001',
-        nome: 'Solicitação de Admissão',
+        nome: 'Solicitação de admissão',
         descricao: 'Solicitação de admissão (Departamento Pessoal)',
         schemaJson: {
           meta: {
@@ -680,7 +690,7 @@ async function main() {
        where: { id: 'AGENDAMENTO_DE_FERIAS' },
       update: {
         codigo: 'RQ.DP.003',
-        nome: 'Solicitação de Férias',
+        nome: 'Solicitação de férias',
         descricao: 'SERVIÇOS DE DP - agendamento de férias',
         schemaJson: agendamentoFeriasSchema,
         updatedAt: new Date(),
@@ -688,7 +698,7 @@ async function main() {
       create: {
         id: 'AGENDAMENTO_DE_FERIAS',
         codigo: 'RQ.DP.003',
-        nome: 'Solicitação de Férias',
+        nome: 'Solicitação de férias',
         descricao: 'SERVIÇOS DE DP - agendamento de férias',
         schemaJson: agendamentoFeriasSchema,
         updatedAt: new Date(),
@@ -872,7 +882,7 @@ async function main() {
        where: { id: 'RQ_247' },
       update: {
         codigo: 'RQ.DP.002',
-        nome: 'RQ_247 - Desligamento de Pessoal',
+        nome: 'Desligamento de pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
         updatedAt: new Date(),
@@ -880,7 +890,7 @@ async function main() {
      create: {
         id: 'RQ_247',
         codigo: 'RQ.DP.002',
-        nome: 'RQ_247 - Desligamento de Pessoal',
+        nome: 'Desligamento de pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
         updatedAt: new Date(),
@@ -1000,7 +1010,7 @@ async function main() {
       where: { id: 'RQ_092' },
       update: {
         codigo: 'RQ.SST.002',
-        nome: 'RQ.092 SOLICITAÇÃO DE EXAMES',
+        nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
@@ -1008,7 +1018,7 @@ async function main() {
       create: {
         id: 'RQ_092',
         codigo: 'RQ.SST.002',
-        nome: 'RQ.092 SOLICITAÇÃO DE EXAMES',
+        nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
@@ -1131,7 +1141,7 @@ async function main() {
       where: { id: 'RQ_043' },
       update: {
         codigo: 'RQ.SST.001',
-        nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES',
+         nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
@@ -1139,7 +1149,7 @@ async function main() {
       create: {
         id: 'RQ_043',
         codigo: 'RQ.SST.001',
-        nome: 'RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES',
+        nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
@@ -1711,7 +1721,7 @@ async function main() {
       where: { id: 'RQ_300' },
       update: {
         codigo: 'RQ.DP.007',
-        nome: 'RQ.300 NADA CONSTA',
+       nome: 'Nada consta',
         descricao: 'Solicitação de nada consta (Departamento Pessoal)',
         schemaJson: nadaConstaSchema,
         updatedAt: new Date(),
@@ -1719,7 +1729,7 @@ async function main() {
       create: {
         id: 'RQ_300',
         codigo: 'RQ.DP.007',
-        nome: 'RQ.300 NADA CONSTA',
+        nome: 'Nada consta',
         descricao: 'Solicitação de nada consta (Departamento Pessoal)',
         schemaJson: nadaConstaSchema,
         updatedAt: new Date(),
