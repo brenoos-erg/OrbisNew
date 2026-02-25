@@ -12,6 +12,7 @@ type TipoCampo = {
 
 type TipoSolicitacao = {
     id: string
+    codigo: string
     nome: string
     descricao?: string
     camposEspecificos?: TipoCampo[]
@@ -201,7 +202,7 @@ export default function NovaSolicitacaoPage() {
                     <option value="">Selecione o tipo</option>
                     {tipos.map((t) => (
                         <option key={t.id} value={t.id}>
-                            {t.nome}
+                            {`${t.codigo} - ${t.nome}`}
                         </option>
                     ))}
                 </select>

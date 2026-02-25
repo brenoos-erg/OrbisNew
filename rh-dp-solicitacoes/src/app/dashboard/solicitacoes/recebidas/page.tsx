@@ -277,9 +277,9 @@ export default function ReceivedRequestsPage() {
                       {row.createdAt
                         ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm')
                         : '-'}
-                    </td>
+                     </td>
                     <td className="px-4 py-2 text-xs">
-                      {row.tipo?.nome ?? row.titulo}
+                      {row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : row.titulo}
                     </td>
                     <td className="px-4 py-2 text-xs">
                       {row.setorDestino ?? '-'}

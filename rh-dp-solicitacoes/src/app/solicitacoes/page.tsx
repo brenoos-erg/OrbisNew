@@ -8,6 +8,7 @@ type Solicitacao = {
   status: string
   createdAt: string
   tipo?: {
+    codigo: string
     nome: string
   }
 }
@@ -80,7 +81,7 @@ export default function ListaSolicitacoesPage() {
             >
               <div className="font-medium">{s.titulo}</div>
               <div className="text-sm text-gray-600">
-                {s.tipo?.nome} • {s.status} •{' '}
+               {s.tipo ? `${s.tipo.codigo} - ${s.tipo.nome}` : '-'} • {s.status} •{' '}
                 {new Date(s.createdAt).toLocaleString('pt-BR')}
               </div>
             </a>

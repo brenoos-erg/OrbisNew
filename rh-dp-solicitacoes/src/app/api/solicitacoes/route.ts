@@ -278,7 +278,7 @@ export const GET = withModuleLevel(
             take: pageSize,
             orderBy: { dataAbertura: 'desc' },
             include: {
-              tipo: { select: { nome: true } },
+             tipo: { select: { codigo: true, nome: true } },
               department: { select: { name: true } },
               costCenter: { select: { description: true, externalCode: true, code: true } },
               approver: { select: { id: true, fullName: true } },
@@ -296,7 +296,7 @@ export const GET = withModuleLevel(
   status: s.status,
   protocolo: s.protocolo,
   createdAt: s.dataAbertura.toISOString(),
-  tipo: s.tipo ? { nome: s.tipo.nome } : null,
+  tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
 
   responsavelId: s.assumidaPor?.id ?? null,
   responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,

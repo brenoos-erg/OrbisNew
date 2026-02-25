@@ -152,17 +152,19 @@ model Leader {
 
 model TipoSolicitacao {
   id           String         @id
+  codigo       String         @unique
   nome         String         @unique
   descricao    String?
   schemaJson   Json
   createdAt    DateTime       @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime       @updatedAt
   solicitacoes Solicitation[]
 }
 
 model Department {
   id              String             @id @default(uuid())
   name            String
+  sigla           String             @unique
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   code            String             @unique

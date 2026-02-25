@@ -59,6 +59,7 @@ type CampoEspecifico = {
 
 type TipoSolicitacao = {
   id: string;
+  codigo: string;
   nome: string;
   descricao?: string;
   meta?: {
@@ -849,7 +850,7 @@ useEffect(() => {
                     <option value="">Selecione...</option>
                     {tipos.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.nome}
+                        {`${t.codigo} - ${t.nome}`}
                       </option>
                     ))}
                   </select>

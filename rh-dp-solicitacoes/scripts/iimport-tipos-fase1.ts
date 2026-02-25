@@ -95,6 +95,7 @@ async function main() {
       where: { nome },
       create: {
         id: randomUUID(),
+        codigo: `RQ.EXT.${randomUUID().slice(0, 8).toUpperCase()}`,
         nome,
         descricao: `Categoria: ${categoria}`,
         schemaJson,
@@ -106,6 +107,7 @@ async function main() {
         updatedAt: new Date(),
       },
     })
+
 
     console.info(`[import-tipos-fase1] Tipo upserted: ${nome}`)
   }

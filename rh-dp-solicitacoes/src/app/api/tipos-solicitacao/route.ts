@@ -74,9 +74,10 @@ export async function GET(request: Request) {
     const departamentoId = searchParams.get('departamentoId')
 
     
-    const tipos = await prisma.tipoSolicitacao.findMany({
+     const tipos = await prisma.tipoSolicitacao.findMany({
       select: {
         id: true,
+        codigo: true,
         nome: true,
         descricao: true,
         schemaJson: true,
@@ -100,6 +101,7 @@ export async function GET(request: Request) {
 
         return {
           id: tipo.id,
+          codigo: tipo.codigo,
           nome: tipo.nome,
           descricao: tipo.descricao ?? undefined,
           camposEspecificos: campos,

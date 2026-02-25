@@ -30,7 +30,7 @@ export type Row = {
   status: string
   protocolo?: string
   createdAt?: string | null
-  tipo?: { nome: string } | null
+  tipo?: { codigo?: string; nome: string } | null
   responsavel?: { fullName: string } | null
   responsavelId?: string | null
   autor?: { fullName: string } | null
@@ -106,7 +106,7 @@ type ChildSolicitation = {
   titulo: string
   status: string
   dataAbertura: string
-  tipo?: { nome: string } | null
+  tipo?: { codigo?: string; nome: string } | null
   setorDestino?: string | null
 }
 type SolicitacaoSetor = {

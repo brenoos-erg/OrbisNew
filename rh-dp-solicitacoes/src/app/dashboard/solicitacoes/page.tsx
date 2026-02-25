@@ -11,7 +11,7 @@ type Solicitation = {
   descricao: string
   status: string
   createdAt: string
-  tipo?: { nome: string }
+  tipo?: { codigo: string; nome: string }
 }
 
 export default function SolicitacoesPage() {
@@ -113,7 +113,7 @@ export default function SolicitacoesPage() {
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2">{item.tipo?.nome || '-'}</td>
+                  <td className="px-4 py-2">{item.tipo ? `${item.tipo.codigo} - ${item.tipo.nome}` : '-'}</td>
                   <td className="px-4 py-2 text-slate-500">
                     {format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm')}
                   </td>

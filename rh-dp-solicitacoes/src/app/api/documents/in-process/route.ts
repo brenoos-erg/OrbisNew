@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     DocumentVersionStatus.AG_APROVACAO,
   ]
 
-  const where = buildVersionWhere({ ...parsed.filters, status: undefined })
+  const where = buildVersionWhere({ ...parsed.filters, status: null }) as any
   where.status = { in: statuses }
 
   const [grid, legend] = await Promise.all([
