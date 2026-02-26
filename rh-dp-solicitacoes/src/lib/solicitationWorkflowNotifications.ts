@@ -1,19 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { sendMail } from '@/lib/mailer'
-import { DEFAULT_TEMPLATE, readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
+import { sendEmail } from '@/lib/emailSender'
+import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
+import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
 
 type NotifyInput = {
   solicitationId: string
   preferredKind?: WorkflowStepKind
   preferredDepartmentId?: string | null
 }
-
-const PLACEHOLDER_REGEX = /\{(protocolo|tipoCodigo|tipoNome|solicitante|departamentoAtual|link)\}/g
-
-function fillTemplate(template: string, values: Record<string, string>) {
-  return template.replace(PLACEHOLDER_REGEX, (_, key: string) => values[key] ?? '')
-}
-
 
 async function resolveDepartmentRecipients(step: WorkflowStepDraft) {
   const manual = step.notificationEmails ?? []
@@ -78,8 +72,8 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   }
 
   let recipients: string[] = []
-  let subjectTemplate = DEFAULT_TEMPLATE.subject
-  let bodyTemplate = DEFAULT_TEMPLATE.body
+  let subjectTemplate = ''
+  let bodyTemplate = ''
 
   if (targetStep.kind === 'APROVACAO') {
     const users = await prisma.user.findMany({
@@ -87,15 +81,17 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
       select: { email: true },
     })
     recipients = users.map((user) => user.email).filter(Boolean)
-    subjectTemplate = targetStep.approvalTemplate?.subject || DEFAULT_TEMPLATE.subject
-    bodyTemplate = targetStep.approvalTemplate?.body || DEFAULT_TEMPLATE.body
+    const template = resolveTemplate(targetStep.approvalTemplate)
+    subjectTemplate = template.subject
+    bodyTemplate = template.body
   } else {
     recipients = await resolveDepartmentRecipients(targetStep)
-    subjectTemplate = targetStep.notificationTemplate?.subject || DEFAULT_TEMPLATE.subject
-    bodyTemplate = targetStep.notificationTemplate?.body || DEFAULT_TEMPLATE.body
+    const template = resolveTemplate(targetStep.notificationTemplate)
+    subjectTemplate = template.subject
+    bodyTemplate = template.body
   }
 
-  recipients = Array.from(new Set(recipients.map((x) => x.trim()).filter(Boolean)))
+  recipients = normalizeAndValidateEmails(recipients)
   if (recipients.length === 0) {
     await prisma.solicitation.update({
       where: { id: solicitation.id },
@@ -124,10 +120,20 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     link: `${baseUrl}/dashboard/solicitacoes/${solicitation.id}`,
   }
 
-  const subject = fillTemplate(subjectTemplate, values)
-  const text = fillTemplate(bodyTemplate, values)
+  const subject = renderTemplate(subjectTemplate, values)
+  const text = renderTemplate(bodyTemplate, values)
 
-  const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
+  const startedAt = performance.now()
+  const result = await sendEmail({ to: recipients, subject, text })
+  const elapsedMs = Math.round(performance.now() - startedAt)
+  console.info('[workflow-email]', {
+    event: targetStep.kind === 'APROVACAO' ? 'approval_pending' : 'department_step_entry',
+    solicitationId: solicitation.id,
+    etapa: targetStep.label,
+    totalDestinatarios: recipients.length,
+    tempoMs: elapsedMs,
+    provider: result.provider,
+  })
 
   await prisma.solicitation.update({
     where: { id: solicitation.id },

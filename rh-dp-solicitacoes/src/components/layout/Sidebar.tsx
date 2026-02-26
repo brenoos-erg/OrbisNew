@@ -104,11 +104,11 @@ export default function Sidebar({
   equipmentFeatures,
   userMenu,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(false)
+   const [collapsed, setCollapsed] = useState(false)
   const [restrictedVehicleCount, setRestrictedVehicleCount] = useState<number | null>(null)
   const [receivedSolicitationsCount, setReceivedSolicitationsCount] = useState<number | null>(null)
+  const [approvalsPendingCount, setApprovalsPendingCount] = useState<number | null>(null)
   const [pendingRefusalCount, setPendingRefusalCount] = useState<number | null>(null)
-  const [departmentId, setDepartmentId] = useState<string | null>(null)
 
 
     const pathname = usePathname()
@@ -230,66 +230,33 @@ export default function Sidebar({
   }, [fleetFeatures.veiculos, showFleet])
 
   useEffect(() => {
-    if (!showSolic || !solicitacaoFeatures.recebidas) return
+    if (!showSolic) return
 
     let active = true
     const controller = new AbortController()
-    const loadDepartment = async () => {
+    const loadSolicitationCounts = async () => {
       try {
-        const response = await fetch('/api/me', {
+        const response = await fetch('/api/solicitacoes/counts', {
+          cache: 'no-store',
           signal: controller.signal,
         })
         if (!response.ok) return
         const data = await response.json()
-        if (active) {
-          setDepartmentId(data?.departmentId ?? null)
-        }
-      } catch {
+        if (!active) return
+        setReceivedSolicitationsCount(Number(data?.receivedOpenCount ?? 0))
+        setApprovalsPendingCount(Number(data?.approvalsPendingCount ?? 0))
+       } catch {
         // ignore
       }
     }
 
-    loadDepartment()
+    loadSolicitationCounts()
 
     return () => {
       active = false
       controller.abort()
     }
-  }, [showSolic, solicitacaoFeatures.recebidas])
-
-  useEffect(() => {
-    if (!showSolic || !solicitacaoFeatures.recebidas) return
-    if (!departmentId) return
-
-    let active = true
-    const controller = new AbortController()
-    const loadReceivedSolicitations = async () => {
-      try {
-        const response = await fetch(
-          `/api/solicitacoes/recebidas?departmentId=${encodeURIComponent(
-            departmentId,
-          )}`,
-          {
-            signal: controller.signal,
-          },
-        )
-        if (!response.ok) return
-        const data = await response.json()
-        if (active && Array.isArray(data)) {
-          setReceivedSolicitationsCount(data.length)
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    loadReceivedSolicitations()
-
-    return () => {
-      active = false
-      controller.abort()
-    }
-  }, [showSolic, solicitacaoFeatures.recebidas, departmentId])
+  }, [showSolic])
 
   useEffect(() => {
     if (!showRefusal || !canReviewRefusal || !refusalFeatures.pendentes) return
@@ -881,9 +848,12 @@ export default function Sidebar({
                           pathname === '/dashboard/solicitacoes/aprovacao'
                             ? 'bg-orange-500/90 text-white'
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                        }`}
+                         }`}
                     >
                        <CheckCircle2 size={16} /> <span className={labelBase}>Aprovações</span>
+                      {!collapsed && approvalsPendingCount !== null && approvalsPendingCount > 0 && (
+                        <span className={`${badgeBase} bg-sky-500 text-white`}>{approvalsPendingCount}</span>
+                      )}
                     </Link>
                   )}
 
@@ -899,7 +869,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <FolderCog size={16} /> <span className={labelBase}>Cadastros</span>
+                     <FolderCog size={16} /> <span className={labelBase}>Controle de Emails</span>
                     </Link>
                   )}
                 </div>
