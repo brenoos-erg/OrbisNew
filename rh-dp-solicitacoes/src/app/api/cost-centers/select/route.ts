@@ -8,7 +8,6 @@ import { prisma } from '@/lib/prisma'
 export async function GET() {
   try {
     const data = await prisma.costCenter.findMany({
-      where: { status: 'ACTIVE' },
       select: {
         id: true,
         code: true,

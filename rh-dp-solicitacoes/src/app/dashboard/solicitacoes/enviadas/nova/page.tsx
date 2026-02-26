@@ -2226,6 +2226,43 @@ useEffect(() => {
                     </div>
                   );
                 })()}
+                {isSolicitacaoEpi && (
+                  <section className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                      Anexos da solicitação
+                    </h3>
+                    <p className="text-xs text-slate-600">
+                      Anexe documentos de apoio já na abertura do chamado (ex.: lista de itens, requisição assinada).
+                    </p>
+                    <input
+                      id="anexosSolicitante"
+                      name="anexosSolicitante"
+                      type="file"
+                      multiple
+                      onChange={(e: InputChange) => handleFileChange('anexosSolicitante', e.target.files)}
+                      className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                    />
+                    {(extraFiles.anexosSolicitante?.length ?? 0) > 0 && (
+                      <div className="space-y-1">
+                        {extraFiles.anexosSolicitante.map((file) => (
+                          <div
+                            key={`anexo-solicitante-${file.name}-${file.lastModified}`}
+                            className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1"
+                          >
+                            <span className="truncate text-xs text-slate-700">{file.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handlePreviewFile(file)}
+                              className="text-xs font-semibold text-orange-700 hover:text-orange-800"
+                            >
+                              Pré-visualizar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
               </>
             )}
           </div>

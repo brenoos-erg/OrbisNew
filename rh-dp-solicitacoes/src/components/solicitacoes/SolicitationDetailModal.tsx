@@ -62,6 +62,9 @@ type CampoEspecifico = {
 }
 
 type SchemaJson = {
+  meta?: {
+    departamentos?: string[]
+  }
   camposEspecificos?: CampoEspecifico[]
 }
 
@@ -227,6 +230,11 @@ function normalizeConstaValue(value: unknown): ConstaFlag | '' {
   if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA')
     return 'NADA_CONSTA'
   return ''
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
 }
 
 // ===== Helpers de Status =====
@@ -661,6 +669,22 @@ export function SolicitationDetailModal({
     isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
     isDesligamento && isDpDestino && !isFinalizadaOuCancelada
+
+  const departamentosFluxo = asStringArray(detail?.tipo?.schemaJson?.meta?.departamentos)
+  const departamentoFinalFluxo =
+    departamentosFluxo.length > 0
+      ? departamentosFluxo[departamentosFluxo.length - 1]
+      : null
+  const isUltimaEtapaFluxo =
+    departamentosFluxo.length <= 1 ||
+    (departamentoFinalFluxo !== null &&
+      detail?.department?.id === departamentoFinalFluxo)
+  const canFinalizarUltimaEtapa =
+    isUltimaEtapaFluxo &&
+    !followsRhFinalizationFlow &&
+    !isNadaConsta &&
+    !isSolicitacaoExames &&
+    !isFinalizadaOuCancelada
     
   const setoresNadaConsta = (() => {
     if (!isNadaConsta || !detail) return []
@@ -789,6 +813,11 @@ export function SolicitationDetailModal({
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' &&
     !!detail?.department?.id &&
     currentUserDepartmentIds.has(detail.department.id)
+  const canShowApprovalActions =
+    isApprovalMode &&
+    approvalStatus === 'PENDENTE' &&
+    canApproveByDepartment &&
+    (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme)
   const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
@@ -1200,6 +1229,34 @@ async function handleEncaminharAprovacaoComAnexo() {
       setClosing(false)
     }
   }
+  async function handleFinalizarUltimaEtapa() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/finalizar`, {
+        method: 'PATCH',
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao finalizar solicitação.')
+      }
+
+      await refreshDetailFromServer()
+      setCloseSuccess('Chamado finalizado com sucesso.')
+      onFinalized?.()
+    } catch (err: any) {
+      console.error('Erro ao finalizar última etapa', err)
+      setCloseError(err?.message ?? 'Erro ao finalizar solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
 
 
   async function handleFinalizarRh() {
@@ -1318,7 +1375,7 @@ async function handleEncaminharAprovacaoComAnexo() {
   // Aprovação pelo gestor (modo approval)
   async function handleAprovarGestor(comment?: string) {
     const solicitationId = detail?.id ?? row?.id
-    if (!solicitationId) return
+    if (!solicitationId) return false
 
     setClosing(true)
     setCloseError(null)
@@ -1339,15 +1396,19 @@ async function handleEncaminharAprovacaoComAnexo() {
       )
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
+         const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Erro ao aprovar a solicitação.')
       }
 
+      await refreshDetailFromServer()
+
       setCloseSuccess('Solicitação aprovada com sucesso.')
       onActionCompleted?.('APROVAR')
+      return true
     } catch (err: any) {
       console.error('Erro ao aprovar', err)
       setCloseError(err?.message ?? 'Erro ao aprovar a solicitação.')
+      return false
     } finally {
       setClosing(false)
     }
@@ -1355,10 +1416,10 @@ async function handleEncaminharAprovacaoComAnexo() {
 
   async function handleReprovarGestor(comment: string) {
     const solicitationId = detail?.id ?? row?.id
-    if (!solicitationId) return
+    if (!solicitationId) return false
     if (!comment || comment.trim().length === 0) {
       setCloseError('Informe um comentário para reprovar a solicitação.')
-      return
+      return false
     }
 
     setClosing(true)
@@ -1382,13 +1443,15 @@ async function handleEncaminharAprovacaoComAnexo() {
         throw new Error(json?.error ?? 'Erro ao reprovar a solicitação.')
       }
 
-      await refreshDetailFromServer()
+       await refreshDetailFromServer()
 
       setCloseSuccess('Solicitação reprovada.')
       onActionCompleted?.('REPROVAR')
+      return true
     } catch (err: any) {
       console.error('Erro ao reprovar', err)
       setCloseError(err?.message ?? 'Erro ao reprovar a solicitação.')
+      return false
     } finally {
       setClosing(false)
     }
@@ -1418,16 +1481,16 @@ async function handleEncaminharAprovacaoComAnexo() {
       return
     }
 
-    if (approvalAction === 'APROVAR') {
-      await handleAprovarGestor(comment || undefined)
-    } else {
-      await handleReprovarGestor(comment)
-    }
+    const success =
+      approvalAction === 'APROVAR'
+        ? await handleAprovarGestor(comment || undefined)
+        : await handleReprovarGestor(comment)
+
+    if (!success) return
 
     setApprovalAction(null)
     setApprovalComment('')
   }
-
   function handleCancelApprovalAction() {
     setApprovalAction(null)
     setCloseError(null)
@@ -1453,7 +1516,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
           <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
             {/* Modo de aprovação (tela do gestor) */}
-               {isApprovalMode && canApproveByDepartment && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && (
+              {canShowApprovalActions && (
               <>
                 <button
                   onClick={() => handleStartApproval('APROVAR')}
@@ -1473,9 +1536,11 @@ async function handleEncaminharAprovacaoComAnexo() {
               </>
             )}
 
-             {isApprovalMode && (!canApproveByDepartment || (isSolicitacaoEpiUniformeTipo && !canApproveEpiUniforme)) && (
+              {isApprovalMode && !canShowApprovalActions && (
               <span className="text-[11px] font-semibold text-amber-700">
-                Aprovação disponível apenas para nível 3 de solicitações no SST.
+                {approvalStatus !== 'PENDENTE'
+                  ? 'Esta solicitação não está pendente de aprovação.'
+                  : 'Aprovação disponível apenas para nível 3 de solicitações no SST.'}
               </span>
             )}
 
@@ -1488,7 +1553,7 @@ async function handleEncaminharAprovacaoComAnexo() {
           </div>
         </div>
 
-         {isApprovalMode && canApproveByDepartment && (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme) && approvalAction && (
+         {canShowApprovalActions && approvalAction && (
           <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex-1 space-y-2">
@@ -2214,6 +2279,16 @@ async function handleEncaminharAprovacaoComAnexo() {
                       className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
+                    </button>
+                  )}
+                  
+                  {canFinalizarUltimaEtapa && (
+                    <button
+                      onClick={handleFinalizarUltimaEtapa}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                    >
+                      {closing ? 'Enviando...' : 'Finalizar chamado'}
                     </button>
                   )}
                    {isSolicitacaoExames && (
