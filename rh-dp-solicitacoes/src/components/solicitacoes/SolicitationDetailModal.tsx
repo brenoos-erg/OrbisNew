@@ -242,7 +242,7 @@ function getStatusLabel(s: {
     s.approvalStatus === 'APROVADO' &&
     !s.assumidaPorId
   ) {
-    return 'Aguardando atendimento'
+     return 'Aguardando atendimento'
   }
 
   // Mapeia os demais status normalmente
@@ -257,6 +257,39 @@ function getStatusLabel(s: {
 
   return map[s.status] ?? s.status
 }
+
+function getTimelineStepIndex(s: {
+  status: string
+  approvalStatus: ApprovalStatus | null
+  assumidaPorId?: string | null
+}) {
+  if (s.status === 'CONCLUIDA') return 6
+  if (s.status === 'AGUARDANDO_TERMO') return 5
+  if (s.status === 'EM_ATENDIMENTO') return 4
+
+  if (
+    s.status === 'ABERTA' &&
+    s.approvalStatus === 'APROVADO' &&
+    !s.assumidaPorId
+  ) {
+    return 3
+  }
+
+  if (s.approvalStatus === 'APROVADO') return 2
+  if (s.approvalStatus === 'PENDENTE') return 1
+
+  return 0
+}
+
+const TIMELINE_STEPS = [
+  'Aberta',
+  'Aguard. aprovação',
+  'Aprovado',
+  'Aguardando atendimento',
+  'Em atendimento',
+  'Aguardando termo',
+  'Concluída',
+]
 
 // ===== PROPS DO MODAL =====
 
@@ -428,6 +461,15 @@ export function SolicitationDetailModal({
   
 
   const statusLabel = getStatusLabel({
+    status: effectiveStatus,
+    approvalStatus,
+    assumidaPorId:
+      (detail as any)?.assumidaPorId ??
+      row?.responsavelId ??
+      null,
+  })
+
+  const timelineStepIndex = getTimelineStepIndex({
     status: effectiveStatus,
     approvalStatus,
     assumidaPorId:
@@ -1526,6 +1568,35 @@ async function handleEncaminharAprovacaoComAnexo() {
                 <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
                   Dados gerais do chamado
                 </p>
+                <div className="mb-5 overflow-x-auto pb-1">
+                  <div className="grid min-w-[780px] grid-cols-7 gap-3">
+                    {TIMELINE_STEPS.map((step, idx) => {
+                      const isDone = idx < timelineStepIndex
+                      const isCurrent = idx === timelineStepIndex
+
+                      const textClass = isCurrent
+                        ? 'text-orange-600'
+                        : isDone
+                          ? 'text-emerald-600'
+                          : 'text-slate-500'
+
+                      const lineClass = isCurrent
+                        ? 'bg-orange-500'
+                        : isDone
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-200'
+
+                      return (
+                        <div key={step} className="space-y-1.5">
+                          <div className={`h-0.5 w-full rounded-full ${lineClass}`} />
+                          <p className={`text-center text-[11px] font-semibold leading-tight ${textClass}`}>
+                            {step}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className={LABEL_RO}>Status</label>
