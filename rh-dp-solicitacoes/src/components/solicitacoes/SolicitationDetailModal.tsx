@@ -2524,10 +2524,13 @@ function RQ063ResumoCampos({
 }: {
   payloadCampos: Record<string, any>
 }) {
+  const [activeTab, setActiveTab] = useState<
+    'basicas' | 'contratacao' | 'academicos' | 'solicitacoes' | 'projetos' | 'admissao'
+  >('basicas')
+
   const get = (key: string) =>
     payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
 
-  // helpers para checkboxes (salvos como 'true' / 'false')
   const bool = (key: string) => {
     const v = (payloadCampos[key] ?? '').toString().toLowerCase()
     if (!v) return ''
@@ -2536,30 +2539,27 @@ function RQ063ResumoCampos({
 
   const joinIfTrue = (entries: [string, string][]) =>
     entries
-      .filter(
-        ([k]) =>
-          (payloadCampos[k] ?? '').toString().toLowerCase() === 'true',
-      )
+      .filter(([k]) => (payloadCampos[k] ?? '').toString().toLowerCase() === 'true')
       .map(([, label]) => label)
       .join(', ')
 
   const motivoVaga = joinIfTrue([
     ['motivoSubstituicao', 'Substituição'],
-    ['motivoAumentoQuadro', 'Aumento de quadro'],
+    ['motivoAumentoQuadro', 'Aumento no quadro'],
   ])
 
-  const contratacao = joinIfTrue([
+  const tipoContratacao = joinIfTrue([
     ['contratacaoTemporaria', 'Temporária'],
     ['contratacaoPermanente', 'Permanente'],
   ])
 
   const solicitacoesNovoFunc = joinIfTrue([
     ['solicitacaoCracha', 'Crachá'],
+    ['solicitacaoTesteDirecao', 'Teste de direção'],
     ['solicitacaoRepublica', 'República'],
-    ['solicitacaoUniforme', 'Uniforme'],
-    ['solicitacaoTesteDirecao', 'Teste direção'],
     ['solicitacaoEpis', 'EPIs'],
-    ['solicitacaoPostoTrabalho', 'Ponto / Posto de trabalho'],
+    ['solicitacaoUniforme', 'Uniforme'],
+    ['solicitacaoPostoTrabalho', 'Posto de trabalho'],
   ])
 
   const localMatrizFilial = joinIfTrue([
@@ -2567,222 +2567,147 @@ function RQ063ResumoCampos({
     ['escritorioFilial', 'Filial'],
   ])
 
-  return (
+  const completoOuAndamento =
+    bool('escolaridadeCompleta') === 'Sim'
+      ? 'Completo'
+      : bool('cursoEmAndamento') === 'Sim'
+        ? 'Em andamento'
+        : ''
+
+  const tabClass = (tab: string) =>
+    `rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+      activeTab === tab
+        ? 'border-orange-300 bg-orange-50 text-orange-700'
+        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+    }`
+   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-        RQ_063 - Solicitação de Pessoal
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+        RQ_063 - Solicitação de Pessoal / Admissão
       </p>
 
-      {/* Informações básicas */}
-      <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Informações básicas
-        </p>
-        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className={LABEL_RO}>Cargo</label>
-            <input className={INPUT_RO} readOnly value={get('cargoNome')} />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button type="button" className={tabClass('basicas')} onClick={() => setActiveTab('basicas')}>
+          Aba 1 — Informações básicas
+        </button>
+        <button type="button" className={tabClass('contratacao')} onClick={() => setActiveTab('contratacao')}>
+          Aba 2 — Contratação
+        </button>
+        <button type="button" className={tabClass('academicos')} onClick={() => setActiveTab('academicos')}>
+          Aba 3 — Requisitos acadêmicos
+        </button>
+        <button type="button" className={tabClass('solicitacoes')} onClick={() => setActiveTab('solicitacoes')}>
+          Aba 4 — Solicitações
+        </button>
+        <button type="button" className={tabClass('projetos')} onClick={() => setActiveTab('projetos')}>
+          Aba 5 — Escritório de Projetos
+        </button>
+        <button type="button" className={tabClass('admissao')} onClick={() => setActiveTab('admissao')}>
+          Aba 6 — Dados do contratado
+        </button>
+      </div>
+
+      {activeTab === 'basicas' && (
+        <section>
+          <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+            <div><label className={LABEL_RO}>Cargo</label><input className={INPUT_RO} readOnly value={get('cargoNome') || get('cargo')} /></div>
+            <div><label className={LABEL_RO}>Setor e/ou Projeto</label><input className={INPUT_RO} readOnly value={get('setorProjeto')} /></div>
+            <div><label className={LABEL_RO}>Vaga prevista em contrato</label><input className={INPUT_RO} readOnly value={get('vagaPrevista') || get('vagaPrevistaContrato')} /></div>
+            <div><label className={LABEL_RO}>Local de trabalho</label><input className={INPUT_RO} readOnly value={get('localTrabalho')} /></div>
+            <div><label className={LABEL_RO}>Centro de custo</label><input className={INPUT_RO} readOnly value={get('centroCustoForm') || get('centroCustoId')} /></div>
+            <div><label className={LABEL_RO}>Horário de trabalho</label><input className={INPUT_RO} readOnly value={get('horarioTrabalho')} /></div>
+            <div><label className={LABEL_RO}>Chefia imediata</label><input className={INPUT_RO} readOnly value={get('chefiaImediata')} /></div>
+            <div><label className={LABEL_RO}>Coordenador do contrato</label><input className={INPUT_RO} readOnly value={get('coordenadorContrato')} /></div>
+            <div><label className={LABEL_RO}>Motivo da vaga</label><input className={INPUT_RO} readOnly value={motivoVaga || get('motivoVaga')} /></div>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'contratacao' && (
+        <section className="space-y-3 text-xs">
           <div>
-            <label className={LABEL_RO}>Setor e/ou Projeto</label>
-            <input className={INPUT_RO} readOnly value={get('setorProjeto')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Vaga prevista em contrato?</label>
-            <input className={INPUT_RO} readOnly value={get('vagaPrevista')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Local de trabalho</label>
-            <input className={INPUT_RO} readOnly value={get('localTrabalho')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Coordenador do contrato</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('coordenadorContrato')}
-            />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Motivo da vaga</label>
-            <input className={INPUT_RO} readOnly value={motivoVaga} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Contratação</label>
-            <input className={INPUT_RO} readOnly value={contratacao} />
+             <label className={LABEL_RO}>Tipo de contratação</label>
+            <input className={INPUT_RO} readOnly value={tipoContratacao || get('tipoContratacao')} />
           </div>
           <div>
             <label className={LABEL_RO}>Justificativa da vaga</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('justificativaVaga')}
-            />
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('justificativaVaga')} />
           </div>
-        </div>
-      </section>
-
-      {/* Atividades */}
-      <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Atividades
-        </p>
-        <div className="space-y-3 text-xs">
           <div>
             <label className={LABEL_RO}>Principais atividades</label>
-            <textarea
-              className={`${INPUT_RO} min-h-[70px]`}
-              readOnly
-              value={get('principaisAtividades')}
-            />
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('principaisAtividades')} />
           </div>
           <div>
             <label className={LABEL_RO}>Atividades complementares</label>
-            <textarea
-              className={`${INPUT_RO} min-h-[70px]`}
-              readOnly
-              value={get('atividadesComplementares')}
-            />
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('atividadesComplementares')} />
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Requisitos acadêmicos */}
-      <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Requisitos acadêmicos
-        </p>
-        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className={LABEL_RO}>Escolaridade</label>
-            <input className={INPUT_RO} readOnly value={get('escolaridade')} />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Curso</label>
-            <input className={INPUT_RO} readOnly value={get('curso')} />
-          </div>
-        </div>
+      {activeTab === 'academicos' && (
+        <section className="space-y-3 text-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div><label className={LABEL_RO}>Escolaridade</label><input className={INPUT_RO} readOnly value={get('escolaridade')} /></div>
+            <div><label className={LABEL_RO}>Curso</label><input className={INPUT_RO} readOnly value={get('curso')} /></div>
+            <div><label className={LABEL_RO}>Completo / Em andamento</label><input className={INPUT_RO} readOnly value={completoOuAndamento} /></div>
 
-        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3 mt-3">
+           </div>
           <div>
-            <label className={LABEL_RO}>Escolaridade completa?</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={bool('escolaridadeCompleta')}
-            />
+            <label className={LABEL_RO}>Período/Módulo (mínimo/máximo)</label>
+            <input className={INPUT_RO} readOnly value={get('periodoModulo')} />
           </div>
           <div>
-            <label className={LABEL_RO}>Curso em andamento?</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={bool('cursoEmAndamento')}
-            />
+            <label className={LABEL_RO}>Requisitos e conhecimentos necessários</label>
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('requisitosConhecimentos')} />
           </div>
-        </div>
+          <div>
+            <label className={LABEL_RO}>Competências comportamentais exigidas</label>
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('competenciasComportamentais')} />
+          </div>
+         </section>
+      )}
 
-        <div className="mt-3">
-          <label className={LABEL_RO}>Período / módulo - mínimo ou máximo</label>
-          <input
-            className={INPUT_RO}
-            readOnly
-            value={get('periodoModulo')}
-          />
-        </div>
-      </section>
+      {activeTab === 'solicitacoes' && (
+        <section className="space-y-3 text-xs">
+          <div>
+            <label className={LABEL_RO}>Solicitações</label>
+            <input className={INPUT_RO} readOnly value={solicitacoesNovoFunc || get('solicitacaoOutros')} />
+          </div>
+        </section>
+      )}
 
-      {/* Requisitos / competências */}
-      <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Requisitos e competências
-        </p>
-        <div className="space-y-3 text-xs">
+      {activeTab === 'projetos' && (
+        <section className="space-y-3 text-xs">
           <div>
-            <label className={LABEL_RO}>
-              Requisitos e conhecimentos necessários
-            </label>
-            <textarea
-              className={`${INPUT_RO} min-h-[70px]`}
-              readOnly
-              value={get('requisitosConhecimentos')}
-            />
+            <label className={LABEL_RO}>Matriz ou Filial</label>
+            <input className={INPUT_RO} readOnly value={localMatrizFilial} />
           </div>
           <div>
-            <label className={LABEL_RO}>
-              Competências comportamentais exigidas
-            </label>
-            <textarea
-              className={`${INPUT_RO} min-h-[70px]`}
-              readOnly
-              value={get('competenciasComportamentais')}
-            />
+            <label className={LABEL_RO}>Previsto em contrato (Salários, Benefícios, Carga Horária e Outros)</label>
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('previstoContrato')} />
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Solicitações para o novo funcionário */}
-      <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Solicitações para o novo funcionário
-        </p>
-       <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className={LABEL_RO}>
-              Crachá / República / Uniforme / Outros
-            </label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={
-                solicitacoesNovoFunc ||
-                get('solicitacaoOutros')
-              }
-            />
+      {activeTab === 'admissao' && (
+        <section className="space-y-3 text-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div><label className={LABEL_RO}>Nome do profissional</label><input className={INPUT_RO} readOnly value={get('nomeProfissional')} /></div>
+            <div><label className={LABEL_RO}>Salário</label><input className={INPUT_RO} readOnly value={get('salario')} /></div>
+            <div><label className={LABEL_RO}>Data de admissão</label><input className={INPUT_RO} readOnly value={get('dataAdmissao')} /></div>
+            <div><label className={LABEL_RO}>CBO</label><input className={INPUT_RO} readOnly value={get('cbo')} /></div>
           </div>
           <div>
-            <label className={LABEL_RO}>Local (Matriz ou Filial)</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={localMatrizFilial}
-            />
+            <label className={LABEL_RO}>Benefícios</label>
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('beneficios')} />
           </div>
-        </div>
-      </section>
+          <div>
+            <label className={LABEL_RO}>Observação</label>
+            <textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={get('observacoesRh') || get('observacao')} />
+          </div>
+        </section>
+      )}
 
-      {/* RH */}
-      <section>
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
-          Preenchimento RH
-        </p>
-        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className={LABEL_RO}>Nome do profissional</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('nomeProfissional')}
-            />
-          </div>
-          <div>
-            <label className={LABEL_RO}>Data de admissão</label>
-            <input
-              className={INPUT_RO}
-              readOnly
-              value={get('dataAdmissao')}
-            />
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className={LABEL_RO}>Observações</label>
-          <textarea
-            className={`${INPUT_RO} min-h-[70px]`}
-            readOnly
-            value={get('observacoesRh')}
-          />
-        </div>
-      </section>
     </div>
   )
 }
