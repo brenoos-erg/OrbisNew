@@ -90,7 +90,7 @@ export async function assertUserMinLevel(
  * })
  */
 export function withModuleLevel<
-  TContext extends { params?: any } = { params?: any },
+  TContext extends { params: any } = { params: any },
   TRequest extends Request = Request,
 >(
   moduleKey: string,
