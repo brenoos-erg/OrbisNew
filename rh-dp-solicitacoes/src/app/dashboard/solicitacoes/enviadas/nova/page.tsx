@@ -47,6 +47,12 @@ type CostCenterOption = {
   externalCode?: string | null;
 };
 
+type CostCenterResponse =
+  | CostCenterOption[]
+  | {
+      items?: CostCenterOption[];
+    };
+
 type CampoEspecifico = {
   name: string;
   label: string;
@@ -119,6 +125,12 @@ function toSentenceCaseWithAcronyms(value: string) {
     const upper = word.toUpperCase();
     return ACRONYM_TOKENS.includes(upper) ? upper : word;
   });
+}
+
+function normalizeCostCenters(data: CostCenterResponse): CostCenterOption[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
 }
 
 function getTipoDisplayName(nome: string) {
@@ -241,10 +253,39 @@ export default function NovaSolicitacaoPage() {
      loadDepartments();
   }, []);
   useEffect(() => {
-    fetch('/api/cost-centers/select', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setCostCenters(Array.isArray(data) ? data : []))
-      .catch(() => setCostCenters([]));
+  async function loadCostCenters() {
+      try {
+        const selectResponse = await fetch('/api/cost-centers/select', {
+          cache: 'no-store',
+        });
+
+        if (selectResponse.ok) {
+          const data = (await selectResponse.json()) as CostCenterResponse;
+          const normalized = normalizeCostCenters(data);
+
+          if (normalized.length > 0) {
+            setCostCenters(normalized);
+            return;
+          }
+        }
+
+        const fallbackResponse = await fetch('/api/cost-centers?pageSize=500', {
+          cache: 'no-store',
+        });
+
+        if (!fallbackResponse.ok) {
+          throw new Error('Erro ao buscar centros de custo');
+        }
+
+        const fallbackData = (await fallbackResponse.json()) as CostCenterResponse;
+        setCostCenters(normalizeCostCenters(fallbackData));
+      } catch (error) {
+        console.error('Falha ao carregar centros de custo:', error);
+        setCostCenters([]);
+      }
+    }
+
+    loadCostCenters();
   }, []);
 
   /* ============================================================
