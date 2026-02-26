@@ -19,9 +19,10 @@ import {
 
 
 const LABEL_RO =
-  'block text-xs font-semibold text-slate-700 uppercase tracking-wide'
+   'block text-xs font-bold text-slate-800 uppercase tracking-wide'
 const INPUT_RO =
-  'mt-1 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-base text-slate-700 focus:outline-none cursor-default lg:text-sm'
+  'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
+
 
 // ===== Tipos que a página de lista já usa =====
 export type Row = {
@@ -204,102 +205,7 @@ export type SolicitationDetail = {
   timelines?: { id: string; status: string; message?: string | null; createdAt: string }[]
 }
 
-// ===== Timeline =====
 
-type TimelineStepKey =
-  | 'ABERTA'
-  | 'AGUARDANDO_APROVACAO'
-  | 'APROVADO'
-  | 'REPROVADO'
-  | 'AGUARDANDO_ATENDIMENTO'
-  | 'EM_ATENDIMENTO'
-  | 'AGUARDANDO_TERMO'
-  | 'CONCLUIDA'
-  | 'CANCELADA'
-
-type TimelineStep = {
-  key: TimelineStepKey
-  label: string
-}
-
-/**
- * Monta os passos e descobre qual é o passo atual da linha do tempo
- * baseado em status + approvalStatus.
- */
-function buildTimeline(
-  status: SolicitationStatus,
-  approvalStatus: ApprovalStatus | undefined | null,
-): { steps: TimelineStep[]; currentIndex: number } {
-  const steps: TimelineStep[] = []
-
-  // sempre começa em ABERTA
-  steps.push({ key: 'ABERTA', label: 'Aberta' })
-
-  if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
-    // fluxo sem aprovação: Aberta → Em atendimento → Concluída/Cancelada
-    steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
-    steps.push({ key: 'AGUARDANDO_TERMO', label: 'Aguardando termo' })
-    steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
-  } else {
-    // fluxo com aprovação
-    steps.push({
-      key: 'AGUARDANDO_APROVACAO',
-      label: 'Aguard. aprovação',
-    })
-
-    if (approvalStatus === 'PENDENTE') {
-      // ainda parado em aguardando aprovação
-    } else if (approvalStatus === 'APROVADO') {
-      steps.push({ key: 'APROVADO', label: 'Aprovado' })
-      steps.push({
-        key: 'AGUARDANDO_ATENDIMENTO',
-        label: 'Aguardando atendimento',
-      })
-      steps.push({ key: 'EM_ATENDIMENTO', label: 'Em atendimento' })
-      steps.push({ key: 'AGUARDANDO_TERMO', label: 'Aguardando termo' })
-    steps.push({ key: 'CONCLUIDA', label: 'Concluída' })
-    } else if (approvalStatus === 'REPROVADO') {
-      steps.push({ key: 'REPROVADO', label: 'Reprovado' })
-      steps.push({
-        key: 'CANCELADA',
-        label: 'Solicitação cancelada',
-      })
-    }
-  }
-
-  // ---- qual passo é o "atual"? ----
-  let currentKey: TimelineStepKey = 'ABERTA'
-
-  if (!approvalStatus || approvalStatus === 'NAO_PRECISA') {
-    // sem aprovação
-    if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
-    else if (status === 'AGUARDANDO_TERMO') currentKey = 'AGUARDANDO_TERMO'
-    else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
-    else if (status === 'CANCELADA') currentKey = 'CANCELADA'
-    else currentKey = 'ABERTA'
-  } else if (approvalStatus === 'PENDENTE') {
-    currentKey = 'AGUARDANDO_APROVACAO'
-  } else if (approvalStatus === 'REPROVADO') {
-    currentKey = status === 'CANCELADA' ? 'CANCELADA' : 'REPROVADO'
-  } else if (approvalStatus === 'APROVADO') {
-    if (status === 'ABERTA') currentKey = 'AGUARDANDO_ATENDIMENTO'
-    else if (status === 'AGUARDANDO_APROVACAO')
-      currentKey = 'AGUARDANDO_APROVACAO'
-    else if (status === 'EM_ATENDIMENTO') currentKey = 'EM_ATENDIMENTO'
-    else if (status === 'AGUARDANDO_TERMO') currentKey = 'AGUARDANDO_TERMO'
-    else if (status === 'CONCLUIDA') currentKey = 'CONCLUIDA'
-    else if (status === 'CANCELADA') currentKey = 'CANCELADA'
-    else currentKey = 'APROVADO'
-  }
-
-
-  const currentIndex = Math.max(
-    0,
-    steps.findIndex((s) => s.key === currentKey),
-  )
-
-  return { steps, currentIndex }
-}
 
 function formatDate(dateStr?: string | null) {
   if (!dateStr) return '-'
@@ -519,10 +425,7 @@ export function SolicitationDetailModal({
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
 
-  const { steps: timelineSteps, currentIndex } = buildTimeline(
-    effectiveStatus,
-    approvalStatus,
-  )
+  
 
   const statusLabel = getStatusLabel({
     status: effectiveStatus,
@@ -1603,57 +1506,7 @@ async function handleEncaminharAprovacaoComAnexo() {
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="min-w-0 space-y-5 lg:col-span-2">
-          {/* TIMELINE NO TOPO */}
-          <div className="mb-3 flex flex-col gap-2">
-            <div className="flex gap-4">
-              {timelineSteps.map((step, index) => {
-                const isActive = index === currentIndex
-                const isDone = index < currentIndex
-                const barColor = isActive
-                  ? 'bg-orange-500'
-                  : isDone
-                    ? 'bg-emerald-500'
-                    : 'bg-slate-300'
-                const textColor = isActive
-                  ? 'text-orange-600 font-semibold'
-                  : isDone
-                    ? 'text-emerald-600'
-                    : 'text-slate-500'
-
-                return (
-                  <div
-                    key={step.key}
-                    className="flex flex-1 flex-col items-center gap-1 text-[11px]"
-                  >
-                    <div className={`h-1 w-full rounded-full ${barColor}`} />
-                    <span className={textColor}>{step.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-
-            {effectiveStatus === 'CANCELADA' && (
-              <p className="text-center text-[11px] text-red-600">
-                Solicitação cancelada.
-              </p>
-            )}
-          </div>
-           {detail?.timelines && detail.timelines.length > 0 && (
-            <section className="rounded-lg border border-slate-200 p-3">
-              <h3 className="mb-2 text-sm font-semibold text-slate-700">Linha do tempo</h3>
-              <ul className="space-y-2">
-                {detail.timelines.map((item) => (
-                  <li key={item.id} className="rounded-md bg-slate-50 p-2">
-                    <p className="text-[11px] text-slate-500">{format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm')}</p>
-                    <p className="text-xs font-medium text-slate-700">{item.status}</p>
-                    <p className="text-xs text-slate-600">{item.message || '-'}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {loading && (
+         {loading && (
             <p className="text-xs text-slate-500">
               Carregando detalhes...
             </p>
@@ -1669,7 +1522,11 @@ async function handleEncaminharAprovacaoComAnexo() {
           {detail && (
             <>
               {/* Informações principais */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                  Dados gerais do chamado
+                </p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className={LABEL_RO}>Status</label>
                   <input
@@ -1733,12 +1590,13 @@ async function handleEncaminharAprovacaoComAnexo() {
                   />
                 </div>
                 <div>
-                  <label className={LABEL_RO}>Data Fechamento</label>
+                   <label className={LABEL_RO}>Data Fechamento</label>
                   <input
                     className={INPUT_RO}
                     readOnly
                     value={formatDate(detail.dataFechamento)}
                   />
+                </div>
                 </div>
               </div>
 
@@ -1784,7 +1642,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               )}
 
               {/* Dados do solicitante */}
-              <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+              <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-sky-50/40 p-4 shadow-sm">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
                   Dados do Solicitante
                 </p>
