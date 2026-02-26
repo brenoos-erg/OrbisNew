@@ -91,9 +91,30 @@ export async function POST(
     }
 
     let rhCostCenter = null
+    let rhDepartment: { id: string; name: string } | null = null
 
      if (isSolicitacaoPessoalTipo) {
-      rhCostCenter = await prisma.costCenter.findFirst({
+      rhDepartment = await prisma.department.findFirst({
+        where: {
+          OR: [
+            { code: '17' },
+            { name: { contains: 'Recursos Humanos' } },
+            { sigla: { contains: 'RH' } },
+          ],
+        },
+        select: { id: true, name: true },
+      })
+
+      if (!rhDepartment) {
+        return NextResponse.json(
+          {
+            error:
+              'Departamento de Recursos Humanos não encontrado para encaminhar a solicitação aprovada.',
+          },
+          { status: 400 },
+        )
+      }
+   rhCostCenter = await prisma.costCenter.findFirst({
         where: {
           OR: [
             {
@@ -104,29 +125,9 @@ export async function POST(
           ],
         },
       })
-
-      if (!rhCostCenter) {
-        return NextResponse.json(
-          {
-            error:
-              'Centro de custo de Recursos Humanos não encontrado para encaminhar a solicitação aprovada.',
-          },
-          { status: 400 },
-        )
-      }
     }
 
-    const rhDepartmentId =
-      rhCostCenter?.departmentId ?? solic.costCenter?.departmentId ?? solic.departmentId
-    if (rhCostCenter && !rhDepartmentId) {
-      return NextResponse.json(
-        {
-          error:
-            'Departamento do centro de custo de RH não encontrado para encaminhar a solicitação aprovada.',
-        },
-        { status: 400 },
-      )
-    }
+    const rhDepartmentId = rhDepartment?.id
      const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
 
@@ -139,8 +140,8 @@ export async function POST(
       status: 'ABERTA',
     }
 
-    if (isSolicitacaoPessoalTipo && rhCostCenter) {
-      updateData.costCenterId = rhCostCenter.id
+    if (isSolicitacaoPessoalTipo && rhDepartmentId) {
+      updateData.costCenterId = rhCostCenter?.id ?? null
       updateData.departmentId = rhDepartmentId
     } else if (isFerias && dpDepartment) {
       updateData.departmentId = dpDepartment.id
@@ -175,9 +176,8 @@ export async function POST(
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
     } else if (isSolicitacaoEpi && logisticaDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
-    } else if (isSolicitacaoPessoalTipo && rhCostCenter) {
-      const rhName = rhCostCenter.description ?? rhCostCenter.code ?? rhCostCenter.id
-      timelineMessage = `Solicitação aprovada e encaminhada para o RH (${rhName}).`
+    } else if (isSolicitacaoPessoalTipo && rhDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para o departamento ${rhDepartment.name}.`
     } else {
       timelineMessage = `Solicitação aprovada por ${me.fullName ?? me.id}.`
     }

@@ -1266,6 +1266,9 @@ async function handleEncaminharAprovacaoComAnexo() {
     setCloseSuccess(null)
 
     try {
+      const isBlank = (value: string | null | undefined) =>
+        !value || value.trim().length === 0
+
       const nomeFinal =
         candidatoNome ||
         (payloadCampos.nomeColaborador as string) ||
@@ -1277,6 +1280,22 @@ async function handleEncaminharAprovacaoComAnexo() {
         (payloadCampos.cpf as string) ||
         (payloadCampos.documento as string) ||
         undefined
+
+      if (isSolicitacaoPessoalTipo) {
+        const faltantes: string[] = []
+
+        if (isBlank(nomeFinal)) faltantes.push('nome do contratado')
+        if (isBlank(documentoFinal)) faltantes.push('documento (CPF)')
+        if (isBlank(dataAdmissaoPrevista)) faltantes.push('data de admissão prevista')
+        if (isBlank(cargo)) faltantes.push('cargo')
+        if (isBlank(salario)) faltantes.push('salário')
+
+        if (faltantes.length > 0) {
+          throw new Error(
+            `Preencha os dados pendentes do contratado antes de enviar para o DP: ${faltantes.join(', ')}.`,
+          )
+        }
+      }
         const buildOptionalValue = (value: string) =>
         value && value.trim().length > 0 ? value : undefined
 
@@ -1973,8 +1992,8 @@ async function handleEncaminharAprovacaoComAnexo() {
               )}
                
 
-               {/* DADOS DO CONTRATADO (formulário extra) */}
-              {showContratadoForm && !showManagementActions && (
+                 {/* DADOS DO CONTRATADO (formulário extra) */}
+              {showContratadoForm && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
                     Dados do contratado
