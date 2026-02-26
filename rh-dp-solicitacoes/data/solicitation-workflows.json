@@ -972,8 +972,10 @@
     ]
   },
   {
+    "id": "0daf6dcf-ec52-413f-baa8-f87e6000f7a8",
     "name": "Fluxo padrão",
     "tipoId": "RQ_RH_103",
+    "departmentId": null,
     "active": true,
     "steps": [
       {
@@ -981,64 +983,82 @@
         "stepKey": "SETOR_ORIGEM",
         "label": "Setor Origem",
         "kind": "DEPARTAMENTO",
-        "notificationEmails": [],
-        "approverUserIds": [],
+        "defaultDepartmentId": null,
+        "notificationEmails": [
+          "brenoos@ergengenharia.com.br"
+        ],
         "notificationTemplate": {
-          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
-          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+          "subject": "Nova etapa iniciada – {tipoCodigo} | {departamentoAtual}",
+          "body": "Prezados,\n\nInformamos que a solicitação {protocolo} ({tipoCodigo} - {tipoNome}), registrada por {solicitante}, entrou na etapa sob responsabilidade do departamento {departamentoAtual}.\n\nSolicitamos que seja realizada a análise e o devido tratamento da demanda.\n\nPara acessar os detalhes da solicitação, utilize o link abaixo:\n{link}\n\nEm caso de dúvidas, entre em contato com o solicitante ou com a equipe responsável.\n\nAtenciosamente,\nSistema de Gestão Integrada"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": false,
+        "posX": 40,
+        "posY": 80
       },
       {
         "order": 2,
         "stepKey": "APROVADORES",
         "label": "Aprovadores",
         "kind": "APROVACAO",
+        "defaultDepartmentId": null,
         "notificationEmails": [],
-        "approverUserIds": [],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": false,
+        "posX": 280,
+        "posY": 80
       },
       {
         "order": 3,
         "stepKey": "SETOR_DESTINO",
         "label": "Setor Destino",
         "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
         "notificationEmails": [],
-        "approverUserIds": [],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": false,
+        "posX": 520,
+        "posY": 80
       },
       {
         "order": 4,
         "stepKey": "FIM",
-        "label": "Fim",
-        "kind": "FIM",
+        "label": "Departamento final",
+        "kind": "DEPARTAMENTO",
+        "defaultDepartmentId": null,
         "notificationEmails": [],
-        "approverUserIds": [],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": true,
+        "posX": 760,
+        "posY": 80
       }
     ],
     "transitions": [
@@ -1054,8 +1074,6 @@
         "fromStepKey": "SETOR_DESTINO",
         "toStepKey": "FIM"
       }
-    ],
-    "id": "0daf6dcf-ec52-413f-baa8-f87e6000f7a8",
-    "departmentId": null
+    ]
   }
 ]

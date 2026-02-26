@@ -2,21 +2,12 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
-
-function generateProtocolo() {
-  const now = new Date()
-  const yy = now.getFullYear().toString().slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const rand = Math.floor(Math.random() * 9999)
-    .toString()
-    .padStart(4, '0')
-  return `RQ${yy}${mm}${dd}-${rand}`
-}
+import { nextSolicitationProtocolo } from '@/lib/protocolo'
 
 export async function POST(
   req: NextRequest,
@@ -482,7 +473,7 @@ export async function POST(
         // 4.2) Cria a nova solicitação para o DP – Solicitação de Admissão
         dpSolicitation = await tx.solicitation.create({
           data: {
-            protocolo: generateProtocolo(),
+            protocolo: await nextSolicitationProtocolo(tx),
             tipoId: tipoAdmissao.id,
             costCenterId: ccDp.id,
             departmentId: deptDp?.id ?? solicitation.departmentId,
@@ -607,7 +598,7 @@ export async function POST(
 
         dpSolicitation = await tx.solicitation.create({
           data: {
-            protocolo: generateProtocolo(),
+            protocolo: await nextSolicitationProtocolo(tx),
             tipoId: tipoIncentivo.id,
             costCenterId: ccDp.id,
             departmentId: deptDp?.id ?? solicitation.departmentId,
@@ -715,7 +706,7 @@ export async function POST(
 
         dpSolicitation = await tx.solicitation.create({
           data: {
-            protocolo: generateProtocolo(),
+            protocolo: await nextSolicitationProtocolo(tx),
             tipoId: solicitation.tipoId,
             costCenterId: ccDp.id,
             departmentId: deptDp?.id ?? solicitation.departmentId,
@@ -780,9 +771,12 @@ export async function POST(
       }
     })
 
-    return NextResponse.json(result, { status: 200 })
+     return NextResponse.json(result, { status: 200 })
   } catch (err: any) {
     console.error('POST /api/solicitacoes/[id]/finalizar-rh error', err)
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json({ error: 'Conflito de dados únicos ao finalizar solicitação.' }, { status: 409 })
+    }
     return NextResponse.json(
       { error: 'Erro ao finalizar solicitação no RH.' },
       { status: 500 },

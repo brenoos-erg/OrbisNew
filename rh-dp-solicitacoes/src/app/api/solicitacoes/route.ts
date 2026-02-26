@@ -2,7 +2,7 @@ export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, SolicitationPriority } from '@prisma/client'
+import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -25,25 +25,7 @@ import {
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { getNivel3DepartmentIds } from '@/lib/solicitationApprovalPermissions'
-
-
-
-
-
-
-/**
- * Gera um código de protocolo simples, ex: RQ2502-0001
- */
-function generateProtocolo() {
-  const now = new Date()
-  const yy = now.getFullYear().toString().slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).toString().padStart(2, '0')
-  const rand = Math.floor(Math.random() * 9999)
-    .toString()
-    .padStart(4, '0')
-  return `RQ${yy}${mm}${dd}-${rand}`
-}
+import { nextSolicitationProtocolo } from '@/lib/protocolo'
 
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
@@ -408,7 +390,7 @@ export const POST = withModuleLevel(
         }
 
           
-          const protocolo = generateProtocolo()
+          const protocolo = await nextSolicitationProtocolo()
         const titulo = tipo.nome
         const tipoMeta = (tipo.schemaJson as {
           meta?: {
@@ -1096,6 +1078,9 @@ export const POST = withModuleLevel(
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
         console.error('POST /api/solicitacoes error', e)
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          return NextResponse.json({ error: 'Conflito de dados únicos ao criar solicitação.' }, { status: 409 })
+        }
         return NextResponse.json(
           { error: 'Erro ao criar solicitação.' },
           { status: 500 },

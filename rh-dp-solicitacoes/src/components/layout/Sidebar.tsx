@@ -961,7 +961,7 @@ export default function Sidebar({
                       href="/dashboard/configuracoes/cargos"
                       className={`${submenuItemBase}
                         ${
-                          pathname.startsWith(
+                           pathname.startsWith(
                             '/dashboard/configuracoes/cargos',
                           )
                             ? 'bg-orange-500/90 text-white'
@@ -969,6 +969,20 @@ export default function Sidebar({
                         }`}
                     >
                      <FolderCog size={16} /> <span className={labelBase}>Cargos</span>
+                    </Link>
+                  )}
+
+                  {configFeatures.painel && (
+                    <Link
+                      href="/dashboard/configuracoes/fluxo-solicitacao"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/configuracoes/fluxo-solicitacao')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Route size={16} /> <span className={labelBase}>Fluxo de Solicitação</span>
                     </Link>
                   )}
                 </div>

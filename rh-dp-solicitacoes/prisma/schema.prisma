@@ -718,6 +718,11 @@ model SolicitationTimeline {
   createdAt      DateTime     @default(now())
   solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
 }
+model ProtocolSequence {
+  year       Int      @id
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
 
 model UserModuleAccess {
   id       String      @id @default(uuid())
