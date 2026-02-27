@@ -289,6 +289,7 @@ export default function Page() {
   const [processingBulk, setProcessingBulk] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkCreateFirstAccess, setBulkCreateFirstAccess] = useState(true)
+  const [bulkCostCenterId, setBulkCostCenterId] = useState('')
   const [bulkDepartmentId, setBulkDepartmentId] = useState('')
   const [bulkResults, setBulkResults] = useState<
     {
@@ -607,7 +608,7 @@ export default function Page() {
         continue
       }
 
-      const loginValue = (loginInput || toLoginFromName(name)).toLowerCase()
+       const loginValue = (loginInput || toLoginFromName(name)).toLowerCase()
       const emailValue =
         (emailInput && emailInput.toLowerCase()) || toEmailFromName(name)
 
@@ -622,6 +623,7 @@ export default function Page() {
             email: emailValue,
             login: loginValue,
             phone: phoneInput || '',
+            costCenterId: bulkCostCenterId || null,
              departmentId: bulkDepartmentId || null,
             password: passwordValue,
             firstAccess: bulkCreateFirstAccess,
@@ -1108,13 +1110,23 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                 <p className="text-xs text-slate-500">
                   Cole várias linhas usando ponto e vírgula como separador e cadastre tudo de uma só vez.
                 </p>
-                <p className="mt-1 text-[11px] text-slate-500">
+               <p className="mt-1 text-[11px] text-slate-500">
                   Formato: Nome completo; email; telefone (opcional); senha (opcional); login (opcional).
                   Se o login estiver vazio, usamos o padrão gerado pelo nome (primeiro e último).
                 </p>
               </div>
 
               <div className="flex flex-col items-start gap-3 sm:items-end sm:w-80 w-full">
+               <CostCenterCombo
+                  label="Centro de custo (opcional)"
+                  valueId={bulkCostCenterId}
+                  onChangeId={setBulkCostCenterId}
+                  centers={costCenters}
+                />
+                <p className="-mt-1 text-[11px] text-slate-500">
+                  Aplicado a todos os usuários criados nesta lista.
+                </p>
+
                <DepartmentCombo
                   label="Departamento (opcional)"
                   valueId={bulkDepartmentId}
