@@ -93,6 +93,57 @@ async function main() {
     },
   })
 
+  const legacyDepartments = await prisma.department.findMany({
+    where: {
+      code: {
+        notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+      },
+    },
+    select: { id: true },
+  })
+
+  const legacyDepartmentIds = legacyDepartments.map((department) => department.id)
+
+  if (legacyDepartmentIds.length > 0) {
+    const legacyDepartmentFilter = {
+      in: legacyDepartmentIds,
+    }
+
+    await prisma.solicitation.updateMany({
+      where: { departmentId: legacyDepartmentFilter },
+      data: { departmentId: tiDepartment.id },
+    })
+
+    await prisma.departmentModule.deleteMany({
+      where: { departmentId: legacyDepartmentFilter },
+    })
+
+    await prisma.costCenter.updateMany({
+      where: { departmentId: legacyDepartmentFilter },
+      data: { departmentId: null },
+    })
+
+    await prisma.position.updateMany({
+      where: { departmentId: legacyDepartmentFilter },
+      data: { departmentId: null },
+    })
+
+    await prisma.user.updateMany({
+      where: { departmentId: legacyDepartmentFilter },
+      data: { departmentId: tiDepartment.id },
+    })
+
+    await prisma.isoDocument.updateMany({
+      where: { ownerDepartmentId: legacyDepartmentFilter },
+      data: { ownerDepartmentId: tiDepartment.id },
+    })
+
+    await prisma.approverGroup.updateMany({
+      where: { departmentId: legacyDepartmentFilter },
+      data: { departmentId: null },
+    })
+  }
+
   await prisma.department.deleteMany({
     where: {
       code: {
