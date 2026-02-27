@@ -5,13 +5,25 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withRequestMetrics } from '@/lib/request-metrics'
 import { OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartment'
+import { requireActiveUser } from '@/lib/auth'
+import { DEFAULT_DEPARTMENT_CODE, ensureDefaultDepartmentExists } from '@/lib/defaultDepartment'
 
 export async function GET() {
   return withRequestMetrics('GET /api/departments', async () => {
     try {
+      const me = await requireActiveUser()
+      const isAdmin = me.role === 'ADMIN'
+
+      if (isAdmin) {
+        await ensureDefaultDepartmentExists()
+      }
+
       const data = await prisma.department.findMany({
         where: {
-          code: { in: OFFICIAL_DEPARTMENT_CODES as string[] },
+          OR: [
+            { code: { in: OFFICIAL_DEPARTMENT_CODES as string[] } },
+            ...(isAdmin ? [{ code: DEFAULT_DEPARTMENT_CODE }] : []),
+          ],
         },
         select: {
           id: true,

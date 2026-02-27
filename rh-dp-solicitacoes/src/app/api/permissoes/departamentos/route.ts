@@ -11,6 +11,7 @@ import { normalizeModuleKey, normalizeModuleLinks, normalizeModules } from '@/li
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { withRequestMetrics } from '@/lib/request-metrics'
+import { DEFAULT_DEPARTMENT_CODE, ensureDefaultDepartmentExists } from '@/lib/defaultDepartment'
 
 const CORE_MODULES = [
   { key: 'solicitacoes', name: 'Solicitações' },
@@ -114,8 +115,14 @@ export async function GET(_req: NextRequest) {
       await assertCanFeature(me.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW)
       await ensureCoreModulesCached()
 
+      const isAdmin = me.role === 'ADMIN'
+      if (isAdmin) {
+        await ensureDefaultDepartmentExists()
+      }
+
       const [departments, modules, links] = await Promise.all([
         prisma.department.findMany({
+          where: isAdmin ? undefined : { code: { not: DEFAULT_DEPARTMENT_CODE } },
           select: { id: true, code: true, name: true },
           orderBy: { name: 'asc' },
         }),
@@ -173,6 +180,19 @@ export async function POST(req: NextRequest) {
           { error: 'departmentId, moduleId e enabled são obrigatórios.' },
           { status: 400 },
         )
+      }
+       if (me.role !== 'ADMIN') {
+        const department = await prisma.department.findUnique({
+          where: { id: departmentId },
+          select: { code: true },
+        })
+
+        if (department?.code === DEFAULT_DEPARTMENT_CODE) {
+          return NextResponse.json(
+            { error: 'Somente administradores podem alterar o departamento Padrao.' },
+            { status: 403 },
+          )
+        }
       }
 
       if (enabled) {
