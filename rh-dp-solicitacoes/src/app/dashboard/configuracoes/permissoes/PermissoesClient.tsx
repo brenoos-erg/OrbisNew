@@ -502,6 +502,9 @@ export default function PermissoesClient() {
       setSuccess(null)
 
       const params = new URLSearchParams({ moduleId: selectedModuleForLevels })
+      if (activeTab === 'departamentos' && selectedDeptId) {
+        params.set('departmentId', selectedDeptId)
+      }
 
       const res = await fetch(`/api/permissoes/modulos?${params.toString()}`, { cache: 'no-store' })
 
