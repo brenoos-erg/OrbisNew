@@ -54,6 +54,16 @@ function normalizeWorkflowGraph(workflow: RawApiWorkflow | ApiWorkflow): ApiWork
   }
 }
 
+function getNodeKindLabel(kind: NodeKind) {
+  return kind === 'DEPARTMENT' ? 'Departamento' : 'Aprovadores'
+}
+
+function getNodeRecipientsText(kind: NodeKind) {
+  return kind === 'DEPARTMENT'
+    ? 'Todos os usuários ativos do departamento vinculado à etapa recebem automaticamente.'
+    : 'Somente os aprovadores selecionados nesta etapa recebem automaticamente.'
+}
+
 export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
   const [typeId, setTypeId] = useState('')
   const [types, setTypes] = useState<Tipo[]>([])
@@ -161,7 +171,9 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-white p-4">
-        <label className="text-sm font-medium">Tipo de Solicitação</label>
+        <h2 className="text-base font-semibold text-slate-900">1) Selecione o tipo de solicitação</h2>
+        <p className="mt-1 text-sm text-slate-600">O fluxo abaixo será atualizado de acordo com o tipo selecionado.</p>
+        <label className="mt-3 block text-sm font-medium">Tipo de Solicitação</label>
         <select className="mt-2 w-full rounded border px-3 py-2" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
           {types.map((tipo) => (
             <option key={tipo.id} value={tipo.id}>
@@ -172,28 +184,35 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
       </div>
 
       <div className="rounded-lg border bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold">Etapas do workflow</h2>
-        <div className="space-y-2">
-          {orderedNodes.map((node) => (
-            <div key={node.id} className="flex items-center justify-between rounded border p-3">
-              <div>
-                <p className="text-xs text-slate-500">{node.kind}</p>
-                <p className="font-medium">{node.label}</p>
-                {node.kind === 'DEPARTMENT' ? (
-                  <p className="text-xs text-slate-600">Destinatários automáticos: membros do departamento vinculado à etapa.</p>
-                ) : (
-                  <p className="text-xs text-slate-600">Destinatários automáticos: aprovadores selecionados nesta etapa.</p>
-                )}
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">2) Entenda o processo completo</h2>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{orderedNodes.length} etapas</span>
+        </div>
+        <p className="mb-4 text-sm text-slate-600">As etapas aparecem na ordem de execução do workflow, mostrando claramente qual departamento (ou grupo de aprovadores) participa em cada fase.</p>
+
+        <div className="space-y-3">
+          {orderedNodes.map((node, index) => (
+            <div key={node.id} className="rounded-lg border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Etapa {index + 1}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{getNodeKindLabel(node.kind)}</span>
+                  </div>
+                  <p className="text-lg font-semibold text-slate-900">{node.label}</p>
+                  <p className="mt-1 text-sm text-slate-600">{getNodeRecipientsText(node.kind)}</p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  className="rounded border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => setEditingNodeId(node.id)}
+                >
+                  Editar e-mails
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={!canEdit}
-                className="rounded border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => setEditingNodeId(node.id)}
-              >
-                Editar e-mails
-              </button>
-            </div>
+               </div>
           ))}
         </div>
       </div>
@@ -216,7 +235,7 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <p className="text-xs text-slate-500">{editingNode.kind}</p>
+                <p className="text-xs text-slate-500">{getNodeKindLabel(editingNode.kind)}</p>
                 <h2 className="text-lg font-semibold">Configurar etapa: {editingNode.label}</h2>
               </div>
               <button className="rounded border px-2 py-1 text-sm" onClick={() => setEditingNodeId(null)}>
@@ -226,9 +245,7 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
 
             {editingNode.kind === 'DEPARTMENT' && (
               <div className="space-y-4">
-                <div className="rounded border bg-slate-50 p-3 text-sm text-slate-700">
-                  Destinatários automáticos: todos os usuários ativos vinculados ao departamento desta etapa.
-                </div>
+                <div className="rounded border bg-slate-50 p-3 text-sm text-slate-700">Destinatários automáticos: todos os usuários ativos vinculados ao departamento desta etapa.</div>
                 <div className="rounded border p-3">
                   <p className="mb-2 text-sm font-medium">E-mails extras manuais</p>
                   <div className="mb-2 flex gap-2">

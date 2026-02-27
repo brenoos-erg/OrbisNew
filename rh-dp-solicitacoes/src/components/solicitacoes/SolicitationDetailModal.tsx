@@ -2592,22 +2592,22 @@ function RQ063ResumoCampos({
 
       <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className={tabClass('basicas')} onClick={() => setActiveTab('basicas')}>
-          Aba 1 — Informações básicas
+         Informações básicas
         </button>
         <button type="button" className={tabClass('contratacao')} onClick={() => setActiveTab('contratacao')}>
-          Aba 2 — Contratação
+          Contratação
         </button>
         <button type="button" className={tabClass('academicos')} onClick={() => setActiveTab('academicos')}>
-          Aba 3 — Requisitos acadêmicos
+          Requisitos acadêmicos
         </button>
         <button type="button" className={tabClass('solicitacoes')} onClick={() => setActiveTab('solicitacoes')}>
-          Aba 4 — Solicitações
+          Solicitações
         </button>
         <button type="button" className={tabClass('projetos')} onClick={() => setActiveTab('projetos')}>
-          Aba 5 — Escritório de Projetos
+          Escritório de Projetos
         </button>
         <button type="button" className={tabClass('admissao')} onClick={() => setActiveTab('admissao')}>
-          Aba 6 — Dados do contratado
+          Dados do contratado
         </button>
       </div>
 

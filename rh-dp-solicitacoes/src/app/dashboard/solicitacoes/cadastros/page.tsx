@@ -6,6 +6,7 @@ import { EmailControlPanel } from '@/components/solicitacoes/EmailControlPanel'
 
 export default async function SolicitacoesCadastrosPage() {
   const { appUser } = await getCurrentAppUser()
+  const isSuperAdminEmail = appUser?.email?.toLowerCase() === 'superadmin@ergengenharia.com.br'
 
   const canViewFluxos = appUser
     ? await canFeature(
@@ -26,6 +27,8 @@ export default async function SolicitacoesCadastrosPage() {
     : false
 
 
+  const canAccessEmailControl = canViewFluxos && isSuperAdminEmail
+
   return (
     <div className="space-y-4">
      <h1 className="text-xl font-semibold">Controle de Emails</h1>
@@ -33,11 +36,11 @@ export default async function SolicitacoesCadastrosPage() {
         Configure as mensagens enviadas para departamentos e aprovadores em cada etapa/ação.
       </p>
 
-      {canViewFluxos ? (
+      {canAccessEmailControl ? (
         <EmailControlPanel canEdit={canEditFluxos} />
       ) : (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Sem permissão para visualizar o controle de e-mails.
+          Esta área é restrita ao administrador principal (<strong>superadmin@ergengenharia.com.br</strong>).
         </div>
       )}
     </div>

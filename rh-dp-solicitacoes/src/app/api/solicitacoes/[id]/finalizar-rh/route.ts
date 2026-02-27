@@ -8,6 +8,17 @@ import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
+import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+
+function isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nome?: string | null } | null | undefined) {
+  const nome = tipo?.nome?.trim().toLowerCase()
+  return (
+    tipo?.id === 'SOLICITACAO_ADMISSAO' ||
+    tipo?.codigo === 'RQ.DP.001' ||
+    nome === 'solicitação de admissão' ||
+    nome === 'solicitacao de admissao'
+  )
+}
 
 export async function POST(
   req: NextRequest,
@@ -87,8 +98,7 @@ export async function POST(
     const isSolicitacaoIncentivo =
       solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
-    const isAdmissaoGerada =
-      solicitation.tipo?.nome === 'Solicitação de Admissão'
+    const isAdmissaoGerada = isAdmissionType(solicitation.tipo)
     const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(solicitation.tipo)
 
     if (isSolicitacaoEquipamentoTi && signedTermAssignments === 0) {
@@ -440,9 +450,16 @@ export async function POST(
             message: 'Subchamado de Solicitação de Admissão criado para o Departamento Pessoal.',
           },
         })
-        // Tipo de solicitação do DP
+         // Tipo de solicitação do DP
         const tipoAdmissao = await tx.tipoSolicitacao.findFirst({
-          where: { id: 'SOLICITACAO_ADMISSAO' },
+          where: {
+            OR: [
+              { id: 'SOLICITACAO_ADMISSAO' },
+              { codigo: 'RQ.DP.001' },
+              { nome: 'Solicitação de Admissão' },
+              { nome: 'Solicitação de admissão' },
+            ],
+          },
         })
 
         if (!tipoAdmissao) {
@@ -771,7 +788,14 @@ export async function POST(
       }
     })
 
-     return NextResponse.json(result, { status: 200 })
+     if (result.dp?.id) {
+      await notifyWorkflowStepEntry({
+        solicitationId: result.dp.id,
+        preferredDepartmentId: result.dp.departmentId ?? null,
+      })
+    }
+
+    return NextResponse.json(result, { status: 200 })
   } catch (err: any) {
     console.error('POST /api/solicitacoes/[id]/finalizar-rh error', err)
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {

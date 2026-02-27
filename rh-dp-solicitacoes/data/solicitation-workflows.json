@@ -1075,5 +1075,72 @@
         "toStepKey": "FIM"
       }
     ]
+  },
+  {
+    "name": "Fluxo padrão",
+    "tipoId": "RQ_300",
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        }
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      }
+    ],
+    "id": "f2b57480-b54c-43a7-b902-428a6fd12f6b",
+    "departmentId": null
   }
 ]
