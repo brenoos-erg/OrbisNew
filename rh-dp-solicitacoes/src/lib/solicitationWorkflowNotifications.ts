@@ -10,15 +10,16 @@ type NotifyInput = {
   preferredDepartmentId?: string | null
 }
 
-async function resolveDepartmentRecipients(step: WorkflowStepDraft) {
+async function resolveDepartmentRecipients(step: WorkflowStepDraft, fallbackDepartmentId?: string | null) {
   const manual = step.notificationEmails ?? []
-  const auto = step.defaultDepartmentId
+  const departmentId = step.defaultDepartmentId ?? fallbackDepartmentId
+  const auto = departmentId
     ? await prisma.user.findMany({
         where: {
           status: 'ATIVO',
           OR: [
-            { departmentId: step.defaultDepartmentId },
-            { userDepartments: { some: { departmentId: step.defaultDepartmentId } } },
+            { departmentId },
+            { userDepartments: { some: { departmentId } } },
           ],
         },
         select: { email: true },
@@ -33,7 +34,12 @@ async function resolveDepartmentRecipients(step: WorkflowStepDraft) {
   )
 }
 
-function pickTargetStep(steps: WorkflowStepDraft[], preferredKind?: WorkflowStepKind, preferredDepartmentId?: string | null) {
+function pickTargetStep(
+  steps: WorkflowStepDraft[],
+  preferredKind?: WorkflowStepKind,
+  preferredDepartmentId?: string | null,
+  lastNotifiedStepKey?: string,
+) {
   if (preferredKind === 'APROVACAO') {
     return steps.find((s) => s.kind === 'APROVACAO')
   }
@@ -42,6 +48,13 @@ function pickTargetStep(steps: WorkflowStepDraft[], preferredKind?: WorkflowStep
   if (preferredDepartmentId) {
     const byDepartment = departments.find((s) => s.defaultDepartmentId === preferredDepartmentId)
     if (byDepartment) return byDepartment
+  }
+
+  if (lastNotifiedStepKey) {
+    const idx = departments.findIndex((step) => step.stepKey === lastNotifiedStepKey)
+    if (idx >= 0 && idx + 1 < departments.length) {
+      return departments[idx + 1]
+    }
   }
 
   return departments[0]
@@ -63,11 +76,16 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   const workflow = workflows.find((row) => row.tipoId === solicitation.tipoId)
   if (!workflow) return { skipped: true, reason: 'workflow_not_found' as const }
 
-  const targetStep = pickTargetStep(workflow.steps, input.preferredKind, input.preferredDepartmentId ?? solicitation.departmentId)
-  if (!targetStep) return { skipped: true, reason: 'step_not_found' as const }
-
   const payload = (solicitation.payload ?? {}) as Record<string, any>
   const lastNotifiedStepKey = payload?.workflowEmail?.lastNotifiedStepKey as string | undefined
+  const targetStep = pickTargetStep(
+    workflow.steps,
+    input.preferredKind,
+    input.preferredDepartmentId ?? solicitation.departmentId,
+    lastNotifiedStepKey,
+  )
+  if (!targetStep) return { skipped: true, reason: 'step_not_found' as const }
+
   if (lastNotifiedStepKey === targetStep.stepKey) {
     return { skipped: true, reason: 'already_notified' as const }
   }
@@ -77,8 +95,15 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   let bodyTemplate = ''
 
   if (targetStep.kind === 'APROVACAO') {
+    const approverIds = Array.from(
+      new Set([
+        ...(targetStep.approverUserIds ?? []),
+        solicitation.approverId ?? '',
+      ].filter(Boolean)),
+    )
+
     const users = await prisma.user.findMany({
-      where: { id: { in: targetStep.approverUserIds ?? [] } },
+      where: { id: { in: approverIds } },
       select: { email: true },
     })
     recipients = users.map((user) => user.email).filter(Boolean)
@@ -86,7 +111,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     subjectTemplate = template.subject
     bodyTemplate = template.body
   } else {
-    recipients = await resolveDepartmentRecipients(targetStep)
+    recipients = await resolveDepartmentRecipients(targetStep, solicitation.departmentId)
     const template = resolveTemplate(targetStep.notificationTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body
@@ -94,21 +119,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
 
   recipients = normalizeAndValidateEmails(recipients)
   if (recipients.length === 0) {
-    await prisma.solicitation.update({
-      where: { id: solicitation.id },
-      data: {
-        payload: {
-          ...payload,
-          workflowEmail: {
-            ...(payload.workflowEmail ?? {}),
-            lastNotifiedStepKey: targetStep.stepKey,
-            lastNotifiedAt: new Date().toISOString(),
-            skipped: true,
-          },
-        },
-      },
-    })
-    return { skipped: true, reason: 'no_recipients' as const }
+     return { skipped: true, reason: 'no_recipients' as const }
   }
 
   const baseUrl =
@@ -133,12 +144,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
   const elapsedMs = Math.round(performance.now() - startedAt)
   console.info('[workflow-email]', {
-    event: targetStep.kind === 'APROVACAO' ? 'approval_pending' : 'department_step_entry',
-    solicitationId: solicitation.id,
-    etapa: targetStep.label,
-    totalDestinatarios: recipients.length,
-    tempoMs: elapsedMs,
-    provider: result.provider,
+     provider: result.provider,
     sent: result.sent,
     error: result.error,
   })
