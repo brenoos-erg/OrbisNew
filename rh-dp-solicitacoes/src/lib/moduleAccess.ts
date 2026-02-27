@@ -92,9 +92,17 @@ async function loadUserModuleContext(
     }
   }
 
-  // Sobrescritas individuais (UserModuleAccess) podem elevar o nível (ex.: aprovador NIVEL_3)
+  // Sobrescritas individuais (UserModuleAccess) só podem elevar nível de módulos
+  // já liberados por algum departamento do usuário.
+  //
+  // Isso garante que a tela de permissões por departamento seja a fonte de verdade
+  // para visibilidade das abas/módulos no menu lateral.
   for (const access of user?.moduleAccesses ?? []) {
     const key = normalizeModuleKey(access.module.key)
+    if (!levels[key]) {
+      continue
+    }
+
     levels[key] = pickHigherLevel(levels[key], access.level)
   }
 
