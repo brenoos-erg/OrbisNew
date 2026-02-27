@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { sendEmail } from '@/lib/emailSender'
+import { sendMail } from '@/lib/mailer'
+import { getSiteUrl } from '@/lib/site-url'
 import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
 import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
 
@@ -110,7 +111,12 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     return { skipped: true, reason: 'no_recipients' as const }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl =
+    getSiteUrl() ||
+    process.env.APP_BASE_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    'http://localhost:3000'
   const values = {
     protocolo: solicitation.protocolo,
     tipoCodigo: solicitation.tipo?.codigo ?? solicitation.tipo?.id ?? '-',
@@ -124,7 +130,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   const text = renderTemplate(bodyTemplate, values)
 
   const startedAt = performance.now()
-  const result = await sendEmail({ to: recipients, subject, text })
+  const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
   const elapsedMs = Math.round(performance.now() - startedAt)
   console.info('[workflow-email]', {
     event: targetStep.kind === 'APROVACAO' ? 'approval_pending' : 'department_step_entry',
@@ -133,7 +139,13 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     totalDestinatarios: recipients.length,
     tempoMs: elapsedMs,
     provider: result.provider,
+    sent: result.sent,
+    error: result.error,
   })
+
+  if (!result.sent) {
+    return { skipped: true, reason: 'send_failed' as const, result }
+  }
 
   await prisma.solicitation.update({
     where: { id: solicitation.id },

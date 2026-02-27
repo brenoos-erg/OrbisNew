@@ -10,7 +10,7 @@ import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPesso
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 
-function isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nome?: string | null } | null | undefined) {
+unction isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nome?: string | null } | null | undefined) {
   const nome = tipo?.nome?.trim().toLowerCase()
   return (
     tipo?.id === 'SOLICITACAO_ADMISSAO' ||
@@ -18,6 +18,14 @@ function isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nom
     nome === 'solicitação de admissão' ||
     nome === 'solicitacao de admissao'
   )
+}
+
+function normalizeText(value: string | null | undefined) {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
 }
 
 export async function POST(
@@ -451,16 +459,22 @@ export async function POST(
           },
         })
          // Tipo de solicitação do DP
-        const tipoAdmissao = await tx.tipoSolicitacao.findFirst({
-          where: {
-            OR: [
-              { id: 'SOLICITACAO_ADMISSAO' },
-              { codigo: 'RQ.DP.001' },
-              { nome: 'Solicitação de Admissão' },
-              { nome: 'Solicitação de admissão' },
-            ],
-          },
-        })
+         const tiposSolicitacao = await tx.tipoSolicitacao.findMany()
+        const tipoAdmissao =
+          tiposSolicitacao.find((tipo) =>
+            isAdmissionType({
+              id: tipo.id,
+              codigo: tipo.codigo,
+              nome: tipo.nome,
+            }),
+          ) ??
+          tiposSolicitacao.find((tipo) => {
+            const nomeNormalizado = normalizeText(tipo.nome)
+            return (
+              nomeNormalizado.includes('admissao') ||
+              nomeNormalizado.includes('admissão')
+            )
+          })
 
         if (!tipoAdmissao) {
           throw new Error('Tipo "Solicitação de Admissão" não cadastrado.')
@@ -468,7 +482,13 @@ export async function POST(
 
         // Centro de custo do DP (externalCode = 590)
         const ccDp = await tx.costCenter.findFirst({
-          where: { externalCode: '590' },
+          where: {
+            OR: [
+              { externalCode: '590' },
+              { description: { contains: 'Pessoal' } },
+              { description: { contains: 'pessoal' } },
+            ],
+          },
         })
 
         if (!ccDp) {
@@ -477,12 +497,14 @@ export async function POST(
           )
         }
 
-        // Departamento do DP (ajuste o critério se for diferente)
+         // Departamento do DP (ajuste o critério se for diferente)
         const deptDp = await tx.department.findFirst({
           where: {
             OR: [
               { code: '08' },
+              { code: 'DP' },
               { name: { contains: 'Pessoal' } },
+              { name: { contains: 'pessoal' } },
             ],
           },
         })
@@ -801,10 +823,15 @@ export async function POST(
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return NextResponse.json({ error: 'Conflito de dados únicos ao finalizar solicitação.' }, { status: 409 })
     }
+    if (err instanceof Error && err.message) {
+      return NextResponse.json(
+        { error: err.message },
+        { status: 400 },
+      )
+    }
     return NextResponse.json(
       { error: 'Erro ao finalizar solicitação no RH.' },
       { status: 500 },
     )
   }
 }
-
