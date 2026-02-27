@@ -10,7 +10,7 @@ import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPesso
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 
-unction isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nome?: string | null } | null | undefined) {
+function isAdmissionType(tipo: { id?: string | null; codigo?: string | null; nome?: string | null } | null | undefined) {
   const nome = tipo?.nome?.trim().toLowerCase()
   return (
     tipo?.id === 'SOLICITACAO_ADMISSAO' ||
