@@ -20,6 +20,7 @@ export async function GET() {
 
       const data = await prisma.department.findMany({
         where: {
+          ...(isAdmin ? {} : { code: { not: DEFAULT_DEPARTMENT_CODE } }),
           OR: [
             { code: { in: OFFICIAL_DEPARTMENT_CODES as string[] } },
             ...(isAdmin ? [{ code: DEFAULT_DEPARTMENT_CODE }] : []),

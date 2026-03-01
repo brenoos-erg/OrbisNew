@@ -3,9 +3,9 @@ import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { getModuleKeyAliases, normalizeModuleKey } from '@/lib/moduleKey'
+import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 
 export type AuthenticatedUser = Awaited<ReturnType<typeof requireActiveUser>>
-
 /**
  * Carrega o nível do usuário para um módulo.
  * Ex.: moduleKey = 'solicitacoes' | 'configuracoes'
@@ -71,13 +71,7 @@ export async function assertUserMinLevel(
     throw new Error('Usuário não possui acesso a este módulo.')
   }
   
-
-
-  const order: ModuleLevel[] = ['NIVEL_1', 'NIVEL_2', 'NIVEL_3']
-  const userIndex = order.indexOf(level)
-  const minIndex = order.indexOf(minLevel)
-
-  if (userIndex < 0 || userIndex < minIndex) {
+  if (!isModuleLevelAtLeast(level, minLevel)) {
     throw new Error('Usuário não possui permissão suficiente.')
   }
 }

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { findUserByIdentifier, normalizeIdentifier } from '@/lib/auth-identifier'
-import { getSiteUrl } from '@/lib/site-url'
+import { resolveAppBaseUrl } from '@/lib/site-url'
 import { sendMail } from '@/lib/mailer'
 
 function tokenHash(token: string) {
@@ -19,8 +19,14 @@ export async function POST(req: Request) {
 
   if (!user) return NextResponse.json({ ok: true, message: 'Se o usuário existir, enviaremos instruções por e-mail.' })
 
+  const baseUrl = resolveAppBaseUrl({ context: 'request-password-reset' })
+  if (!baseUrl && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ ok: true, message: 'Não foi possível enviar o e-mail agora. Tente novamente em instantes.' })
+  }
+
+
   const token = randomBytes(24).toString('hex')
-  const resetLink = `${getSiteUrl()}/primeiro-acesso?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`
+  const resetLink = `${baseUrl}/primeiro-acesso?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`
 
   await prisma.user.update({
     where: { id: user.id },

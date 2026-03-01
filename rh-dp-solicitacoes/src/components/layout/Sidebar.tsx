@@ -939,6 +939,21 @@ export default function Sidebar({
                        <Shield size={16} /> <span className={labelBase}>Permissões</span>
                     </Link>
                   )}
+                   {configFeatures.permissoes && (
+                    <Link
+                      href="/dashboard/configuracoes/poderes-de-acesso"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/poderes-de-acesso',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Shield size={16} /> <span className={labelBase}>Poderes de Acesso</span>
+                    </Link>
+                  )}
 
                   {configFeatures.centros && (
                     <Link

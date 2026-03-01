@@ -18,6 +18,11 @@ function normalizeVercelUrl() {
 
 const DEV_FALLBACK = 'http://localhost:3000'
 
+type ResolveOptions = {
+  allowLocalhostInProduction?: boolean
+  context?: string
+}
+
 export function getSiteUrl() {
   let url = normalizeUrl(process.env.NEXT_PUBLIC_SITE_URL || '')
   const vercelUrl = normalizeVercelUrl()
@@ -49,4 +54,32 @@ export function getSiteUrl() {
   }
 
   return url
+}
+
+export function resolveAppBaseUrl(options?: ResolveOptions) {
+  const context = options?.context ?? 'general'
+  const allowLocalhostInProduction = options?.allowLocalhostInProduction ?? false
+
+  const candidates = [
+    getSiteUrl(),
+    normalizeUrl(process.env.APP_BASE_URL || ''),
+    normalizeUrl(process.env.APP_URL || ''),
+    normalizeUrl(process.env.NEXT_PUBLIC_APP_URL || ''),
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    if (process.env.NODE_ENV === 'production' && looksLocalhost(candidate) && !allowLocalhostInProduction) {
+      console.error(`[${context}] URL base inválida em produção (localhost ignorado).`, { candidate })
+      continue
+    }
+
+    return candidate
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return DEV_FALLBACK
+  }
+
+  console.error(`[${context}] URL base não configurada em produção. Defina APP_BASE_URL, APP_URL, NEXT_PUBLIC_APP_URL ou NEXT_PUBLIC_SITE_URL.`)
+  return ''
 }

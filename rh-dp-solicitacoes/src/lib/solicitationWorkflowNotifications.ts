@@ -1,8 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
-import { getSiteUrl } from '@/lib/site-url'
+import { resolveAppBaseUrl } from '@/lib/site-url'
+import type { ModuleLevel } from '@prisma/client'
 import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
 import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
+import { normalizeModuleKey } from '@/lib/moduleKey'
+import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
 
 type NotifyInput = {
   solicitationId: string
@@ -10,9 +13,26 @@ type NotifyInput = {
   preferredDepartmentId?: string | null
 }
 
+type NotificationAccessRule = {
+  moduleKey: string
+  minLevel: ModuleLevel
+}
+
+function resolveNotificationAccessRule(step: WorkflowStepDraft): NotificationAccessRule {
+  const maybeModuleKey = (step as WorkflowStepDraft & { notificationModuleKey?: string }).notificationModuleKey
+  const maybeMinLevel = (step as WorkflowStepDraft & { notificationMinLevel?: ModuleLevel }).notificationMinLevel
+
+  const moduleKey = normalizeModuleKey(maybeModuleKey?.trim() || 'solicitacoes')
+  const minLevel = maybeMinLevel ?? 'NIVEL_3'
+
+  return { moduleKey, minLevel }
+}
+
 async function resolveDepartmentRecipients(step: WorkflowStepDraft, fallbackDepartmentId?: string | null) {
   const manual = step.notificationEmails ?? []
   const departmentId = step.defaultDepartmentId ?? fallbackDepartmentId
+  const accessRule = resolveNotificationAccessRule(step)
+
   const auto = departmentId
     ? await prisma.user.findMany({
         where: {
@@ -22,14 +42,32 @@ async function resolveDepartmentRecipients(step: WorkflowStepDraft, fallbackDepa
             { userDepartments: { some: { departmentId } } },
           ],
         },
-        select: { email: true },
-      })
+        select: {
+          email: true,
+          moduleAccesses: {
+            select: {
+              level: true,
+              module: {
+                select: {
+                  key: true,
+                },
+              },
+            },
+          },
+        },
+       })
     : []
+
+  const automaticRecipients = auto
+    .filter((user) =>
+      hasRequiredWorkflowNotificationAccess(user.moduleAccesses, accessRule.moduleKey, accessRule.minLevel),
+    )
+    .map((user) => user.email)
 
   return Array.from(
     new Set([
       ...manual,
-      ...auto.map((user) => user.email),
+      ...automaticRecipients,
     ].map((x) => x?.trim()).filter(Boolean) as string[]),
   )
 }
@@ -122,19 +160,18 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
      return { skipped: true, reason: 'no_recipients' as const }
   }
 
-  const baseUrl =
-    getSiteUrl() ||
-    process.env.APP_BASE_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    'http://localhost:3000'
+  const baseUrl = resolveAppBaseUrl({ context: 'workflow-email' })
+  if (!baseUrl && process.env.NODE_ENV === 'production') {
+    return { skipped: true, reason: 'invalid_base_url' as const }
+  }
+
   const values = {
     protocolo: solicitation.protocolo,
     tipoCodigo: solicitation.tipo?.codigo ?? solicitation.tipo?.id ?? '-',
     tipoNome: solicitation.tipo?.nome ?? '-',
     solicitante: solicitation.solicitante?.fullName ?? solicitation.solicitante?.email ?? '-',
     departamentoAtual: solicitation.department?.name ?? targetStep.label,
-    link: `${baseUrl}/dashboard/solicitacoes/${solicitation.id}`,
+    link: baseUrl ? `${baseUrl}/dashboard/solicitacoes/${solicitation.id}` : '',
   }
 
   const subject = renderTemplate(subjectTemplate, values)

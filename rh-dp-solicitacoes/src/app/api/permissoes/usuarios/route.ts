@@ -11,12 +11,12 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeModules } from '@/lib/normalizeModules'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature } from '@/lib/permissions'
 import { withRequestMetrics } from '@/lib/request-metrics'
+import { DEFAULT_DEPARTMENT_CODE } from '@/lib/defaultDepartment'
 /**
  * Helper para montar o payload que o frontend espera
  */
-async function buildUserPayload(search: string) {
+async function buildUserPayload(search: string, isAdmin: boolean) {
   const searchTerm = search.trim()
 
   const user = await prisma.user.findFirst({
@@ -35,6 +35,7 @@ async function buildUserPayload(search: string) {
   const normalizedModules = normalizeModules(modules)
 
   const departments = await prisma.department.findMany({
+    where: isAdmin ? undefined : { code: { not: DEFAULT_DEPARTMENT_CODE } },
     orderBy: { name: 'asc' },
   })
 
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
         )
       }
 
-    const payload = await buildUserPayload(search)
+    const payload = await buildUserPayload(search, me.role === 'ADMIN')
       return NextResponse.json(payload)
     } catch (e: any) {
       console.error('GET /api/permissoes/usuarios error', e)
@@ -178,7 +179,7 @@ export async function PATCH(req: NextRequest) {
           })
         }
       }
-    const payload = await buildUserPayload(email)
+    const payload = await buildUserPayload(email, me.role === 'ADMIN')
       return NextResponse.json(payload)
     } catch (e: any) {
       console.error('PATCH /api/permissoes/usuarios error', e)
