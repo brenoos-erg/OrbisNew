@@ -168,10 +168,19 @@ export async function POST(req: NextRequest) {
       await ensureUserDepartmentLink(userId, departmentId, tx)
 
       if (setAsPrimary) {
+        const currentUser = await tx.user.findUnique({
+          where: { id: userId },
+          select: { departmentId: true },
+        })
+
         await tx.user.update({
           where: { id: userId },
           data: { departmentId },
         })
+
+        if (currentUser?.departmentId && currentUser.departmentId !== departmentId) {
+          await removeUserDepartmentLink(userId, currentUser.departmentId, tx)
+        }
       }
     })
 

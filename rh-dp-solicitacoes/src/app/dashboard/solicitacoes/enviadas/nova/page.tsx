@@ -296,16 +296,28 @@ export default function NovaSolicitacaoPage() {
           }
         }
 
-        const fallbackResponse = await fetch('/api/cost-centers?pageSize=500', {
-          cache: 'no-store',
-        });
+         const pageSize = 200;
+        const aggregated: CostCenterOption[] = [];
+        let page = 1;
 
-        if (!fallbackResponse.ok) {
-          throw new Error('Erro ao buscar centros de custo');
+        while (true) {
+          const fallbackResponse = await fetch(`/api/cost-centers?pageSize=${pageSize}&page=${page}`, {
+            cache: 'no-store',
+          });
+
+          if (!fallbackResponse.ok) {
+            throw new Error('Erro ao buscar centros de custo');
+          }
+
+          const fallbackData = (await fallbackResponse.json()) as CostCenterResponse;
+          const pageItems = normalizeCostCenters(fallbackData);
+          aggregated.push(...pageItems);
+
+          if (pageItems.length < pageSize) break;
+          page += 1;
         }
 
-        const fallbackData = (await fallbackResponse.json()) as CostCenterResponse;
-        setCostCenters(normalizeCostCenters(fallbackData));
+        setCostCenters(aggregated);
       } catch (error) {
         console.error('Falha ao carregar centros de custo:', error);
         setCostCenters([]);
@@ -542,13 +554,14 @@ export default function NovaSolicitacaoPage() {
   const getAutoFillValueFromMe = (fieldName: string): string | null => {
     if (!me) return null;
 
-    const normalized = fieldName.toLowerCase();
+     const normalized = fieldName.toLowerCase();
     if (normalized.includes('emailsolicitante')) return me.email ?? '';
     if (isNomeFuncionarioField(fieldName)) return null;
     if (normalized.includes('telefonesolicitante')) return me.phone ?? '';
     if (normalized.includes('departamentosolicitante')) return me.departmentName ?? '';
     if (normalized.includes('cargosolicitante')) return me.positionName ?? '';
-    if (normalized.includes('centrocusto')) return me.costCenterName ?? '';
+
+    // Centro de custo deve permanecer selecionável para listar todos os cadastrados.
     return null;
   };
   const handleAbonoChange = (name: string, value: string) => {

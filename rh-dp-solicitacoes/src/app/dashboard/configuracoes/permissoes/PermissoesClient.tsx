@@ -64,6 +64,7 @@ type DepartmentUser = {
   fullName: string
   email: string
   departmentId: string | null
+  departments: string[]
   isMember: boolean
   isPrimary?: boolean
   canRemove?: boolean
@@ -105,6 +106,7 @@ export default function PermissoesClient() {
   const [searchDeptTerm, setSearchDeptTerm] = useState('')
   const [deptSearchResults, setDeptSearchResults] = useState<DepartmentUser[]>([])
   const [searchingDeptUsers, setSearchingDeptUsers] = useState(false)
+  const [primaryDeptSelections, setPrimaryDeptSelections] = useState<Record<string, string>>({})
 
   // ---- Usuários ----
   const [userSearchInput, setUserSearchInput] = useState('')
@@ -365,6 +367,49 @@ export default function PermissoesClient() {
       setSaving(false)
     }
   }
+  const changeUserPrimaryDepartment = async (user: DepartmentUser) => {
+    const nextDepartmentId = primaryDeptSelections[user.id]
+    if (!nextDepartmentId || nextDepartmentId === user.departmentId) return
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const res = await fetch('/api/permissoes/departamentos/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          departmentId: nextDepartmentId,
+          userId: user.id,
+          setAsPrimary: true,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error || 'Erro ao trocar departamento principal do usuário.')
+      }
+
+      if (selectedDeptId) {
+        await loadDepartmentMembers(selectedDeptId)
+      }
+      if (searchDeptTerm.trim()) {
+        await searchUsersForDepartment()
+      }
+
+      setPrimaryDeptSelections((prev) => ({
+        ...prev,
+        [user.id]: nextDepartmentId,
+      }))
+      setSuccess('Departamento principal do usuário atualizado.')
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao trocar departamento principal do usuário.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
 
   const isModuleEnabledForDept = (moduleId: string) => {
     if (!deptData || !selectedDeptId) return false
@@ -922,7 +967,13 @@ const updateModuleLevelInBulk = async () => {
                     <p className="text-xs text-gray-500">Nenhum usuário vinculado a este departamento.</p>
                   ) : (
                     <ul className="space-y-2">
-                      {deptMembers.map((user) => (
+                      {deptMembers.map((user) => {
+                        const availableDepartments =
+                          deptData?.departments.filter((department) => user.departments.includes(department.id)) ?? []
+                        const selectedPrimaryDepartmentId =
+                          primaryDeptSelections[user.id] ?? user.departmentId ?? availableDepartments[0]?.id ?? ''
+
+                        return (
                         <li
                           key={user.id}
                           className="flex flex-col gap-2 rounded-md bg-gray-50 px-3 py-2 text-sm md:flex-row md:items-center md:justify-between"
@@ -935,20 +986,53 @@ const updateModuleLevelInBulk = async () => {
                             )}
                           </div>
 
-                          {user.canRemove ? (
-                            <button
-                              type="button"
-                              className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
-                              onClick={() => removeUserFromDepartment(user.id)}
-                              disabled={saving}
-                            >
-                              Remover
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-gray-500">Não é possível remover o principal.</span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <select
+                                className="rounded-md border px-2 py-1 text-xs"
+                                value={selectedPrimaryDepartmentId}
+                                onChange={(e) =>
+                                  setPrimaryDeptSelections((prev) => ({ ...prev, [user.id]: e.target.value }))
+                                }
+                                disabled={saving || availableDepartments.length === 0}
+                              >
+                                {availableDepartments.map((department) => (
+                                  <option key={department.id} value={department.id}>
+                                    {department.code} - {department.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="rounded-md bg-slate-800 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
+                                onClick={() => changeUserPrimaryDepartment(user)}
+                                disabled={
+                                  saving ||
+                                  availableDepartments.length === 0 ||
+                                  !selectedPrimaryDepartmentId ||
+                                  selectedPrimaryDepartmentId === user.departmentId
+                                }
+                              >
+                                Trocar principal
+                              </button>
+                            </div>
+
+                            {user.canRemove ? (
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60"
+                                onClick={() => removeUserFromDepartment(user.id)}
+                                disabled={saving}
+                              >
+                                Remover
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-gray-500">Não é possível remover o principal.</span>
+                            )}
+                          </div>
                         </li>
-                      ))}
+                       )
+                      })}
                     </ul>
                   )}
                 </div>
