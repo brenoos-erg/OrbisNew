@@ -521,7 +521,7 @@ export default function NovaSolicitacaoPage() {
       return;
     }
 
-    const normalizedValue =
+   const normalizedValue =
       name === 'telefoneManutencao' ? formatBrazilPhone(value) : value;
 
     setExtras((prev) => ({
@@ -529,19 +529,28 @@ export default function NovaSolicitacaoPage() {
       [name]: normalizedValue,
     }));
   };
+  const isNomeFuncionarioField = (fieldName: string) => {
+    const normalized = fieldName.toLowerCase();
+    return normalized.includes('nomesolicitante');
+  };
+
+  const getDisplayLabel = (campo: CampoEspecifico) => {
+    if (isNomeFuncionarioField(campo.name)) return 'Nome do funcionário';
+    return campo.label;
+  };
+
   const getAutoFillValueFromMe = (fieldName: string): string | null => {
     if (!me) return null;
 
     const normalized = fieldName.toLowerCase();
     if (normalized.includes('emailsolicitante')) return me.email ?? '';
-    if (normalized.includes('nomesolicitante')) return me.fullName ?? '';
+    if (isNomeFuncionarioField(fieldName)) return null;
     if (normalized.includes('telefonesolicitante')) return me.phone ?? '';
     if (normalized.includes('departamentosolicitante')) return me.departmentName ?? '';
     if (normalized.includes('cargosolicitante')) return me.positionName ?? '';
     if (normalized.includes('centrocusto')) return me.costCenterName ?? '';
     return null;
   };
-
   const handleAbonoChange = (name: string, value: string) => {
     setAbonoCampos((prev) => ({
       ...prev,
@@ -2155,7 +2164,8 @@ useEffect(() => {
 
                   const renderCampo = (campo: CampoEspecifico) => {
                     const autoFillValue = getAutoFillValueFromMe(campo.name);
-                    const isAutoFilled = autoFillValue !== null;
+                    const isNomeFuncionario = isNomeFuncionarioField(campo.name);
+                    const isAutoFilled = !isNomeFuncionario && autoFillValue !== null;
                     const hasCostCenterName = /centro\s*custo|centrocusto/i.test(campo.name);
                     const normalizedType =
                       campo.type === 'cost_center' || hasCostCenterName ? 'cost_center' : campo.type;
@@ -2221,11 +2231,11 @@ useEffect(() => {
                       disabled: isAutoFilled || campo.disabled,
                     };
 
-                    return (
+                         return (
                       <div key={campo.name}>
                         <label className="space-y-1 text-sm block">
                           <span className="block text-xs font-semibold text-gray-700">
-                            {campo.label}{' '}
+                            {getDisplayLabel(campo)}{' '}
                             {campo.required && (
                               <span className="text-red-500">*</span>
                             )}

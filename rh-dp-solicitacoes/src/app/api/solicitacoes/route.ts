@@ -785,6 +785,13 @@ export const POST = withModuleLevel(
               { status: 400 },
             )
           }
+           const funcionarioStatusRaw = (payload as Record<string, any>)?.campos
+            ?.funcionarioStatus
+          const funcionarioStatus = funcionarioStatusRaw
+            ? String(funcionarioStatusRaw).trim().toUpperCase()
+            : ''
+          const isFuncionarioAntigo = funcionarioStatus === 'ANTIGO'
+
 
            const payloadAtualizado = {
             ...(payload as Record<string, any>),
@@ -807,38 +814,50 @@ export const POST = withModuleLevel(
             data: {
               departmentId: sstDepartment.id,
               payload: payloadAtualizado,
-               requiresApproval: true,
-              approvalStatus: 'PENDENTE',
+               requiresApproval: isFuncionarioAntigo,
+              approvalStatus: isFuncionarioAntigo ? 'PENDENTE' : 'NAO_PRECISA',
               approverId,
-              status: 'AGUARDANDO_APROVACAO',
+              status: isFuncionarioAntigo ? 'AGUARDANDO_APROVACAO' : 'ABERTA',
             },
           })
 
-          await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
-            },
-          })
+          if (isFuncionarioAntigo) {
+            await prisma.event.create({
+              data: {
+                id: crypto.randomUUID(),
+                solicitationId: created.id,
+                actorId: approverId,
+                tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+              },
+            })
 
-          await prisma.solicitationTimeline.create({
-            data: {
-               solicitationId: created.id,
-              status: 'ENCAMINHADA_SST',
-              message:
-                'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
-            },
-          })
-           await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO_SETOR',
-              message:
-                'SST encaminhou a solicitação para aprovação do aprovador do setor.',
-            },
-          })
+            await prisma.solicitationTimeline.create({
+              data: {
+                solicitationId: created.id,
+                status: 'AGUARDANDO_APROVACAO_SETOR',
+                message:
+                  'Solicitação de EPI/Uniformes para funcionário antigo encaminhada diretamente para aprovação do aprovador do setor.',
+              },
+            })
+          } else {
+            await prisma.event.create({
+              data: {
+                id: crypto.randomUUID(),
+                solicitationId: created.id,
+                actorId: solicitanteId,
+                tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
+              },
+            })
+
+            await prisma.solicitationTimeline.create({
+              data: {
+                solicitationId: created.id,
+                status: 'ENCAMINHADA_SST',
+                message:
+                  'Solicitação de EPI/Uniformes para funcionário novo criada e encaminhada à fila de atendimento do SST.',
+              },
+            })
+          }
 
           await notifyWorkflowStepEntry({
             solicitationId: updated.id,
