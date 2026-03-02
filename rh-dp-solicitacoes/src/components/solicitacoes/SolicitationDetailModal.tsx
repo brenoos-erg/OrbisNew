@@ -437,7 +437,6 @@ export function SolicitationDetailModal({
   const [assumindo, setAssumindo] = useState(false)
   const [assumirError, setAssumirError] = useState<string | null>(null)
   const [encaminhandoAprovacao, setEncaminhandoAprovacao] = useState(false)
-  const [autoEncaminhadoId, setAutoEncaminhadoId] = useState<string | null>(null)
 
   // formulário de dados do contratado / incentivo
   const [showContratadoForm, setShowContratadoForm] = useState(false)
@@ -462,6 +461,7 @@ export function SolicitationDetailModal({
   const [descricaoSolucaoSst, setDescricaoSolucaoSst] = useState('')
   const [observacaoSst1, setObservacaoSst1] = useState('')
   const [observacaoSst2, setObservacaoSst2] = useState('')
+
 
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
@@ -685,6 +685,20 @@ export function SolicitationDetailModal({
     !isNadaConsta &&
     !isSolicitacaoExames &&
     !isFinalizadaOuCancelada
+    const funcionarioStatus = String(
+    detail?.payload?.campos?.funcionarioStatus ?? '',
+  )
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+  const isEpiFuncionarioNovo =
+    isSolicitacaoEpiUniformeTipo &&
+    detail?.department?.code === '19' &&
+    funcionarioStatus === 'NOVO'
+  const canFinalizarEpiFluxoSst =
+    canFinalizarUltimaEtapa &&
+    (!isSolicitacaoEpiUniformeTipo || !isEpiFuncionarioNovo)
     
   const setoresNadaConsta = (() => {
     if (!isNadaConsta || !detail) return []
@@ -1120,7 +1134,6 @@ async function handleEncaminharAprovacaoComAnexo() {
       }
 
       setCloseSuccess('Solicitação encaminhada para aprovação nível 3.')
-      setAutoEncaminhadoId(solicitationId)
       await refreshDetailFromServer()
     } catch (err: any) {
       console.error('Erro ao encaminhar solicitação para aprovação', err)
@@ -1132,12 +1145,6 @@ async function handleEncaminharAprovacaoComAnexo() {
     }
   }
 
-  useEffect(() => {
-    if (!canEncaminharAprovacaoEpi || !detail?.id) return
-    if (autoEncaminhadoId === detail.id) return
-    void handleEncaminharAprovacaoComAnexo()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEncaminharAprovacaoEpi, detail?.id, autoEncaminhadoId])
   async function handleTiAlocarEquipamento() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
@@ -1756,20 +1763,23 @@ async function handleEncaminharAprovacaoComAnexo() {
                   <label className={LABEL_RO}>
                     Anexo(s) da Solicitação
                   </label>
-                  <div className="mt-2 space-y-1 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                  <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-xs">
                     {detail.anexos.map((a) => (
                       <div
                         key={a.id}
-                        className="flex items-center justify-between"
+                        className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
                       >
-                        <span>{a.filename}</span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-700">{a.filename}</p>
+                          <p className="text-[10px] text-slate-500">{formatDate(a.createdAt)}</p>
+                        </div>
                         <a
                           href={a.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[11px] font-medium text-blue-600 hover:underline"
+                          className="shrink-0 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100"
                         >
-                          Download
+                          Visualizar
                         </a>
                       </div>
                     ))}
@@ -2230,6 +2240,27 @@ async function handleEncaminharAprovacaoComAnexo() {
                           onChange={(e) => setFilesToUpload(e.target.files)}
                           className="mt-1 block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
                         />
+                          {detail.anexos && detail.anexos.length > 0 && (
+                          <div className="rounded-md border border-blue-100 bg-white p-2">
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                              Arquivos já anexados
+                            </p>
+                            <div className="space-y-1.5">
+                              {detail.anexos.map((a) => (
+                                <a
+                                  key={a.id}
+                                  href={a.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-between rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-700 hover:bg-slate-50"
+                                >
+                                  <span className="truncate">{a.filename}</span>
+                                  <span className="ml-2 shrink-0 text-blue-600">Visualizar</span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex flex-wrap items-center gap-2 text-[11px]">
                           <button
@@ -2282,7 +2313,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </button>
                   )}
                   
-                  {canFinalizarUltimaEtapa && (
+                      {canFinalizarEpiFluxoSst && (
                     <button
                       onClick={handleFinalizarUltimaEtapa}
                       disabled={closing || isFinalizadaOuCancelada}
@@ -2290,6 +2321,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                     >
                       {closing ? 'Enviando...' : 'Finalizar chamado'}
                     </button>
+                  )}
+                  {isEpiFuncionarioNovo && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                      Funcionário novo: após revisar os dados e anexar documentos, encaminhe para aprovação.
+                    </div>
                   )}
                    {isSolicitacaoExames && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
