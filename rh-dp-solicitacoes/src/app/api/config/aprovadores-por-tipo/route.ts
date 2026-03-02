@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, Role } from '@prisma/client'
+import { ModuleLevel, Role, TipoApproverRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
@@ -21,9 +21,10 @@ export async function GET() {
           approvers: {
             select: {
               userId: true,
+              role: true,
               user: { select: { id: true, fullName: true, email: true, status: true } },
             },
-            orderBy: { user: { fullName: 'asc' } },
+            orderBy: [{ role: 'asc' }, { user: { fullName: 'asc' } }],
           },
         },
         orderBy: { nome: 'asc' },
@@ -31,7 +32,7 @@ export async function GET() {
       prisma.user.findMany({
         where: {
           status: 'ATIVO',
-          moduleAccesses: { some: { level: 'NIVEL_3', module: { key: 'solicitacoes' } } },
+          moduleAccesses: { some: { module: { key: 'solicitacoes' } } },
         },
         select: { id: true, fullName: true, email: true },
         orderBy: { fullName: 'asc' },
@@ -51,9 +52,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Somente administrador pode alterar aprovadores.' }, { status: 403 })
     }
 
-    const body = await req.json().catch(() => null) as { tipoId?: string; userIds?: string[] } | null
+    const body = (await req.json().catch(() => null)) as
+      | { tipoId?: string; approvers?: string[]; viewers?: string[] }
+      | null
+
     const tipoId = body?.tipoId?.trim()
-    const userIds = Array.from(new Set((body?.userIds ?? []).filter(Boolean)))
+    const approvers = Array.from(new Set((body?.approvers ?? []).filter(Boolean)))
+    const viewers = Array.from(new Set((body?.viewers ?? []).filter(Boolean))).filter((id) => !approvers.includes(id))
 
     if (!tipoId) {
       return NextResponse.json({ error: 'tipoId é obrigatório.' }, { status: 400 })
@@ -61,9 +66,15 @@ export async function PUT(req: NextRequest) {
 
     await prisma.$transaction(async (tx) => {
       await tx.tipoSolicitacaoApprover.deleteMany({ where: { tipoId } })
-      if (userIds.length > 0) {
+
+      const data = [
+        ...approvers.map((userId) => ({ tipoId, userId, role: TipoApproverRole.APPROVER })),
+        ...viewers.map((userId) => ({ tipoId, userId, role: TipoApproverRole.VIEWER })),
+      ]
+
+      if (data.length > 0) {
         await tx.tipoSolicitacaoApprover.createMany({
-          data: userIds.map((userId) => ({ tipoId, userId })),
+          data,
           skipDuplicates: true,
         })
       }

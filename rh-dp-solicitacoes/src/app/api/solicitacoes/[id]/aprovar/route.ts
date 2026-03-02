@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 
 export async function POST(
@@ -38,6 +39,14 @@ export async function POST(
       )
     }
 
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({
+      solicitationId,
+      userId: me.id,
+    })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: 'Usuário visualizador não pode aprovar solicitações.' }, { status: 403 })
+    }
     if (solic.approvalStatus !== 'PENDENTE') {
       return NextResponse.json(
         { error: 'Esta solicitação não está pendente de aprovação.' },
@@ -142,7 +151,7 @@ export async function POST(
       approvalAt: new Date(),
       approverId: me.id,
       approvalComment: approvalComment ?? null,
-      status: 'ABERTA',
+      status: isSolicitacaoEpi ? 'EM_ATENDIMENTO' : 'ABERTA',
     }
 
     if (isSolicitacaoPessoalTipo && rhDepartmentId) {

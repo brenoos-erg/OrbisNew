@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 export async function PATCH(
   _req: Request,
@@ -13,6 +14,12 @@ export async function PATCH(
   try {
     const me = await requireActiveUser()
     const { id } = await params
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+    }
+
 
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },

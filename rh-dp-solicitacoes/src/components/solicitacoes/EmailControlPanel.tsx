@@ -33,6 +33,7 @@ type RawApiWorkflow = {
 
 type Tipo = { id: string; name: string }
 type WorkflowUser = { id: string; fullName: string; email: string }
+type DepartmentOption = { id: string; label: string; description?: string }
 
 const DEFAULT_TEMPLATE = {
   subject: '[{tipoCodigo}] Nova etapa: {departamentoAtual}',
@@ -75,13 +76,19 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
   const [newEmail, setNewEmail] = useState('')
   const [usersSearch, setUsersSearch] = useState('')
   const [users, setUsers] = useState<WorkflowUser[]>([])
+  const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     ;(async () => {
-      const response = await fetch('/api/solicitacoes/tipos', { cache: 'no-store' })
-      const data: Tipo[] = await response.json()
+      const [tiposResponse, departmentsResponse] = await Promise.all([
+        fetch('/api/solicitacoes/tipos', { cache: 'no-store' }),
+        fetch('/api/departments', { cache: 'no-store' }),
+      ])
+      const data: Tipo[] = await tiposResponse.json()
       setTypes(data)
+      const departmentsData: DepartmentOption[] = await departmentsResponse.json()
+      setDepartments(departmentsData)
       if (data[0]?.id) setTypeId(data[0].id)
     })()
   }, [])
@@ -135,6 +142,15 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
   }, [nodes, edges])
 
   const editingNode = nodes.find((node) => node.id === editingNodeId) ?? null
+  const departmentNameById = useMemo(() => {
+    return new Map(departments.map((department) => [department.id, department.label]))
+  }, [departments])
+
+  const getDisplayNodeLabel = (node: ApiNode) => {
+    if (node.kind !== 'DEPARTMENT') return node.label
+    if (!node.departmentId) return node.label
+    return departmentNameById.get(node.departmentId) ?? '(Setor não encontrado)'
+  }
 
   const updateNode = (id: string, updater: (node: ApiNode) => ApiNode) => {
     setNodes((prev) => prev.map((node) => (node.id === id ? updater(node) : node)))
@@ -199,7 +215,7 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
                     <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Etapa {index + 1}</span>
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{getNodeKindLabel(node.kind)}</span>
                   </div>
-                  <p className="text-lg font-semibold text-slate-900">{node.label}</p>
+                  <p className="text-lg font-semibold text-slate-900">{getDisplayNodeLabel(node)}</p>
                   <p className="mt-1 text-sm text-slate-600">{getNodeRecipientsText(node.kind)}</p>
                 </div>
 
@@ -235,8 +251,8 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <p className="text-xs text-slate-500">{getNodeKindLabel(editingNode.kind)}</p>
-                <h2 className="text-lg font-semibold">Configurar etapa: {editingNode.label}</h2>
+                 <p className="text-xs text-slate-500">{getNodeKindLabel(editingNode.kind)}</p>
+                <h2 className="text-lg font-semibold">Configurar etapa: {getDisplayNodeLabel(editingNode)}</h2>
               </div>
               <button className="rounded border px-2 py-1 text-sm" onClick={() => setEditingNodeId(null)}>
                 Fechar

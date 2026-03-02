@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
@@ -20,6 +21,12 @@ export async function POST(
   try {
     const me = await requireActiveUser()
     const solicitationId = (await params).id
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+    }
+
     const body = (await req.json().catch(() => ({}))) as {
       action?: 'ALOCAR' | 'ALOCAR_E_GERAR_TERMO' | 'SEM_ESTOQUE'
       equipmentId?: string

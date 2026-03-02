@@ -166,6 +166,7 @@ model TipoSolicitacaoApprover {
   id        String          @id @default(uuid())
   tipoId    String
   userId    String
+  role      TipoApproverRole @default(APPROVER)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   tipo      TipoSolicitacao @relation(fields: [tipoId], references: [id], onDelete: Cascade)
@@ -1144,6 +1145,11 @@ enum SolicitationStatus {
   AGUARDANDO_TERMO
   CONCLUIDA
   CANCELADA
+}
+
+enum TipoApproverRole {
+  APPROVER
+  VIEWER
 }
 
 enum DocumentType {

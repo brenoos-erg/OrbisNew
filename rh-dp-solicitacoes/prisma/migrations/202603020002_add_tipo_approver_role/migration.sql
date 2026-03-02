@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `TipoSolicitacaoApprover`
+  ADD COLUMN `role` ENUM('APPROVER', 'VIEWER') NOT NULL DEFAULT 'APPROVER';

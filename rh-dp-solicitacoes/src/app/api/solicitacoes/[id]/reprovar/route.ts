@@ -9,6 +9,7 @@ import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -20,6 +21,10 @@ export const POST = withModuleLevel<RouteParams>(
   async (req: Request, { params, me }) => {
     try {
       const { id: solicitationId } = await params
+      const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+      if (isViewerOnly) {
+        return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+      }
 
       const body = await req.json().catch(() => ({}))
       const comment: string | undefined = body.comment

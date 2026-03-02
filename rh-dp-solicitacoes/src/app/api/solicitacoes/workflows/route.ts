@@ -7,6 +7,7 @@ import {
   type WorkflowDraft,
   type WorkflowStepKind,
 } from '@/lib/solicitationWorkflowsStore'
+import { prisma } from '@/lib/prisma'
 
 type ApiNodeKind = 'DEPARTMENT' | 'APPROVERS'
 
@@ -140,11 +141,13 @@ function normalizeForPersistence(nodesInput: NonNullable<ApiPayload['nodes']>, e
   }
 }
 
-function rowToApi(row: WorkflowDraft) {
+function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
   const orderedSteps = [...row.steps].sort((a, b) => a.order - b.order)
   const rawNodes = orderedSteps.map((step, index) => {
     const kind = toApiKind(step.kind)
-    const label = step.kind === 'FIM' && step.label.trim().toLowerCase() === 'fim' ? 'Departamento final' : step.label
+    const fallbackLabel = step.kind === 'FIM' && step.label.trim().toLowerCase() === 'fim' ? 'Departamento final' : step.label
+    const resolvedDepartmentName = step.defaultDepartmentId ? departmentNameById.get(step.defaultDepartmentId) : null
+    const label = kind === 'DEPARTMENT' ? (resolvedDepartmentName ?? fallbackLabel) : fallbackLabel
     return {
       id: step.stepKey,
       label,
@@ -182,7 +185,14 @@ export async function GET(req: Request) {
   const rows = await readWorkflowRows()
   const existing = rows.find((row) => row.tipoId === typeId)
 
-  if (existing) return NextResponse.json(rowToApi(existing))
+  if (existing) {
+    const departmentIds = Array.from(new Set(existing.steps.map((step) => step.defaultDepartmentId).filter(Boolean))) as string[]
+    const departments = departmentIds.length
+      ? await prisma.department.findMany({ where: { id: { in: departmentIds } }, select: { id: true, name: true } })
+      : []
+    const departmentNameById = new Map(departments.map((department) => [department.id, department.name]))
+    return NextResponse.json(rowToApi(existing, departmentNameById))
+  }
 
   const created = await createWorkflowRow({
     name: 'Fluxo padrão',
@@ -200,7 +210,13 @@ export async function GET(req: Request) {
     })),
   })
 
-  return NextResponse.json(rowToApi(created))
+  const createdDepartmentIds = Array.from(new Set(created.steps.map((step) => step.defaultDepartmentId).filter(Boolean))) as string[]
+  const createdDepartments = createdDepartmentIds.length
+    ? await prisma.department.findMany({ where: { id: { in: createdDepartmentIds } }, select: { id: true, name: true } })
+    : []
+  const createdDepartmentNameById = new Map(createdDepartments.map((department) => [department.id, department.name]))
+
+  return NextResponse.json(rowToApi(created, createdDepartmentNameById))
 }
 
 export async function PUT(req: Request) {

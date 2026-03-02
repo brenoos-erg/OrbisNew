@@ -1540,7 +1540,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <span className="text-[11px] font-semibold text-amber-700">
                 {approvalStatus !== 'PENDENTE'
                   ? 'Esta solicitação não está pendente de aprovação.'
-                  : 'Aprovação disponível apenas para nível 3 de solicitações no SST.'}
+                  : ''}
               </span>
             )}
 

@@ -252,7 +252,7 @@ export const GET = withModuleLevel(
           where.approvalStatus = 'PENDENTE'
           where.OR = [
             { approverId: me.id },
-            { tipo: { approvers: { some: { userId: me.id } } } },
+            { tipo: { approvers: { some: { userId: me.id, role: 'APPROVER' } } } },
           ]
         }
 
