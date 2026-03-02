@@ -61,10 +61,10 @@ export function resolveAppBaseUrl(options?: ResolveOptions) {
   const allowLocalhostInProduction = options?.allowLocalhostInProduction ?? false
 
   const candidates = [
-    getSiteUrl(),
     normalizeUrl(process.env.APP_BASE_URL || ''),
     normalizeUrl(process.env.APP_URL || ''),
     normalizeUrl(process.env.NEXT_PUBLIC_APP_URL || ''),
+    getSiteUrl(),
   ].filter(Boolean)
 
   for (const candidate of candidates) {

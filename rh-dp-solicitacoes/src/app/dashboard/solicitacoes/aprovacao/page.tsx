@@ -1,12 +1,13 @@
 // src/app/dashboard/solicitacoes/aprovacao/page.tsx
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   SolicitationDetailModal,
   type Row,
   type SolicitationDetail,
 } from '@/components/solicitacoes/SolicitationDetailModal'
+import { useSearchParams } from 'next/navigation'
 
 type ApiResponse = {
   rows: Row[]
@@ -18,6 +19,10 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [allowedDepartmentIds, setAllowedDepartmentIds] = useState<string[]>([])
+  const [allowedDepartmentsLoaded, setAllowedDepartmentsLoaded] = useState(false)
+
+  const searchParams = useSearchParams()
+  const deepLinkId = useMemo(() => searchParams.get('open')?.trim() || '', [searchParams])
 
   // estado do modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -25,6 +30,8 @@ export default function ApprovalsPage() {
   const [detail, setDetail] = useState<SolicitationDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [deepLinkHandledId, setDeepLinkHandledId] = useState('')
+  const [deepLinkMessage, setDeepLinkMessage] = useState<string | null>(null)
 
   // ===== CARREGAR LISTA DE APROVAÇÕES =====
   async function loadApprovals() {
@@ -64,11 +71,36 @@ export default function ApprovalsPage() {
         const ids = [json.departmentId, ...(Array.isArray(json.departments) ? json.departments.map((d: any) => d.id) : [])]
           .filter(Boolean) as string[]
         setAllowedDepartmentIds(Array.from(new Set(ids)))
-      } catch {
+       } catch {
         setAllowedDepartmentIds([])
+      } finally {
+        setAllowedDepartmentsLoaded(true)
       }
     })()
   }, [])
+
+
+  useEffect(() => {
+    if (!deepLinkId || loading || !allowedDepartmentsLoaded || deepLinkHandledId === deepLinkId) return
+
+    const targetRow = rows.find((row) => row.id === deepLinkId)
+    if (!targetRow) {
+      setDeepLinkMessage('A solicitação do link não está pendente para sua aprovação ou não foi encontrada.')
+      setDeepLinkHandledId(deepLinkId)
+      return
+    }
+
+    const canApprove = !!targetRow.departmentId && allowedDepartmentIds.includes(targetRow.departmentId)
+    if (!canApprove) {
+      setDeepLinkMessage('Você não possui permissão para aprovar esta solicitação.')
+      setDeepLinkHandledId(deepLinkId)
+      return
+    }
+
+    setDeepLinkMessage(null)
+    setDeepLinkHandledId(deepLinkId)
+    void handleOpenPreview(targetRow)
+  }, [deepLinkId, deepLinkHandledId, loading, rows, allowedDepartmentIds, allowedDepartmentsLoaded])
 
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
   async function handleOpenPreview(row: Row) {
@@ -76,7 +108,9 @@ export default function ApprovalsPage() {
     setIsModalOpen(true)
     setDetail(null)
     setDetailError(null)
+    setDeepLinkMessage(null)
     setDetailLoading(true)
+
 
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}`)
@@ -95,17 +129,17 @@ export default function ApprovalsPage() {
     }
   }
 
-  function handleCloseModal() {
+ function handleCloseModal() {
     setIsModalOpen(false)
     setSelectedRow(null)
     setDetail(null)
     setDetailError(null)
+    setDeepLinkMessage(null)
   }
 
   // ===== AÇÕES DE APROVAR / REPROVAR (botões da lista) =====
   async function handleApprove(e: React.MouseEvent, row: Row) {
     e.stopPropagation() // não abrir o modal ao clicar no botão
-    
 
 
     try {
@@ -184,8 +218,12 @@ export default function ApprovalsPage() {
         </button>
       </div>
 
-      {error && (
+       {error && (
         <p className="mb-2 text-xs text-red-600">{error}</p>
+      )}
+
+      {deepLinkMessage && (
+        <p className="mb-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{deepLinkMessage}</p>
       )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">

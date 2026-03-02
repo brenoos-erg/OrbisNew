@@ -49,6 +49,22 @@ assert.equal(
   true,
 )
 
+
+withEnv(
+  {
+    NODE_ENV: 'development',
+    NEXT_PUBLIC_SITE_URL: '',
+    APP_BASE_URL: 'http://177.174.106.226:3000',
+    APP_URL: '',
+    NEXT_PUBLIC_APP_URL: '',
+    NEXT_PUBLIC_VERCEL_URL: '',
+    VERCEL_URL: '',
+  },
+  () => {
+    assert.equal(resolveAppBaseUrl({ context: 'workflow-email' }), 'https://meu-dominio.com')
+  },
+)
+
 withEnv(
   {
     NODE_ENV: 'production',

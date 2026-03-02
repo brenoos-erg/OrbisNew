@@ -17,18 +17,20 @@ import { DEFAULT_DEPARTMENT_CODE } from '@/lib/defaultDepartment'
 /**
  * Helper para montar o payload que o frontend espera
  */
-async function buildUserPayload(search: string, isAdmin: boolean) {
+async function buildUserPayload(search: string, isAdmin: boolean, userId?: string) {
   const searchTerm = search.trim()
 
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: { equals: searchTerm } },
-        { fullName: { contains: searchTerm } },
-      ],
-    },
-    orderBy: { fullName: 'asc' },
-  })
+  const user = userId
+    ? await prisma.user.findUnique({ where: { id: userId } })
+    : await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: { equals: searchTerm } },
+            { fullName: { contains: searchTerm } },
+          ],
+        },
+        orderBy: { fullName: 'asc' },
+      })
 
   const modules = await prisma.module.findMany({
     orderBy: { name: 'asc' },
@@ -180,7 +182,7 @@ export async function PATCH(req: NextRequest) {
           })
         }
       }
-    const payload = await buildUserPayload(email, me.role === 'ADMIN')
+   const payload = await buildUserPayload(email, me.role === 'ADMIN', user.id)
       return NextResponse.json(payload)
     } catch (e: any) {
       console.error('PATCH /api/permissoes/usuarios error', e)

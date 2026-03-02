@@ -144,7 +144,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
       where: { id: { in: approverIds } },
       select: { email: true },
     })
-    recipients = users.map((user) => user.email).filter(Boolean)
+  recipients = users.map((user) => user.email).filter(Boolean)
     const template = resolveTemplate(targetStep.approvalTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body
@@ -165,13 +165,17 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     return { skipped: true, reason: 'invalid_base_url' as const }
   }
 
+  const solicitationPath = targetStep.kind === 'APROVACAO'
+    ? `/dashboard/solicitacoes/aprovacao?solicitationId=${encodeURIComponent(solicitation.id)}`
+    : `/dashboard/solicitacoes/${solicitation.id}`
+
   const values = {
     protocolo: solicitation.protocolo,
     tipoCodigo: solicitation.tipo?.codigo ?? solicitation.tipo?.id ?? '-',
     tipoNome: solicitation.tipo?.nome ?? '-',
     solicitante: solicitation.solicitante?.fullName ?? solicitation.solicitante?.email ?? '-',
     departamentoAtual: solicitation.department?.name ?? targetStep.label,
-    link: baseUrl ? `${baseUrl}/dashboard/solicitacoes/${solicitation.id}` : '',
+    link: baseUrl ? `${baseUrl}${solicitationPath}` : '',
   }
 
   const subject = renderTemplate(subjectTemplate, values)
