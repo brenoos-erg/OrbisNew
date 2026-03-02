@@ -8,7 +8,6 @@ import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
-import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -43,12 +42,13 @@ export const POST = withModuleLevel<RouteParams>(
         )
       }
 
-      const canApprove = await canNivel3ApproveSolicitation(me.id, solicit.departmentId)
-      if (!canApprove) {
-        return NextResponse.json(
-          { error: 'Você não pode reprovar solicitações deste departamento.' },
-          { status: 403 },
-        )
+        const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
+      if (!isNivel3) {
+        return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
+      }
+
+      if (!solicit.approverId || solicit.approverId !== me.id) {
+        return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
       }
 
       const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solicit.tipo)

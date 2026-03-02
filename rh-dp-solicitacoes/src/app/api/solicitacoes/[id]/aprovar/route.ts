@@ -7,7 +7,6 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
-import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
 
 
 export async function POST(
@@ -45,12 +44,13 @@ export async function POST(
       )
     }
 
-    const canApprove = await canNivel3ApproveSolicitation(me.id, solic.departmentId)
-    if (!canApprove) {
-      return NextResponse.json(
-        { error: 'Você não pode aprovar solicitações deste departamento.' },
-        { status: 403 },
-      )
+    const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
+    if (!isNivel3) {
+      return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
+    }
+
+    if (!solic.approverId || solic.approverId !== me.id) {
+      return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
     }
 
    const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)

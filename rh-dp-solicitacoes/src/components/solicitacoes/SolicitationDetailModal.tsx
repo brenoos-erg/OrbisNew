@@ -41,6 +41,7 @@ export type Row = {
   approvalStatus?: string | null
   costCenterId?: string | null
   departmentId?: string | null
+  approverId?: string | null
 }
 type TiInventoryItem = {
   id: string
@@ -48,7 +49,6 @@ type TiInventoryItem = {
   name: string
   status: string
 }
-
 
 type CampoEspecifico = {
   name: string

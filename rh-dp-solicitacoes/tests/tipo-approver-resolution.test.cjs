@@ -1,0 +1,5 @@
+const assert = require('node:assert/strict')
+const { pickEligibleTipoApproverId } = require('../src/lib/solicitationApproverRules.ts')
+assert.equal(pickEligibleTipoApproverId(['u3', 'u1']), 'u3')
+assert.equal(pickEligibleTipoApproverId([]), null)
+console.info('tipo-approver-resolution.test.cjs: ok')

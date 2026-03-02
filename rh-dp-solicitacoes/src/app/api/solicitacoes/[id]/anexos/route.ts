@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
+import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorId: string) {
   const solicitation = await prisma.solicitation.findUnique({
@@ -31,12 +31,11 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
     return { changed: false, error: 'Anexe ao menos um documento antes de encaminhar para aprovação.' }
   }
 
-  const approver = await findLevel3SolicitacoesApprover('19')
-  if (!approver?.id) {
+  const approverId = await resolveTipoApproverId(solicitation?.tipoId ?? '')
+  if (!approverId) {
     return {
       changed: false,
-      error:
-        'Não há aprovadores SST nível 3 cadastrados para o módulo de solicitações.',
+      error: 'Não existe aprovador configurado para este tipo de solicitação.',
     }
   }
 
@@ -45,7 +44,7 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
     data: {
       requiresApproval: true,
       approvalStatus: 'PENDENTE',
-      approverId: approver.id,
+      approverId,
       status: 'AGUARDANDO_APROVACAO',
     },
   })

@@ -7,6 +7,8 @@ import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/l
 import { normalizeModuleKey } from '@/lib/moduleKey'
 import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
 import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
+import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+import { resolveApprovalRecipientId } from '@/lib/solicitationApproverRules'
 
 type NotifyInput = {
   solicitationId: string
@@ -134,18 +136,28 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   let bodyTemplate = ''
 
   if (targetStep.kind === 'APROVACAO') {
-    const approverIds = Array.from(
-      new Set([
-        ...(targetStep.approverUserIds ?? []),
-        solicitation.approverId ?? '',
-      ].filter(Boolean)),
-    )
+     const fallbackTipoApproverId = solicitation.approverId ? null : await resolveTipoApproverId(solicitation.tipoId)
+    const approverId = resolveApprovalRecipientId({
+      solicitationApproverId: solicitation.approverId,
+      fallbackTipoApproverId,
+    })
 
-    const users = await prisma.user.findMany({
-      where: { id: { in: approverIds } },
+    if (!solicitation.approverId && approverId) {
+      await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: { approverId },
+      })
+    }
+
+    if (!approverId) {
+      return { skipped: true, reason: 'no_approver_configured' as const }
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: approverId },
       select: { email: true },
     })
-  recipients = users.map((user) => user.email).filter(Boolean)
+    recipients = user?.email ? [user.email] : []
     const template = resolveTemplate(targetStep.approvalTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body

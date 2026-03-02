@@ -65,7 +65,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     }
 
-    return NextResponse.json({ ok: true })
+    const updatedAccess = await prisma.userModuleAccess.findMany({ where: { userId }, select: { moduleId: true, level: true } })
+    return NextResponse.json({ ok: true, access: updatedAccess })
   } catch (e) {
     console.error(
       'PATCH /api/configuracoes/permissoes/usuarios/[id] error',

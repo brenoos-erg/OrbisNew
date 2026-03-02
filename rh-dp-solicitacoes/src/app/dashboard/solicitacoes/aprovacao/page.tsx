@@ -18,7 +18,7 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [allowedDepartmentIds, setAllowedDepartmentIds] = useState<string[]>([])
+  const [myUserId, setMyUserId] = useState('')
   const [allowedDepartmentsLoaded, setAllowedDepartmentsLoaded] = useState(false)
 
   const searchParams = useSearchParams()
@@ -70,9 +70,9 @@ export default function ApprovalsPage() {
         const json = await res.json()
         const ids = [json.departmentId, ...(Array.isArray(json.departments) ? json.departments.map((d: any) => d.id) : [])]
           .filter(Boolean) as string[]
-        setAllowedDepartmentIds(Array.from(new Set(ids)))
+         setMyUserId(json.id || '')
        } catch {
-        setAllowedDepartmentIds([])
+        setMyUserId('')
       } finally {
         setAllowedDepartmentsLoaded(true)
       }
@@ -90,7 +90,7 @@ export default function ApprovalsPage() {
       return
     }
 
-    const canApprove = !!targetRow.departmentId && allowedDepartmentIds.includes(targetRow.departmentId)
+   const canApprove = !!targetRow.approverId && targetRow.approverId === myUserId
     if (!canApprove) {
       setDeepLinkMessage('Você não possui permissão para aprovar esta solicitação.')
       setDeepLinkHandledId(deepLinkId)
@@ -100,7 +100,7 @@ export default function ApprovalsPage() {
     setDeepLinkMessage(null)
     setDeepLinkHandledId(deepLinkId)
     void handleOpenPreview(targetRow)
-  }, [deepLinkId, deepLinkHandledId, loading, rows, allowedDepartmentIds, allowedDepartmentsLoaded])
+  }, [deepLinkId, deepLinkHandledId, loading, rows, myUserId, allowedDepartmentsLoaded])
 
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
   async function handleOpenPreview(row: Row) {
@@ -260,7 +260,7 @@ export default function ApprovalsPage() {
               </tr>
             ) : (
                 rows.map((row) => {
-                const canApproveRow = !!row.departmentId && allowedDepartmentIds.includes(row.departmentId)
+                 const canApproveRow = !!row.approverId && row.approverId === myUserId
                 return (
                 <tr
                    key={row.id}

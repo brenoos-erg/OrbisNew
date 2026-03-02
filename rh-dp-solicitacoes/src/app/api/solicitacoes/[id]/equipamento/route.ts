@@ -7,7 +7,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
+import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { PdfGenerationError, generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
 import { DEFAULT_TERMO_CLAUSES } from '@/lib/documents/termoResponsabilidade'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
@@ -55,8 +55,10 @@ export async function POST(
     }
 
     if (action === 'SEM_ESTOQUE') {
-      const approver = await findLevel3SolicitacoesApprover()
-      const approverId = approver?.id ?? null
+    const approverId = await resolveTipoApproverId(solicitation.tipoId)
+      if (!approverId) {
+        return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+      }
 
       const updated = await prisma.solicitation.update({
         where: { id: solicitation.id },

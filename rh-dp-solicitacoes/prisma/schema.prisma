@@ -159,6 +159,19 @@ model TipoSolicitacao {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   solicitacoes Solicitation[]
+  approvers    TipoSolicitacaoApprover[]
+}
+
+model TipoSolicitacaoApprover {
+  id        String          @id @default(uuid())
+  tipoId    String
+  userId    String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  tipo      TipoSolicitacao @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tipoId, userId])
 }
 
 model Department {
@@ -310,6 +323,7 @@ model User {
   solicitacoesAprovador                      Solicitation[]               @relation("SolicitationAprovador")
   solicitacoesAssumidas                      Solicitation[]               @relation("SolicitationAssumidaPor")
   solicitacoesCriadas                        Solicitation[]               @relation("SolicitationSolicitante")
+  tipoSolicitacaoApprovers                   TipoSolicitacaoApprover[]
   costCenter                                 CostCenter?                  @relation(fields: [costCenterId], references: [id])
   department                                 Department?                  @relation(fields: [departmentId], references: [id])
   leader                                     Leader?                      @relation(fields: [leaderId], references: [id])

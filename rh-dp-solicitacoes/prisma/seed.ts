@@ -566,6 +566,57 @@ async function main() {
     },
   })
   console.log('✅ Tipo "RQ.089 - Solicitação de Equipamento" ok.')
+  const tiposTiExtras = [
+    {
+      id: 'RQ_TI_SGI',
+      codigo: 'RQ.TI.002',
+      nome: 'Sistema SGI - Relatar problema ou sugerir melhoria',
+      descricao: 'Registro de problema ou sugestão de melhoria no SGI',
+      camposEspecificos: [
+        { name: 'detalhes', label: 'Detalhes', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
+      ],
+    },
+    {
+      id: 'RQ_TI_MANUTENCAO',
+      codigo: 'RQ.TI.003',
+      nome: 'Manutenção - Equipamentos ou sistema',
+      descricao: 'Solicitação de manutenção para equipamentos ou sistemas',
+      camposEspecificos: [
+        { name: 'itemManutencao', label: 'Equipamento ou sistema', type: 'text', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
+        { name: 'detalhesManutencao', label: 'Detalhes da manutenção', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
+      ],
+    },
+    {
+      id: 'RQ_TI_ACESSO_SISTEMA',
+      codigo: 'RQ.TI.004',
+      nome: 'Solicitação de Acesso - Sistema',
+      descricao: 'Solicitação de acesso a um sistema',
+      camposEspecificos: [
+        { name: 'sistema', label: 'Sistema', type: 'text', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
+        { name: 'justificativaAcesso', label: 'Justificativa', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
+      ],
+    },
+  ] as const
+
+  for (const tipoTi of tiposTiExtras) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: tipoTi.id },
+      update: {
+        codigo: tipoTi.codigo,
+        nome: tipoTi.nome,
+        descricao: tipoTi.descricao,
+        schemaJson: { meta: { departamentos: [tiDepartment.id], requiresApproval: true }, camposEspecificos: tipoTi.camposEspecificos },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: tipoTi.id,
+        codigo: tipoTi.codigo,
+        nome: tipoTi.nome,
+        descricao: tipoTi.descricao,
+        schemaJson: { meta: { departamentos: [tiDepartment.id], requiresApproval: true }, camposEspecificos: tipoTi.camposEspecificos },
+      },
+    })
+  }
 
   /* =========================
      DP: Solicitação de Admissão

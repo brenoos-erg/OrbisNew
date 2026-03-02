@@ -31,6 +31,7 @@ export default function PoderesDeAcessoClient() {
   const [success, setSuccess] = useState<string | null>(null)
   const [data, setData] = useState<UserPayload | null>(null)
   const [selectedModuleId, setSelectedModuleId] = useState('')
+  const [copyFrom, setCopyFrom] = useState('')
 
   const selectedLevel = useMemo(() => {
     if (!data || !selectedModuleId) return ''
@@ -95,6 +96,32 @@ export default function PoderesDeAcessoClient() {
       setError(err?.message || 'Erro ao salvar alterações.')
     } finally {
       setSaving(false)
+    }
+  }
+  const copyPermissions = async () => {
+    if (!copyFrom.trim() || !data?.user) return
+    const params = new URLSearchParams({ search: copyFrom.trim() })
+    const response = await fetch(`/api/permissoes/usuarios?${params.toString()}`, { cache: 'no-store' })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok || !payload?.user) {
+      setError(payload?.error || 'Usuário de origem não encontrado.')
+      return
+    }
+    for (const row of payload.access ?? []) {
+      // eslint-disable-next-line no-await-in-loop
+      await patchPermissions({ moduleId: row.moduleId, level: row.level }, `Permissões copiadas de ${payload.user.fullName}.`)
+    }
+  }
+
+  const resetDepartmentDefault = async () => {
+    if (!data?.user) return
+    const defaults: Record<string, ModuleLevel> = {}
+    for (const mod of data.modules) {
+      defaults[mod.id] = mod.key === 'configuracoes' ? 'NIVEL_1' : 'NIVEL_1'
+    }
+    for (const moduleId of Object.keys(defaults)) {
+      // eslint-disable-next-line no-await-in-loop
+      await patchPermissions({ moduleId, level: defaults[moduleId] }, 'Permissões resetadas para o padrão do departamento (NIVEL_1).')
     }
   }
 
@@ -170,25 +197,47 @@ export default function PoderesDeAcessoClient() {
               </select>
             </div>
           </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Nível no módulo</label>
+              <select
+                value={selectedLevel}
+                disabled={!selectedModuleId || saving}
+                onChange={(event) => {
+                  if (!selectedModuleId) return
+                  void patchPermissions(
+                    { moduleId: selectedModuleId, level: event.target.value },
+                    'Nível de acesso atualizado com sucesso.',
+                  )
+                }}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+              >
+                {LEVEL_OPTIONS.map((option) => (
+                  <option key={option.label} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">Copiar permissões de outro usuário</label>
+              <div className="flex gap-2">
+                <input className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} placeholder="Nome ou e-mail" />
+                <button type="button" onClick={() => void copyPermissions()} className="rounded-md bg-slate-700 px-3 py-2 text-sm text-white">Copiar</button>
+              </div>
+              <button type="button" onClick={() => void resetDepartmentDefault()} className="rounded-md bg-slate-100 px-3 py-2 text-sm">Resetar padrão do departamento</button>
+            </div>
+          </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Nível no módulo</label>
-            <select
-              value={selectedLevel}
-              disabled={!selectedModuleId || saving}
-              onChange={(event) => {
-                if (!selectedModuleId) return
-                void patchPermissions(
-                  { moduleId: selectedModuleId, level: event.target.value },
-                  'Nível de acesso atualizado com sucesso.',
-                )
-              }}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
-            >
-              {LEVEL_OPTIONS.map((option) => (
-                <option key={option.label} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+             <p className="mb-2 text-sm font-medium text-slate-700">Módulo → Nível atual</p>
+            <table className="w-full text-sm border">
+              <thead><tr className="bg-slate-50"><th className="text-left p-2 border">Módulo</th><th className="text-left p-2 border">Nível atual</th></tr></thead>
+              <tbody>
+                {data.modules.map((m) => {
+                  const level = data.access.find((a) => a.moduleId === m.id)?.level ?? 'Sem acesso'
+                  return <tr key={m.id}><td className="p-2 border">{m.name}</td><td className="p-2 border">{level}</td></tr>
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

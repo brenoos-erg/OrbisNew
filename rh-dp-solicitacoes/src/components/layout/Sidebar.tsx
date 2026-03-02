@@ -941,6 +941,21 @@ export default function Sidebar({
                   )}
                    {configFeatures.permissoes && (
                     <Link
+                      href="/dashboard/configuracoes/aprovadores"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/aprovadores',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Shield size={16} /> <span className={labelBase}>Aprovadores</span>
+                    </Link>
+                  )}
+                  {configFeatures.permissoes && (
+                    <Link
                       href="/dashboard/configuracoes/poderes-de-acesso"
                       className={`${submenuItemBase}
                         ${

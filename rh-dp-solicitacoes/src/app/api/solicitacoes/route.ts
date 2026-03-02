@@ -6,7 +6,6 @@ import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
 import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
@@ -24,8 +23,8 @@ import {
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
-import { getNivel3DepartmentIds } from '@/lib/solicitationApprovalPermissions'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
+import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
@@ -251,12 +250,7 @@ export const GET = withModuleLevel(
         } else if (scope === 'to-approve') {
           where.requiresApproval = true
           where.approvalStatus = 'PENDENTE'
-          const allowedDepartmentIds = await getNivel3DepartmentIds(me.id)
-          if (allowedDepartmentIds.length === 0) {
-            where.id = '__never__' as any
-          } else {
-            where.departmentId = { in: allowedDepartmentIds }
-          }
+          where.approverId = me.id
         }
 
         const listStartedAt = performance.now()
@@ -297,6 +291,7 @@ export const GET = withModuleLevel(
    setorDestino:
     formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
   departmentId: s.departmentId,
+  approverId: s.approver?.id ?? s.approverId ?? null,
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,
@@ -575,11 +570,13 @@ export const POST = withModuleLevel(
           return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
-           2.5) Agendamento de Férias (aguarda aprovação do gestor e segue para DP)
+            2.5) Agendamento de Férias (aguarda aprovação do gestor e segue para DP)
            ===================================================================== */
         if (isAgendamentoFerias) {
-          const approver = await findLevel3SolicitacoesApprover()
-          const approverId = approver?.id ?? null
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -621,8 +618,10 @@ export const POST = withModuleLevel(
            2.6) Solicitação de Equipamento (encaminha obrigatoriamente para TI)
            ===================================================================== */
         if (isSolicitacaoEquipamentoTi) {
-          const approver = await findLevel3SolicitacoesApprover()
-          const approverId = approver?.id ?? null
+           const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -734,10 +733,11 @@ export const POST = withModuleLevel(
           return NextResponse.json(updated, { status: 201 })
           }
 
-          // qualquer coisa diferente de SIM exige aprovação
-          const approver = await findLevel3SolicitacoesApprover()
-
-          const approverId = approver?.id ?? null
+           // qualquer coisa diferente de SIM exige aprovação
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -783,7 +783,7 @@ export const POST = withModuleLevel(
             )
           }
 
-         const payloadAtualizado = {
+           const payloadAtualizado = {
             ...(payload as Record<string, any>),
             epiUniforme: {
               categoria: 'SERVIÇOS DE LOGÍSTICA',
@@ -794,6 +794,11 @@ export const POST = withModuleLevel(
             },
           }
 
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
+
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
@@ -801,7 +806,7 @@ export const POST = withModuleLevel(
               payload: payloadAtualizado,
                requiresApproval: true,
               approvalStatus: 'PENDENTE',
-              approverId: (await findLevel3SolicitacoesApprover())?.id ?? null,
+              approverId,
               status: 'AGUARDANDO_APROVACAO',
             },
           })
@@ -842,9 +847,11 @@ export const POST = withModuleLevel(
         }
 
 
-        if (isSolicitacaoVeiculosTipo) {
-          const approver = await findLevel3SolicitacoesApprover()
-          const approverId = approver?.id ?? null
+          if (isSolicitacaoVeiculosTipo) {
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -892,9 +899,15 @@ export const POST = withModuleLevel(
               {
                 error:
                   'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
+             
               },
               { status: 400 },
             )
+          }
+
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
           }
 
           const updated = await prisma.solicitation.update({
@@ -902,7 +915,7 @@ export const POST = withModuleLevel(
             data: {
               requiresApproval: true,
               approvalStatus: 'PENDENTE',
-              approverId: null, // RH vai tratar
+              approverId,
               status: 'AGUARDANDO_APROVACAO',
               costCenterId: rhCostCenter.id,
               departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
@@ -939,8 +952,10 @@ export const POST = withModuleLevel(
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
            ===================================================================== */
         if (isDesligamento) {
-          const approver = await findLevel3SolicitacoesApprover()
-          const approverId = approver?.id ?? null
+          const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -1014,12 +1029,15 @@ export const POST = withModuleLevel(
 
 
 
+        
          /* =====================================================================
            5) Solicitação de Abono Educacional
            ===================================================================== */
         if (isAbonoEducacional) {
-           const approver = await findLevel3SolicitacoesApprover()
-          const approverId = approver?.id ?? null
+           const approverId = await resolveTipoApproverId(tipoId)
+          if (!approverId) {
+            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -1030,7 +1048,6 @@ export const POST = withModuleLevel(
               status: 'AGUARDANDO_APROVACAO',
             },
           })
-
           await prisma.event.create({
             data: {
               id: crypto.randomUUID(),
