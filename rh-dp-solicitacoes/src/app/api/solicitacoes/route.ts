@@ -250,7 +250,10 @@ export const GET = withModuleLevel(
         } else if (scope === 'to-approve') {
           where.requiresApproval = true
           where.approvalStatus = 'PENDENTE'
-          where.approverId = me.id
+          where.OR = [
+            { approverId: me.id },
+            { tipo: { approvers: { some: { userId: me.id } } } },
+          ]
         }
 
         const listStartedAt = performance.now()

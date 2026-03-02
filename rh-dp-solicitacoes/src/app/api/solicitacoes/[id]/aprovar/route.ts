@@ -7,6 +7,7 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 
 
 export async function POST(
@@ -49,7 +50,11 @@ export async function POST(
       return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
     }
 
-    if (!solic.approverId || solic.approverId !== me.id) {
+   const tipoApproverIds = await resolveTipoApproverIds(solic.tipoId)
+    const canApproveSolicitation =
+      solic.approverId === me.id || tipoApproverIds.includes(me.id)
+
+    if (!canApproveSolicitation) {
       return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
     }
 

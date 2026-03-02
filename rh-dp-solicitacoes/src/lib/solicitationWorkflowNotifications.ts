@@ -134,10 +134,14 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   let subjectTemplate = ''
   let bodyTemplate = ''
 
-  if (targetStep.kind === 'APROVACAO') {
-      const approverIds = solicitation.approverId
-      ? [solicitation.approverId]
-      : await resolveTipoApproverIds(solicitation.tipoId)
+   if (targetStep.kind === 'APROVACAO') {
+    const tipoApproverIds = await resolveTipoApproverIds(solicitation.tipoId)
+    const approverIds = Array.from(
+      new Set([
+        ...(solicitation.approverId ? [solicitation.approverId] : []),
+        ...tipoApproverIds,
+      ]),
+    )
 
     const primaryApproverId = approverIds[0] ?? null
 

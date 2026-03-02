@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -47,10 +48,13 @@ export const POST = withModuleLevel<RouteParams>(
         return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
       }
 
-      if (!solicit.approverId || solicit.approverId !== me.id) {
+       const tipoApproverIds = await resolveTipoApproverIds(solicit.tipoId)
+      const canApproveSolicitation =
+        solicit.approverId === me.id || tipoApproverIds.includes(me.id)
+
+      if (!canApproveSolicitation) {
         return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
       }
-
       const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solicit.tipo)
       const sstDepartment = isSolicitacaoEpi
         ? await prisma.department.findUnique({ where: { code: '19' }, select: { id: true } })

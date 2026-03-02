@@ -18,8 +18,6 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [myUserId, setMyUserId] = useState('')
-  const [allowedDepartmentsLoaded, setAllowedDepartmentsLoaded] = useState(false)
 
   const searchParams = useSearchParams()
   const deepLinkId = useMemo(() => searchParams.get('open')?.trim() || '', [searchParams])
@@ -63,25 +61,7 @@ export default function ApprovalsPage() {
 
 
   useEffect(() => {
-    ;(async () => {
-      try {
-        const res = await fetch('/api/me', { cache: 'no-store' })
-        if (!res.ok) return
-        const json = await res.json()
-        const ids = [json.departmentId, ...(Array.isArray(json.departments) ? json.departments.map((d: any) => d.id) : [])]
-          .filter(Boolean) as string[]
-         setMyUserId(json.id || '')
-       } catch {
-        setMyUserId('')
-      } finally {
-        setAllowedDepartmentsLoaded(true)
-      }
-    })()
-  }, [])
-
-
-  useEffect(() => {
-    if (!deepLinkId || loading || !allowedDepartmentsLoaded || deepLinkHandledId === deepLinkId) return
+    if (!deepLinkId || loading || deepLinkHandledId === deepLinkId) return
 
     const targetRow = rows.find((row) => row.id === deepLinkId)
     if (!targetRow) {
@@ -90,17 +70,10 @@ export default function ApprovalsPage() {
       return
     }
 
-   const canApprove = !!targetRow.approverId && targetRow.approverId === myUserId
-    if (!canApprove) {
-      setDeepLinkMessage('Você não possui permissão para aprovar esta solicitação.')
-      setDeepLinkHandledId(deepLinkId)
-      return
-    }
-
     setDeepLinkMessage(null)
     setDeepLinkHandledId(deepLinkId)
     void handleOpenPreview(targetRow)
-  }, [deepLinkId, deepLinkHandledId, loading, rows, myUserId, allowedDepartmentsLoaded])
+  }, [deepLinkId, deepLinkHandledId, loading, rows])
 
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
   async function handleOpenPreview(row: Row) {
@@ -260,8 +233,8 @@ export default function ApprovalsPage() {
               </tr>
             ) : (
                 rows.map((row) => {
-                 const canApproveRow = !!row.approverId && row.approverId === myUserId
-                return (
+                  const canApproveRow = true
+                  return (
                 <tr
                    key={row.id}
                   onClick={() => handleOpenPreview(row)}
