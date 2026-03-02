@@ -167,6 +167,33 @@ const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
   'TP-Link': ['Roteador', 'Access Point', 'Switch gerenciável', 'Switch não gerenciável'],
   'Outros equipamentos': ['Webcam', 'Headset', 'Dock station', 'Teclado e mouse', 'Outro'],
 };
+const TI_STOCK_EQUIPMENT_OPTIONS = [
+  'Linha telefônica',
+  'Smartphone',
+  'Notebook',
+  'Desktop',
+  'Monitor',
+  'Impressora',
+  'TP-Link',
+  'Outros',
+];
+
+const TI_MANUTENCAO_CODIGO = 'RQ.TI.003';
+
+const isTiMaintenanceRequest = (tipo: TipoSolicitacao | null) =>
+  !!tipo && tipo.codigo?.toUpperCase() === TI_MANUTENCAO_CODIGO;
+
+function formatBrazilPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (!digits) return '';
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)})${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)})${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function isValidBrazilPhone(value: string) {
+  return /^\(\d{2}\)\d{5}-\d{4}$/.test(value);
+}
 
 
 /* ================================================================
@@ -320,11 +347,7 @@ export default function NovaSolicitacaoPage() {
   const selectedDepartamento =
     departamentos.find((d) => d.id === departamentoId)?.label ?? '';
   const getTipoOptionLabel = (tipo: TipoSolicitacao) => {
-    const parts = [
-      selectedDepartamento,
-      tipo.codigo,
-      getTipoDisplayName(tipo.nome),
-    ].filter(Boolean);
+    const parts = [tipo.codigo, getTipoDisplayName(tipo.nome)].filter(Boolean);
 
     return parts.join(' - ');
   };
@@ -357,6 +380,7 @@ export default function NovaSolicitacaoPage() {
     selectedTipo?.nome === 'Solicitação de Incentivo à Educação' ||
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
+  const isTiMaintenance = isTiMaintenanceRequest(selectedTipo);
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
   const tipoMeta = selectedTipo?.meta;
@@ -486,9 +510,23 @@ export default function NovaSolicitacaoPage() {
       }));
       return;
     }
+
+    if (name === 'itemManutencao') {
+      setExtras((prev) => ({
+        ...prev,
+        [name]: value,
+        nomeSistemaManutencao: value === 'Sistema' ? prev.nomeSistemaManutencao ?? '' : '',
+        tipoEquipamentoManutencao: value === 'Equipamento' ? prev.tipoEquipamentoManutencao ?? '' : '',
+      }));
+      return;
+    }
+
+    const normalizedValue =
+      name === 'telefoneManutencao' ? formatBrazilPhone(value) : value;
+
     setExtras((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: normalizedValue,
     }));
   };
   const getAutoFillValueFromMe = (fieldName: string): string | null => {
@@ -717,6 +755,38 @@ export default function NovaSolicitacaoPage() {
             return;
           }
         }
+        if (isTiMaintenance) {
+          if (!extras.itemManutencao) {
+            setSubmitError('Selecione se a manutenção é para equipamento ou sistema.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (extras.itemManutencao === 'Sistema' && !(extras.nomeSistemaManutencao ?? '').trim()) {
+            setSubmitError('Informe o nome do sistema para a manutenção.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (extras.itemManutencao === 'Equipamento' && !(extras.tipoEquipamentoManutencao ?? '').trim()) {
+            setSubmitError('Selecione o tipo de equipamento para a manutenção.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (!(extras.telefoneManutencao ?? '').trim()) {
+            setSubmitError('Informe o número de telefone para contato.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (!isValidBrazilPhone(extras.telefoneManutencao ?? '')) {
+            setSubmitError('Telefone inválido. Use o formato (xx)xxxxx-xxxx.');
+            setSubmitting(false);
+            return;
+          }
+        }
+
 
         if (selectedTipo?.id === 'RQ_106' && (extraFiles.anexosSolicitante?.length ?? 0) < 1) {
           setSubmitError('Anexe o formulário RQ.106 na solicitação.');
@@ -773,6 +843,22 @@ export default function NovaSolicitacaoPage() {
       console.log('Solicitação criada:', data);
       if (data?.id) {
         await uploadExtrasFiles(data.id);
+      }
+       const telefoneManutencao = extras.telefoneManutencao ?? '';
+      if (isTiMaintenance && isValidBrazilPhone(telefoneManutencao) && telefoneManutencao !== (me?.phone ?? '')) {
+        const profileRes = await fetch('/api/me', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ phone: telefoneManutencao }),
+        });
+
+        if (profileRes.ok) {
+          setMe((prev) => (prev ? { ...prev, phone: telefoneManutencao } : prev));
+        } else {
+          console.error('Não foi possível atualizar o telefone do perfil via /api/me.');
+        }
       }
 
       const query = new URLSearchParams();
@@ -2077,8 +2163,14 @@ useEffect(() => {
                     const shouldShowEnderecoEnvio =
                       campo.name !== 'enderecoEnvio' ||
                       extras.entregaTipo === 'Será enviado';
+                  const shouldShowTiMaintenanceSystemField =
+                      campo.name !== 'nomeSistemaManutencao' ||
+                      extras.itemManutencao === 'Sistema';
+                    const shouldShowTiMaintenanceEquipmentField =
+                      campo.name !== 'tipoEquipamentoManutencao' ||
+                      extras.itemManutencao === 'Equipamento';
 
-                    if (!shouldShowEnderecoEnvio) {
+                    if (!shouldShowEnderecoEnvio || !shouldShowTiMaintenanceSystemField || !shouldShowTiMaintenanceEquipmentField) {
                       return null;
                     }
 
@@ -2097,7 +2189,7 @@ useEffect(() => {
                                 )
                               }
                             />
-                            <span className="text-gray-700 leading-snug">
+                             <span className="text-gray-700 leading-snug">
                               {campo.label}
                               {campo.required && (
                                 <span className="ml-1 text-red-500">*</span>
@@ -2108,10 +2200,14 @@ useEffect(() => {
                       );
                     }
 
+                      const isConditionalRequired =
+                        (campo.name === 'nomeSistemaManutencao' && extras.itemManutencao === 'Sistema') ||
+                        (campo.name === 'tipoEquipamentoManutencao' && extras.itemManutencao === 'Equipamento');
+
                       const commonProps = {
                       id: campo.name,
                       name: campo.name,
-                      required: campo.required,
+                      required: campo.required || isConditionalRequired,
                       value,
                       onChange: (
                         e:
@@ -2138,14 +2234,14 @@ useEffect(() => {
                           {normalizedType === 'textarea' && (
                             <textarea
                               {...commonProps}
-                              className={`${commonProps.className} min-h-[80px]`}
+                              className={`${commonProps.className} ${campo.name === 'detalhesManutencao' || campo.name === 'detalhesSgi' || campo.name === 'justificativaAcesso' ? 'min-h-[140px]' : 'min-h-[80px]'}`}
                             />
                           )}
 
                            {normalizedType === 'select' && campo.options && (
                              <select {...(commonProps as any)} disabled={campo.disabled}>
                               <option value="">Selecione...</option>
-                              {campo.options.map((opt) => (
+                              {(campo.name === 'tipoEquipamentoManutencao' ? TI_STOCK_EQUIPMENT_OPTIONS : campo.options).map((opt) => (
                                 <option key={opt} value={opt}>
                                   {opt}
                                 </option>
