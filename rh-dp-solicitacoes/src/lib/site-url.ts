@@ -60,6 +60,7 @@ export function resolveAppBaseUrl(options?: ResolveOptions) {
   const context = options?.context ?? 'general'
   const allowLocalhostInProduction = options?.allowLocalhostInProduction ?? false
 
+  // Prioridade: variáveis específicas da aplicação antes do fallback de getSiteUrl().
   const candidates = [
     normalizeUrl(process.env.APP_BASE_URL || ''),
     normalizeUrl(process.env.APP_URL || ''),

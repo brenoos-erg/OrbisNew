@@ -89,7 +89,7 @@ SUPERADMIN_PASSWORD="<SENHA_SUPERADMIN>"
 # URL da aplicação (links enviados por e-mail / integração)
 APP_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-APP_BASE_URL="http://localhost:3000"
+APP_BASE_URL="http://177.174.106.226:3000"
 NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 
 # Storage
