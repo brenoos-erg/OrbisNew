@@ -6,6 +6,7 @@ import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from 
 import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
 import { normalizeModuleKey } from '@/lib/moduleKey'
 import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
+import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
 
 type NotifyInput = {
   solicitationId: string
@@ -165,9 +166,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     return { skipped: true, reason: 'invalid_base_url' as const }
   }
 
-  const solicitationPath = targetStep.kind === 'APROVACAO'
-    ? `/dashboard/solicitacoes/aprovacao?solicitationId=${encodeURIComponent(solicitation.id)}`
-    : `/dashboard/solicitacoes/${solicitation.id}`
+  const solicitationPath = buildWorkflowNotificationPath(targetStep.kind, solicitation.id)
 
   const values = {
     protocolo: solicitation.protocolo,
