@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { assertCanFeature } from '@/lib/permissions'
-import { getUserModuleContext } from '@/lib/moduleAccess'
+import { getUserModuleContext, invalidateUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeModules } from '@/lib/normalizeModules'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
@@ -182,7 +182,12 @@ export async function PATCH(req: NextRequest) {
           })
         }
       }
-   const payload = await buildUserPayload(email, me.role === 'ADMIN', user.id)
+    invalidateUserModuleContext(user.id)
+      if (user.id === me.id) {
+        invalidateUserModuleContext(me.id)
+      }
+
+      const payload = await buildUserPayload(email, me.role === 'ADMIN', user.id)
       return NextResponse.json(payload)
     } catch (e: any) {
       console.error('PATCH /api/permissoes/usuarios error', e)

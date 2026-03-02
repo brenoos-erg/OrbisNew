@@ -14,6 +14,10 @@ const moduleContextCache = new Map<
   { expiresAt: number; value: Promise<{ levels: AccessMap; departmentCode: string | null }> }
 >()
 
+export function invalidateUserModuleContext(userId: string) {
+  moduleContextCache.delete(userId)
+}
+
 
 function pickHigherLevel(current: ModuleLevel | undefined, incoming: ModuleLevel) {
   if (!current) return incoming
@@ -92,20 +96,12 @@ async function loadUserModuleContext(
     }
   }
 
-  // Sobrescritas individuais (UserModuleAccess) só podem elevar nível de módulos
-  // já liberados por algum departamento do usuário.
-  //
-  // Isso garante que a tela de permissões por departamento seja a fonte de verdade
-  // para visibilidade das abas/módulos no menu lateral.
+  // Sobrescritas individuais (UserModuleAccess) podem conceder acesso mesmo sem
+  // vínculo prévio do módulo com algum departamento do usuário.
   for (const access of user?.moduleAccesses ?? []) {
     const key = normalizeModuleKey(access.module.key)
-    if (!levels[key]) {
-      continue
-    }
-
     levels[key] = pickHigherLevel(levels[key], access.level)
   }
-
   const departmentCode =
     user?.department?.code ??
     user?.userDepartments.find((d) => d.department?.code)?.department?.code ??

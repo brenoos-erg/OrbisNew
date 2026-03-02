@@ -7,8 +7,7 @@ import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/l
 import { normalizeModuleKey } from '@/lib/moduleKey'
 import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
 import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
-import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
-import { resolveApprovalRecipientId } from '@/lib/solicitationApproverRules'
+import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 
 type NotifyInput = {
   solicitationId: string
@@ -136,28 +135,28 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   let bodyTemplate = ''
 
   if (targetStep.kind === 'APROVACAO') {
-     const fallbackTipoApproverId = solicitation.approverId ? null : await resolveTipoApproverId(solicitation.tipoId)
-    const approverId = resolveApprovalRecipientId({
-      solicitationApproverId: solicitation.approverId,
-      fallbackTipoApproverId,
-    })
+      const approverIds = solicitation.approverId
+      ? [solicitation.approverId]
+      : await resolveTipoApproverIds(solicitation.tipoId)
 
-    if (!solicitation.approverId && approverId) {
+    const primaryApproverId = approverIds[0] ?? null
+
+    if (!solicitation.approverId && primaryApproverId) {
       await prisma.solicitation.update({
         where: { id: solicitation.id },
-        data: { approverId },
+        data: { approverId: primaryApproverId },
       })
     }
 
-    if (!approverId) {
+    if (!primaryApproverId) {
       return { skipped: true, reason: 'no_approver_configured' as const }
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: approverId },
+    const users = await prisma.user.findMany({
+      where: { id: { in: approverIds } },
       select: { email: true },
     })
-    recipients = user?.email ? [user.email] : []
+    recipients = users.map((user) => user.email)
     const template = resolveTemplate(targetStep.approvalTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body
