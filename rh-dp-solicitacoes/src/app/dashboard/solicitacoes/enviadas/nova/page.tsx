@@ -452,6 +452,15 @@ export default function NovaSolicitacaoPage() {
      const existingNames = new Set(baseCampos.map((campo) => campo.name));
     return [...baseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
   }, [camposSolicitante, destinoOptions, extras.tipoEquipamentoTi, isSolicitacaoEquipamentoTi]);
+  const shouldFieldUseFullWidth = (campo: CampoEspecifico) =>
+    campo.type === 'textarea' || campo.name === 'observacoes';
+
+  const buildCostCenterLabel = (costCenterId: string) => {
+    const selectedOption = costCenters.find((cc) => cc.id === costCenterId);
+    return selectedOption
+      ? [selectedOption.code, selectedOption.description].filter(Boolean).join(' - ')
+      : '';
+  };
 
 
   useEffect(() => {
@@ -832,10 +841,34 @@ export default function NovaSolicitacaoPage() {
          (acc, campo) => {
             const nextValue = extras[campo.name] ?? '';
             acc[campo.name] = campo.name === 'placaVeiculo' ? nextValue.trim().toUpperCase() : nextValue;
+
+            if (campo.type === 'cost_center' && nextValue) {
+              const labelValue = extras[`${campo.name}Label`] ?? buildCostCenterLabel(nextValue);
+              if (labelValue) acc[`${campo.name}Label`] = labelValue;
+            }
+
             return acc;
           },
           {},
         );
+
+        if (selectedTipo?.id === 'RQ_043') {
+          const centroDestinoId =
+            campos.centroCustoDestinoId ??
+            campos.centroCustoId ??
+            '';
+          const centroDestinoText =
+            campos.centroCustoDestinoIdLabel ??
+            campos.centroCustoIdLabel ??
+            (centroDestinoId ? buildCostCenterLabel(centroDestinoId) : '');
+
+          if (centroDestinoId) {
+            campos.centroCustoDestinoId = centroDestinoId;
+          }
+          if (centroDestinoText) {
+            campos.centroCustoDestinoText = centroDestinoText;
+          }
+        }
       }
 
       const body = {
@@ -2250,7 +2283,7 @@ useEffect(() => {
                     };
 
                          return (
-                      <div key={campo.name}>
+                      <div key={campo.name} className={shouldFieldUseFullWidth(campo) ? 'md:col-span-2' : ''}>
                         <label className="space-y-1 text-sm block">
                           <span className="block text-xs font-semibold text-gray-700">
                             {getDisplayLabel(campo)}{' '}
@@ -2262,7 +2295,7 @@ useEffect(() => {
                           {normalizedType === 'textarea' && (
                             <textarea
                               {...commonProps}
-                              className={`${commonProps.className} ${campo.name === 'detalhesManutencao' || campo.name === 'detalhesSgi' || campo.name === 'justificativaAcesso' ? 'min-h-[140px]' : 'min-h-[80px]'}`}
+                              className={`${commonProps.className} ${campo.name === 'observacoes' ? 'min-h-[200px]' : campo.name === 'detalhesManutencao' || campo.name === 'detalhesSgi' || campo.name === 'justificativaAcesso' ? 'min-h-[140px]' : 'min-h-[80px]'}`}
                             />
                           )}
 
@@ -2282,10 +2315,8 @@ useEffect(() => {
                               options={costCenters}
                               onValueChange={(nextValue) => {
                                 handleExtraChange(campo.name, nextValue);
-                                const selectedOption = costCenters.find((cc) => cc.id === nextValue);
-                                if (selectedOption) {
-                                  handleExtraChange(`${campo.name}Label`, [selectedOption.code, selectedOption.description].filter(Boolean).join(' - '));
-                                }
+                                 handleExtraChange(`${campo.name}Label`, buildCostCenterLabel(nextValue));
+
                               }}
                               required={campo.required}
                               disabled={commonProps.disabled}

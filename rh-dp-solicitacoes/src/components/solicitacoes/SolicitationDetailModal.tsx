@@ -824,7 +824,23 @@ export function SolicitationDetailModal({
   const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
-    const hasAttachments = (detail?.anexos?.length ?? 0) > 0
+
+  const getCampoDisplayValue = (campo: CampoEspecifico) => {
+    if (campo.name === 'centroCustoDestinoId') {
+      return String(
+        payloadCampos.centroCustoDestinoText ??
+          payloadCampos.centroCustoDestinoIdLabel ??
+          payloadCampos.centroCustoIdLabel ??
+          payloadCampos.centroCustoLabel ??
+          '',
+      )
+    }
+
+    const rawValue = payloadCampos[campo.name]
+    return rawValue !== undefined ? String(rawValue) : ''
+  }
+
+  const hasAttachments = (detail?.anexos?.length ?? 0) > 0
   const canEncaminharAprovacaoEpi =
     showManagementActions &&
     isSolicitacaoEpiUniformeTipo &&
@@ -1877,20 +1893,23 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </p>
 
                       <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                      {camposFormSolicitante.map((campo) => (
-                        <div key={campo.name}>
-                          <label className={LABEL_RO}>{campo.label}</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={
-                              payloadCampos[campo.name] !== undefined
-                                ? String(payloadCampos[campo.name])
-                                : ''
-                            }
-                          />
-                        </div>
-                      ))}
+                      {camposFormSolicitante.map((campo) => {
+                        const value = getCampoDisplayValue(campo)
+                        const isTextarea = campo.type === 'textarea'
+
+                        return (
+                          <div key={campo.name} className={isTextarea ? 'md:col-span-2' : ''}>
+                            <label className={LABEL_RO}>{campo.label}</label>
+                            {isTextarea ? (
+                              <div className={`${INPUT_RO} min-h-[110px] whitespace-pre-wrap break-words`}>
+                                {value}
+                              </div>
+                            ) : (
+                              <input className={INPUT_RO} readOnly value={value} />
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
