@@ -428,6 +428,9 @@ export function SolicitationDetailModal({
   const [approvalAction, setApprovalAction] =
     useState<'APROVAR' | 'REPROVAR' | null>(null)
   const [approvalComment, setApprovalComment] = useState('')
+  const [showLeftPanel, setShowLeftPanel] = useState(true)
+  const [showCenterPanel, setShowCenterPanel] = useState(true)
+  const [showRightPanel, setShowRightPanel] = useState(true)
   const [tiInventory, setTiInventory] = useState<TiInventoryItem[]>([])
   const [loadingTiInventory, setLoadingTiInventory] = useState(false)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState('')
@@ -1495,124 +1498,86 @@ async function handleEncaminharAprovacaoComAnexo() {
     setApprovalAction(null)
     setCloseError(null)
   }
+
+  useEffect(() => {
+    if (!isOpen) return
+    setShowLeftPanel(true)
+    setShowCenterPanel(true)
+    setShowRightPanel(true)
+  }, [isOpen, detail?.id])
+
   if (!isOpen || !row) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 lg:items-center">
-      <div className="flex w-full h-full flex-col overflow-hidden rounded-none bg-white shadow-xl lg:h-auto lg:max-h-[90vh] lg:max-w-6xl lg:rounded-xl">
-        {/* Cabeçalho */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Fechar tudo"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
+
+      <div className="relative z-10 flex h-full flex-col p-3 lg:p-6">
+        <div className="mb-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
           <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Detalhes da Solicitação
-            </h2>
-            <p className="text-xs text-slate-500">
-              Protocolo {detail?.protocolo ?? row.protocolo ?? '-'}
-            </p>
-            {assumirError && (
-              <p className="mt-1 text-[11px] text-red-600">{assumirError}</p>
-            )}
-          </div>
-
-          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-            {/* Modo de aprovação (tela do gestor) */}
-              {canShowApprovalActions && (
-              <>
-                <button
-                  onClick={() => handleStartApproval('APROVAR')}
-                  disabled={closing}
-                  className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
-                >
-                  Aprovar
-                </button>
-
-                <button
-                  onClick={() => handleStartApproval('REPROVAR')}
-                  disabled={closing}
-                    className="w-full rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-500 disabled:opacity-60 lg:w-auto lg:text-sm"
-                >
-                  Reprovar
-                </button>
-              </>
-            )}
-
-              {isApprovalMode && !canShowApprovalActions && (
-              <span className="text-[11px] font-semibold text-amber-700">
-                {approvalStatus !== 'PENDENTE'
-                  ? 'Esta solicitação não está pendente de aprovação.'
-                  : 'Aprovação disponível apenas para nível 3 de solicitações no SST.'}
-              </span>
-            )}
-
-            <button
-              onClick={onClose}
-              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
-            >
-              Fechar
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold text-slate-800">Detalhes da Solicitação</h2>
+            <p className="text-xs text-slate-500">Protocolo {detail?.protocolo ?? row.protocolo ?? '-'}</p>
+           </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Fechar tudo
+          </button>
         </div>
 
-         {canShowApprovalActions && approvalAction && (
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1 space-y-2">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-800">
-                    {approvalAction === 'APROVAR'
-                      ? 'Confirme a aprovação'
-                      : 'Confirme a reprovação'}
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    Informe um comentário para registrar se a solicitação foi
-                    aprovada ou reprovada.
-                  </p>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(720px,1fr)_380px]">
+          {showLeftPanel && (
+            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-slate-800">Dados do solicitante</h3>
+                <button onClick={() => setShowLeftPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+              </header>
+              <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
+                {loading && <p className="text-xs text-slate-500">Carregando detalhes...</p>}
+                {error && <p className="text-xs text-red-600">{error}</p>}
+                {detail && (
+                  <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-sky-50/40 p-4 shadow-sm">
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className={LABEL_RO}>Nome completo</label>
+                        <textarea className={`${INPUT_RO} min-h-[72px]`} readOnly value={payloadSolic.fullName ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>E-mail</label>
+                        <textarea className={`${INPUT_RO} min-h-[72px]`} readOnly value={payloadSolic.email ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Login</label>
+                        <input className={INPUT_RO} readOnly value={payloadSolic.login ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Telefone</label>
+                        <input className={INPUT_RO} readOnly value={payloadSolic.phone ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Centro de Custo</label>
+                        <textarea className={`${INPUT_RO} min-h-[72px]`} readOnly value={payloadSolic.costCenterText ?? ''} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 </div>
+            </section>
+          )}
 
-                <div>
-                  <label className={LABEL_RO}>
-                    Comentário {approvalAction === 'REPROVAR' && '(obrigatório)'}
-                  </label>
-                  <textarea
-                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 lg:text-sm"
-                    rows={3}
-                    value={approvalComment}
-                    onChange={(e) => setApprovalComment(e.target.value)}
-                    placeholder={
-                      approvalAction === 'APROVAR'
-                        ? 'Ex.: Solicitação aprovada pelo gestor.'
-                        : 'Descreva o motivo da reprovação.'
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex w-full flex-col items-stretch gap-2 self-end sm:self-start lg:w-auto">
-                <button
-                  onClick={handleConfirmApprovalAction}
-                  disabled={closing}
-                  className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
-                >
-                  {approvalAction === 'APROVAR'
-                    ? 'Confirmar aprovação'
-                    : 'Confirmar reprovação'}
-                </button>
-
-                <button
-                  onClick={handleCancelApprovalAction}
-                  className="w-full rounded-md border border-slate-300 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CONTEÚDO */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="min-w-0 space-y-5 lg:col-span-2">
+          {showCenterPanel && (
+            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-slate-800">Formulário / Detalhes da Solicitação</h3>
+                <button onClick={() => setShowCenterPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+              </header>
+              <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
          {loading && (
             <p className="text-xs text-slate-500">
               Carregando detalhes...
@@ -1662,7 +1627,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     })}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2">
                 <div>
                   <label className={LABEL_RO}>Status</label>
                   <input
@@ -1777,61 +1742,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
               )}
 
-              {/* Dados do solicitante */}
-              <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-sky-50/40 p-4 shadow-sm">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                  Dados do Solicitante
-                </p>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className={LABEL_RO}>Nome completo</label>
-                    <input
-                      className={INPUT_RO}
-                      readOnly
-                      value={payloadSolic.fullName ?? ''}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div>
-                      <label className={LABEL_RO}>E-mail</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={payloadSolic.email ?? ''}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Login</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={payloadSolic.login ?? ''}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div>
-                      <label className={LABEL_RO}>Telefone</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={payloadSolic.phone ?? ''}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_RO}>Centro de Custo</label>
-                      <input
-                        className={INPUT_RO}
-                        readOnly
-                        value={payloadSolic.costCenterText ?? ''}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+             
               
 
               {/* Formulário do tipo de solicitação */}
@@ -1965,7 +1876,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       Formulário do tipo de solicitação
                     </p>
 
-                      <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                       {camposFormSolicitante.map((campo) => (
                         <div key={campo.name}>
                           <label className={LABEL_RO}>{campo.label}</label>
@@ -1993,7 +1904,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Dados do contratado
                   </p>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                     <div>
                       <label className={LABEL_RO}>Nome completo</label>
                       <input
@@ -2090,7 +2001,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Informações para incentivo à educação
                   </p>
 
-                    <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                     <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                     <div>
                       <label className={LABEL_RO}>
                         Nome do colaborador/aluno
@@ -2210,10 +2121,54 @@ async function handleEncaminharAprovacaoComAnexo() {
             </>
           )}
             </div>
+             </section>
+          )}
 
-            {showManagementActions && detail && (
-              <aside className="w-full lg:col-span-1">
-                <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6 lg:max-h-[72vh] lg:overflow-y-auto">
+          {showRightPanel && (
+            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-slate-800">Ações / Tratativas</h3>
+                <button onClick={() => setShowRightPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+              </header>
+              <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
+                {canShowApprovalActions && (
+                  <div className="mb-4 space-y-2">
+                    <button
+                      onClick={() => handleStartApproval('APROVAR')}
+                      disabled={closing}
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:text-sm"
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => handleStartApproval('REPROVAR')}
+                      disabled={closing}
+                      className="w-full rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-500 disabled:opacity-60 lg:text-sm"
+                    >
+                      Reprovar
+                    </button>
+                  </div>
+                )}
+
+                {canShowApprovalActions && approvalAction && (
+                  <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <label className={LABEL_RO}>Comentário {approvalAction === 'REPROVAR' && '(obrigatório)'}</label>
+                    <textarea
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 lg:text-sm"
+                      rows={3}
+                      value={approvalComment}
+                      onChange={(e) => setApprovalComment(e.target.value)}
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={handleConfirmApprovalAction} disabled={closing} className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Confirmar</button>
+                      <button onClick={handleCancelApprovalAction} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Cancelar</button>
+                    </div>
+                  </div>
+                )}
+
+                {showManagementActions && detail && (
+                  <aside className="w-full">
+                    <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
                     Painel de Tratativas
                   </p>
@@ -2472,24 +2427,20 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
               </aside>
             )}
-          </div>
-        </div>
+        <div className="mt-4 border-t border-slate-200 pt-3">
+              <div className="text-xs">
+              {closeError && <p className="text-red-600">{closeError}</p>}
+              {closeSuccess && (
+                <p className="text-emerald-600">{closeSuccess}</p>
+              )}
+            </div>
 
-        {/* Rodapé */}
-         <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="text-xs">
-            {closeError && <p className="text-red-600">{closeError}</p>}
-            {closeSuccess && (
-              <p className="text-emerald-600">{closeSuccess}</p>
-            )}
-          </div>
-
-          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:flex-row lg:items-center">
+          <div className="mt-2 flex w-full flex-col items-stretch gap-2">
              {showManagementActions && canAssumir && (
               <button
                 onClick={handleAssumirChamado}
                 disabled={assumindo || isFinalizadaOuCancelada}
-                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60 lg:w-auto lg:text-sm"
+                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60 lg:text-sm"
               >
                 {assumindo ? 'Assumindo...' : 'Assumir chamado'}
               </button>
@@ -2499,7 +2450,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <button
                 onClick={handleEncaminharAprovacaoComAnexo}
                 disabled={encaminhandoAprovacao}
-                className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:w-auto lg:text-sm"
+                className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:text-sm"
               >
                 {encaminhandoAprovacao
                   ? 'Encaminhando...'
@@ -2508,11 +2459,15 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
             <button
               onClick={onClose}
-              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
+              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:text-sm"
             >
               Fechar
             </button>
           </div>
+            </div>
+          </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
