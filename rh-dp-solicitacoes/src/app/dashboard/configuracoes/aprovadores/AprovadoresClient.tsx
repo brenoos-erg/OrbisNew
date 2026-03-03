@@ -12,6 +12,7 @@ export default function AprovadoresClient() {
   const [tipoId, setTipoId] = useState('')
   const [selectedApprovers, setSelectedApprovers] = useState<string[]>([])
   const [selectedViewers, setSelectedViewers] = useState<string[]>([])
+  const [search, setSearch] = useState('')
 
   const currentTipo = useMemo(() => tipos.find((t) => t.id === tipoId) ?? null, [tipos, tipoId])
 
@@ -44,6 +45,26 @@ export default function AprovadoresClient() {
     setSelectedViewers((prev) => (checked ? [...prev, userId] : prev.filter((id) => id !== userId)))
     if (checked) setSelectedApprovers((prev) => prev.filter((id) => id !== userId))
   }
+const filteredUsers = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase()
+    if (!normalizedSearch) return users
+
+    return users.filter((u) => {
+      const haystack = `${u.fullName} ${u.email}`.toLowerCase()
+      return haystack.includes(normalizedSearch)
+    })
+  }, [search, users])
+
+  const selectedUsers = useMemo(() => {
+    const selectedSet = new Set([...selectedApprovers, ...selectedViewers])
+    return users
+      .filter((u) => selectedSet.has(u.id))
+      .map((u) => ({
+        ...u,
+        role: selectedApprovers.includes(u.id) ? 'Aprovador' : 'Visualizador',
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR'))
+  }, [selectedApprovers, selectedViewers, users])
 
   const save = async () => {
     await fetch('/api/config/aprovadores-por-tipo', {
@@ -69,41 +90,88 @@ export default function AprovadoresClient() {
         Defina por usuário se ele atua como <strong>Aprovador</strong> ou <strong>Visualizador (Nível 1)</strong>.
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2">
-        {users.map((u) => {
-          const isApprover = selectedApprovers.includes(u.id)
-          const isViewer = selectedViewers.includes(u.id)
-          return (
-            <div key={u.id} className="space-y-2 rounded border p-3">
-              <span>
-                {u.fullName} <span className="text-xs text-slate-500">({u.email})</span>
-              </span>
-              <div className="flex gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={isApprover}
-                    onChange={(e) => toggleRole('APPROVER', u.id, e.target.checked)}
-                  />
-                  Aprovador
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={isViewer}
-                    onChange={(e) => toggleRole('VIEWER', u.id, e.target.checked)}
-                  />
-                  Visualizador
-                </label>
-              </div>
-              {(isApprover || isViewer) && (
-                <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                  {isApprover ? 'Aprovador' : 'Visualizador'}
-                </span>
-              )}
-            </div>
-          )
-        })}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="space-y-3">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar usuário por nome ou e-mail"
+            className="w-full rounded border px-3 py-2"
+          />
+
+          <div className="grid gap-2 md:grid-cols-2">
+            {filteredUsers.map((u) => {
+              const isApprover = selectedApprovers.includes(u.id)
+              const isViewer = selectedViewers.includes(u.id)
+              return (
+                <div key={u.id} className="space-y-2 rounded border p-3">
+                  <span>
+                    {u.fullName} <span className="text-xs text-slate-500">({u.email})</span>
+                  </span>
+                  <div className="flex gap-4 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isApprover}
+                        onChange={(e) => toggleRole('APPROVER', u.id, e.target.checked)}
+                      />
+                      Aprovador
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isViewer}
+                        onChange={(e) => toggleRole('VIEWER', u.id, e.target.checked)}
+                      />
+                      Visualizador
+                    </label>
+                  </div>
+                  {(isApprover || isViewer) && (
+                    <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                      {isApprover ? 'Aprovador' : 'Visualizador'}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {filteredUsers.length === 0 && (
+            <div className="rounded border border-dashed p-4 text-sm text-slate-500">
+              Nenhum usuário encontrado para a busca informada.
+             </div>
+          )}
+        </div>
+
+        <div className="h-fit rounded border p-3">
+          <h2 className="mb-2 text-sm font-semibold text-slate-700">Com permissão no tipo selecionado</h2>
+          <div className="overflow-hidden rounded border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                <tr>
+                  <th className="px-3 py-2">Usuário</th>
+                  <th className="px-3 py-2">Permissão</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedUsers.map((u) => (
+                  <tr key={u.id} className="border-t">
+                    <td className="px-3 py-2">{u.fullName}</td>
+                    <td className="px-3 py-2">{u.role}</td>
+                  </tr>
+                ))}
+                {selectedUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={2} className="px-3 py-3 text-center text-slate-500">
+                      Nenhum usuário com permissão.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
       <button className="rounded bg-orange-500 px-3 py-2 text-white" onClick={save}>
         Salvar

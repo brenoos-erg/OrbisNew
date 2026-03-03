@@ -449,6 +449,9 @@ export function SolicitationDetailModal({
   const [dataAdmissaoPrevista, setDataAdmissaoPrevista] = useState('')
   const [salario, setSalario] = useState('')
   const [cargo, setCargo] = useState('')
+  const [cbo, setCbo] = useState('')
+  const [beneficios, setBeneficios] = useState('')
+  const [observacao, setObservacao] = useState('')
   const [duracaoCursoMeses, setDuracaoCursoMeses] = useState('')
   const [valorMensalCurso, setValorMensalCurso] = useState('')
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null)
@@ -465,7 +468,6 @@ export function SolicitationDetailModal({
   const [descricaoSolucaoSst, setDescricaoSolucaoSst] = useState('')
   const [observacaoSst1, setObservacaoSst1] = useState('')
   const [observacaoSst2, setObservacaoSst2] = useState('')
-
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
 
@@ -517,6 +519,13 @@ export function SolicitationDetailModal({
     setCargo(
       (payloadCampos.cargoFinal as string) ||
         (payloadCampos.cargo as string) ||
+        '',
+    )
+    setCbo((payloadCampos.cbo as string) || '')
+    setBeneficios((payloadCampos.beneficios as string) || '')
+    setObservacao(
+      (payloadCampos.observacoesRh as string) ||
+        (payloadCampos.observacao as string) ||
         '',
     )
     setDuracaoCursoMeses(
@@ -1362,6 +1371,13 @@ async function handleEncaminharAprovacaoComAnexo() {
               ...(valorTotalCurso !== null
                 ? { valorTotalCalculado: valorTotalCurso }
                 : {}),
+                ...(buildOptionalValue(cbo) ? { cbo } : {}),
+              ...(buildOptionalValue(beneficios)
+                ? { beneficios }
+                : {}),
+              ...(buildOptionalValue(observacao)
+                ? { observacao }
+                : {}),
                 ...desligamentoInfos,
             },
           }),
@@ -1977,6 +1993,37 @@ async function handleEncaminharAprovacaoComAnexo() {
                         value={salario}
                         onChange={(e) => setSalario(e.target.value)}
                         placeholder="Ex: 3500,00"
+                      />
+                    </div>
+                     <div>
+                      <label className={LABEL_RO}>CBO</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        value={cbo}
+                        onChange={(e) => setCbo(e.target.value)}
+                        placeholder="Código CBO"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Benefícios</label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        value={beneficios}
+                        onChange={(e) => setBeneficios(e.target.value)}
+                        placeholder="Descreva os benefícios"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Observação</label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        value={observacao}
+                        onChange={(e) => setObservacao(e.target.value)}
+                        placeholder="Observações adicionais"
+                        rows={3}
                       />
                     </div>
 
