@@ -195,6 +195,13 @@ function formatBrazilPhone(value: string) {
 function isValidBrazilPhone(value: string) {
   return /^\(\d{2}\)\d{5}-\d{4}$/.test(value);
 }
+function createClientRequestId() {
+  if (typeof globalThis !== 'undefined' && typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 
 /* ================================================================
@@ -205,11 +212,10 @@ export default function NovaSolicitacaoPage() {
   const router = useRouter();
   const { toasts, pushToast, removeToast } = useSolicitacoesToast();
 
-  // controle de envio
+ // controle de envio
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const idempotencyKeyRef = useRef(globalThis.crypto.randomUUID());
-
+  const idempotencyKeyRef = useRef(createClientRequestId());
   // ---------- DADOS DO SOLICITANTE ----------
   const [me, setMe] = useState<UserMe | null>(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -927,7 +933,7 @@ export default function NovaSolicitacaoPage() {
       const nextUrl = query.toString()
         ? `/dashboard/solicitacoes/enviadas?${query.toString()}`
         : '/dashboard/solicitacoes/enviadas';
-      idempotencyKeyRef.current = globalThis.crypto.randomUUID();
+      idempotencyKeyRef.current = createClientRequestId();
       pushToast('Solicitação criada com sucesso', 'success');
       window.setTimeout(() => {
         router.push(nextUrl);
