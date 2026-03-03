@@ -258,6 +258,13 @@ export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
   const nome = normalizeSolicitacaoName(tipo.nome)
   return nome.includes('RQ_063') || nome.includes('RQ.063') || nome.includes('SOLICITACAO DE PESSOAL')
 }
+export function isSolicitacaoAdmissao(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === 'SOLICITACAO_ADMISSAO') return true
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return nome.includes('SOLICITACAO DE ADMISSAO')
+}
 
 export function isSolicitacaoVeiculos(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false

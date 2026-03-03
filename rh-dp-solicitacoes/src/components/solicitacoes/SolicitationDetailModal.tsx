@@ -11,6 +11,7 @@ import {
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
   isSolicitacaoPessoal,
+  isSolicitacaoAdmissao,
   NADA_CONSTA_SETORES,
   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
@@ -559,6 +560,7 @@ export function SolicitationDetailModal({
 
     // Fluxos especiais
  const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(detail?.tipo)
+  const isSolicitacaoAdmissaoTipo = isSolicitacaoAdmissao(detail?.tipo)
   const isSolicitacaoIncentivo =
     detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
@@ -1881,7 +1883,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   )}
                 </div>
-              ) : isSolicitacaoPessoalTipo ? (
+              ) : isSolicitacaoPessoalTipo || isSolicitacaoAdmissaoTipo ? (
                 <RQ063ResumoCampos payloadCampos={payloadCampos} />
                   ) : isDesligamento ? (
                 <RQ247ResumoCampos
@@ -2555,6 +2557,16 @@ function RQ063ResumoCampos({
 
   const get = (key: string) =>
     payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+  const getFirst = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = payloadCampos[key]
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        return String(value)
+      }
+    }
+    return ''
+  }
+
 
   const bool = (key: string) => {
     const v = (payloadCampos[key] ?? '').toString().toLowerCase()
@@ -2635,7 +2647,7 @@ function RQ063ResumoCampos({
       {activeTab === 'basicas' && (
         <section>
           <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-            <div><label className={LABEL_RO}>Cargo</label><input className={INPUT_RO} readOnly value={get('cargoNome') || get('cargo')} /></div>
+            <div><label className={LABEL_RO}>Cargo</label><input className={INPUT_RO} readOnly value={getFirst('cargoNome', 'cargo', 'cargoFinal')} /></div>
             <div><label className={LABEL_RO}>Setor e/ou Projeto</label><input className={INPUT_RO} readOnly value={get('setorProjeto')} /></div>
             <div><label className={LABEL_RO}>Vaga prevista em contrato</label><input className={INPUT_RO} readOnly value={get('vagaPrevista') || get('vagaPrevistaContrato')} /></div>
             <div><label className={LABEL_RO}>Local de trabalho</label><input className={INPUT_RO} readOnly value={get('localTrabalho')} /></div>
@@ -2717,9 +2729,9 @@ function RQ063ResumoCampos({
       {activeTab === 'admissao' && (
         <section className="space-y-3 text-xs">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div><label className={LABEL_RO}>Nome do profissional</label><input className={INPUT_RO} readOnly value={get('nomeProfissional')} /></div>
+            <div><label className={LABEL_RO}>Nome do profissional</label><input className={INPUT_RO} readOnly value={getFirst('nomeProfissional', 'nomeCandidato', 'nomeColaborador', 'candidatoNome')} /></div>
             <div><label className={LABEL_RO}>Salário</label><input className={INPUT_RO} readOnly value={get('salario')} /></div>
-            <div><label className={LABEL_RO}>Data de admissão</label><input className={INPUT_RO} readOnly value={get('dataAdmissao')} /></div>
+            <div><label className={LABEL_RO}>Data de admissão</label><input className={INPUT_RO} readOnly value={getFirst('dataAdmissao', 'dataAdmissaoPrevista')} /></div>
             <div><label className={LABEL_RO}>CBO</label><input className={INPUT_RO} readOnly value={get('cbo')} /></div>
           </div>
           <div>
@@ -2771,7 +2783,6 @@ function RQ247ResumoCampos({
 }) {
   const get = (key: string) =>
     payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
-
   const joinIfTrue = (entries: [string, string][]) =>
     entries
       .filter(
