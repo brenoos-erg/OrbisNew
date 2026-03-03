@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import { getNivel3DepartmentIds } from '@/lib/solicitationApprovalPermissions'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 
 export const dynamic = 'force-dynamic'
@@ -68,11 +67,13 @@ export async function GET() {
           : [{ id: '__never__' }],
     }
 
-    const allowedDepartmentIds = await getNivel3DepartmentIds(me.id)
     const approvalsPendingWhere: Record<string, any> = {
       requiresApproval: true,
       approvalStatus: 'PENDENTE',
-      departmentId: allowedDepartmentIds.length > 0 ? { in: allowedDepartmentIds } : '__never__',
+      OR: [
+        { approverId: me.id },
+        { tipo: { approvers: { some: { userId: me.id, role: 'APPROVER' } } } },
+      ],
     }
 
     const [receivedOpenCount, approvalsPendingCount] = await Promise.all([
