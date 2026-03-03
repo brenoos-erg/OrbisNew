@@ -1,0 +1,2223 @@
+diff --git a/rh-dp-solicitacoes/package.json b/rh-dp-solicitacoes/package.json
+index ee5b69e626db59472413eb2cc6790243347ef174..50583f35441b391e848d9bc97e2521461f3ddbc2 100644
+--- a/rh-dp-solicitacoes/package.json
++++ b/rh-dp-solicitacoes/package.json
+@@ -1,46 +1,46 @@
+ {
+   "name": "rh-dp-solicitacoes",
+   "version": "1.0.0",
+   "private": true,
+   "scripts": {
+     "dev": "node scripts/dev.js",
+     "prebuild": "prisma generate --schema ./prisma/schema.prisma",
+     "build": "next build",
+     "start": "prisma migrate deploy --schema ./prisma/schema.prisma && next start",
+     "lint": "tsc --noEmit",
+-     "test": "npm run test:workflow-notifications",
++    "test": "npm run test:workflow-notifications",
+     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+     "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
+     "seed": "prisma db push --schema ./prisma/schema.prisma && ts-node -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts",
+     "generate:checklist": "node -r ts-node/register src/scripts/generateChecklistReport.ts",
+     "postinstall": "playwright install chromium",
+     "test:signing-url": "node scripts/verify-long-signing-url.mjs",
+     "test:pdf-termo": "node scripts/generate-termo-pdf.mjs",
+     "prisma:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
+     "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma",
+-    "test:workflow-notifications": "node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-rules.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-workflow-notification-link.test.cjs"
++    "test:workflow-notifications": "node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-rules.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-workflow-notification-link.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/tipo-approver-resolution.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/workflow-approval-recipients.test.cjs"
+   },
+   "dependencies": {
+     "@headlessui/react": "^2.2.9",
+     "@heroicons/react": "^2.2.0",
+     "@prisma/client": "^6.19.0",
+     "@radix-ui/react-select": "^2.2.6",
+     "bcryptjs": "^3.0.3",
+     "date-fns": "^4.1.0",
+     "docx": "^9.5.1",
+     "dotenv": "^16.4.5",
+     "framer-motion": "^12.23.24",
+     "handlebars": "^4.7.8",
+     "jsonwebtoken": "^9.0.3",
+     "jszip": "^3.10.1",
+     "lucide-react": "^0.552.0",
+     "next": "^16.1.6",
+     "nodemailer": "^7.0.13",
+     "playwright": "^1.56.1",
+     "react": "18.2.0",
+     "react-dom": "18.2.0",
+     "zod": "^4.1.12"
+   },
+   "devDependencies": {
+     "@tailwindcss/postcss": "^4.1.16",
+     "@types/bcryptjs": "^2.4.6",
+diff --git a/rh-dp-solicitacoes/prisma/migrations/202603020001_add_tipo_solicitacao_approver/migration.sql b/rh-dp-solicitacoes/prisma/migrations/202603020001_add_tipo_solicitacao_approver/migration.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7fb7e0ae2d02ca08222d4b1e934f882e3bdb8a6
+--- /dev/null
++++ b/rh-dp-solicitacoes/prisma/migrations/202603020001_add_tipo_solicitacao_approver/migration.sql
+@@ -0,0 +1,20 @@
++CREATE TABLE `TipoSolicitacaoApprover` (
++  `id` VARCHAR(191) NOT NULL,
++  `tipoId` VARCHAR(191) NOT NULL,
++  `userId` VARCHAR(191) NOT NULL,
++  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
++  `updatedAt` DATETIME(3) NOT NULL,
++
++  UNIQUE INDEX `TipoSolicitacaoApprover_tipoId_userId_key`(`tipoId`, `userId`),
++  INDEX `TipoSolicitacaoApprover_tipoId_idx`(`tipoId`),
++  INDEX `TipoSolicitacaoApprover_userId_idx`(`userId`),
++  PRIMARY KEY (`id`)
++) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
++
++ALTER TABLE `TipoSolicitacaoApprover`
++  ADD CONSTRAINT `TipoSolicitacaoApprover_tipoId_fkey`
++  FOREIGN KEY (`tipoId`) REFERENCES `TipoSolicitacao`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
++
++ALTER TABLE `TipoSolicitacaoApprover`
++  ADD CONSTRAINT `TipoSolicitacaoApprover_userId_fkey`
++  FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+diff --git a/rh-dp-solicitacoes/prisma/schema.prisma b/rh-dp-solicitacoes/prisma/schema.prisma
+index b9e4e255ce4c859d9dcf967b1e2d83341663fe65..ea84ddcf4243861119750c6c37e3d2712ca0d65c 100644
+--- a/rh-dp-solicitacoes/prisma/schema.prisma
++++ b/rh-dp-solicitacoes/prisma/schema.prisma
+@@ -137,50 +137,63 @@ model Position {
+ 
+   @@map("Position")
+ }
+ 
+ model Leader {
+   id        String   @id @default(uuid())
+   fullName  String
+   email     String?  @unique
+   phone     String?
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt
+   members   User[]
+ 
+   @@map("Leader")
+ }
+ 
+ model TipoSolicitacao {
+   id           String         @id
+   codigo       String         @unique
+   nome         String         @unique
+   descricao    String?
+   schemaJson   Json
+   createdAt    DateTime       @default(now())
+   updatedAt    DateTime       @updatedAt
+   solicitacoes Solicitation[]
++  approvers    TipoSolicitacaoApprover[]
++}
++
++model TipoSolicitacaoApprover {
++  id        String          @id @default(uuid())
++  tipoId    String
++  userId    String
++  createdAt DateTime        @default(now())
++  updatedAt DateTime        @updatedAt
++  tipo      TipoSolicitacao @relation(fields: [tipoId], references: [id], onDelete: Cascade)
++  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
++
++  @@unique([tipoId, userId])
+ }
+ 
+ model Department {
+   id              String             @id @default(uuid())
+   name            String
+   sigla           String             @unique
+   createdAt       DateTime           @default(now())
+   updatedAt       DateTime           @updatedAt
+   code            String             @unique
+   costCenters     CostCenter[]
+   modules         DepartmentModule[]
+   positions       Position[]
+   solicitations   Solicitation[]
+   users           User[]
+   userDepartments UserDepartment[]
+   isoDocuments    IsoDocument[]
+   approverGroups  ApproverGroup[]
+ }
+ 
+ model Solicitation {
+   id                 String                 @id @default(uuid())
+   titulo             String
+   descricao          String?
+   tipoId             String
+   payload            Json
+@@ -288,50 +301,51 @@ model User {
+   updatedAt                                  DateTime                     @updatedAt
+   fullName                                   String
+   passwordHash                               String?
+   mustChangePassword                         Boolean                      @default(false)
+   resetTokenHash                             String?
+   resetTokenExpiresAt                        DateTime?
+   lastLoginAt                                DateTime?
+   login                                      String?                      @unique(map: "user_login_key")
+   phone                                      String?
+   status                                     UserStatus                   @default(ATIVO)
+   leaderId                                   String?
+   costCenterId                               String?
+   positionId                                 String?
+   avatarUrl                                  String?
+   departmentId                               String?
+   comments                                   Comment[]                    @relation("CommentAutor")
+   events                                     Event[]                      @relation("EventActor")
+   membersOfGroups                            GroupMember[]
+   refusalReportsAsContractManager            RefusalReport[]              @relation("RefusalReportContractManager")
+   refusalReportsAsDecidedBy                  RefusalReport[]              @relation("RefusalReportDecisionUser")
+   refusalReportsAsEmployee                   RefusalReport[]              @relation("RefusalReportEmployee")
+   refusalReportsAsGeneralCoordinator         RefusalReport[]              @relation("RefusalReportGeneralCoordinator")
+   solicitacoesAprovador                      Solicitation[]               @relation("SolicitationAprovador")
+   solicitacoesAssumidas                      Solicitation[]               @relation("SolicitationAssumidaPor")
+   solicitacoesCriadas                        Solicitation[]               @relation("SolicitationSolicitante")
++  tipoSolicitacaoApprovers                   TipoSolicitacaoApprover[]
+   costCenter                                 CostCenter?                  @relation(fields: [costCenterId], references: [id])
+   department                                 Department?                  @relation(fields: [departmentId], references: [id])
+   leader                                     Leader?                      @relation(fields: [leaderId], references: [id])
+   position                                   Position?                    @relation(fields: [positionId], references: [id])
+   costCenters                                UserCostCenter[]
+   userDepartments                            UserDepartment[]
+   moduleAccesses                             UserModuleAccess[]
+   vehicleCheckins                            VehicleCheckin[]
+   vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
+   vehicleStatusLogs                          VehicleStatusLog[]
+   tiEquipments                               TiEquipment[]
+   documentsCreated                           Document[]                   @relation("DocumentCreatedBy")
+   documentsAssigned                          DocumentAssignment[]         @relation("DocumentAssignedTo")
+   WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                @relation("WorkRefusal_analyzedByIdToUser")
+   WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
+   WorkRefusalAttachment                      WorkRefusalAttachment[]
+   WorkRefusalHistory                         WorkRefusalHistory[]
+   nonConformitiesAsRequester                 NonConformity[]              @relation("NonConformityRequester")
+   nonConformitiesAsQualityApprover           NonConformity[]              @relation("NonConformityQualityApprover")
+   nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
+   nonConformityActionItems                   NonConformityActionItem[]
+   nonConformityAttachments                   NonConformityAttachment[]
+   nonConformityComments                      NonConformityComment[]
+   nonConformityTimelineEvents                NonConformityTimeline[]
+   isoDocumentsAuthored                       IsoDocument[]                @relation("IsoDocumentAuthor")
+diff --git a/rh-dp-solicitacoes/prisma/seed.ts b/rh-dp-solicitacoes/prisma/seed.ts
+index f291b4d4a1f792fdc482500049d479fa7b048b8d..13a1477aeda6f8c1178c640abfe08c24c7fccc01 100644
+--- a/rh-dp-solicitacoes/prisma/seed.ts
++++ b/rh-dp-solicitacoes/prisma/seed.ts
+@@ -545,50 +545,103 @@ async function main() {
+         meta: { departamentos: [tiDepartment.id] },
+         camposEspecificos: [
+           {
+             name: 'tipoEquipamento',
+             label: 'Tipo de equipamento',
+             type: 'text',
+             required: true,
+             stage: 'solicitante',
+             section: 'Dados da solicitação',
+           },
+           {
+             name: 'justificativa',
+             label: 'Justificativa',
+             type: 'textarea',
+             required: true,
+             stage: 'solicitante',
+             section: 'Dados da solicitação',
+           },
+         ],
+       },
+       updatedAt: new Date(),
+     },
+   })
+   console.log('✅ Tipo "RQ.089 - Solicitação de Equipamento" ok.')
+ 
++
++  const tiposTiExtras = [
++    {
++      id: 'RQ_TI_SGI',
++      codigo: 'RQ.TI.002',
++      nome: 'Sistema SGI - Relatar problema ou sugerir melhoria',
++      descricao: 'Registro de problema ou sugestão de melhoria no SGI',
++      camposEspecificos: [
++        { name: 'detalhes', label: 'Detalhes', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
++      ],
++    },
++    {
++      id: 'RQ_TI_MANUTENCAO',
++      codigo: 'RQ.TI.003',
++      nome: 'Manutenção - Equipamentos ou sistema',
++      descricao: 'Solicitação de manutenção para equipamentos ou sistemas',
++      camposEspecificos: [
++        { name: 'itemManutencao', label: 'Equipamento ou sistema', type: 'text', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
++        { name: 'detalhesManutencao', label: 'Detalhes da manutenção', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
++      ],
++    },
++    {
++      id: 'RQ_TI_ACESSO_SISTEMA',
++      codigo: 'RQ.TI.004',
++      nome: 'Solicitação de Acesso - Sistema',
++      descricao: 'Solicitação de acesso a um sistema',
++      camposEspecificos: [
++        { name: 'sistema', label: 'Sistema', type: 'text', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
++        { name: 'justificativaAcesso', label: 'Justificativa', type: 'textarea', required: true, stage: 'solicitante', section: 'Tecnologia da Informação' },
++      ],
++    },
++  ] as const
++
++  for (const tipoTi of tiposTiExtras) {
++    await prisma.tipoSolicitacao.upsert({
++      where: { id: tipoTi.id },
++      update: {
++        codigo: tipoTi.codigo,
++        nome: tipoTi.nome,
++        descricao: tipoTi.descricao,
++        schemaJson: { meta: { departamentos: [tiDepartment.id], requiresApproval: true }, camposEspecificos: tipoTi.camposEspecificos },
++        updatedAt: new Date(),
++      },
++      create: {
++        id: tipoTi.id,
++        codigo: tipoTi.codigo,
++        nome: tipoTi.nome,
++        descricao: tipoTi.descricao,
++        schemaJson: { meta: { departamentos: [tiDepartment.id], requiresApproval: true }, camposEspecificos: tipoTi.camposEspecificos },
++      },
++    })
++  }
++
+   /* =========================
+      DP: Solicitação de Admissão
+      ========================= */
+   if (dpDepartment) {
+     const existingAdmissionByName = await prisma.tipoSolicitacao.findUnique({
+      where: { nome: 'Solicitação de admissão' },
+       select: { id: true },
+     })
+ 
+     const admissionTypeId = existingAdmissionByName?.id ?? 'SOLICITACAO_ADMISSAO'
+ 
+     await prisma.tipoSolicitacao.upsert({
+       where: { id: admissionTypeId },
+       update: {
+         codigo: 'RQ.DP.001',
+         nome: 'Solicitação de admissão',
+         descricao: 'Solicitação de admissão (Departamento Pessoal)',
+         schemaJson: {
+           meta: {
+             departamentos: [dpDepartment.id],
+             hiddenFromCreate: true,
+           },
+           camposEspecificos: [],
+         },
+         updatedAt: new Date(),
+diff --git a/rh-dp-solicitacoes/src/app/api/config/aprovadores-por-tipo/route.ts b/rh-dp-solicitacoes/src/app/api/config/aprovadores-por-tipo/route.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d012546343d60f9d9ae4e88de2438f87e6feadfe
+--- /dev/null
++++ b/rh-dp-solicitacoes/src/app/api/config/aprovadores-por-tipo/route.ts
+@@ -0,0 +1,76 @@
++import { NextRequest, NextResponse } from 'next/server'
++import { ModuleLevel, Role } from '@prisma/client'
++import { prisma } from '@/lib/prisma'
++import { requireActiveUser } from '@/lib/auth'
++import { assertUserMinLevel } from '@/lib/access'
++
++export const dynamic = 'force-dynamic'
++export const revalidate = 0
++
++export async function GET() {
++  try {
++    const me = await requireActiveUser()
++    await assertUserMinLevel(me.id, 'configuracoes', ModuleLevel.NIVEL_1)
++
++    const [tipos, users] = await Promise.all([
++      prisma.tipoSolicitacao.findMany({
++        select: {
++          id: true,
++          codigo: true,
++          nome: true,
++          approvers: {
++            select: {
++              userId: true,
++              user: { select: { id: true, fullName: true, email: true, status: true } },
++            },
++            orderBy: { user: { fullName: 'asc' } },
++          },
++        },
++        orderBy: { nome: 'asc' },
++      }),
++      prisma.user.findMany({
++        where: {
++          status: 'ATIVO',
++          moduleAccesses: { some: { level: 'NIVEL_3', module: { key: 'solicitacoes' } } },
++        },
++        select: { id: true, fullName: true, email: true },
++        orderBy: { fullName: 'asc' },
++      }),
++    ])
++
++    return NextResponse.json({ tipos, users })
++  } catch (error: any) {
++    return NextResponse.json({ error: error?.message ?? 'Erro ao carregar aprovadores.' }, { status: 500 })
++  }
++}
++
++export async function PUT(req: NextRequest) {
++  try {
++    const me = await requireActiveUser()
++    if (me.role !== Role.ADMIN) {
++      return NextResponse.json({ error: 'Somente administrador pode alterar aprovadores.' }, { status: 403 })
++    }
++
++    const body = await req.json().catch(() => null) as { tipoId?: string; userIds?: string[] } | null
++    const tipoId = body?.tipoId?.trim()
++    const userIds = Array.from(new Set((body?.userIds ?? []).filter(Boolean)))
++
++    if (!tipoId) {
++      return NextResponse.json({ error: 'tipoId é obrigatório.' }, { status: 400 })
++    }
++
++    await prisma.$transaction(async (tx) => {
++      await tx.tipoSolicitacaoApprover.deleteMany({ where: { tipoId } })
++      if (userIds.length > 0) {
++        await tx.tipoSolicitacaoApprover.createMany({
++          data: userIds.map((userId) => ({ tipoId, userId })),
++          skipDuplicates: true,
++        })
++      }
++    })
++
++    return GET()
++  } catch (error: any) {
++    return NextResponse.json({ error: error?.message ?? 'Erro ao salvar aprovadores.' }, { status: 500 })
++  }
++}
+diff --git a/rh-dp-solicitacoes/src/app/api/configuracoes/permissoes/usuarios/[id]/route.ts b/rh-dp-solicitacoes/src/app/api/configuracoes/permissoes/usuarios/[id]/route.ts
+index 1ae6f09b61fff73d44b2be52111ba21b09001602..d2e523d020bbe2af26bd87af377f42f92f4311a6 100644
+--- a/rh-dp-solicitacoes/src/app/api/configuracoes/permissoes/usuarios/[id]/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/configuracoes/permissoes/usuarios/[id]/route.ts
+@@ -43,37 +43,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
+     })
+ 
+     if (!level) {
+       // remover acesso
+       if (existing) {
+         await prisma.userModuleAccess.delete({ where: { id: existing.id } })
+       }
+     } else if (existing) {
+       // atualizar nível
+       await prisma.userModuleAccess.update({
+         where: { id: existing.id },
+         data: { level },
+       })
+     } else {
+       // criar acesso
+       await prisma.userModuleAccess.create({
+         data: {
+           id: crypto.randomUUID(),
+           userId,
+           moduleId: module.id,
+           level,
+         },
+       })
+     }
+ 
+-    return NextResponse.json({ ok: true })
++    const updatedAccess = await prisma.userModuleAccess.findMany({ where: { userId }, select: { moduleId: true, level: true } })
++    return NextResponse.json({ ok: true, access: updatedAccess })
+   } catch (e) {
+     console.error(
+       'PATCH /api/configuracoes/permissoes/usuarios/[id] error',
+       e,
+     )
+     return NextResponse.json(
+       { error: 'Erro ao salvar nível do usuário.' },
+       { status: 500 },
+     )
+   }
+ }
+diff --git a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/anexos/route.ts b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/anexos/route.ts
+index c37d86cbbed584f862d0754124ebe5dab6ba9f1a..9bf16f5454135e8008b03d37c23ede85022a18b8 100644
+--- a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/anexos/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/anexos/route.ts
+@@ -1,73 +1,72 @@
+ import { mkdir, writeFile, unlink } from 'node:fs/promises'
+ import path from 'node:path'
+ import { randomUUID } from 'node:crypto'
+ import { NextResponse, type NextRequest } from 'next/server'
+ import { prisma } from '@/lib/prisma'
+ import { requireActiveUser } from '@/lib/auth'
+-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
++import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+ import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorId: string) {
+   const solicitation = await prisma.solicitation.findUnique({
+     where: { id: solicitationId },
+     include: {
+       anexos: { select: { id: true } },
+       tipo: true,
+       department: { select: { code: true } },
+     },
+   })
+ 
+   const isSstEpiFlow =
+     Boolean(solicitation) &&
+     isSolicitacaoEpiUniforme(solicitation?.tipo) &&
+     solicitation?.department?.code === '19' &&
+     solicitation.approvalStatus === 'NAO_PRECISA' &&
+     solicitation.requiresApproval === false
+ 
+   if (!isSstEpiFlow) {
+     return { changed: false }
+   }
+ 
+   if ((solicitation?.anexos?.length ?? 0) === 0) {
+     return { changed: false, error: 'Anexe ao menos um documento antes de encaminhar para aprovação.' }
+   }
+ 
+-  const approver = await findLevel3SolicitacoesApprover('19')
+-  if (!approver?.id) {
++  const approverId = await resolveTipoApproverId(solicitation?.tipoId ?? '')
++  if (!approverId) {
+     return {
+       changed: false,
+-      error:
+-        'Não há aprovadores SST nível 3 cadastrados para o módulo de solicitações.',
++      error: 'Não existe aprovador configurado para este tipo de solicitação.',
+     }
+   }
+ 
+   await prisma.solicitation.update({
+     where: { id: solicitationId },
+     data: {
+       requiresApproval: true,
+       approvalStatus: 'PENDENTE',
+-      approverId: approver.id,
++      approverId,
+       status: 'AGUARDANDO_APROVACAO',
+     },
+   })
+ 
+   await prisma.event.create({
+     data: {
+       id: randomUUID(),
+       solicitationId,
+       actorId,
+       tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+     },
+   })
+ 
+   await prisma.solicitationTimeline.create({
+     data: {
+       solicitationId,
+       status: 'AGUARDANDO_APROVACAO',
+       message:
+         'Documento anexado pelo SST. Solicitação encaminhada para aprovação nível 3.',
+     },
+   })
+ 
+   return { changed: true }
+ }
+ 
+diff --git a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/aprovar/route.ts b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/aprovar/route.ts
+index 80ab61fc3c092ca57bdea24110c893d63c7cd105..237df22f80e0564c92d0b16b9db9f10ebc02bf7f 100644
+--- a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/aprovar/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/aprovar/route.ts
+@@ -1,78 +1,78 @@
+ export const dynamic = 'force-dynamic'
+ export const revalidate = 0
+ 
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/lib/prisma'
+ import { requireActiveUser } from '@/lib/auth'
+ import crypto from 'crypto'
+ import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
+ import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+-import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
+ 
+ 
+ export async function POST(
+   req: NextRequest,
+   { params }: { params: Promise<{ id: string }> },
+ ) {
+   try {
+     const me = await requireActiveUser()
+     const solicitationId = (await params).id
+     const body = (await req.json().catch(() => ({}))) as {
+       comment?: string
+     }
+     const approvalComment = body.comment?.trim()
+ 
+ 
+     const solic = await prisma.solicitation.findUnique({
+       where: { id: solicitationId },
+       include: {
+         tipo: true,
+         costCenter: true,
+       },
+     })
+ 
+     if (!solic) {
+       return NextResponse.json(
+         { error: 'Solicitação não encontrada.' },
+         { status: 404 },
+       )
+     }
+ 
+     if (solic.approvalStatus !== 'PENDENTE') {
+       return NextResponse.json(
+         { error: 'Esta solicitação não está pendente de aprovação.' },
+         { status: 400 },
+       )
+     }
+ 
+-    const canApprove = await canNivel3ApproveSolicitation(me.id, solic.departmentId)
+-    if (!canApprove) {
+-      return NextResponse.json(
+-        { error: 'Você não pode aprovar solicitações deste departamento.' },
+-        { status: 403 },
+-      )
++    const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
++    if (!isNivel3) {
++      return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
++    }
++
++    if (!solic.approverId || solic.approverId !== me.id) {
++      return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
+     }
+ 
+    const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
+     const isSolicitacaoIncentivo =
+       solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+     const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
+     const isFerias = isSolicitacaoAgendamentoFerias(solic.tipo)
+     const isVeiculos = isSolicitacaoVeiculos(solic.tipo)    
+     const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solic.tipo)
+ 
+     
+ 
+     if (isSolicitacaoIncentivo) {
+       const allowedCostCenters = new Set<string>()
+ 
+       if (me.costCenterId) {
+         allowedCostCenters.add(me.costCenterId)
+       }
+ 
+       const links = await prisma.userCostCenter.findMany({
+         where: { userId: me.id },
+        select: { costCenterId: true },
+       })
+ 
+       for (const link of links) {
+diff --git a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/equipamento/route.ts b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/equipamento/route.ts
+index 46cfeca5b5e105e1b16938fc8bc500972f47d376..0b43379703ead38429322a462cee7f71d940125e 100644
+--- a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/equipamento/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/equipamento/route.ts
+@@ -1,84 +1,86 @@
+ export const dynamic = 'force-dynamic'
+ export const revalidate = 0
+ 
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/lib/prisma'
+ import { devErrorDetail } from '@/lib/apiError'
+ import { requireActiveUser } from '@/lib/auth'
+ import crypto from 'crypto'
+ import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
+-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
++import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+ import { PdfGenerationError, generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
+ import { DEFAULT_TERMO_CLAUSES } from '@/lib/documents/termoResponsabilidade'
+ import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
+ import { createEnvelopeFromPdfBuffer } from '@/lib/signature/providers/docusign/envelopes'
+ import { createRecipientView } from '@/lib/signature/providers/docusign/recipientView'
+ export async function POST(
+   req: NextRequest,
+   { params }: { params: Promise<{ id: string }> },
+ ) {
+   try {
+     const me = await requireActiveUser()
+     const solicitationId = (await params).id
+     const body = (await req.json().catch(() => ({}))) as {
+       action?: 'ALOCAR' | 'ALOCAR_E_GERAR_TERMO' | 'SEM_ESTOQUE'
+       equipmentId?: string
+       title?: string
+       pdfUrl?: string
+       signingProvider?: string
+       signingUrl?: string
+     }
+ 
+     const action = body.action
+     if (!action || !['ALOCAR', 'ALOCAR_E_GERAR_TERMO', 'SEM_ESTOQUE'].includes(action)) {
+       return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 })
+     }
+ 
+     const solicitation = await prisma.solicitation.findUnique({
+       where: { id: solicitationId },
+       include: {
+         tipo: true,
+         costCenter: true,
+         solicitante: true,
+       },
+     })
+ 
+     if (!solicitation) {
+       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+     }
+ 
+     if (!isSolicitacaoEquipamento(solicitation.tipo)) {
+       return NextResponse.json(
+         { error: 'Esta rota é exclusiva para solicitações de equipamento.' },
+         { status: 400 },
+       )
+     }
+ 
+     if (action === 'SEM_ESTOQUE') {
+-      const approver = await findLevel3SolicitacoesApprover()
+-      const approverId = approver?.id ?? null
++      const approverId = await resolveTipoApproverId(solicitation.tipoId)
++      if (!approverId) {
++        return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++      }
+ 
+       const updated = await prisma.solicitation.update({
+         where: { id: solicitation.id },
+         data: {
+           requiresApproval: true,
+           approvalStatus: 'PENDENTE',
+           approverId,
+           status: 'AGUARDANDO_APROVACAO',
+         },
+       })
+ 
+       await prisma.solicitationTimeline.create({
+         data: {
+           solicitationId: solicitation.id,
+           status: 'AGUARDANDO_APROVACAO',
+           message:
+             'Solicitação de equipamento sem estoque disponível. Encaminhada para aprovação.',
+         },
+       })
+ 
+       await prisma.event.create({
+         data: {
+           id: crypto.randomUUID(),
+           solicitationId: solicitation.id,
+           actorId: me.id,
+diff --git a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/reprovar/route.ts b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/reprovar/route.ts
+index b25975c6e707722025c80fba3b0aadeacfa90985..6084c6a988684af63b1a3610f09adcb616d5ac48 100644
+--- a/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/reprovar/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/solicitacoes/[id]/reprovar/route.ts
+@@ -1,76 +1,76 @@
+ export const dynamic = 'force-dynamic'
+ export const revalidate = 0
+ 
+ // src/app/api/solicitacoes/[id]/reprovar/route.ts
+ import { NextRequest, NextResponse } from 'next/server'
+ import { prisma } from '@/lib/prisma'
+ import crypto from 'crypto'
+ import { withModuleLevel } from '@/lib/access'
+ import { ModuleLevel } from '@prisma/client'
+ import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+-import { canNivel3ApproveSolicitation } from '@/lib/solicitationApprovalPermissions'
+ 
+ type RouteParams = { params: Promise<{ id: string }> }
+ 
+ 
+ // 🔒 Somente NIVEL_3 no módulo "solicitacoes"
+ export const POST = withModuleLevel<RouteParams>(
+   'solicitacoes',
+   ModuleLevel.NIVEL_3,
+   async (req: Request, { params, me }) => {
+     try {
+       const { id: solicitationId } = await params
+ 
+       const body = await req.json().catch(() => ({}))
+       const comment: string | undefined = body.comment
+ 
+       if (!comment || comment.trim().length === 0) {
+         return NextResponse.json(
+           { error: 'Comentário é obrigatório para reprovar.' },
+           { status: 400 },
+         )
+       }
+ 
+       const solicit = await prisma.solicitation.findUnique({
+         where: { id: solicitationId },
+         include: { tipo: true },
+       })
+ 
+       if (!solicit) {
+         return NextResponse.json(
+           { error: 'Solicitação não encontrada.' },
+           { status: 404 },
+         )
+       }
+ 
+-      const canApprove = await canNivel3ApproveSolicitation(me.id, solicit.departmentId)
+-      if (!canApprove) {
+-        return NextResponse.json(
+-          { error: 'Você não pode reprovar solicitações deste departamento.' },
+-          { status: 403 },
+-        )
++      const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
++      if (!isNivel3) {
++        return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
++      }
++
++      if (!solicit.approverId || solicit.approverId !== me.id) {
++        return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
+       }
+ 
+       const isSolicitacaoEpi = isSolicitacaoEpiUniforme(solicit.tipo)
+       const sstDepartment = isSolicitacaoEpi
+         ? await prisma.department.findUnique({ where: { code: '19' }, select: { id: true } })
+         : null
+ 
+       const updated = await prisma.solicitation.update({
+         where: { id: solicitationId },
+         data: {
+           approvalStatus: 'REPROVADO',
+           approvalAt: new Date(),
+           approvalComment: comment,
+           requiresApproval: false,
+           status: 'CANCELADA',
+           ...(isSolicitacaoEpi && sstDepartment ? { departmentId: sstDepartment.id } : {}),
+         },
+       })
+ 
+       if (isSolicitacaoEpi) {
+         await prisma.solicitationTimeline.create({
+           data: {
+             solicitationId,
+             status: 'REPROVADO_SETOR',
+             message: `Solicitação reprovada pelo aprovador do setor: ${comment}`,
+diff --git a/rh-dp-solicitacoes/src/app/api/solicitacoes/route.ts b/rh-dp-solicitacoes/src/app/api/solicitacoes/route.ts
+index 2d495621b311fc442978bf2a729dd9a553623671..5fe8bb5fff22fb6000fcb30425f37ff6fb53368e 100644
+--- a/rh-dp-solicitacoes/src/app/api/solicitacoes/route.ts
++++ b/rh-dp-solicitacoes/src/app/api/solicitacoes/route.ts
+@@ -1,53 +1,52 @@
+ export const revalidate = 0
+ 
+ // src/app/api/solicitacoes/route.ts
+ import { NextRequest, NextResponse } from 'next/server'
+ import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
+ import { prisma } from '@/lib/prisma'
+ import crypto from 'crypto'
+ import { withModuleLevel } from '@/lib/access'
+-import { findLevel3SolicitacoesApprover } from '@/lib/solicitationApprovers'
+ import { performance } from 'node:perf_hooks'
+ import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
+ import { formatCostCenterLabel } from '@/lib/costCenter'
+ import {
+      isSolicitacaoAgendamentoFerias,
+   isSolicitacaoDesligamento,
+   isSolicitacaoEquipamento,
+   isSolicitacaoEpiUniforme,
+   isSolicitacaoExamesSst,
+   isSolicitacaoNadaConsta,
+   isSolicitacaoPessoal,
+   isSolicitacaoVeiculos,
+   NADA_CONSTA_SETORES,
+   resolveNadaConstaSetoresByDepartment,
+ } from '@/lib/solicitationTypes'
+ import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
+ import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+-import { getNivel3DepartmentIds } from '@/lib/solicitationApprovalPermissions'
+ import { nextSolicitationProtocolo } from '@/lib/protocolo'
++import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+ 
+ /**
+  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
+  */
+ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
+   const where: any = {}
+ 
+   const dateStart = searchParams.get('dateStart')
+   const dateEnd = searchParams.get('dateEnd')
+   const centerId = searchParams.get('centerId')
+   const costCenterId = searchParams.get('costCenterId') ?? centerId
+   const departmentId = searchParams.get('departmentId')
+   const tipoId = searchParams.get('tipoId')
+   const protocolo = searchParams.get('protocolo')
+   const solicitante = searchParams.get('solicitante')
+   const status = searchParams.get('status')
+   const text = searchParams.get('text')
+   if (dateStart || dateEnd) {
+     where.dataAbertura = {}
+     if (dateStart) {
+       where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
+     }
+     if (dateEnd) {
+       const end = new Date(dateEnd + 'T23:59:59')
+       where.dataAbertura.lte = end
+@@ -229,96 +228,92 @@ export const GET = withModuleLevel(
+                 ...(where.AND ?? []),
+                 { OR: [...receivedFilters, ...setorFilters] },
+               ]
+             }
+           }
+            // RQ_063 só deve chegar na fila após aprovação (nível 3)
+           where.AND = [
+             ...(where.AND ?? []),
+             {
+               NOT: {
+                 AND: [
+                   { requiresApproval: true },
+                   { approvalStatus: 'PENDENTE' },
+                   {
+                     OR: [
+                       { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                     ],
+                   },
+                 ],
+               },
+             },
+           ]
+         } else if (scope === 'to-approve') {
+           where.requiresApproval = true
+           where.approvalStatus = 'PENDENTE'
+-          const allowedDepartmentIds = await getNivel3DepartmentIds(me.id)
+-          if (allowedDepartmentIds.length === 0) {
+-            where.id = '__never__' as any
+-          } else {
+-            where.departmentId = { in: allowedDepartmentIds }
+-          }
++          where.approverId = me.id
+         }
+ 
+         const listStartedAt = performance.now()
+         const [solicitations, total] = await Promise.all([
+           prisma.solicitation.findMany({
+             where,
+             skip,
+             take: pageSize,
+             orderBy: { dataAbertura: 'desc' },
+             include: {
+              tipo: { select: { codigo: true, nome: true } },
+               department: { select: { name: true } },
+               costCenter: { select: { description: true, externalCode: true, code: true } },
+               approver: { select: { id: true, fullName: true } },
+               assumidaPor: { select: { id: true, fullName: true } },
+               solicitante: { select: { id: true, fullName: true } },
+             },
+           }),
+           prisma.solicitation.count({ where }),
+         ])
+         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
+ 
+         const rows = solicitations.map((s) => ({
+   id: s.id,
+   titulo: s.titulo,
+   status: s.status,
+   protocolo: s.protocolo,
+   createdAt: s.dataAbertura.toISOString(),
+   tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
+ 
+   responsavelId: s.assumidaPor?.id ?? null,
+   responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+ 
+   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+ 
+   sla: null,
+ 
+    setorDestino:
+     formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
+   departmentId: s.departmentId,
++  approverId: s.approver?.id ?? s.approverId ?? null,
+ 
+   requiresApproval: s.requiresApproval,
+   approvalStatus: s.approvalStatus,
+ }))
+         return NextResponse.json({ rows, total })
+       } catch (e) {
+         console.error('GET /api/solicitacoes error', e)
+         return NextResponse.json(
+           { error: 'Erro ao listar solicitações.' },
+           { status: 500 },
+         )
+       }
+       })
+   },
+ )
+ 
+ /**
+  * Acha um "aprovador nível 3" vinculado ao centro de custo,
+  * ou qualquer usuário como fallback.
+  */
+ 
+ /**
+  * Monta o payload padrão com dados do solicitante + campos do formulário
+  */
+ async function buildPayload(
+@@ -556,95 +551,99 @@ export const POST = withModuleLevel(
+                 'Solicitação RQ.092 criada e encaminhada automaticamente para SEGURANÇA DO TRABALHO.',
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: solicitanteId,
+               tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
+             },
+           })
+ 
+           await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+         /* =====================================================================
+            2.5) Agendamento de Férias (aguarda aprovação do gestor e segue para DP)
+            ===================================================================== */
+         if (isAgendamentoFerias) {
+-          const approver = await findLevel3SolicitacoesApprover()
+-          const approverId = approver?.id ?? null
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+               approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: approverId ?? solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+            await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO',
+               message: 'Solicitação de férias aguardando aprovação do gestor.',
+             },
+           })
+ 
+           await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+         /* =====================================================================
+            2.6) Solicitação de Equipamento (encaminha obrigatoriamente para TI)
+            ===================================================================== */
+         if (isSolicitacaoEquipamentoTi) {
+-          const approver = await findLevel3SolicitacoesApprover()
+-          const approverId = approver?.id ?? null
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               departmentId: resolvedDepartmentId,
+               costCenterId: resolvedCostCenterId,
+               requiresApproval: false,
+               approvalStatus: 'NAO_PRECISA',
+               approverId,
+               status: 'ABERTA',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_ATENDIMENTO',
+               message: 'Solicitação de equipamento encaminhada automaticamente para TI.',
+             },
+           })
+ 
+            await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+@@ -713,53 +712,54 @@ export const POST = withModuleLevel(
+                 solicitationId: created.id,
+                 actorId: solicitanteId,
+                 tipo: 'APROVACAO_AUTOMATICA_CONTRATO',
+               },
+             })
+ 
+             await prisma.solicitationTimeline.create({
+               data: {
+                 solicitationId: created.id,
+                  status: 'ENCAMINHADA_RH',
+                 message:
+                   'Solicitação de pessoal com vaga prevista em contrato encaminhada diretamente para o RH.',
+               },
+             })
+ 
+            await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+           }
+ 
+           // qualquer coisa diferente de SIM exige aprovação
+-          const approver = await findLevel3SolicitacoesApprover()
+-
+-          const approverId = approver?.id ?? null
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+               approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+            await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: approverId ?? solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO_SETOR',
+               message:
+@@ -772,101 +772,108 @@ export const POST = withModuleLevel(
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+         if (isSolicitacaoEpi) {
+           if (!sstDepartment) {
+             return NextResponse.json(
+               { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado.' },
+               { status: 400 },
+             )
+           }
+ 
+          const payloadAtualizado = {
+             ...(payload as Record<string, any>),
+             epiUniforme: {
+               categoria: 'SERVIÇOS DE LOGÍSTICA',
+               solicitacaoCodigo: 'RQ.043',
+               solicitacaoNome: 'REQUISIÇÃO DE EPI S/UNIFORMES',
+               centroResponsavelLabel: sstDepartment.name,
+               logisticaDepartmentId: logisticaDepartment?.id ?? null,
+             },
+           }
+ 
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
++
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               departmentId: sstDepartment.id,
+               payload: payloadAtualizado,
+                requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+-              approverId: (await findLevel3SolicitacoesApprover())?.id ?? null,
++              approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: solicitanteId,
+               tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+                solicitationId: created.id,
+               status: 'ENCAMINHADA_SST',
+               message:
+                 'Solicitação de EPI/Uniformes criada e encaminhada à fila de atendimento do SST.',
+             },
+           })
+            await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO_SETOR',
+               message:
+                 'SST encaminhou a solicitação para aprovação do aprovador do setor.',
+             },
+           })
+ 
+           await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+ 
+ 
+         if (isSolicitacaoVeiculosTipo) {
+-          const approver = await findLevel3SolicitacoesApprover()
+-          const approverId = approver?.id ?? null
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+               approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: approverId ?? solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO',
+                message: 'Solicitação de veículos aguardando aprovação do gestor.',
+@@ -875,94 +882,101 @@ export const POST = withModuleLevel(
+ 
+           await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+ 
+ 
+       /* =====================================================================
+            4) RQ_091 - Solicitação de Incentivo à Educação
+            ===================================================================== */
+         if (isSolicitacaoIncentivo) {
+           if (!rhCostCenter) {
+             return NextResponse.json(
+               {
+                 error:
+                   'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
+               },
+               { status: 400 },
+             )
+           }
+ 
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
++
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+-              approverId: null, // RH vai tratar
++              approverId,
+               status: 'AGUARDANDO_APROVACAO',
+               costCenterId: rhCostCenter.id,
+               departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO',
+               message:
+                 'Solicitação enviada diretamente ao RH para aprovação e tratamento.',
+             },
+           })
+ 
+         await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+ 
+           return NextResponse.json(updated, { status: 201 })
+         }
+         /* =====================================================================
+           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
+            ===================================================================== */
+         if (isDesligamento) {
+-          const approver = await findLevel3SolicitacoesApprover()
+-          const approverId = approver?.id ?? null
++          const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+               approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+               actorId: approverId ?? solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_APROVACAO',
+               message: 'Solicitação de desligamento aguardando aprovação do gestor.',
+@@ -996,52 +1010,54 @@ export const POST = withModuleLevel(
+ 
+           await prisma.solicitationTimeline.create({
+             data: {
+               solicitationId: created.id,
+               status: 'AGUARDANDO_ATENDIMENTO',
+               message:
+                 'Solicitação criada e encaminhada automaticamente para os setores responsáveis.',
+             },
+           })
+ 
+          await notifyWorkflowStepEntry({
+             solicitationId: created.id,
+             preferredDepartmentId: created.departmentId,
+           })
+ 
+ 
+         return NextResponse.json(created, { status: 201 })
+         }
+ 
+ 
+ 
+          /* =====================================================================
+            5) Solicitação de Abono Educacional
+            ===================================================================== */
+         if (isAbonoEducacional) {
+-           const approver = await findLevel3SolicitacoesApprover()
+-          const approverId = approver?.id ?? null
++           const approverId = await resolveTipoApproverId(tipoId)
++          if (!approverId) {
++            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
++          }
+ 
+           const updated = await prisma.solicitation.update({
+             where: { id: created.id },
+             data: {
+               requiresApproval: true,
+               approvalStatus: 'PENDENTE',
+               approverId,
+               status: 'AGUARDANDO_APROVACAO',
+             },
+           })
+ 
+           await prisma.event.create({
+             data: {
+               id: crypto.randomUUID(),
+               solicitationId: created.id,
+              actorId: approverId ?? solicitanteId,
+               tipo: 'AGUARDANDO_APROVACAO_GESTOR',
+             },
+           })
+ 
+           await notifyWorkflowStepEntry({
+             solicitationId: updated.id,
+             preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
+             preferredDepartmentId: updated.departmentId,
+           })
+diff --git a/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/AprovadoresClient.tsx b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/AprovadoresClient.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..039ad27e160dc382ed62a232cbac0098b772e43b
+--- /dev/null
++++ b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/AprovadoresClient.tsx
+@@ -0,0 +1,59 @@
++'use client'
++
++import { useEffect, useMemo, useState } from 'react'
++
++type User = { id: string; fullName: string; email: string }
++type Tipo = { id: string; codigo: string; nome: string; approvers: { userId: string; user: User }[] }
++
++export default function AprovadoresClient() {
++  const [tipos, setTipos] = useState<Tipo[]>([])
++  const [users, setUsers] = useState<User[]>([])
++  const [tipoId, setTipoId] = useState('')
++  const [selected, setSelected] = useState<string[]>([])
++
++  const currentTipo = useMemo(() => tipos.find((t) => t.id === tipoId) ?? null, [tipos, tipoId])
++
++  const load = async () => {
++    const res = await fetch('/api/config/aprovadores-por-tipo', { cache: 'no-store' })
++    const json = await res.json()
++    setTipos(json.tipos ?? [])
++    setUsers(json.users ?? [])
++    const first = tipoId || json.tipos?.[0]?.id || ''
++    setTipoId(first)
++  }
++
++  useEffect(() => { void load() }, [])
++  useEffect(() => {
++    setSelected(currentTipo?.approvers?.map((a) => a.userId) ?? [])
++  }, [currentTipo?.id])
++
++  const save = async () => {
++    await fetch('/api/config/aprovadores-por-tipo', {
++      method: 'PUT', headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ tipoId, userIds: selected }),
++    })
++    await load()
++  }
++
++  return (
++    <div className="space-y-4 max-w-4xl">
++      <h1 className="text-xl font-semibold">Aprovadores por tipo</h1>
++      <select className="border rounded px-3 py-2" value={tipoId} onChange={(e) => setTipoId(e.target.value)}>
++        {tipos.map((t) => <option key={t.id} value={t.id}>{t.codigo} - {t.nome}</option>)}
++      </select>
++      <div className="grid md:grid-cols-2 gap-2">
++        {users.map((u) => (
++          <label key={u.id} className="border rounded p-2 flex gap-2 items-center">
++            <input
++              type="checkbox"
++              checked={selected.includes(u.id)}
++              onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, u.id] : prev.filter((id) => id !== u.id))}
++            />
++            <span>{u.fullName} <span className="text-xs text-slate-500">({u.email})</span></span>
++          </label>
++        ))}
++      </div>
++      <button className="bg-orange-500 text-white rounded px-3 py-2" onClick={save}>Salvar</button>
++    </div>
++  )
++}
+diff --git a/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/page.tsx b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/page.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..861ae6cdd70674b91efa4f57a0c47351a4bf8ce5
+--- /dev/null
++++ b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/aprovadores/page.tsx
+@@ -0,0 +1,11 @@
++import { redirect } from 'next/navigation'
++import { getCurrentAppUser } from '@/lib/auth'
++import { Role } from '@prisma/client'
++import AprovadoresClient from './AprovadoresClient'
++
++export default async function Page() {
++  const { appUser } = await getCurrentAppUser()
++  if (!appUser) redirect('/login')
++  if (appUser.role !== Role.ADMIN) redirect('/dashboard')
++  return <AprovadoresClient />
++}
+diff --git a/rh-dp-solicitacoes/src/app/dashboard/configuracoes/poderes-de-acesso/PoderesDeAcessoClient.tsx b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/poderes-de-acesso/PoderesDeAcessoClient.tsx
+index c7dbde9aeac24867e036c11cb662d65a05b73f8f..fcc2f8f7c454069c4a160297dd401691af080ada 100644
+--- a/rh-dp-solicitacoes/src/app/dashboard/configuracoes/poderes-de-acesso/PoderesDeAcessoClient.tsx
++++ b/rh-dp-solicitacoes/src/app/dashboard/configuracoes/poderes-de-acesso/PoderesDeAcessoClient.tsx
+@@ -9,50 +9,51 @@ type UserPayload = {
+     id: string
+     fullName: string
+     email: string
+     departmentId: string | null
+   } | null
+   modules: { id: string; key: string; name: string }[]
+   access: { moduleId: string; level: ModuleLevel }[]
+   departments: { id: string; code: string; name: string }[]
+ }
+ 
+ const LEVEL_OPTIONS: { value: ModuleLevel | ''; label: string }[] = [
+   { value: '', label: 'Sem acesso' },
+   { value: 'NIVEL_1', label: 'Nível 1' },
+   { value: 'NIVEL_2', label: 'Nível 2' },
+   { value: 'NIVEL_3', label: 'Nível 3' },
+ ]
+ 
+ export default function PoderesDeAcessoClient() {
+   const [search, setSearch] = useState('')
+   const [loading, setLoading] = useState(false)
+   const [saving, setSaving] = useState(false)
+   const [error, setError] = useState<string | null>(null)
+   const [success, setSuccess] = useState<string | null>(null)
+   const [data, setData] = useState<UserPayload | null>(null)
+   const [selectedModuleId, setSelectedModuleId] = useState('')
++  const [copyFrom, setCopyFrom] = useState('')
+ 
+   const selectedLevel = useMemo(() => {
+     if (!data || !selectedModuleId) return ''
+     return data.access.find((row) => row.moduleId === selectedModuleId)?.level ?? ''
+   }, [data, selectedModuleId])
+ 
+   const onSearch = async (event: FormEvent) => {
+     event.preventDefault()
+     const term = search.trim()
+ 
+     if (!term) {
+       setError('Informe nome ou e-mail para pesquisar.')
+       return
+     }
+ 
+     try {
+       setLoading(true)
+       setError(null)
+       setSuccess(null)
+ 
+       const params = new URLSearchParams({ search: term })
+       const response = await fetch(`/api/permissoes/usuarios?${params.toString()}`, { cache: 'no-store' })
+       const payload = await response.json().catch(() => ({}))
+ 
+       if (!response.ok) {
+@@ -76,50 +77,79 @@ export default function PoderesDeAcessoClient() {
+     try {
+       setSaving(true)
+       setError(null)
+       setSuccess(null)
+ 
+       const response = await fetch('/api/permissoes/usuarios', {
+         method: 'PATCH',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ email: data.user.email, ...body }),
+       })
+       const payload = await response.json().catch(() => ({}))
+ 
+       if (!response.ok) {
+         throw new Error(payload?.error || 'Erro ao salvar alterações.')
+       }
+ 
+       setData(payload)
+       setSuccess(successMessage)
+     } catch (err: any) {
+       setError(err?.message || 'Erro ao salvar alterações.')
+     } finally {
+       setSaving(false)
+     }
+   }
+ 
++
++
++  const copyPermissions = async () => {
++    if (!copyFrom.trim() || !data?.user) return
++    const params = new URLSearchParams({ search: copyFrom.trim() })
++    const response = await fetch(`/api/permissoes/usuarios?${params.toString()}`, { cache: 'no-store' })
++    const payload = await response.json().catch(() => ({}))
++    if (!response.ok || !payload?.user) {
++      setError(payload?.error || 'Usuário de origem não encontrado.')
++      return
++    }
++    for (const row of payload.access ?? []) {
++      // eslint-disable-next-line no-await-in-loop
++      await patchPermissions({ moduleId: row.moduleId, level: row.level }, `Permissões copiadas de ${payload.user.fullName}.`)
++    }
++  }
++
++  const resetDepartmentDefault = async () => {
++    if (!data?.user) return
++    const defaults: Record<string, ModuleLevel> = {}
++    for (const mod of data.modules) {
++      defaults[mod.id] = mod.key === 'configuracoes' ? 'NIVEL_1' : 'NIVEL_1'
++    }
++    for (const moduleId of Object.keys(defaults)) {
++      // eslint-disable-next-line no-await-in-loop
++      await patchPermissions({ moduleId, level: defaults[moduleId] }, 'Permissões resetadas para o padrão do departamento (NIVEL_1).')
++    }
++  }
++
+   return (
+     <div className="max-w-3xl space-y-4">
+       <div>
+         <h1 className="text-xl font-semibold text-slate-800">Poderes de Acesso</h1>
+         <p className="mt-1 text-sm text-slate-500">Ajuste departamento padrão e nível por módulo para usuários específicos.</p>
+       </div>
+ 
+       <form onSubmit={onSearch} className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+         <label className="text-sm font-medium text-slate-700">Buscar por nome ou e-mail</label>
+         <div className="flex gap-2">
+           <input
+             value={search}
+             onChange={(event) => setSearch(event.target.value)}
+             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+             placeholder="ex.: maria@empresa.com"
+           />
+           <button
+             type="submit"
+             disabled={loading}
+             className="rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+           >
+             {loading ? 'Buscando...' : 'Buscar'}
+           </button>
+         </div>
+       </form>
+@@ -149,53 +179,76 @@ export default function PoderesDeAcessoClient() {
+                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+               >
+                 <option value="">Sem departamento</option>
+                 {data.departments.map((department) => (
+                   <option key={department.id} value={department.id}>
+                     {department.name} ({department.code})
+                   </option>
+                 ))}
+               </select>
+             </div>
+ 
+             <div>
+               <label className="mb-1 block text-sm font-medium text-slate-700">Módulo</label>
+               <select
+                 value={selectedModuleId}
+                 onChange={(event) => setSelectedModuleId(event.target.value)}
+                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+               >
+                 {data.modules.map((module) => (
+                   <option key={module.id} value={module.id}>{module.name}</option>
+                 ))}
+               </select>
+             </div>
+           </div>
+ 
++          <div className="grid gap-3 md:grid-cols-2">
++            <div>
++              <label className="mb-1 block text-sm font-medium text-slate-700">Nível no módulo</label>
++              <select
++                value={selectedLevel}
++                disabled={!selectedModuleId || saving}
++                onChange={(event) => {
++                  if (!selectedModuleId) return
++                  void patchPermissions(
++                    { moduleId: selectedModuleId, level: event.target.value },
++                    'Nível de acesso atualizado com sucesso.',
++                  )
++                }}
++                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
++              >
++                {LEVEL_OPTIONS.map((option) => (
++                  <option key={option.label} value={option.value}>{option.label}</option>
++                ))}
++              </select>
++            </div>
++            <div className="space-y-2">
++              <label className="block text-sm font-medium text-slate-700">Copiar permissões de outro usuário</label>
++              <div className="flex gap-2">
++                <input className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} placeholder="Nome ou e-mail" />
++                <button type="button" onClick={() => void copyPermissions()} className="rounded-md bg-slate-700 px-3 py-2 text-sm text-white">Copiar</button>
++              </div>
++              <button type="button" onClick={() => void resetDepartmentDefault()} className="rounded-md bg-slate-100 px-3 py-2 text-sm">Resetar padrão do departamento</button>
++            </div>
++          </div>
++
+           <div>
+-            <label className="mb-1 block text-sm font-medium text-slate-700">Nível no módulo</label>
+-            <select
+-              value={selectedLevel}
+-              disabled={!selectedModuleId || saving}
+-              onChange={(event) => {
+-                if (!selectedModuleId) return
+-                void patchPermissions(
+-                  { moduleId: selectedModuleId, level: event.target.value },
+-                  'Nível de acesso atualizado com sucesso.',
+-                )
+-              }}
+-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+-            >
+-              {LEVEL_OPTIONS.map((option) => (
+-                <option key={option.label} value={option.value}>{option.label}</option>
+-              ))}
+-            </select>
++            <p className="mb-2 text-sm font-medium text-slate-700">Módulo → Nível atual</p>
++            <table className="w-full text-sm border">
++              <thead><tr className="bg-slate-50"><th className="text-left p-2 border">Módulo</th><th className="text-left p-2 border">Nível atual</th></tr></thead>
++              <tbody>
++                {data.modules.map((m) => {
++                  const level = data.access.find((a) => a.moduleId === m.id)?.level ?? 'Sem acesso'
++                  return <tr key={m.id}><td className="p-2 border">{m.name}</td><td className="p-2 border">{level}</td></tr>
++                })}
++              </tbody>
++            </table>
+           </div>
+         </div>
+       )}
+ 
+       {data && !data.user && (
+         <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">Nenhum usuário encontrado para esse termo.</p>
+       )}
+     </div>
+   )
+ }
+\ No newline at end of file
+diff --git a/rh-dp-solicitacoes/src/app/dashboard/solicitacoes/aprovacao/page.tsx b/rh-dp-solicitacoes/src/app/dashboard/solicitacoes/aprovacao/page.tsx
+index e0cb9e20dce5f2907e35fc76d904c0047945deb3..3d5a8cfe7a2f03325e91387e24a0e429ae5b7c7f 100644
+--- a/rh-dp-solicitacoes/src/app/dashboard/solicitacoes/aprovacao/page.tsx
++++ b/rh-dp-solicitacoes/src/app/dashboard/solicitacoes/aprovacao/page.tsx
+@@ -1,46 +1,46 @@
+ // src/app/dashboard/solicitacoes/aprovacao/page.tsx
+ 'use client'
+ 
+ import React, { useEffect, useMemo, useState } from 'react'
+ import {
+   SolicitationDetailModal,
+   type Row,
+   type SolicitationDetail,
+ } from '@/components/solicitacoes/SolicitationDetailModal'
+ import { useSearchParams } from 'next/navigation'
+ 
+ type ApiResponse = {
+   rows: Row[]
+   total: number
+ }
+ 
+ export default function ApprovalsPage() {
+   const [rows, setRows] = useState<Row[]>([])
+   const [loading, setLoading] = useState(true)
+   const [error, setError] = useState<string | null>(null)
+-  const [allowedDepartmentIds, setAllowedDepartmentIds] = useState<string[]>([])
++  const [myUserId, setMyUserId] = useState('')
+   const [allowedDepartmentsLoaded, setAllowedDepartmentsLoaded] = useState(false)
+ 
+   const searchParams = useSearchParams()
+   const deepLinkId = useMemo(() => searchParams.get('open')?.trim() || '', [searchParams])
+ 
+   // estado do modal
+   const [isModalOpen, setIsModalOpen] = useState(false)
+   const [selectedRow, setSelectedRow] = useState<Row | null>(null)
+   const [detail, setDetail] = useState<SolicitationDetail | null>(null)
+   const [detailLoading, setDetailLoading] = useState(false)
+   const [detailError, setDetailError] = useState<string | null>(null)
+   const [deepLinkHandledId, setDeepLinkHandledId] = useState('')
+   const [deepLinkMessage, setDeepLinkMessage] = useState<string | null>(null)
+ 
+   // ===== CARREGAR LISTA DE APROVAÇÕES =====
+   async function loadApprovals() {
+     try {
+       setLoading(true)
+       setError(null)
+ 
+       const res = await fetch(
+         '/api/solicitacoes?scope=to-approve&page=1&pageSize=50',
+       )
+       if (!res.ok) {
+         const json = await res.json().catch(() => ({}))
+@@ -48,81 +48,81 @@ export default function ApprovalsPage() {
+       }
+ 
+       const data = (await res.json()) as ApiResponse
+       setRows(data.rows ?? [])
+     } catch (err: any) {
+       console.error('Erro ao carregar aprovações', err)
+       setError(err?.message ?? 'Erro ao carregar aprovações.')
+     } finally {
+       setLoading(false)
+     }
+   }
+ 
+   useEffect(() => {
+     loadApprovals()
+   }, [])
+ 
+ 
+   useEffect(() => {
+     ;(async () => {
+       try {
+         const res = await fetch('/api/me', { cache: 'no-store' })
+         if (!res.ok) return
+         const json = await res.json()
+         const ids = [json.departmentId, ...(Array.isArray(json.departments) ? json.departments.map((d: any) => d.id) : [])]
+           .filter(Boolean) as string[]
+-        setAllowedDepartmentIds(Array.from(new Set(ids)))
++        setMyUserId(json.id || '')
+        } catch {
+-        setAllowedDepartmentIds([])
++        setMyUserId('')
+       } finally {
+         setAllowedDepartmentsLoaded(true)
+       }
+     })()
+   }, [])
+ 
+ 
+   useEffect(() => {
+     if (!deepLinkId || loading || !allowedDepartmentsLoaded || deepLinkHandledId === deepLinkId) return
+ 
+     const targetRow = rows.find((row) => row.id === deepLinkId)
+     if (!targetRow) {
+       setDeepLinkMessage('A solicitação do link não está pendente para sua aprovação ou não foi encontrada.')
+       setDeepLinkHandledId(deepLinkId)
+       return
+     }
+ 
+-    const canApprove = !!targetRow.departmentId && allowedDepartmentIds.includes(targetRow.departmentId)
++    const canApprove = !!targetRow.approverId && targetRow.approverId === myUserId
+     if (!canApprove) {
+       setDeepLinkMessage('Você não possui permissão para aprovar esta solicitação.')
+       setDeepLinkHandledId(deepLinkId)
+       return
+     }
+ 
+     setDeepLinkMessage(null)
+     setDeepLinkHandledId(deepLinkId)
+     void handleOpenPreview(targetRow)
+-  }, [deepLinkId, deepLinkHandledId, loading, rows, allowedDepartmentIds, allowedDepartmentsLoaded])
++  }, [deepLinkId, deepLinkHandledId, loading, rows, myUserId, allowedDepartmentsLoaded])
+ 
+   // ===== ABRIR MODAL / CARREGAR DETALHE =====
+   async function handleOpenPreview(row: Row) {
+     setSelectedRow(row)
+     setIsModalOpen(true)
+     setDetail(null)
+     setDetailError(null)
+     setDeepLinkMessage(null)
+     setDetailLoading(true)
+ 
+ 
+     try {
+       const res = await fetch(`/api/solicitacoes/${row.id}`)
+       if (!res.ok) {
+         const json = await res.json().catch(() => ({}))
+         throw new Error(json?.error ?? 'Erro ao carregar detalhes.')
+       }
+ 
+       const data = (await res.json()) as SolicitationDetail
+       setDetail(data)
+     } catch (err: any) {
+       console.error('Erro ao carregar detalhe da solicitação', err)
+       setDetailError(err?.message ?? 'Erro ao carregar detalhes.')
+     } finally {
+       setDetailLoading(false)
+@@ -238,51 +238,51 @@ export default function ApprovalsPage() {
+               <th className="px-3 py-2 text-left">Departamento</th>
+               <th className="px-3 py-2 text-right">Ações</th>
+             </tr>
+           </thead>
+           <tbody>
+             {loading ? (
+               <tr>
+                 <td
+                   colSpan={7}
+                   className="px-3 py-4 text-center text-xs text-slate-500"
+                 >
+                   Carregando...
+                 </td>
+               </tr>
+             ) : rows.length === 0 ? (
+               <tr>
+                 <td
+                   colSpan={7}
+                   className="px-3 py-4 text-center text-xs text-slate-500"
+                 >
+                   Nenhuma solicitação pendente de aprovação.
+                 </td>
+               </tr>
+             ) : (
+                 rows.map((row) => {
+-                const canApproveRow = !!row.departmentId && allowedDepartmentIds.includes(row.departmentId)
++                const canApproveRow = !!row.approverId && row.approverId === myUserId
+                 return (
+                 <tr
+                    key={row.id}
+                   onClick={() => handleOpenPreview(row)}
+                   className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                 >
+                   <td className="px-3 py-2 text-xs">
+                     {row.protocolo ?? '—'}
+                   </td>
+                   <td className="px-3 py-2 text-xs">
+                     {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
+                   </td>
+                   <td className="px-3 py-2 text-xs">
+                     {row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : '—'}
+                   </td>
+                   <td className="px-3 py-2 text-xs">{row.titulo}</td>
+                   <td className="px-3 py-2 text-xs">
+                     {row.autor?.fullName ?? '—'}
+                   </td>
+                   <td className="px-3 py-2 text-xs">
+                     {row.setorDestino ?? '—'}
+                   </td>
+                   <td className="px-3 py-2 text-right text-xs">
+                     <button
+                       onClick={(e) => handleApprove(e, row)}
+diff --git a/rh-dp-solicitacoes/src/components/layout/Sidebar.tsx b/rh-dp-solicitacoes/src/components/layout/Sidebar.tsx
+index f2c25a84896661faa4501d80aa5039d53c35e83e..85a7ec255b6dc8ba7abb14ef1f0cba23d7496086 100644
+--- a/rh-dp-solicitacoes/src/components/layout/Sidebar.tsx
++++ b/rh-dp-solicitacoes/src/components/layout/Sidebar.tsx
+@@ -918,50 +918,65 @@ export default function Sidebar({
+                           pathname.startsWith('/dashboard/configuracoes/usuarios')
+                             ? 'bg-orange-500/90 text-white'
+                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                         }`}
+                     >
+                       <Users size={16} /> <span className={labelBase}>Usuários</span>
+                     </Link>
+                   )}
+ 
+                   {configFeatures.permissoes && (
+                     <Link
+                       href="/dashboard/configuracoes/permissoes"
+                       className={`${submenuItemBase}
+                         ${
+                           pathname.startsWith(
+                             '/dashboard/configuracoes/permissoes',
+                           )
+                             ? 'bg-orange-500/90 text-white'
+                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                         }`}
+                     >
+                        <Shield size={16} /> <span className={labelBase}>Permissões</span>
+                     </Link>
+                   )}
+                    {configFeatures.permissoes && (
++                    <Link
++                      href="/dashboard/configuracoes/aprovadores"
++                      className={`${submenuItemBase}
++                        ${
++                          pathname.startsWith(
++                            '/dashboard/configuracoes/aprovadores',
++                          )
++                            ? 'bg-orange-500/90 text-white'
++                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
++                        }`}
++                    >
++                      <Shield size={16} /> <span className={labelBase}>Aprovadores</span>
++                    </Link>
++                  )}
++                  {configFeatures.permissoes && (
+                     <Link
+                       href="/dashboard/configuracoes/poderes-de-acesso"
+                       className={`${submenuItemBase}
+                         ${
+                           pathname.startsWith(
+                             '/dashboard/configuracoes/poderes-de-acesso',
+                           )
+                             ? 'bg-orange-500/90 text-white'
+                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                         }`}
+                     >
+                       <Shield size={16} /> <span className={labelBase}>Poderes de Acesso</span>
+                     </Link>
+                   )}
+ 
+                   {configFeatures.centros && (
+                     <Link
+                       href="/dashboard/configuracoes/centros-de-custo"
+                       className={`${submenuItemBase}
+                         ${
+                           pathname.startsWith(
+                             '/dashboard/configuracoes/centros-de-custo',
+                           )
+                             ? 'bg-orange-500/90 text-white'
+                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+diff --git a/rh-dp-solicitacoes/src/components/solicitacoes/SolicitationDetailModal.tsx b/rh-dp-solicitacoes/src/components/solicitacoes/SolicitationDetailModal.tsx
+index d1e3edd059d9938a098bebc03031ca81777b2d27..aea613a082b61a142efcf61cccc2d66113e58f8e 100644
+--- a/rh-dp-solicitacoes/src/components/solicitacoes/SolicitationDetailModal.tsx
++++ b/rh-dp-solicitacoes/src/components/solicitacoes/SolicitationDetailModal.tsx
+@@ -19,50 +19,51 @@ import {
+ 
+ 
+ const LABEL_RO =
+    'block text-xs font-bold text-slate-800 uppercase tracking-wide'
+ const INPUT_RO =
+   'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
+ 
+ 
+ // ===== Tipos que a página de lista já usa =====
+ export type Row = {
+   id: string
+   titulo: string
+   status: string
+   protocolo?: string
+   createdAt?: string | null
+   tipo?: { codigo?: string; nome: string } | null
+   responsavel?: { fullName: string } | null
+   responsavelId?: string | null
+   autor?: { fullName: string } | null
+   sla?: string | null
+   setorDestino?: string | null
+   requiresApproval?: boolean
+   approvalStatus?: string | null
+   costCenterId?: string | null
+   departmentId?: string | null
++  approverId?: string | null
+ }
+ type TiInventoryItem = {
+   id: string
+   patrimonio: string
+   name: string
+   status: string
+ }
+ 
+ 
+ type CampoEspecifico = {
+   name: string
+   label: string
+   type: string
+   required?: boolean
+   options?: string[]
+   defaultValue?: string
+   section?: string
+   stage?: string
+ }
+ 
+ type SchemaJson = {
+   meta?: {
+     departamentos?: string[]
+   }
+   camposEspecificos?: CampoEspecifico[]
+diff --git a/rh-dp-solicitacoes/src/lib/solicitationApproverRules.ts b/rh-dp-solicitacoes/src/lib/solicitationApproverRules.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a6a8806edaca44af9cb7418663cbcdf8e25fafc2
+--- /dev/null
++++ b/rh-dp-solicitacoes/src/lib/solicitationApproverRules.ts
+@@ -0,0 +1,10 @@
++export function pickEligibleTipoApproverId(userIds: string[]): string | null {
++  return userIds[0] ?? null
++}
++
++export function resolveApprovalRecipientId(params: {
++  solicitationApproverId?: string | null
++  fallbackTipoApproverId?: string | null
++}): string | null {
++  return params.solicitationApproverId ?? params.fallbackTipoApproverId ?? null
++}
+diff --git a/rh-dp-solicitacoes/src/lib/solicitationTipoApprovers.ts b/rh-dp-solicitacoes/src/lib/solicitationTipoApprovers.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e1c1ac528df832db606ed7d5b280c6cca9e3df9
+--- /dev/null
++++ b/rh-dp-solicitacoes/src/lib/solicitationTipoApprovers.ts
+@@ -0,0 +1,35 @@
++import { ModuleLevel } from '@prisma/client'
++import { prisma } from '@/lib/prisma'
++import { MODULE_KEYS } from '@/lib/featureKeys'
++import { pickEligibleTipoApproverId } from '@/lib/solicitationApproverRules'
++
++export async function resolveTipoApproverIds(tipoId: string): Promise<string[]> {
++  if (!tipoId) return []
++
++  const rows = await prisma.tipoSolicitacaoApprover.findMany({
++    where: {
++      tipoId,
++      user: {
++        status: 'ATIVO',
++        moduleAccesses: {
++          some: {
++            level: ModuleLevel.NIVEL_3,
++            module: { key: MODULE_KEYS.SOLICITACOES },
++          },
++        },
++      },
++    },
++    orderBy: [
++      { user: { fullName: 'asc' } },
++      { createdAt: 'asc' },
++    ],
++    select: { userId: true },
++  })
++
++  return rows.map((row) => row.userId)
++}
++
++export async function resolveTipoApproverId(tipoId: string): Promise<string | null> {
++  const ids = await resolveTipoApproverIds(tipoId)
++  return pickEligibleTipoApproverId(ids)
++}
+diff --git a/rh-dp-solicitacoes/src/lib/solicitationWorkflowNotifications.ts b/rh-dp-solicitacoes/src/lib/solicitationWorkflowNotifications.ts
+index 105fb01f170841d5a7c007d5b68c12ce1c8ff867..e902246993356ab0ffba8b506a7e1560f96ce548 100644
+--- a/rh-dp-solicitacoes/src/lib/solicitationWorkflowNotifications.ts
++++ b/rh-dp-solicitacoes/src/lib/solicitationWorkflowNotifications.ts
+@@ -1,34 +1,36 @@
+ import { prisma } from '@/lib/prisma'
+ import { sendMail } from '@/lib/mailer'
+ import { resolveAppBaseUrl } from '@/lib/site-url'
+ import type { ModuleLevel } from '@prisma/client'
+ import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
+ import { normalizeAndValidateEmails, renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
+ import { normalizeModuleKey } from '@/lib/moduleKey'
+ import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
+ import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
++import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
++import { resolveApprovalRecipientId } from '@/lib/solicitationApproverRules'
+ 
+ type NotifyInput = {
+   solicitationId: string
+   preferredKind?: WorkflowStepKind
+   preferredDepartmentId?: string | null
+ }
+ 
+ type NotificationAccessRule = {
+   moduleKey: string
+   minLevel: ModuleLevel
+ }
+ 
+ function resolveNotificationAccessRule(step: WorkflowStepDraft): NotificationAccessRule {
+   const maybeModuleKey = (step as WorkflowStepDraft & { notificationModuleKey?: string }).notificationModuleKey
+   const maybeMinLevel = (step as WorkflowStepDraft & { notificationMinLevel?: ModuleLevel }).notificationMinLevel
+ 
+   const moduleKey = normalizeModuleKey(maybeModuleKey?.trim() || 'solicitacoes')
+   const minLevel = maybeMinLevel ?? 'NIVEL_3'
+ 
+   return { moduleKey, minLevel }
+ }
+ 
+ async function resolveDepartmentRecipients(step: WorkflowStepDraft, fallbackDepartmentId?: string | null) {
+   const manual = step.notificationEmails ?? []
+   const departmentId = step.defaultDepartmentId ?? fallbackDepartmentId
+@@ -112,62 +114,72 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
+   if (!solicitation) return { skipped: true, reason: 'solicitation_not_found' as const }
+ 
+   const workflows = await readWorkflowRows()
+   const workflow = workflows.find((row) => row.tipoId === solicitation.tipoId)
+   if (!workflow) return { skipped: true, reason: 'workflow_not_found' as const }
+ 
+   const payload = (solicitation.payload ?? {}) as Record<string, any>
+   const lastNotifiedStepKey = payload?.workflowEmail?.lastNotifiedStepKey as string | undefined
+   const targetStep = pickTargetStep(
+     workflow.steps,
+     input.preferredKind,
+     input.preferredDepartmentId ?? solicitation.departmentId,
+     lastNotifiedStepKey,
+   )
+   if (!targetStep) return { skipped: true, reason: 'step_not_found' as const }
+ 
+   if (lastNotifiedStepKey === targetStep.stepKey) {
+     return { skipped: true, reason: 'already_notified' as const }
+   }
+ 
+   let recipients: string[] = []
+   let subjectTemplate = ''
+   let bodyTemplate = ''
+ 
+   if (targetStep.kind === 'APROVACAO') {
+-    const approverIds = Array.from(
+-      new Set([
+-        ...(targetStep.approverUserIds ?? []),
+-        solicitation.approverId ?? '',
+-      ].filter(Boolean)),
+-    )
++    const fallbackTipoApproverId = solicitation.approverId ? null : await resolveTipoApproverId(solicitation.tipoId)
++    const approverId = resolveApprovalRecipientId({
++      solicitationApproverId: solicitation.approverId,
++      fallbackTipoApproverId,
++    })
++
++    if (!solicitation.approverId && approverId) {
++      await prisma.solicitation.update({
++        where: { id: solicitation.id },
++        data: { approverId },
++      })
++    }
++
++    if (!approverId) {
++      return { skipped: true, reason: 'no_approver_configured' as const }
++    }
+ 
+-    const users = await prisma.user.findMany({
+-      where: { id: { in: approverIds } },
++    const user = await prisma.user.findUnique({
++      where: { id: approverId },
+       select: { email: true },
+     })
+-  recipients = users.map((user) => user.email).filter(Boolean)
++    recipients = user?.email ? [user.email] : []
+     const template = resolveTemplate(targetStep.approvalTemplate)
+     subjectTemplate = template.subject
+     bodyTemplate = template.body
+   } else {
+     recipients = await resolveDepartmentRecipients(targetStep, solicitation.departmentId)
+     const template = resolveTemplate(targetStep.notificationTemplate)
+     subjectTemplate = template.subject
+     bodyTemplate = template.body
+   }
+ 
+   recipients = normalizeAndValidateEmails(recipients)
+   if (recipients.length === 0) {
+      return { skipped: true, reason: 'no_recipients' as const }
+   }
+ 
+   const baseUrl = resolveAppBaseUrl({ context: 'workflow-email' })
+   if (!baseUrl && process.env.NODE_ENV === 'production') {
+     return { skipped: true, reason: 'invalid_base_url' as const }
+   }
+ 
+   const solicitationPath = buildWorkflowNotificationPath(targetStep.kind, solicitation.id)
+ 
+   const values = {
+     protocolo: solicitation.protocolo,
+     tipoCodigo: solicitation.tipo?.codigo ?? solicitation.tipo?.id ?? '-',
+diff --git a/rh-dp-solicitacoes/tests/tipo-approver-resolution.test.cjs b/rh-dp-solicitacoes/tests/tipo-approver-resolution.test.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c849214941f67042695890b6b7d3f90204b2cb6b
+--- /dev/null
++++ b/rh-dp-solicitacoes/tests/tipo-approver-resolution.test.cjs
+@@ -0,0 +1,5 @@
++const assert = require('node:assert/strict')
++const { pickEligibleTipoApproverId } = require('../src/lib/solicitationApproverRules.ts')
++assert.equal(pickEligibleTipoApproverId(['u3', 'u1']), 'u3')
++assert.equal(pickEligibleTipoApproverId([]), null)
++console.info('tipo-approver-resolution.test.cjs: ok')
+diff --git a/rh-dp-solicitacoes/tests/workflow-approval-recipients.test.cjs b/rh-dp-solicitacoes/tests/workflow-approval-recipients.test.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a62a735751064d7dc159ae0f4a6ef338d71079f2
+--- /dev/null
++++ b/rh-dp-solicitacoes/tests/workflow-approval-recipients.test.cjs
+@@ -0,0 +1,14 @@
++const assert = require('node:assert/strict')
++const { resolveApprovalRecipientId } = require('../src/lib/solicitationApproverRules.ts')
++
++assert.equal(
++  resolveApprovalRecipientId({ solicitationApproverId: 'principal', fallbackTipoApproverId: 'backup1' }),
++  'principal',
++)
++assert.equal(
++  resolveApprovalRecipientId({ solicitationApproverId: null, fallbackTipoApproverId: 'backup1' }),
++  'backup1',
++)
++assert.equal(resolveApprovalRecipientId({ solicitationApproverId: null, fallbackTipoApproverId: null }), null)
++
++console.info('workflow-approval-recipients.test.cjs: ok')
