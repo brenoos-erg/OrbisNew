@@ -291,8 +291,8 @@ export const GET = withModuleLevel(
 
   sla: null,
 
-   setorDestino:
-    formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
+  setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
+  departamentoResponsavel: s.department?.name ?? null,
   departmentId: s.departmentId,
   approverId: s.approver?.id ?? s.approverId ?? null,
 
@@ -350,6 +350,8 @@ export const POST = withModuleLevel(
   ModuleLevel.NIVEL_1,
   async (req: NextRequest, ctx) => {
     return withRequestMetrics('POST /api/solicitacoes', async () => {
+      let idempotencyKey: string | null = null
+      let requestId: string | null = null
       try {
         const { me } = ctx
         const body = await req.json().catch(() => null)
@@ -364,8 +366,36 @@ export const POST = withModuleLevel(
         const tipoId = body.tipoId as string | undefined
         const costCenterId = body.costCenterId as string | null | undefined
         const departmentId = body.departmentId as string | undefined
+        const idempotencyKeyRaw = body.idempotencyKey
+        idempotencyKey =
+          typeof idempotencyKeyRaw === 'string' && idempotencyKeyRaw.trim().length > 0
+            ? idempotencyKeyRaw.trim()
+            : null
+        requestId = req.headers.get('x-request-id') ?? crypto.randomUUID()
         const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
+
+        console.info('POST /api/solicitacoes request', {
+          requestId,
+          idempotencyKey,
+          solicitanteId,
+          tipoId,
+        })
+
+        if (idempotencyKey) {
+          const existingByIdempotency = await prisma.solicitation.findUnique({
+            where: { idempotencyKey },
+          })
+
+          if (existingByIdempotency) {
+            console.info('POST /api/solicitacoes duplicate prevented (pre-check)', {
+              requestId,
+              idempotencyKey,
+              solicitationId: existingByIdempotency.id,
+            })
+            return NextResponse.json(existingByIdempotency, { status: 200 })
+          }
+        }
 
         if (!tipoId) {
           return NextResponse.json(
@@ -439,7 +469,7 @@ export const POST = withModuleLevel(
           data: {
             protocolo,
             tipoId,
-            costCenterId: resolvedCostCenterId,
+             costCenterId: resolvedCostCenterId,
             departmentId: resolvedDepartmentId,
             solicitanteId,
             titulo,
@@ -447,6 +477,7 @@ export const POST = withModuleLevel(
             prioridade,
             dataPrevista,
             payload,
+            idempotencyKey,
           },
         })
 
@@ -459,7 +490,6 @@ export const POST = withModuleLevel(
             tipo: 'CRIACAO',
           },
         })
-
         await prisma.solicitationTimeline.create({
           data: {
             solicitationId: created.id,
@@ -1116,8 +1146,21 @@ export const POST = withModuleLevel(
 
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
-        console.error('POST /api/solicitacoes error', e)
+         console.error('POST /api/solicitacoes error', { requestId, idempotencyKey, error: e })
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          if (idempotencyKey) {
+            const existingByIdempotency = await prisma.solicitation.findUnique({
+              where: { idempotencyKey },
+            })
+
+            if (existingByIdempotency) {
+              console.info('POST /api/solicitacoes duplicate prevented (race)', {
+                idempotencyKey,
+                solicitationId: existingByIdempotency.id,
+              })
+              return NextResponse.json(existingByIdempotency, { status: 200 })
+            }
+          }
           return NextResponse.json({ error: 'Conflito de dados únicos ao criar solicitação.' }, { status: 409 })
         }
         return NextResponse.json(

@@ -228,8 +228,8 @@ export async function GET(req: NextRequest) {
       responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
       sla: null,
-      setorDestino:
-        formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
+      setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
+      departamentoResponsavel: s.department?.name ?? null,
       requiresApproval: s.requiresApproval,
       approvalStatus: s.approvalStatus,
       costCenterId: s.costCenterId ?? null,

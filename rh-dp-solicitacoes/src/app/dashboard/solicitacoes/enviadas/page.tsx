@@ -287,7 +287,7 @@ export default function SentRequestsPage() {
   }
 
   const exportCsv = () => {
-    const header = ['Status', 'Protocolo', 'Data Abertura', 'Solicitação', 'SLA', 'Centro Responsável', 'Atendente']
+    const header = ['Status', 'Protocolo', 'Data Abertura', 'Solicitação', 'SLA', 'Departamento responsável', 'Atendente']
     const rows = data.map((r) => [
       r.status ?? '',
       r.protocolo ?? '',
@@ -475,7 +475,7 @@ export default function SentRequestsPage() {
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 bg-slate-50 text-slate-600">
                 <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left">
-                  <th>Status</th><th>Protocolo</th><th>Data Abertura</th><th>Solicitação</th><th>SLA</th><th>Centro Responsável</th><th>Atendente</th>
+                 <th>Status</th><th>Protocolo</th><th>Data Abertura</th><th>Solicitação</th><th>SLA</th><th>Departamento responsável</th><th>Atendente</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

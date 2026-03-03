@@ -243,11 +243,11 @@ export default function ReceivedRequestsPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-2">Status</th>
+                   <th className="px-4 py-2">Status</th>
                   <th className="px-4 py-2">Protocolo</th>
                   <th className="px-4 py-2">Data Abertura</th>
                   <th className="px-4 py-2">Solicitação</th>
-                  <th className="px-4 py-2">Centro Responsável</th>
+                  <th className="px-4 py-2">Departamento responsável</th>
                   <th className="px-4 py-2">Atendente</th>
                 </tr>
               </thead>

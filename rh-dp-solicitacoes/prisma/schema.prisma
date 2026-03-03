@@ -212,6 +212,7 @@ model Solicitation {
   departmentId       String
   prioridade         SolicitationPriority?
   protocolo          String                 @unique
+  idempotencyKey     String?                @unique
   requiresApproval   Boolean                @default(false)
   solicitanteId      String
   status             SolicitationStatus     @default(ABERTA)

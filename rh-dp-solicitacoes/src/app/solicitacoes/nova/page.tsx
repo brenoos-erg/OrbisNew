@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type TipoCampo = {
@@ -57,6 +57,8 @@ export default function NovaSolicitacaoPage() {
 
     // campos dinâmicos (payload)
     const [extras, setExtras] = useState<Record<string, any>>({})
+    const [submitting, setSubmitting] = useState(false)
+    const idempotencyKeyRef = useRef(globalThis.crypto.randomUUID())
 
     // cargos (Position)
     const [positions, setPositions] = useState<Position[]>([])
@@ -146,17 +148,25 @@ export default function NovaSolicitacaoPage() {
     // enviar formulário
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (submitting) return
 
-        await fetch('/api/solicitacoes', {
+        setSubmitting(true)
+        try {
+            await fetch('/api/solicitacoes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 ...form,
                 payload: extras, // aqui vão os campos da RQ_063
+                idempotencyKey: idempotencyKeyRef.current,
             }),
         })
 
-        router.push('/solicitacoes')
+            idempotencyKeyRef.current = globalThis.crypto.randomUUID()
+            router.push('/solicitacoes')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     const tipoSelecionado = tipos.find((t) => t.id === form.tipoId)
@@ -250,10 +260,11 @@ export default function NovaSolicitacaoPage() {
                     </div>
                 ) : null}
 
-                <button className="rounded bg-black px-4 py-2 text-white">
-                    Criar
+                 <button type="submit" disabled={submitting} className="rounded bg-black px-4 py-2 text-white disabled:opacity-60">
+                    {submitting ? 'Criando...' : 'Criar'}
                 </button>
             </form>
         </div>
     )
 }
+

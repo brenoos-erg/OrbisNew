@@ -5,6 +5,7 @@ import {
   FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
   ChangeEvent,
 } from 'react';
@@ -197,7 +198,7 @@ function isValidBrazilPhone(value: string) {
 
 
 /* ================================================================
-   COMPONENTE PRINCIPAL
+  COMPONENTE PRINCIPAL
 ================================================================ */
 
 export default function NovaSolicitacaoPage() {
@@ -207,6 +208,7 @@ export default function NovaSolicitacaoPage() {
   // controle de envio
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef(globalThis.crypto.randomUUID());
 
   // ---------- DADOS DO SOLICITANTE ----------
   const [me, setMe] = useState<UserMe | null>(null);
@@ -639,6 +641,7 @@ export default function NovaSolicitacaoPage() {
   ============================================================ */
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
 
     if (step !== 2) return;
     if (step2ReadyAt && Date.now() < step2ReadyAt) {
@@ -840,6 +843,7 @@ export default function NovaSolicitacaoPage() {
         departmentId: departamentoId,
         tipoId,
         campos,
+        idempotencyKey: idempotencyKeyRef.current,
        };
 
       const res = await fetch('/api/solicitacoes', {
@@ -883,13 +887,14 @@ export default function NovaSolicitacaoPage() {
         }
       }
 
-      const query = new URLSearchParams();
+       const query = new URLSearchParams();
       if (departamentoId) {
         query.set('departmentId', departamentoId);
       }
       const nextUrl = query.toString()
         ? `/dashboard/solicitacoes/enviadas?${query.toString()}`
         : '/dashboard/solicitacoes/enviadas';
+      idempotencyKeyRef.current = globalThis.crypto.randomUUID();
       pushToast('Solicitação criada com sucesso', 'success');
       window.setTimeout(() => {
         router.push(nextUrl);
