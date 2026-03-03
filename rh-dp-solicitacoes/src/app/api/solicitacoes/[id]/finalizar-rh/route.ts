@@ -121,10 +121,11 @@ export async function POST(
         solicitation.department?.code === '08',
     )
 
-    const payloadOrigem = (solicitation.payload ?? {}) as any
+const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
-    const solicitanteOrigem = payloadOrigem.solicitante ?? {}
+    const solicitanteOrigem = payloadOrigem.solicitante
     const vemDeRh = Boolean(payloadOrigem?.origem?.rhSolicitationId)
+
 
     if (
       !isSolicitacaoPessoalTipo &&
@@ -520,33 +521,17 @@ export async function POST(
             parentId: solicitation.id, // vínculo pai/filho
             titulo: 'Solicitação de Admissão',
             descricao: `Solicitação de admissão gerada automaticamente a partir da ${solicitation.protocolo}.`,
-            requiresApproval: false,
+             requiresApproval: false,
             approvalStatus: 'APROVADO',
             status: 'ABERTA',
             payload: {
+              ...payloadOrigem,
               origem: {
                 rhSolicitationId: solicitation.id,
                 rhProtocolo: solicitation.protocolo,
               },
               campos: {
-                // campos reaproveitados da RQ_063:
-                cargo: cargo ?? camposOrigem.cargo,
-                setorProjeto:
-                  camposOrigem.setorProjeto ?? camposOrigem.setorOuProjeto,
-                localTrabalho: camposOrigem.localTrabalho,
-                horarioTrabalho: camposOrigem.horarioTrabalho,
-                centroCusto: camposOrigem.centroCusto,
-                chefiaImediata: camposOrigem.chefiaImediata,
-                motivoVaga: camposOrigem.motivoDaVaga,
-                tipoContratacao: camposOrigem.contratacao,
-                beneficios: camposOrigem.beneficios,
-                cbo: camposOrigem.cbo,
-                matriz: camposOrigem.matriz,
-                filial: camposOrigem.filial,
-                observacao:
-                  outrasInfos?.observacao ?? camposOrigem.observacao,
-
-                // dados do contratado (vindos do formulário de finalização):
+                ...camposOrigem,
                 nomeProfissional:
                   candidatoNome ??
                   camposOrigem.nomeProfissional ??
@@ -556,9 +541,10 @@ export async function POST(
                 salario: salario ?? camposOrigem.salario,
                 dataAdmissao:
                   dataAdmissaoPrevista ?? camposOrigem.dataAdmissaoPrevista,
+                cargoFinal: cargo ?? camposOrigem.cargoFinal,
+                ...(outrasInfos ?? {}),
               },
-              // mantém os dados do solicitante original (quem pediu a vaga)
-              solicitante: solicitanteOrigem,
+              ...(solicitanteOrigem ? { solicitante: solicitanteOrigem } : {}),
             },
           },
 
