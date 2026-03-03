@@ -1618,8 +1618,8 @@ async function handleEncaminharAprovacaoComAnexo() {
 
         {/* CONTEÚDO */}
         <div className="flex-1 overflow-y-auto px-5 py-4 text-sm">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="min-w-0 space-y-5 lg:col-span-2">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div className="min-w-0 space-y-5 xl:col-span-2">
          {loading && (
             <p className="text-xs text-slate-500">
               Carregando detalhes...
@@ -1977,17 +1977,37 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                       <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                       {camposFormSolicitante.map((campo) => (
-                        <div key={campo.name}>
+                        <div
+                          key={campo.name}
+                          className={
+                            campo.name.toLowerCase().includes('justificativa')
+                              ? 'sm:col-span-2 lg:col-span-3'
+                              : undefined
+                          }
+                        >
                           <label className={LABEL_RO}>{campo.label}</label>
-                          <input
-                            className={INPUT_RO}
-                            readOnly
-                            value={
-                              payloadCampos[campo.name] !== undefined
-                                ? String(payloadCampos[campo.name])
-                                : ''
-                            }
-                          />
+                          {campo.name.toLowerCase().includes('justificativa') ||
+                          campo.type === 'textarea' ? (
+                            <textarea
+                              className={`${INPUT_RO} min-h-[140px] resize-y whitespace-pre-wrap leading-relaxed`}
+                              readOnly
+                              value={
+                                payloadCampos[campo.name] !== undefined
+                                  ? String(payloadCampos[campo.name])
+                                  : ''
+                              }
+                            />
+                          ) : (
+                            <input
+                              className={INPUT_RO}
+                              readOnly
+                              value={
+                                payloadCampos[campo.name] !== undefined
+                                  ? String(payloadCampos[campo.name])
+                                  : ''
+                              }
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2221,10 +2241,10 @@ async function handleEncaminharAprovacaoComAnexo() {
           )}
             </div>
 
-            {showManagementActions && detail && (
-              <aside className="w-full lg:col-span-1">
-                <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 lg:sticky lg:top-6 lg:max-h-[72vh] lg:overflow-y-auto">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+             {showManagementActions && detail && (
+              <aside className="w-full xl:col-span-1">
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-4 xl:max-h-[72vh] xl:overflow-y-auto">
+                  <p className="flex items-center gap-2 border-b border-slate-200 pb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
                     Painel de Tratativas
                   </p>
                   {!isFinalizadaOuCancelada && (
@@ -2262,12 +2282,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                           </div>
                         )}
 
-                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        <div className="flex flex-col gap-2 text-[11px]">
                           <button
                             type="button"
                             onClick={handleUploadAnexos}
                             disabled={uploading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-3 text-base text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                            className="w-full rounded-md bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                           >
                             {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
                           </button>
@@ -2285,7 +2305,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                    {!isDpDestino && canFinalizarRh && isSolicitacaoPessoalTipo && (
                     <button
                       onClick={() => setShowContratadoForm((v) => !v)}
-                      className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 lg:w-auto lg:text-sm"
+                      className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 lg:text-sm"
                     >
                        {showContratadoForm
                         ? 'Ocultar dados do contratado'
@@ -2297,7 +2317,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => handleSalvarOuFinalizarSst(false)}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
+                     className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                     >
                       {closing ? 'Salvando...' : 'Salvar resposta/solução'}
                     </button>
@@ -2307,7 +2327,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh())}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
                     </button>
@@ -2317,7 +2337,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={handleFinalizarUltimaEtapa}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                     >
                       {closing ? 'Enviando...' : 'Finalizar chamado'}
                     </button>
@@ -2404,7 +2424,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             Equipamento disponível (IN_STOCK)
                           </span>
                           <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                           className="w-full rounded-md border border-slate-300 px-3 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 lg:text-sm"
                             value={selectedEquipmentId}
                             onChange={(e) => setSelectedEquipmentId(e.target.value)}
                             disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
@@ -2420,18 +2440,18 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="mt-3 flex flex-col gap-2">
                         <button
                           onClick={handleTiAlocarEquipamento}
                           disabled={closing || isFinalizadaOuCancelada}
-                         className="w-full rounded-md bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                         className="w-full rounded-md bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                         >
                           {closing ? 'Processando...' : 'Alocar equipamento e gerar termo'}
                         </button>
                         <button
                           onClick={handleTiSemEstoque}
                           disabled={closing || isFinalizadaOuCancelada}
-                          className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                         >
                           Sem estoque → encaminhar para aprovação
                         </button>
@@ -2484,12 +2504,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                       )}
 
                       {camposNadaConstaSetor.length > 0 && canEditNadaConstaSetor && (
-                        <div className="mt-4 flex flex-wrap gap-2">
+                       <div className="mt-4 flex flex-col gap-2">
                           <button
                             type="button"
                             onClick={() => handleSalvarNadaConsta(false)}
                             disabled={savingNadaConsta}
-                          className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:opacity-60 lg:text-sm"
                           >
                             {savingNadaConsta ? 'Salvando...' : 'Salvar'}
                           </button>
