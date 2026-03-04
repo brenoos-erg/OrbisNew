@@ -16,6 +16,10 @@ import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
 import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
 import {
+  EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from '@/lib/experienceEvaluation.constants';
+import {
   SolicitacoesToastViewport,
   useSolicitacoesToast,
 } from '@/components/solicitacoes/SolicitacoesToast';
@@ -427,7 +431,7 @@ export default function NovaSolicitacaoPage() {
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
   const isTiMaintenance = isTiMaintenanceRequest(selectedTipo);
-  const isAvaliacaoExperiencia = selectedTipo?.id === 'RQ_RH_103';
+   const isAvaliacaoExperiencia = selectedTipo?.id === EXPERIENCE_EVALUATION_TIPO_ID;
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
   const tipoMeta = selectedTipo?.meta;
@@ -441,6 +445,14 @@ export default function NovaSolicitacaoPage() {
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
   const camposSolicitante = camposEspecificos.filter((campo) => {
     if (campo.stage && campo.stage !== 'solicitante') return false;
+    if (
+      isAvaliacaoExperiencia &&
+      EXPERIENCE_EVALUATION_REQUIRED_FIELDS.includes(
+        campo.name as (typeof EXPERIENCE_EVALUATION_REQUIRED_FIELDS)[number],
+      )
+    ) {
+      return false;
+    }
     if (isSolicitacaoEpi && ['emailSolicitante', 'local', 'data'].includes(campo.name)) {
       return false;
     }
