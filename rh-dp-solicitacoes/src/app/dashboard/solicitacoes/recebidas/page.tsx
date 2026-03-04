@@ -32,6 +32,7 @@ function mapStatusLabel(status: string) {
   if (status === 'EM_ATENDIMENTO') return 'EM ATENDIMENTO'
   if (status === 'AGUARDANDO_APROVACAO') return 'AGUARD. APROVAÇÃO'
   if (status === 'AGUARDANDO_TERMO') return 'AGUARD. TERMO'
+  if (status === 'AGUARDANDO_AVALIACAO_GESTOR') return 'AGUARD. AVALIAÇÃO GESTOR'
   if (status === 'CONCLUIDA') return 'CONCLUÍDA'
   if (status === 'CANCELADA') return 'CANCELADA'
   return status

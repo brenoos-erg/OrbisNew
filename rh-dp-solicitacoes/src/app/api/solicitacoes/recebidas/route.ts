@@ -155,6 +155,10 @@ export async function GET(req: NextRequest) {
       isDpUser && dpDepartmentId
         ? [{ costCenterId: null, departmentId: dpDepartmentId }]
         : []
+    const gestorAvaliadorFilter = {
+      approverId: me.id,
+      status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
+    }
 
     if (where.costCenterId) {
       const receivedFilters = ccIds.has(where.costCenterId)
@@ -162,11 +166,14 @@ export async function GET(req: NextRequest) {
         : []
 
       if (receivedFilters.length === 0 && setorFilters.length === 0) {
-        where.id = '__never__' as any
+        where.AND = [
+          ...(where.AND ?? []),
+          { OR: [gestorAvaliadorFilter] },
+        ]
       } else {
         where.AND = [
           ...(where.AND ?? []),
-          { OR: [...receivedFilters, ...setorFilters] },
+          { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
         ]
       }
     } else {
@@ -177,11 +184,14 @@ export async function GET(req: NextRequest) {
       ]
 
       if (receivedFilters.length === 0 && setorFilters.length === 0) {
-        where.id = '__never__' as any
+       where.AND = [
+          ...(where.AND ?? []),
+          { OR: [gestorAvaliadorFilter] },
+        ]
       } else {
         where.AND = [
           ...(where.AND ?? []),
-          { OR: [...receivedFilters, ...setorFilters] },
+          { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
         ]
       }
     }
@@ -233,6 +243,7 @@ export async function GET(req: NextRequest) {
       requiresApproval: s.requiresApproval,
       approvalStatus: s.approvalStatus,
       costCenterId: s.costCenterId ?? null,
+      approverId: s.approver?.id ?? s.approverId ?? null,
     }))
 
     return NextResponse.json({ rows, total })

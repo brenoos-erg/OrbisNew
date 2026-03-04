@@ -25,6 +25,11 @@ import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+import {
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+  listExperienceEvaluators,
+} from '@/lib/experienceEvaluation'
 
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
@@ -198,6 +203,10 @@ export const GET = withModuleLevel(
             isDpUser && dpDepartmentId
               ? [{ costCenterId: null, departmentId: dpDepartmentId }]
               : []
+          const gestorAvaliadorFilter = {
+            approverId: me.id,
+            status: EXPERIENCE_EVALUATION_STATUS,
+          }
 
           if (where.costCenterId) {
             const receivedFilters = ccIds.has(where.costCenterId)
@@ -205,11 +214,14 @@ export const GET = withModuleLevel(
               : []
 
             if (receivedFilters.length === 0 && setorFilters.length === 0) {
-              where.id = '__never__' as any
+              where.AND = [
+                ...(where.AND ?? []),
+                { OR: [gestorAvaliadorFilter] },
+              ]
             } else {
               where.AND = [
                 ...(where.AND ?? []),
-                { OR: [...receivedFilters, ...setorFilters] },
+                { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
               ]
             }
           } else {
@@ -222,11 +234,14 @@ export const GET = withModuleLevel(
             ]
 
             if (receivedFilters.length === 0 && setorFilters.length === 0) {
-              where.id = '__never__' as any
+             where.AND = [
+                ...(where.AND ?? []),
+                { OR: [gestorAvaliadorFilter] },
+              ]
             } else {
               where.AND = [
                 ...(where.AND ?? []),
-                { OR: [...receivedFilters, ...setorFilters] },
+                { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
               ]
             }
           }
@@ -463,6 +478,41 @@ export const POST = withModuleLevel(
           campos.gestorSolicitanteInfo = `${me.fullName ?? me.login} / Cargo: gestor solicitante / Data: ${new Date().toISOString().slice(0, 10)}`
         }
         const payload: any = await buildPayload(solicitanteId, campos)
+         const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+
+        if (isAvaliacaoExperiencia) {
+          const gestorImediatoAvaliadorId =
+            typeof campos.gestorImediatoAvaliadorId === 'string'
+              ? campos.gestorImediatoAvaliadorId.trim()
+              : ''
+
+          if (!gestorImediatoAvaliadorId) {
+            return NextResponse.json(
+              { error: 'Selecione o gestor imediato avaliador.' },
+              { status: 400 },
+            )
+          }
+
+          const coordenadores = await listExperienceEvaluators()
+          const gestorValido = coordenadores.some(
+            (coordenador) => coordenador.id === gestorImediatoAvaliadorId,
+          )
+
+          if (!gestorValido) {
+            return NextResponse.json(
+              {
+                error:
+                  'Gestor imediato avaliador inválido. Verifique o grupo COORDENADORES_AVALIACAO_EXPERIENCIA.',
+              },
+              { status: 400 },
+            )
+          }
+
+          payload.campos = {
+            ...(payload.campos ?? {}),
+            gestorImediatoAvaliadorId,
+          }
+        }
 
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({
@@ -497,6 +547,38 @@ export const POST = withModuleLevel(
             message: 'Solicitação criada pelo solicitante.',
           },
         })
+        if (isAvaliacaoExperiencia) {
+          const gestorImediatoAvaliadorId = String(
+            payload?.campos?.gestorImediatoAvaliadorId ?? '',
+          )
+
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              approverId: gestorImediatoAvaliadorId,
+              status: EXPERIENCE_EVALUATION_STATUS as any,
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: EXPERIENCE_EVALUATION_STATUS as any,
+              message: 'Encaminhada para gestor imediato avaliador.',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'ENCAMINHADA_GESTOR_AVALIADOR',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
 
         const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
         const isSolicitacaoIncentivo =

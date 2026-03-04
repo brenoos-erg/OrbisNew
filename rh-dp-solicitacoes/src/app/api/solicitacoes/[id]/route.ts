@@ -99,6 +99,7 @@ export async function GET(
       descricao: item.descricao,
 
       status: item.status,
+      approverId: item.approverId,
       approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
 
       dataAbertura: item.dataAbertura?.toISOString(),

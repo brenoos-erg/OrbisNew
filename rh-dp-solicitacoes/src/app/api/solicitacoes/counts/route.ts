@@ -49,22 +49,30 @@ export async function GET() {
     ]
 
     const receivedOpenWhere: Record<string, any> = {
-      status: 'ABERTA',
-      AND:
-        receivedFilters.length > 0
-          ? [
-              { OR: receivedFilters },
-              {
-                NOT: {
-                  AND: [
-                    { requiresApproval: true },
-                    { approvalStatus: 'PENDENTE' },
-                    { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
-                  ],
-                },
-              },
-            ]
-          : [{ id: '__never__' }],
+       OR: [
+        {
+          status: 'ABERTA',
+          AND:
+            receivedFilters.length > 0
+              ? [
+                  { OR: receivedFilters },
+                  {
+                    NOT: {
+                      AND: [
+                        { requiresApproval: true },
+                        { approvalStatus: 'PENDENTE' },
+                        { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                      ],
+                    },
+                  },
+                ]
+              : [{ id: '__never__' }],
+        },
+        {
+          status: 'AGUARDANDO_AVALIACAO_GESTOR',
+          approverId: me.id,
+        },
+      ],
     }
 
     const approvalsPendingWhere: Record<string, any> = {

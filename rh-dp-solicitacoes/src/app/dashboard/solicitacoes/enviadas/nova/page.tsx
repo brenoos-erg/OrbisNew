@@ -101,6 +101,11 @@ type Position = {
 
 type Extras = Record<string, string>;
 
+type CoordinatorOption = {
+  id: string;
+  fullName: string;
+};
+
 type InputChange = ChangeEvent<HTMLInputElement>;
 type SelectChange = ChangeEvent<HTMLSelectElement>;
 type TextAreaChange = ChangeEvent<HTMLTextAreaElement>;
@@ -225,6 +230,7 @@ export default function NovaSolicitacaoPage() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([]);
+  const [coordinators, setCoordinators] = useState<CoordinatorOption[]>([]);
 
   const [departamentoId, setDepartamentoId] = useState('');
   const [tipoId, setTipoId] = useState('');
@@ -363,6 +369,26 @@ export default function NovaSolicitacaoPage() {
 
     loadTipos();
   }, [departamentoId]);
+  useEffect(() => {
+    if (tipoId !== 'RQ_RH_103') {
+      setCoordinators([]);
+      return;
+    }
+
+    async function loadCoordinators() {
+      try {
+        const res = await fetch('/api/coordenadores', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Erro ao buscar coordenadores');
+        const data = (await res.json()) as CoordinatorOption[];
+        setCoordinators(data);
+      } catch (err) {
+        console.error(err);
+        setCoordinators([]);
+      }
+    }
+
+    loadCoordinators();
+  }, [tipoId]);
 
   const selectedDepartamento =
     departamentos.find((d) => d.id === departamentoId)?.label ?? '';
@@ -401,6 +427,7 @@ export default function NovaSolicitacaoPage() {
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
   const isTiMaintenance = isTiMaintenanceRequest(selectedTipo);
+  const isAvaliacaoExperiencia = selectedTipo?.id === 'RQ_RH_103';
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
   const tipoMeta = selectedTipo?.meta;
@@ -758,6 +785,12 @@ export default function NovaSolicitacaoPage() {
 
         campos = { ...abonoCampos };
       } else {
+        if (isAvaliacaoExperiencia && !extras.gestorImediatoAvaliadorId) {
+          setSubmitError('Selecione o gestor imediato avaliador.');
+          setSubmitting(false);
+          return;
+        }
+
         const obrigatorios = camposSolicitanteComTi
           .filter((c) => c.required)
           .map((c) => c.name);
@@ -857,6 +890,10 @@ export default function NovaSolicitacaoPage() {
           },
           {},
         );
+
+        if (isAvaliacaoExperiencia) {
+          campos.gestorImediatoAvaliadorId = extras.gestorImediatoAvaliadorId ?? '';
+        }
 
         if (selectedTipo?.id === 'RQ_043') {
           const centroDestinoId =
@@ -2239,6 +2276,36 @@ useEffect(() => {
 
                     if (!shouldShowEnderecoEnvio || !shouldShowTiMaintenanceSystemField || !shouldShowTiMaintenanceEquipmentField) {
                       return null;
+                    }
+                     const isGestorAvaliadorField =
+                      isAvaliacaoExperiencia &&
+                      (campo.name === 'gestorImediatoAvaliador' || campo.name === 'gestorImediatoAvaliadorId');
+
+                    if (isGestorAvaliadorField) {
+                      return (
+                        <div key={campo.name}>
+                          <label className="space-y-1 text-sm block">
+                            <span className="block text-xs font-semibold text-gray-700">
+                              {getDisplayLabel(campo)} <span className="text-red-500">*</span>
+                            </span>
+                            <select
+                              className="w-full border rounded px-3 py-2 text-sm bg-white"
+                              value={extras.gestorImediatoAvaliadorId ?? ''}
+                              onChange={(e: SelectChange) =>
+                                handleExtraChange('gestorImediatoAvaliadorId', e.target.value)
+                              }
+                              required
+                            >
+                              <option value="">Selecione...</option>
+                              {coordinators.map((coordinator) => (
+                                <option key={coordinator.id} value={coordinator.id}>
+                                  {coordinator.fullName}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      );
                     }
 
                     if (campo.type === 'checkbox') {

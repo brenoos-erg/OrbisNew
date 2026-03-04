@@ -112,6 +112,7 @@ type ChildSolicitation = {
   titulo: string
   status: string
   dataAbertura: string
+  approverId?: string | null
   tipo?: { codigo?: string; nome: string } | null
   setorDestino?: string | null
 }
@@ -171,6 +172,7 @@ type SolicitationStatus =
   | 'EM_ATENDIMENTO'
   | 'AGUARDANDO_APROVACAO'
   | 'AGUARDANDO_TERMO'
+  | 'AGUARDANDO_AVALIACAO_GESTOR'
   | 'CONCLUIDA'
   | 'CANCELADA'
 
@@ -182,6 +184,7 @@ export type SolicitationDetail = {
   status: SolicitationStatus | string
   approvalStatus?: ApprovalStatus | null
   dataAbertura: string
+  approverId?: string | null
   dataPrevista?: string | null
   dataFechamento?: string | null
   dataCancelamento?: string | null
@@ -260,6 +263,7 @@ function getStatusLabel(s: {
     EM_ATENDIMENTO: 'Em atendimento',
     AGUARDANDO_APROVACAO: 'Aguardando aprovação',
     AGUARDANDO_TERMO: 'Aguardando termo',
+    AGUARDANDO_AVALIACAO_GESTOR: 'Aguardando avaliação do gestor',
     CONCLUIDA: 'Concluída',
     CANCELADA: 'Cancelada',
   }
@@ -273,6 +277,7 @@ function getTimelineStepIndex(s: {
   assumidaPorId?: string | null
 }) {
   if (s.status === 'CONCLUIDA') return 6
+  if (s.status === 'AGUARDANDO_AVALIACAO_GESTOR') return 4
   if (s.status === 'AGUARDANDO_TERMO') return 5
   if (s.status === 'EM_ATENDIMENTO') return 4
 
@@ -344,6 +349,10 @@ export function SolicitationDetailModal({
     useState<NadaConstaSetorKey | null>(null)
   const [isNadaConstaSetorOpen, setIsNadaConstaSetorOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [gestorAvaliacaoNota, setGestorAvaliacaoNota] = useState('')
+  const [gestorAvaliacaoComentario, setGestorAvaliacaoComentario] = useState('')
+  const [gestorAvaliacaoError, setGestorAvaliacaoError] = useState<string | null>(null)
+  const [savingGestorAvaliacao, setSavingGestorAvaliacao] = useState(false)
 
   useEffect(() => {
     setDetail(detailProp)
@@ -542,7 +551,7 @@ export function SolicitationDetailModal({
     setRhDataExameDemissional(
       (payloadCampos.rhDataExameDemissional as string) || '',
     )
-     setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
+      setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
     setRhConsideracoes((payloadCampos.rhConsideracoes as string) || '')
     setDpDataDemissao((payloadCampos.dpDataDemissao as string) || '')
     setDpDataPrevistaAcerto((payloadCampos.dpDataPrevistaAcerto as string) || '')
@@ -552,6 +561,10 @@ export function SolicitationDetailModal({
     setDescricaoSolucaoSst((payloadSstResposta.descricaoSolucao as string) || '')
     setObservacaoSst1((payloadSstResposta.observacao1 as string) || '')
     setObservacaoSst2((payloadSstResposta.observacao2 as string) || '')
+    const payloadAvaliacaoGestor = (payload as any)?.avaliacaoGestor ?? {}
+    setGestorAvaliacaoNota((payloadAvaliacaoGestor.nota as string) || '')
+    setGestorAvaliacaoComentario((payloadAvaliacaoGestor.comentario as string) || '')
+    setGestorAvaliacaoError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
 
@@ -569,6 +582,11 @@ export function SolicitationDetailModal({
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+  const isAvaliacaoExperiencia = detail?.tipo?.id === 'RQ_RH_103'
+  const canEditAvaliacaoGestor =
+    Boolean(currentUser?.id) &&
+    currentUser?.id === detail?.approverId &&
+    effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
 
 
   const isDpDestino = !!(
@@ -879,6 +897,40 @@ export function SolicitationDetailModal({
       setDetail(json)
     } catch (err) {
       console.error('Erro ao atualizar detalhes após ação', err)
+    }
+  }
+  async function handleSalvarAvaliacaoGestor() {
+    if (!detail?.id || !canEditAvaliacaoGestor) return
+
+    if (!gestorAvaliacaoNota.trim()) {
+      setGestorAvaliacaoError('Informe a nota da avaliação.')
+      return
+    }
+
+    setSavingGestorAvaliacao(true)
+    setGestorAvaliacaoError(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${detail.id}/avaliacao-gestor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nota: gestorAvaliacaoNota,
+          comentario: gestorAvaliacaoComentario,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao salvar avaliação do gestor.')
+      }
+
+      setCloseSuccess('Avaliação registrada com sucesso.')
+      await refreshDetailFromServer()
+    } catch (err: any) {
+      setGestorAvaliacaoError(err?.message ?? 'Erro ao salvar avaliação do gestor.')
+    } finally {
+      setSavingGestorAvaliacao(false)
     }
   }
 
@@ -1933,6 +1985,52 @@ async function handleEncaminharAprovacaoComAnexo() {
                 )
               )}
                
+                {isAvaliacaoExperiencia && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    Avaliação do gestor imediato
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div>
+                      <label className={LABEL_RO}>Nota</label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        value={gestorAvaliacaoNota}
+                        onChange={(e) => setGestorAvaliacaoNota(e.target.value)}
+                        placeholder="Ex: 8,5"
+                        disabled={!canEditAvaliacaoGestor}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Comentário</label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        value={gestorAvaliacaoComentario}
+                        onChange={(e) => setGestorAvaliacaoComentario(e.target.value)}
+                        placeholder="Descreva o parecer da avaliação"
+                        disabled={!canEditAvaliacaoGestor}
+                      />
+                    </div>
+                  </div>
+
+                  {canEditAvaliacaoGestor && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={handleSalvarAvaliacaoGestor}
+                        disabled={savingGestorAvaliacao}
+                        className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                      >
+                        {savingGestorAvaliacao ? 'Salvando...' : 'Salvar avaliação e concluir'}
+                      </button>
+                    </div>
+                  )}
+
+                  {gestorAvaliacaoError && (
+                    <p className="mt-2 text-xs text-red-600">{gestorAvaliacaoError}</p>
+                  )}
+                </div>
+              )}
 
                  {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && (
