@@ -27,6 +27,8 @@ type ListResponse = {
   total: number
 }
 
+type PaginationItem = number | 'ellipsis'
+
 function mapStatusLabel(status: string) {
   if (status === 'ABERTA') return 'AGUARDANDO ATENDIMENTO'
   if (status === 'EM_ATENDIMENTO') return 'EM ATENDIMENTO'
@@ -37,6 +39,40 @@ function mapStatusLabel(status: string) {
   if (status === 'CANCELADA') return 'CANCELADA'
   return status
 }
+
+function buildPaginationItems(
+  currentPage: number,
+  totalPages: number,
+): PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1)
+  }
+
+  const pages = new Set<number>([1, totalPages])
+  for (
+    let page = Math.max(2, currentPage - 2);
+    page <= Math.min(totalPages - 1, currentPage + 2);
+    page += 1
+  ) {
+    pages.add(page)
+  }
+
+  const sortedPages = Array.from(pages).sort((a, b) => a - b)
+  const items: PaginationItem[] = []
+
+  sortedPages.forEach((page, index) => {
+    if (index > 0) {
+      const previousPage = sortedPages[index - 1]
+      if (page - previousPage > 1) {
+        items.push('ellipsis')
+      }
+    }
+    items.push(page)
+  })
+
+  return items
+}
+
 
 
 export default function ReceivedRequestsPage() {
@@ -152,7 +188,13 @@ export default function ReceivedRequestsPage() {
   }, [detailOpen, selectedRow])
 
   const rows = data?.rows ?? []
+  const page = filters.page
+  const pageSize = filters.pageSize
   const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const paginationItems = buildPaginationItems(page, totalPages)
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total)
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
@@ -301,11 +343,96 @@ export default function ReceivedRequestsPage() {
           </div>
         </div>
 
-        {/* Rodapé com total */}
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
+        {/* Rodapé com paginação */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
           <span>
-            Mostrando {rows.length} de {total} solicitações
+            Mostrando {rangeStart}-{rangeEnd} de {total} solicitações
           </span>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="page-size" className="text-xs text-slate-500">
+              Itens por página
+            </label>
+            <select
+              id="page-size"
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = Number(e.target.value)
+                setFilters((prev) => ({
+                  ...prev,
+                  pageSize: newSize,
+                  page: 1,
+                }))
+              }}
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+              disabled={loading}
+            >
+              {[10, 20, 50].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600">
+              Página {page}/{totalPages}
+            </span>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))
+                }
+                disabled={loading || page <= 1}
+                className="rounded border border-slate-300 px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+
+              {paginationItems.map((item, index) => {
+                if (item === 'ellipsis') {
+                  return (
+                    <span key={`ellipsis-${index}`} className="px-2 text-xs text-slate-400">
+                      ...
+                    </span>
+                  )
+                }
+
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilters((prev) => ({ ...prev, page: item }))}
+                    disabled={loading || item === page}
+                    className={`rounded border px-3 py-1 text-xs ${
+                      item === page
+                        ? 'border-orange-500 bg-orange-500 text-white'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {item}
+                  </button>
+                )
+              })}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    page: Math.min(totalPages, prev.page + 1),
+                  }))
+                }
+                disabled={loading || page >= totalPages}
+                className="rounded border border-slate-300 px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
