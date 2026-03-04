@@ -466,13 +466,129 @@ async function main() {
   }
 
   if (logisticaDepartment) {
-    await prisma.tipoSolicitacao.upsert({
+    const veiculosCamposEspecificos = [
+      {
+        name: 'nomeCondutor',
+        label: 'Nome (condutor)',
+        type: 'text',
+        required: true,
+        stage: 'solicitante',
+        section: 'Formulário',
+      },
+      {
+        name: 'dataSolicitacao',
+        label: 'Data Solicitação',
+        type: 'date',
+        required: true,
+        stage: 'solicitante',
+        section: 'Formulário',
+      },
+      {
+        name: 'setor',
+        label: 'Setor',
+        type: 'text',
+        required: false,
+        stage: 'solicitante',
+        section: 'Formulário',
+      },
+      {
+        name: 'centroCustoId',
+        label: 'Centro de Custo',
+        type: 'cost_center',
+        required: true,
+        stage: 'solicitante',
+        section: 'Formulário',
+      },
+      {
+        name: 'previstoEmContrato',
+        label: 'Previsto em Contrato',
+        type: 'checkbox',
+        required: false,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'valorPrevisto',
+        label: 'Valor Previsto',
+        type: 'money',
+        required: false,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'dataUtilizacao',
+        label: 'Data de Utilização',
+        type: 'date',
+        required: true,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'horarioRetirada',
+        label: 'Horário de Retirada',
+        type: 'text',
+        required: false,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'dataDevolucao',
+        label: 'Data da Devolução',
+        type: 'date',
+        required: false,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'finalidadeUtilizacao',
+        label: 'Finalidade da Utilização',
+        type: 'text',
+        required: true,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'cidadeDestino',
+        label: 'Cidade Destino',
+        type: 'text',
+        required: false,
+        stage: 'solicitante',
+        section: 'Locação / Utilização',
+      },
+      {
+        name: 'tipoVeiculo',
+        label: 'Tipo de veículo',
+        type: 'select',
+        required: true,
+        stage: 'solicitante',
+        section: 'Tipo de veículo',
+        options: [
+          'Veículo 4X4 para Ambientação (RAC do Cliente)',
+          'Veículo 4X4 - (Sem RAC do Cliente)',
+          'Veículo Leve para Ambientação (RAC do Cliente)',
+          'Veículo para Locação Diária (LEVES E DOBLÔ)',
+        ],
+      },
+      {
+        name: 'observacao',
+        label: 'Observação',
+        type: 'textarea',
+        required: false,
+        stage: 'solicitante',
+        section: 'Observação',
+      },
+    ]
+
+     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_088' },
       update: {
         codigo: 'RQ.LOG.001',
         nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
-        schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
+        schemaJson: {
+          meta: { departamentos: [logisticaDepartment.id] },
+          camposEspecificos: veiculosCamposEspecificos,
+        },
         updatedAt: new Date(),
       },
       create: {
@@ -480,10 +596,82 @@ async function main() {
         codigo: 'RQ.LOG.001',
         nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
-        schemaJson: { meta: { departamentos: [logisticaDepartment.id] }, camposEspecificos: [] },
+        schemaJson: {
+          meta: { departamentos: [logisticaDepartment.id] },
+          camposEspecificos: veiculosCamposEspecificos,
+        },
         updatedAt: new Date(),
       },
     })
+
+    const solicitacaoEquipamentos = await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_LOG_EQUIPAMENTOS' },
+      update: {
+        codigo: 'RQ.LOG.003',
+        nome: 'Solicitação de equipamentos',
+        descricao: 'Solicitação de equipamentos para Logística',
+        schemaJson: {
+          meta: {
+            departamentos: [logisticaDepartment.id],
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            {
+              name: 'nome',
+              label: 'Nome',
+              type: 'text',
+              required: true,
+              stage: 'solicitante',
+              section: 'Dados da solicitação',
+            },
+            {
+              name: 'centroCustoId',
+              label: 'Centro de custo',
+              type: 'cost_center',
+              required: true,
+              stage: 'solicitante',
+              section: 'Dados da solicitação',
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_LOG_EQUIPAMENTOS',
+        codigo: 'RQ.LOG.003',
+        nome: 'Solicitação de equipamentos',
+        descricao: 'Solicitação de equipamentos para Logística',
+        schemaJson: {
+          meta: {
+            departamentos: [logisticaDepartment.id],
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            {
+              name: 'nome',
+              label: 'Nome',
+              type: 'text',
+              required: true,
+              stage: 'solicitante',
+              section: 'Dados da solicitação',
+            },
+            {
+              name: 'centroCustoId',
+              label: 'Centro de custo',
+              type: 'cost_center',
+              required: true,
+              stage: 'solicitante',
+              section: 'Dados da solicitação',
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log(
+      `✅ Tipo de solicitação criado/atualizado: ${solicitacaoEquipamentos.codigo} - ${solicitacaoEquipamentos.nome}`,
+    )
   }
 
   /* =========================

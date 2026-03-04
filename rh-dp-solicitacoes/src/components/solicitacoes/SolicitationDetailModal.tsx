@@ -505,6 +505,10 @@ export function SolicitationDetailModal({
 
   // formulário de dados do contratado / incentivo
   const [showContratadoForm, setShowContratadoForm] = useState(false)
+  const [showCancelarVagaForm, setShowCancelarVagaForm] = useState(false)
+  const [cancelamentoVagaMotivo, setCancelamentoVagaMotivo] = useState('')
+  const [showAdminCancelForm, setShowAdminCancelForm] = useState(false)
+  const [adminCancelReason, setAdminCancelReason] = useState('')
   const [candidatoNome, setCandidatoNome] = useState('')
   const [candidatoDocumento, setCandidatoDocumento] = useState('')
   const [dataAdmissaoPrevista, setDataAdmissaoPrevista] = useState('')
@@ -1425,7 +1429,7 @@ async function handleEncaminharAprovacaoComAnexo() {
   }
 
 
-  async function handleFinalizarRh() {
+ async function handleFinalizarRh(actionOverride: 'ENCAMINHAR_DP' | 'CANCELAR_VAGA' = 'ENCAMINHAR_DP') {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
@@ -1449,7 +1453,7 @@ async function handleEncaminharAprovacaoComAnexo() {
         (payloadCampos.documento as string) ||
         undefined
 
-      if (isSolicitacaoPessoalTipo) {
+      if (isSolicitacaoPessoalTipo && actionOverride !== 'CANCELAR_VAGA') {
         const faltantes: string[] = []
 
         if (isBlank(nomeFinal)) faltantes.push('nome do contratado')
@@ -1463,6 +1467,15 @@ async function handleEncaminharAprovacaoComAnexo() {
             `Preencha os dados pendentes do contratado antes de enviar para o DP: ${faltantes.join(', ')}.`,
           )
         }
+      }
+
+      const action = actionOverride
+
+      if (
+        action === 'CANCELAR_VAGA' &&
+        (!cancelamentoVagaMotivo || cancelamentoVagaMotivo.trim().length === 0)
+      ) {
+        throw new Error('Informe a descrição do cancelamento de vaga.')
       }
         const buildOptionalValue = (value: string) =>
         value && value.trim().length > 0 ? value : undefined
@@ -1497,12 +1510,14 @@ async function handleEncaminharAprovacaoComAnexo() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
+            body: JSON.stringify({
             candidatoNome: nomeFinal,
             candidatoDocumento: documentoFinal,
             dataAdmissaoPrevista,
             salario,
             cargo,
+            action,
+            cancelamentoVagaMotivo: action === 'CANCELAR_VAGA' ? cancelamentoVagaMotivo.trim() : undefined,
             duracaoMeses: duracaoCursoMeses,
             valorMensal: valorMensalCurso,
             outrasInfos: {
@@ -1531,7 +1546,9 @@ async function handleEncaminharAprovacaoComAnexo() {
 
       setCloseSuccess(
         isSolicitacaoPessoalTipo
-          ? 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
+          ? action === 'CANCELAR_VAGA'
+            ? 'Vaga cancelada com sucesso.'
+            : 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
           : isDesligamento && isDpDestino
             ? 'Solicitação finalizada pelo DP.'
             : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
@@ -1540,6 +1557,45 @@ async function handleEncaminharAprovacaoComAnexo() {
     } catch (err: any) {
       console.error('Erro ao finalizar RH', err)
       setCloseError(err?.message ?? 'Erro ao finalizar solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+  async function handleCancelarSolicitacaoAdmin() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    if (!adminCancelReason.trim()) {
+      setCloseError('Informe o motivo do cancelamento.')
+      return
+    }
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/cancelar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo: adminCancelReason.trim() }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao cancelar solicitação.')
+      }
+
+      await refreshDetailFromServer()
+      setShowAdminCancelForm(false)
+      setAdminCancelReason('')
+      setCloseSuccess('Solicitação cancelada com sucesso.')
+      onFinalized?.()
+    } catch (err: any) {
+      console.error('Erro ao cancelar solicitação como admin', err)
+      setCloseError(err?.message ?? 'Erro ao cancelar solicitação.')
     } finally {
       setClosing(false)
     }
@@ -2531,12 +2587,46 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                   {canFinalizarRh && (!isSolicitacaoExames || canEditSstResposta) && (
                     <button
-                      onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh())}
+                      onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh('ENCAMINHAR_DP'))}
                       disabled={closing || isFinalizadaOuCancelada}
                       className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
                     </button>
+                  )}
+
+                  {canFinalizarRh && isSolicitacaoPessoalTipo && !isDpDestino && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelarVagaForm((prev) => !prev)}
+                        className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
+                      >
+                        {showCancelarVagaForm ? 'Ocultar cancelamento de vaga' : 'Cancelamento de vaga'}
+                      </button>
+
+                      {showCancelarVagaForm && (
+                        <div className="mt-3 space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wide text-rose-800">
+                            Descrição do cancelamento (obrigatório)
+                          </label>
+                          <textarea
+                            value={cancelamentoVagaMotivo}
+                            onChange={(event) => setCancelamentoVagaMotivo(event.target.value)}
+                            placeholder="Descreva o motivo do cancelamento da vaga"
+                            className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFinalizarRh('CANCELAR_VAGA')}
+                            disabled={closing}
+                            className="w-full rounded-md bg-rose-600 px-4 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          >
+                            {closing ? 'Cancelando...' : 'Confirmar cancelamento de vaga'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                   
                   {canFinalizarUltimaEtapa && (
@@ -2748,7 +2838,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               </button>
             )}
 
-            {canEncaminharAprovacaoEpi && (
+             {canEncaminharAprovacaoEpi && (
               <button
                 onClick={handleEncaminharAprovacaoComAnexo}
                 disabled={encaminhandoAprovacao}
@@ -2758,6 +2848,40 @@ async function handleEncaminharAprovacaoComAnexo() {
                   ? 'Encaminhando...'
                   : 'Encaminhar para aprovação'}
               </button>
+            )}
+
+            {showManagementActions && userIsAdmin && !isFinalizadaOuCancelada && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminCancelForm((prev) => !prev)}
+                  className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:text-sm"
+                >
+                  {showAdminCancelForm ? 'Ocultar cancelamento administrativo' : 'Cancelar solicitação (Admin)'}
+                </button>
+
+                {showAdminCancelForm && (
+                  <div className="mt-3 space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-rose-800">
+                      Motivo do cancelamento (obrigatório)
+                    </label>
+                    <textarea
+                      value={adminCancelReason}
+                      onChange={(event) => setAdminCancelReason(event.target.value)}
+                      className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                      placeholder="Descreva o motivo do cancelamento"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCancelarSolicitacaoAdmin}
+                      disabled={closing}
+                      className="w-full rounded-md bg-rose-600 px-4 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-60 lg:text-sm"
+                    >
+                      {closing ? 'Cancelando...' : 'Confirmar cancelamento'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             <button
               onClick={onClose}

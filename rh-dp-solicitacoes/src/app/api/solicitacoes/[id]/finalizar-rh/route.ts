@@ -45,8 +45,10 @@ export async function POST(
       salario,
       cargo,
       outrasInfos,
-    duracaoMeses,
+      duracaoMeses,
       valorMensal,
+      action,
+      cancelamentoVagaMotivo,
     } = body as {
       candidatoNome?: string
       candidatoDocumento?: string
@@ -56,6 +58,8 @@ export async function POST(
       outrasInfos?: Record<string, any>
       duracaoMeses?: string | number
       valorMensal?: string | number
+      action?: 'ENCAMINHAR_DP' | 'CANCELAR_VAGA'
+      cancelamentoVagaMotivo?: string
     }
 
     // 1) Busca a solicitação original (RH)
@@ -125,6 +129,57 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
     const camposOrigem = payloadOrigem.campos ?? {}
     const solicitanteOrigem = payloadOrigem.solicitante
     const vemDeRh = Boolean(payloadOrigem?.origem?.rhSolicitationId)
+
+
+    const actionNormalized = action ?? 'ENCAMINHAR_DP'
+
+    if (isSolicitacaoPessoalTipo && actionNormalized === 'CANCELAR_VAGA') {
+      if (!cancelamentoVagaMotivo || cancelamentoVagaMotivo.trim().length === 0) {
+        return NextResponse.json(
+          { error: 'Informe a descrição do cancelamento da vaga.' },
+          { status: 400 },
+        )
+      }
+
+      const agora = new Date()
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CANCELADA',
+          dataCancelamento: agora,
+          approvalStatus: 'REPROVADO',
+          approvalAt: agora,
+          approvalComment: cancelamentoVagaMotivo.trim(),
+          payload: {
+            ...payloadOrigem,
+            campos: {
+              ...camposOrigem,
+              cancelamentoVagaMotivo: cancelamentoVagaMotivo.trim(),
+            },
+          },
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CANCELADA',
+          message: `Vaga cancelada por ${me.fullName ?? me.id}: ${cancelamentoVagaMotivo.trim()}`,
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'REPROVACAO',
+        },
+      })
+
+      return NextResponse.json({ solicitation: updated }, { status: 200 })
+    }
+
 
 
     if (
