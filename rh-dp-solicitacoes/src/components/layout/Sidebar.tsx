@@ -951,7 +951,22 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <Shield size={16} /> <span className={labelBase}>Aprovadores</span>
+                       <Shield size={16} /> <span className={labelBase}>Aprovadores</span>
+                    </Link>
+                  )}
+                  {configFeatures.permissoes && (
+                    <Link
+                      href="/dashboard/configuracoes/coordenadores-avaliacao-experiencia"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith(
+                            '/dashboard/configuracoes/coordenadores-avaliacao-experiencia',
+                          )
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ClipboardCheck size={16} /> <span className={labelBase}>Coordenadores de Avaliação</span>
                     </Link>
                   )}
                   {configFeatures.permissoes && (
