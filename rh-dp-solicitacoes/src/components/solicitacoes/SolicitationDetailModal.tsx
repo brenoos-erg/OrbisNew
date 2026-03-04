@@ -1963,13 +1963,21 @@ async function handleEncaminharAprovacaoComAnexo() {
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                         Setores responsáveis
                       </p>
-                        {visibleSetoresNadaConsta.length > 0 ? (
+                       {visibleSetoresNadaConsta.length > 0 ? (
                         <div className="space-y-2 text-xs">
                           {visibleSetoresNadaConsta.map((setor) => {
                             const isConcluida = setor.status === 'CONCLUIDO'
                             const isCurrent = activeSector === setor.key
+                            const setorRegistro = detail?.solicitacaoSetores?.find(
+                              (registro) => registro.setor === setor.key,
+                            )
+                            const constaFlag = (setorRegistro?.constaFlag ?? '').toString().toUpperCase()
                             const badgeClass = isConcluida
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              ? constaFlag === 'CONSTA'
+                                ? 'border-red-200 bg-red-50 text-red-700'
+                                : constaFlag === 'NADA_CONSTA'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : 'border-slate-200 bg-slate-50 text-slate-700'
                               : 'border-yellow-200 bg-yellow-50 text-yellow-700'
 
                             return (
@@ -1987,7 +1995,13 @@ async function handleEncaminharAprovacaoComAnexo() {
                               >
                                 <span className="truncate">{setor.label}</span>
                                 <span className="text-[10px] uppercase tracking-wide">
-                                  {isConcluida ? 'Concluído' : 'Pendente'}
+                                  {isConcluida
+                                    ? constaFlag === 'CONSTA'
+                                      ? 'Concluído / Consta'
+                                      : constaFlag === 'NADA_CONSTA'
+                                        ? 'Concluído / Nada Consta'
+                                        : 'Concluído'
+                                    : 'Pendente'}
                                 </span>
                               </button>
                             )
@@ -3125,7 +3139,7 @@ function RQ247ResumoCampos({
           </div>
           <div>
             <label className={LABEL_RO}>
-              Data sugerida do último dia
+              Data do ultimo dia trabalhado 
             </label>
             <input
               className={INPUT_RO}

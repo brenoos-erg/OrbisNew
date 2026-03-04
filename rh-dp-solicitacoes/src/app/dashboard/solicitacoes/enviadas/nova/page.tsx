@@ -114,6 +114,13 @@ type InputChange = ChangeEvent<HTMLInputElement>;
 type SelectChange = ChangeEvent<HTMLSelectElement>;
 type TextAreaChange = ChangeEvent<HTMLTextAreaElement>;
 
+const RQ247_MOTIVO_FIELDS = [
+  'motivoPedidoDemissao',
+  'motivoSemJustaCausa',
+  'motivoJustaCausa',
+  'motivoTerminoExperiencia',
+] as const;
+
 /* ================================================================
    ESTILOS COMPARTILHADOS
 ================================================================ */
@@ -434,6 +441,7 @@ export default function NovaSolicitacaoPage() {
    const isAvaliacaoExperiencia = selectedTipo?.id === EXPERIENCE_EVALUATION_TIPO_ID;
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
+  const isRQ247 = selectedTipo?.id === 'RQ_247';
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
   const templateDownload = tipoMeta?.templateDownload;
@@ -500,12 +508,22 @@ export default function NovaSolicitacaoPage() {
   const shouldFieldUseFullWidth = (campo: CampoEspecifico) =>
     campo.type === 'textarea' || campo.name === 'observacoes';
 
+  const isPedidoDemissaoSemAviso =
+    isRQ247 &&
+    extras.motivoPedidoDemissao === 'true' &&
+    extras.cumpriraAviso === 'Não';
+  const hasAnexoPedidoDemissao =
+    (extraFiles.anexoPedidoDemissao?.length ?? 0) >= 1;
+  const shouldRequireAnexoPedidoDemissao =
+    isPedidoDemissaoSemAviso && !hasAnexoPedidoDemissao;
+
   const buildCostCenterLabel = (costCenterId: string) => {
     const selectedOption = costCenters.find((cc) => cc.id === costCenterId);
     return selectedOption
       ? [selectedOption.code, selectedOption.description].filter(Boolean).join(' - ')
       : '';
   };
+
 
 
   useEffect(() => {
@@ -537,6 +555,17 @@ export default function NovaSolicitacaoPage() {
     setExtraFiles({});
     setCargoId('');
   }, [selectedTipo]);
+
+  useEffect(() => {
+    if (!isRQ247) return;
+    if (extras.motivoTerminoExperiencia === 'true') return;
+    if (!extras.dataFimExperiencia) return;
+
+    setExtras((prev) => ({
+      ...prev,
+      dataFimExperiencia: '',
+    }));
+  }, [extras.dataFimExperiencia, extras.motivoTerminoExperiencia, isRQ247]);
 
   /* ============================================================
    4) /api/positions
@@ -628,6 +657,26 @@ export default function NovaSolicitacaoPage() {
   };
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
+    if (isRQ247 && RQ247_MOTIVO_FIELDS.includes(name as (typeof RQ247_MOTIVO_FIELDS)[number])) {
+      if (!checked) {
+        return;
+      }
+
+      setExtras((prev) => {
+        const next = { ...prev };
+        for (const field of RQ247_MOTIVO_FIELDS) {
+          next[field] = field === name ? 'true' : 'false';
+        }
+
+        if (name !== 'motivoTerminoExperiencia') {
+          next.dataFimExperiencia = '';
+        }
+
+        return next;
+      });
+      return;
+    }
+
     handleExtraChange(name, checked ? 'true' : 'false');
   };
   const handleFileChange = (name: string, files: FileList | null) => {
@@ -833,9 +882,22 @@ export default function NovaSolicitacaoPage() {
             setSubmitError('Marque ao menos um benefício de renúncia ou preencha "Outros".');
             setSubmitting(false);
             return;
+           }
+        }
+
+        if (isRQ247) {
+          const hasMotivoSelecionado = RQ247_MOTIVO_FIELDS.some(
+            (field) => extras[field] === 'true',
+          );
+
+          if (!hasMotivoSelecionado) {
+            setSubmitError('Selecione um motivo do desligamento para continuar.');
+            setSubmitting(false);
+            return;
           }
-          if ((extraFiles.anexosSolicitante?.length ?? 0) < 1) {
-            setSubmitError('Anexe a carta de próprio punho para continuar.');
+
+          if (shouldRequireAnexoPedidoDemissao) {
+            setSubmitError('Anexe o pedido de demissão para continuar.');
             setSubmitting(false);
             return;
           }
@@ -2286,7 +2348,17 @@ useEffect(() => {
                       campo.name !== 'tipoEquipamentoManutencao' ||
                       extras.itemManutencao === 'Equipamento';
 
-                    if (!shouldShowEnderecoEnvio || !shouldShowTiMaintenanceSystemField || !shouldShowTiMaintenanceEquipmentField) {
+                     const shouldShowDataFimExperiencia =
+                      !isRQ247 ||
+                      campo.name !== 'dataFimExperiencia' ||
+                      extras.motivoTerminoExperiencia === 'true';
+
+                    if (
+                      !shouldShowEnderecoEnvio ||
+                      !shouldShowTiMaintenanceSystemField ||
+                      !shouldShowTiMaintenanceEquipmentField ||
+                      !shouldShowDataFimExperiencia
+                    ) {
                       return null;
                     }
                      const isGestorAvaliadorField =
@@ -2329,9 +2401,9 @@ useEffect(() => {
                               className="mt-1"
                               checked={value === 'true'}
                               onChange={(e: InputChange) =>
-                                handleExtraChange(
+                                 handleCheckboxChange(
                                   campo.name,
-                                  e.target.checked ? 'true' : 'false',
+                                  e.target.checked,
                                 )
                               }
                             />
@@ -2417,9 +2489,14 @@ useEffect(() => {
                                 name={campo.name}
                                 type="file"
                                 multiple
-                                onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
+                               onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
                                 className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
                               />
+                              {campo.name === 'anexoPedidoDemissao' && shouldRequireAnexoPedidoDemissao && (
+                                <p className="mt-2 text-xs font-semibold text-red-600">
+                                  Anexe o pedido de demissão para continuar.
+                                </p>
+                              )}
                               <p className="mt-2 text-xs font-medium text-orange-700">
                                 Arraste arquivos ou clique em “Escolher arquivos” para anexar.
                               </p>
@@ -2571,9 +2648,9 @@ useEffect(() => {
               </button>
             ) : (
               <button
-                type="submit"
+                 type="submit"
                 className="inline-flex items-center justify-center rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={submitting || !tipoId}
+                disabled={submitting || !tipoId || shouldRequireAnexoPedidoDemissao}
               >
                 {submitting ? 'Enviando...' : 'Enviar Solicitação'}
               </button>

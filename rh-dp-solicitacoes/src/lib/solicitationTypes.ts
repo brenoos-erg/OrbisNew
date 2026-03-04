@@ -23,6 +23,7 @@ export type NadaConstaSetorKey =
   | 'ALMOX'
   | 'LOGISTICA'
   | 'SST'
+  | 'SAUDE'
   | 'FINANCEIRO'
   | 'FISCAL'
 export type NadaConstaCampoDef = {
@@ -128,6 +129,12 @@ export const NADA_CONSTA_SETORES: {
     constaField: 'sstStatus',
   },
   {
+    key: 'SAUDE',
+    label: 'Saúde',
+    stage: 'saude',
+    constaField: 'saudeStatus',
+  },
+  {
     key: 'FINANCEIRO',
     label: 'Financeiro',
     stage: 'financeiro',
@@ -159,7 +166,7 @@ export function resolveNadaConstaSetoresByDepartment(
     }
   }
 
-  const code = dept.code?.trim()
+ const code = dept.code?.trim()
   if (code === '08') pushUnique('DP')
   if (code === '20') pushUnique('TI')
   if (code === '11') {
@@ -169,6 +176,7 @@ export function resolveNadaConstaSetoresByDepartment(
   if (code === '10') pushUnique('FINANCEIRO')
   if (code === '06') pushUnique('FISCAL')
   if (code === '19') pushUnique('SST')
+  if (code === '21') pushUnique('SAUDE')
 
   const normalized =
     dept.name
@@ -176,7 +184,6 @@ export function resolveNadaConstaSetoresByDepartment(
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toUpperCase() ?? ''
-
   if (normalized.includes('PESSOAL')) pushUnique('DP')
   if (normalized.includes('TECNOLOGIA') || normalized.includes('INFORMACAO'))
     pushUnique('TI')
@@ -184,15 +191,21 @@ export function resolveNadaConstaSetoresByDepartment(
   if (normalized.includes('LOGISTICA')) {
     pushUnique('LOGISTICA')
     pushUnique('ALMOX')
-  }
+}
   if (normalized.includes('SST') || normalized.includes('SEGURANCA'))
     pushUnique('SST')
+  if (
+    normalized.includes('SAUDE') ||
+    normalized.includes('MEDICINA') ||
+    normalized.includes('OCUPACIONAL')
+  ) {
+    pushUnique('SAUDE')
+  }
   if (normalized.includes('FINANCEIRO')) pushUnique('FINANCEIRO')
   if (normalized.includes('FISCAL') || normalized.includes('CONTABIL'))
     pushUnique('FISCAL')
   return resolved
 }
-
 export function resolveNadaConstaSetorByDepartment(
   dept?: {
     code?: string | null

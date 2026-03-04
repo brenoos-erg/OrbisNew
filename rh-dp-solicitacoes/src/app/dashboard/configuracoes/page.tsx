@@ -1,4 +1,4 @@
-const LABEL = 'form-label'
+import Link from 'next/link'
 
 export default function ConfiguracoesPage() {
   return (
@@ -9,6 +9,19 @@ export default function ConfiguracoesPage() {
       </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-slate-200 p-4">
+          <h2 className="font-medium text-slate-700">Departamentos x Centros de custo</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Vincule centros de custo para controle de visibilidade por departamento.
+          </p>
+          <Link
+            href="/dashboard/configuracoes/departamentos-centros-de-custo"
+            className="mt-3 inline-block text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            Abrir configuração
+          </Link>
+        </section>
+
         <section className="rounded-lg border border-slate-200 p-4">
           <h2 className="font-medium text-slate-700">Preferências</h2>
           <p className="text-sm text-slate-500 mt-1">

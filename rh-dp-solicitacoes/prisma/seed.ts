@@ -182,6 +182,7 @@ async function main() {
   const rhDepartment = await prisma.department.findUnique({ where: { code: '17' } })
   const dpDepartment = await prisma.department.findUnique({ where: { code: '08' } })
   const sstDepartment = await prisma.department.findUnique({ where: { code: '19' } })
+  const saudeDepartment = await prisma.department.findUnique({ where: { code: '21' } })
   if (!sstDepartment) throw new Error('Departamento SST (code=19) não encontrado.')
      const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' } })
 
@@ -941,6 +942,14 @@ async function main() {
           section: 'Motivo do desligamento',
         },
         {
+          name: 'anexoPedidoDemissao',
+          label: 'Anexo do pedido de demissão',
+          type: 'file',
+          required: false,
+          stage: 'solicitante',
+          section: 'Anexos',
+        },
+        {
           name: 'funcionarioNome',
           label: 'Nome do funcionário',
           type: 'text',
@@ -971,7 +980,7 @@ async function main() {
         },
         {
           name: 'dataSugeridaUltimoDia',
-          label: 'Data sugerida do último dia',
+          label: 'Data do ultimo dia trabalhado ',
           type: 'date',
           stage: 'solicitante',
           section: 'Dados do funcionário',
@@ -1299,8 +1308,8 @@ async function main() {
     })
     console.log('✅ Tipo "RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES" ok.')
     const nadaConstaSchema = {
-      meta: {
-        departamentos: [dpDepartment.id],
+     meta: {
+        departamentos: [dpDepartment.id, saudeDepartment?.id].filter((value): value is string => Boolean(value)),
         fluxo: {
           multiSetor: true,
         },
@@ -1792,11 +1801,11 @@ async function main() {
           section: 'SST',
         },
         {
-          name: 'sstAso',
+           name: 'sstAso',
           label: 'ASO',
           type: 'text',
-          stage: 'sst',
-          section: 'SST',
+          stage: 'saude',
+          section: 'Saúde',
         },
         {
           name: 'sstObs',
@@ -1804,6 +1813,21 @@ async function main() {
           type: 'textarea',
           stage: 'sst',
           section: 'SST',
+        },
+        {
+          name: 'saudeStatus',
+          label: 'Status (Consta / Nada Consta)',
+          type: 'select',
+          options: ['Consta', 'Nada Consta'],
+          stage: 'saude',
+          section: 'Saúde',
+        },
+        {
+          name: 'saudeObs',
+          label: 'Obs.',
+          type: 'textarea',
+          stage: 'saude',
+          section: 'Saúde',
         },
         {
           name: 'financeiroStatus',

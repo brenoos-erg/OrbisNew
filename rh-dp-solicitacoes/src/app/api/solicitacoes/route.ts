@@ -160,6 +160,21 @@ export const GET = withModuleLevel(
             deptIds.add(link.departmentId)
           }
 
+          if (deptIds.size > 0) {
+            const departmentCostCenters = await prisma.costCenter.findMany({
+              where: {
+                departmentId: {
+                  in: [...deptIds],
+                },
+              },
+              select: { id: true },
+            })
+
+            for (const cc of departmentCostCenters) {
+              ccIds.add(cc.id)
+            }
+          }
+
           const setorKeys = new Set<string>()
           const primarySetores = resolveNadaConstaSetoresByDepartment(
             me.department,
