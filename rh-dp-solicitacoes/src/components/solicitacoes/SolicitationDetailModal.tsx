@@ -17,7 +17,7 @@ import {
   type NadaConstaSetorKey,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
-import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation'
+import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
 
 
 const LABEL_RO =

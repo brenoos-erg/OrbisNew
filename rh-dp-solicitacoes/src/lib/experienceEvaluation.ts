@@ -1,18 +1,12 @@
 import { prisma } from '@/lib/prisma'
+import { EXPERIENCE_EVALUATOR_GROUP_NAME } from '@/lib/experienceEvaluation.constants'
 
-export const EXPERIENCE_EVALUATOR_GROUP_NAME = 'COORDENADORES_AVALIACAO_EXPERIENCIA'
-export const EXPERIENCE_EVALUATION_TIPO_ID = 'RQ_RH_103'
-export const EXPERIENCE_EVALUATION_STATUS = 'AGUARDANDO_AVALIACAO_GESTOR' as const
-export const EXPERIENCE_EVALUATION_REQUIRED_FIELDS = [
-  'relacionamentoNota',
-  'comunicacaoNota',
-  'atitudeNota',
-  'saudeSegurancaNota',
-  'dominioTecnicoProcessosNota',
-  'adaptacaoMudancaNota',
-  'autogestaoGestaoPessoasNota',
-  'comentarioFinal',
-] as const
+export { 
+  EXPERIENCE_EVALUATOR_GROUP_NAME,
+  EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from '@/lib/experienceEvaluation.constants'
 
 export async function listExperienceEvaluators() {
   const group = await prisma.approverGroup.findFirst({

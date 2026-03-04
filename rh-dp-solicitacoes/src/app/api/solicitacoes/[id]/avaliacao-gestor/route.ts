@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import {
+  EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
