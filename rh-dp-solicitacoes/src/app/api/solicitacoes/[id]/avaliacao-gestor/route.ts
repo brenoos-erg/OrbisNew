@@ -16,13 +16,45 @@ export async function POST(
     const { id } = await params
     const body = await req.json().catch(() => null)
 
-    const nota = typeof body?.nota === 'string' ? body.nota.trim() : ''
-    const comentario =
-      typeof body?.comentario === 'string' ? body.comentario.trim() : ''
+   const avaliacao = {
+      relacionamentoNota:
+        typeof body?.relacionamentoNota === 'string'
+          ? body.relacionamentoNota.trim()
+          : '',
+      comunicacaoNota:
+        typeof body?.comunicacaoNota === 'string' ? body.comunicacaoNota.trim() : '',
+      atitudeNota: typeof body?.atitudeNota === 'string' ? body.atitudeNota.trim() : '',
+      saudeSegurancaNota:
+        typeof body?.saudeSegurancaNota === 'string'
+          ? body.saudeSegurancaNota.trim()
+          : '',
+      dominioTecnicoProcessosNota:
+        typeof body?.dominioTecnicoProcessosNota === 'string'
+          ? body.dominioTecnicoProcessosNota.trim()
+          : '',
+      adaptacaoMudancaNota:
+        typeof body?.adaptacaoMudancaNota === 'string'
+          ? body.adaptacaoMudancaNota.trim()
+          : '',
+      autogestaoGestaoPessoasNota:
+        typeof body?.autogestaoGestaoPessoasNota === 'string'
+          ? body.autogestaoGestaoPessoasNota.trim()
+          : '',
+      comentarioFinal:
+        typeof body?.comentarioFinal === 'string' ? body.comentarioFinal.trim() : '',
+    }
 
-    if (!nota) {
+    const missingFields = EXPERIENCE_EVALUATION_REQUIRED_FIELDS.filter((field) => {
+      const value = avaliacao[field]
+      return !value || !String(value).trim()
+    })
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: 'Nota da avaliação é obrigatória.' },
+        {
+          error: 'Preencha todos os campos da avaliação.',
+          missingFields,
+        },
         { status: 400 },
       )
     }
@@ -61,8 +93,7 @@ export async function POST(
     const updatedPayload = {
       ...payload,
       avaliacaoGestor: {
-        nota,
-        comentario,
+        ...avaliacao,
         avaliadoEm: new Date().toISOString(),
         avaliadorId: me.id,
       },

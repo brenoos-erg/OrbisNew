@@ -13,10 +13,11 @@ import {
   isSolicitacaoPessoal,
   isSolicitacaoAdmissao,
   NADA_CONSTA_SETORES,
-  getNadaConstaDefaultFieldsForSetor,
+   getNadaConstaDefaultFieldsForSetor,
   type NadaConstaSetorKey,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation'
 
 
 const LABEL_RO =
@@ -83,6 +84,53 @@ type Payload = {
   campos?: Record<string, any>
   solicitante?: PayloadSolicitante
   [key: string]: any
+}
+type AvaliacaoGestorForm = {
+  relacionamentoNota: string
+  comunicacaoNota: string
+  atitudeNota: string
+  saudeSegurancaNota: string
+  dominioTecnicoProcessosNota: string
+  adaptacaoMudancaNota: string
+  autogestaoGestaoPessoasNota: string
+  comentarioFinal: string
+}
+
+const AVALIACAO_GESTOR_FIELDS: Array<{
+  name: keyof AvaliacaoGestorForm
+  label: string
+}> = [
+  { name: 'relacionamentoNota', label: 'Relacionamento' },
+  { name: 'comunicacaoNota', label: 'Comunicação' },
+  { name: 'atitudeNota', label: 'Atitude' },
+  { name: 'saudeSegurancaNota', label: 'Saúde e segurança' },
+  {
+    name: 'dominioTecnicoProcessosNota',
+    label: 'Domínio técnico e processos',
+  },
+  { name: 'adaptacaoMudancaNota', label: 'Adaptação à mudança' },
+  {
+    name: 'autogestaoGestaoPessoasNota',
+    label: 'Autogestão e gestão de pessoas',
+  },
+]
+
+const AVALIACAO_GESTOR_NOTA_OPTIONS = [
+  'INSUFICIENTE',
+  'PARCIAL',
+  'PLENA',
+  'ACIMA DA MÉDIA',
+] as const
+
+const EMPTY_AVALIACAO_GESTOR_FORM: AvaliacaoGestorForm = {
+  relacionamentoNota: '',
+  comunicacaoNota: '',
+  atitudeNota: '',
+  saudeSegurancaNota: '',
+  dominioTecnicoProcessosNota: '',
+  adaptacaoMudancaNota: '',
+  autogestaoGestaoPessoasNota: '',
+  comentarioFinal: '',
 }
 
 
@@ -349,8 +397,11 @@ export function SolicitationDetailModal({
     useState<NadaConstaSetorKey | null>(null)
   const [isNadaConstaSetorOpen, setIsNadaConstaSetorOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
-  const [gestorAvaliacaoNota, setGestorAvaliacaoNota] = useState('')
-  const [gestorAvaliacaoComentario, setGestorAvaliacaoComentario] = useState('')
+  const [gestorAvaliacaoForm, setGestorAvaliacaoForm] =
+    useState<AvaliacaoGestorForm>(EMPTY_AVALIACAO_GESTOR_FORM)
+  const [gestorAvaliacaoFieldErrors, setGestorAvaliacaoFieldErrors] = useState<
+    Partial<Record<keyof AvaliacaoGestorForm, string>>
+  >({})
   const [gestorAvaliacaoError, setGestorAvaliacaoError] = useState<string | null>(null)
   const [savingGestorAvaliacao, setSavingGestorAvaliacao] = useState(false)
 
@@ -562,8 +613,19 @@ export function SolicitationDetailModal({
     setObservacaoSst1((payloadSstResposta.observacao1 as string) || '')
     setObservacaoSst2((payloadSstResposta.observacao2 as string) || '')
     const payloadAvaliacaoGestor = (payload as any)?.avaliacaoGestor ?? {}
-    setGestorAvaliacaoNota((payloadAvaliacaoGestor.nota as string) || '')
-    setGestorAvaliacaoComentario((payloadAvaliacaoGestor.comentario as string) || '')
+    setGestorAvaliacaoForm({
+      relacionamentoNota: (payloadAvaliacaoGestor.relacionamentoNota as string) || '',
+      comunicacaoNota: (payloadAvaliacaoGestor.comunicacaoNota as string) || '',
+      atitudeNota: (payloadAvaliacaoGestor.atitudeNota as string) || '',
+      saudeSegurancaNota: (payloadAvaliacaoGestor.saudeSegurancaNota as string) || '',
+      dominioTecnicoProcessosNota:
+        (payloadAvaliacaoGestor.dominioTecnicoProcessosNota as string) || '',
+      adaptacaoMudancaNota: (payloadAvaliacaoGestor.adaptacaoMudancaNota as string) || '',
+      autogestaoGestaoPessoasNota:
+        (payloadAvaliacaoGestor.autogestaoGestaoPessoasNota as string) || '',
+      comentarioFinal: (payloadAvaliacaoGestor.comentarioFinal as string) || '',
+    })
+    setGestorAvaliacaoFieldErrors({})
     setGestorAvaliacaoError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.id])
@@ -588,6 +650,16 @@ export function SolicitationDetailModal({
     currentUser?.id === detail?.approverId &&
     effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
 
+  const missingGestorAvaliacaoFields = useMemo(() => {
+    return EXPERIENCE_EVALUATION_REQUIRED_FIELDS.filter((field) => {
+      const value = gestorAvaliacaoForm[field]
+      return !value || !String(value).trim()
+    })
+  }, [gestorAvaliacaoForm])
+  const canSubmitGestorAvaliacao =
+    canEditAvaliacaoGestor &&
+    !savingGestorAvaliacao &&
+    missingGestorAvaliacaoFields.length === 0
 
   const isDpDestino = !!(
     detail?.costCenter?.externalCode === '590' ||
@@ -902,26 +974,38 @@ export function SolicitationDetailModal({
   async function handleSalvarAvaliacaoGestor() {
     if (!detail?.id || !canEditAvaliacaoGestor) return
 
-    if (!gestorAvaliacaoNota.trim()) {
-      setGestorAvaliacaoError('Informe a nota da avaliação.')
+    if (missingGestorAvaliacaoFields.length > 0) {
+      const nextErrors: Partial<Record<keyof AvaliacaoGestorForm, string>> = {}
+      for (const field of missingGestorAvaliacaoFields) {
+        nextErrors[field] = 'Campo obrigatório'
+      }
+      setGestorAvaliacaoFieldErrors(nextErrors)
+      setGestorAvaliacaoError('Preencha todos os campos da avaliação.')
       return
     }
 
     setSavingGestorAvaliacao(true)
+    setGestorAvaliacaoFieldErrors({})
     setGestorAvaliacaoError(null)
 
     try {
       const res = await fetch(`/api/solicitacoes/${detail.id}/avaliacao-gestor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nota: gestorAvaliacaoNota,
-          comentario: gestorAvaliacaoComentario,
-        }),
+        body: JSON.stringify(gestorAvaliacaoForm),
       })
 
-      if (!res.ok) {
+       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
+        if (Array.isArray(json?.missingFields)) {
+          const nextErrors: Partial<Record<keyof AvaliacaoGestorForm, string>> = {}
+          for (const field of json.missingFields as string[]) {
+            if (field in EMPTY_AVALIACAO_GESTOR_FORM) {
+              nextErrors[field as keyof AvaliacaoGestorForm] = 'Campo obrigatório'
+            }
+          }
+          setGestorAvaliacaoFieldErrors(nextErrors)
+        }
         throw new Error(json?.error ?? 'Erro ao salvar avaliação do gestor.')
       }
 
@@ -1992,25 +2076,63 @@ async function handleEncaminharAprovacaoComAnexo() {
                   </p>
 
                   <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                    <div>
-                      <label className={LABEL_RO}>Nota</label>
-                      <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
-                        value={gestorAvaliacaoNota}
-                        onChange={(e) => setGestorAvaliacaoNota(e.target.value)}
-                        placeholder="Ex: 8,5"
-                        disabled={!canEditAvaliacaoGestor}
-                      />
-                    </div>
+                    {AVALIACAO_GESTOR_FIELDS.map((field) => (
+                      <div key={field.name}>
+                        <label className={LABEL_RO}>{field.label}</label>
+                        <select
+                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                          value={gestorAvaliacaoForm[field.name]}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            setGestorAvaliacaoForm((prev) => ({
+                              ...prev,
+                              [field.name]: value,
+                            }))
+                            setGestorAvaliacaoFieldErrors((prev) => ({
+                              ...prev,
+                              [field.name]: value.trim() ? '' : 'Campo obrigatório',
+                            }))
+                          }}
+                          disabled={!canEditAvaliacaoGestor}
+                        >
+                          <option value="">Selecione...</option>
+                          {AVALIACAO_GESTOR_NOTA_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        {canEditAvaliacaoGestor &&
+                        (!gestorAvaliacaoForm[field.name].trim() ||
+                          gestorAvaliacaoFieldErrors[field.name]) ? (
+                          <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
+                        ) : null}
+                      </div>
+                    ))}
                     <div className="md:col-span-2">
-                      <label className={LABEL_RO}>Comentário</label>
+                      <label className={LABEL_RO}>Comentário final</label>
                       <textarea
                         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
-                        value={gestorAvaliacaoComentario}
-                        onChange={(e) => setGestorAvaliacaoComentario(e.target.value)}
-                        placeholder="Descreva o parecer da avaliação"
+                        value={gestorAvaliacaoForm.comentarioFinal}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setGestorAvaliacaoForm((prev) => ({
+                            ...prev,
+                            comentarioFinal: value,
+                          }))
+                          setGestorAvaliacaoFieldErrors((prev) => ({
+                            ...prev,
+                            comentarioFinal: value.trim() ? '' : 'Campo obrigatório',
+                          }))
+                        }}
+                         placeholder="Descreva o parecer da avaliação"
                         disabled={!canEditAvaliacaoGestor}
                       />
+                      {canEditAvaliacaoGestor &&
+                      (!gestorAvaliacaoForm.comentarioFinal.trim() ||
+                        gestorAvaliacaoFieldErrors.comentarioFinal) ? (
+                        <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -2018,7 +2140,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         onClick={handleSalvarAvaliacaoGestor}
-                        disabled={savingGestorAvaliacao}
+                        disabled={!canSubmitGestorAvaliacao}
                         className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                       >
                         {savingGestorAvaliacao ? 'Salvando...' : 'Salvar avaliação e concluir'}
