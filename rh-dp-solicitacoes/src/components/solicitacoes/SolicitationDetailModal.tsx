@@ -314,10 +314,7 @@ function normalizeConstaValue(value: unknown): ConstaFlag | '' {
     .toUpperCase()
 
   if (normalized === 'CONSTA') return 'CONSTA'
-  if (normalized === 'AGENDAMENTO') return 'CONSTA'
   if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA')
-    return 'NADA_CONSTA'
-  if (normalized === 'ASO VALIDO' || normalized === 'ASO_VALIDO')
     return 'NADA_CONSTA'
   return ''
 }
@@ -1174,16 +1171,10 @@ export function SolicitationDetailModal({
         )
       }
       const normalizedValue = normalizeConstaValue(value) as ConstaFlag | ''
-      const options = isSaudeAsoField
-        ? ([
-            { value: 'NADA_CONSTA' as ConstaFlag, label: 'ASO Válido' },
-            { value: 'CONSTA' as ConstaFlag, label: 'Agendamento' },
-          ] as const)
-        : ([
-            { value: 'CONSTA' as ConstaFlag, label: 'Consta' },
-            { value: 'NADA_CONSTA' as ConstaFlag, label: 'Nada Consta' },
-          ] as const)
-
+      const options = [
+        { value: 'CONSTA' as ConstaFlag, label: 'Consta' },
+        { value: 'NADA_CONSTA' as ConstaFlag, label: 'Nada Consta' },
+      ] as const
       return (
         <div key={campo.name} className="space-y-2 text-xs text-slate-700">
           <span className="font-semibold">{campo.label}</span>
@@ -2134,23 +2125,26 @@ async function handleEncaminharAprovacaoComAnexo() {
                               (registro) => registro.setor === setor.key,
                             )
                             const constaFlag = (setorRegistro?.constaFlag ?? '').toString().toUpperCase()
-                             const saudeStatus = normalizeSaudeStatusValue(setorRegistro?.campos?.saudeStatus)
+                           const saudeStatus = normalizeSaudeStatusValue(setorRegistro?.campos?.saudeStatus)
                             const isSaudeSetor = setor.key === 'SAUDE'
-                            const badgeClass = isConcluida
-                              ? isSaudeSetor
-                                ? saudeStatus === 'Agendamento'
-                                  ? 'border-red-200 bg-red-50 text-red-700'
-                                  : saudeStatus === 'ASO Válido'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700'
-                                : constaFlag === 'CONSTA'
-                                  ? 'border-red-200 bg-red-50 text-red-700'
-                                  : constaFlag === 'NADA_CONSTA'
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700'
-                              : 'border-yellow-200 bg-yellow-50 text-yellow-700'
-
+                            let badgeClass = 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                            if (isConcluida) {
+                              if (isSaudeSetor) {
+                                badgeClass =
+                                  saudeStatus === 'Agendamento'
+                                    ? 'border-red-200 bg-red-50 text-red-700'
+                                    : saudeStatus === 'ASO Válido'
+                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                              } else {
+                                badgeClass =
+                                  constaFlag === 'CONSTA'
+                                    ? 'border-red-200 bg-red-50 text-red-700'
+                                    : constaFlag === 'NADA_CONSTA'
+                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                              }
+                            }
                             return (
                               <button
                                 key={setor.key}
