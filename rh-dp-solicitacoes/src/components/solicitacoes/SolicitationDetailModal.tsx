@@ -843,29 +843,7 @@ export function SolicitationDetailModal({
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
     )
 
-    const setoresRegistrados = (detail.solicitacaoSetores ?? [])
-      .map((registro) => {
-        const setorMeta = NADA_CONSTA_SETORES.find(
-          (setor) => setor.key === registro.setor,
-        )
-
-        if (!setorMeta) return null
-
-        return {
-          key: setorMeta.key,
-          label: setorMeta.label,
-          status: registro.status ?? 'PENDENTE',
-        }
-      })
-      .filter((setor): setor is {
-        key: NadaConstaSetorKey
-        label: string
-        status: string
-      } => Boolean(setor))
-
-    if (setoresRegistrados.length > 0) {
-      return setoresRegistrados
-    }
+    
 
     return NADA_CONSTA_SETORES.map((setor) => ({
       key: setor.key,
