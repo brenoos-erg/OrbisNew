@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import {
   NADA_CONSTA_SETORES,
+  getNadaConstaDefaultFieldsForSetor,
+  type NadaConstaSetorKey,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 
@@ -91,7 +93,7 @@ export async function POST(
       )
     }
 
-    const setorRegistro = await prisma.solicitacaoSetor.findUnique({
+    let setorRegistro = await prisma.solicitacaoSetor.findUnique({
       where: {
         solicitacaoId_setor: {
           solicitacaoId: id,
@@ -101,10 +103,25 @@ export async function POST(
     })
 
     if (!setorRegistro) {
-      return NextResponse.json(
-        { error: 'Setor da solicitação não encontrado.' },
-        { status: 404 },
+      const defaultFieldDefinitions = getNadaConstaDefaultFieldsForSetor(
+        normalizedSetor as NadaConstaSetorKey,
       )
+      const defaultCampos = defaultFieldDefinitions.reduce<Record<string, string>>(
+        (acc, field) => {
+          acc[field.name] = ''
+          return acc
+        },
+        { [setorMeta.constaField]: '' },
+      )
+
+      setorRegistro = await prisma.solicitacaoSetor.create({
+        data: {
+          solicitacaoId: id,
+          setor: normalizedSetor,
+          status: 'PENDENTE',
+          campos: defaultCampos,
+        },
+      })
     }
 
     if (setorRegistro.status === 'CONCLUIDO') {
