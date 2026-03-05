@@ -16,8 +16,11 @@ function expandSetorFilterKeys(keys: string[]) {
     if (key === 'FINANCEIRO') values.add('Financeiro')
     if (key === 'FISCAL') values.add('Fiscal')
   }
-  return Array.from(values)
+ return Array.from(values)
 }
+
+function buildWhereFromSearchParams(searchParams: URLSearchParams) {
+  const where: any = {}
 
   const dateStart = searchParams.get('dateStart')
   const dateEnd = searchParams.get('dateEnd')
@@ -29,7 +32,6 @@ function expandSetorFilterKeys(keys: string[]) {
   const solicitante = searchParams.get('solicitante')
   const status = searchParams.get('status')
   const text = searchParams.get('text')
-
   if (dateStart || dateEnd) {
     where.dataAbertura = {}
     if (dateStart) {
