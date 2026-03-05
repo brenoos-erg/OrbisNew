@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import {
-   NADA_CONSTA_SETORES,
+  getNadaConstaDefaultFieldsForSetor,
+  NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 
@@ -103,12 +104,21 @@ export async function POST(
 
     
     if (!setorRegistro) {
+      const defaultCampos = getNadaConstaDefaultFieldsForSetor(setorMeta.key)
+      const camposIniciais = defaultCampos.reduce<Record<string, string>>(
+        (acc, field) => {
+          acc[field.name] = ''
+          return acc
+        },
+        { [setorMeta.constaField]: '' },
+      )
+
       setorRegistro = await prisma.solicitacaoSetor.create({
         data: {
           solicitacaoId: id,
           setor: normalizedSetor,
           status: 'PENDENTE',
-          campos: {},
+          campos: camposIniciais,
         },
       })
     }
