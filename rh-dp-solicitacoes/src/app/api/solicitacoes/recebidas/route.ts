@@ -19,6 +19,9 @@ function expandSetorFilterKeys(keys: string[]) {
   return Array.from(values)
 }
 
+function buildWhereFromSearchParams(searchParams: URLSearchParams) {
+  const where: any = {}
+
   const dateStart = searchParams.get('dateStart')
   const dateEnd = searchParams.get('dateEnd')
   const centerId = searchParams.get('centerId')
