@@ -24,6 +24,29 @@ const LABEL_RO =
    'block text-xs font-bold text-slate-800 uppercase tracking-wide'
 const INPUT_RO =
   'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
+const isBooleanLikeType = (campoType?: string) => {
+  const normalizedType = (campoType ?? '').trim().toLowerCase()
+  return normalizedType === 'boolean' || normalizedType === 'checkbox'
+}
+
+const getBooleanValue = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim().toLowerCase()
+    if (normalizedValue === 'true') return true
+    if (normalizedValue === 'false') return false
+  }
+  return null
+}
+
+const formatDisplayValue = (value: unknown, _campoType?: string) => {
+  const booleanValue = getBooleanValue(value)
+  if (booleanValue !== null) {
+    return booleanValue ? 'Sim' : 'Não'
+  }
+  if (value === null || value === undefined) return ''
+  return String(value)
+}
 
 
 // ===== Tipos que a página de lista já usa =====
@@ -998,7 +1021,7 @@ export function SolicitationDetailModal({
     if (campo.type === 'date') {
       return formatDateDDMMYYYY(rawValue)
     }
-    return rawValue !== undefined ? String(rawValue) : ''
+    return formatDisplayValue(rawValue, campo.type)
   }
 
   const hasAttachments = (detail?.anexos?.length ?? 0) > 0
@@ -2071,7 +2094,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 bg-white p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                        Dados do colaborador
+                       Dados do colaborador
                       </p>
                       {camposNadaConstaSolicitante.length > 0 ? (
                         <div className="space-y-2 text-xs text-slate-700">
@@ -2083,11 +2106,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                               <input
                                 className={INPUT_RO}
                                 readOnly
-                                value={
-                                  payloadCampos[campo.name] !== undefined
-                                    ? String(payloadCampos[campo.name])
-                                    : ''
-                                }
+                                value={formatDisplayValue(payloadCampos[campo.name], campo.type)}
                               />
                             </div>
                           ))}
@@ -2218,10 +2237,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                       Formulário do tipo de solicitação
                     </p>
 
-                      <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                       <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                       {camposFormSolicitante.map((campo) => {
                         const value = getCampoDisplayValue(campo)
                         const isTextarea = campo.type === 'textarea'
+                        const isBooleanField = isBooleanLikeType(campo.type)
+                        const checkboxValue = getBooleanValue(payloadCampos[campo.name])
 
                         return (
                           <div key={campo.name} className={isTextarea ? 'md:col-span-2' : ''}>
@@ -2229,6 +2250,16 @@ async function handleEncaminharAprovacaoComAnexo() {
                             {isTextarea ? (
                               <div className={`${INPUT_RO} min-h-[110px] whitespace-pre-wrap break-words`}>
                                 {value}
+                              </div>
+                            ) : isBooleanField ? (
+                              <div className={`${INPUT_RO} flex items-center gap-3`}>
+                                <input
+                                  type="checkbox"
+                                  disabled
+                                  checked={checkboxValue === true}
+                                  aria-label={campo.label}
+                                />
+                                <span>{formatDisplayValue(payloadCampos[campo.name], campo.type)}</span>
                               </div>
                             ) : (
                               <input className={INPUT_RO} readOnly value={value} />
@@ -3017,8 +3048,7 @@ function RQ063ResumoCampos({
     'basicas' | 'contratacao' | 'academicos' | 'solicitacoes' | 'projetos' | 'admissao'
   >('basicas')
 
-  const get = (key: string) =>
-    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+  const get = (key: string) => formatDisplayValue(payloadCampos[key])
   const getFirst = (...keys: string[]) => {
     for (const key of keys) {
       const value = payloadCampos[key]
@@ -3245,8 +3275,7 @@ function RQ247ResumoCampos({
   dpEditable: boolean
   costCenterLabel: string
 }) {
-  const get = (key: string) =>
-    payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
+  const get = (key: string) => formatDisplayValue(payloadCampos[key])
   const joinIfTrue = (entries: [string, string][]) =>
     entries
       .filter(

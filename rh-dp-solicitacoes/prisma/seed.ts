@@ -860,6 +860,8 @@ async function main() {
         },
         updatedAt: new Date(),
       },
+
+      
     })
 
     console.log(
