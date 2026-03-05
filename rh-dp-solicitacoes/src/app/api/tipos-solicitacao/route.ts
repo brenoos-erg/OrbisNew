@@ -106,9 +106,14 @@ export async function GET(request: Request) {
         descricao: true,
         schemaJson: true,
       },
-      orderBy: {
-        nome: 'asc',
-      },
+      orderBy: [
+        {
+          codigo: 'asc',
+        },
+        {
+          nome: 'asc',
+        },
+      ],
     })
     const resposta = tipos
       .filter((tipo) =>

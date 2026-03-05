@@ -7,17 +7,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 
-function expandSetorFilterKeys(keys: string[]) {
-  const values = new Set<string>()
-  for (const key of keys) {
-    values.add(key)
-    if (key === 'FINANCEIRO') values.add('Financeiro')
-    if (key === 'FISCAL') values.add('Fiscal')
-  }
- return Array.from(values)
-}
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const where: any = {}
@@ -126,31 +116,16 @@ export async function GET(req: NextRequest) {
       deptIds.add(link.departmentId)
     }
 
-    const setorKeys = new Set<string>()
-    const primarySetores = resolveNadaConstaSetoresByDepartment(me.department)
-    for (const setor of primarySetores) {
-      setorKeys.add(setor)
+    const tipoApproverViewerFilter = {
+      tipo: {
+        approvers: {
+          some: {
+            userId: me.id,
+          },
+        },
+      },
     }
 
-    for (const link of departmentLinks) {
-      const resolved = resolveNadaConstaSetoresByDepartment(link.department)
-      for (const setor of resolved) {
-        setorKeys.add(setor)
-      }
-    }
-
-    const setorKeysExpanded = expandSetorFilterKeys([...setorKeys])
-
-    const setorFilters =
-      setorKeysExpanded.length > 0
-        ? [
-            {
-              solicitacaoSetores: {
-                some: { setor: { in: setorKeysExpanded } },
-              },
-            },
-          ]
-        : []
 
     const isDpUser =
       me.department?.code === '08' ||
@@ -166,8 +141,6 @@ export async function GET(req: NextRequest) {
       isDpUser && dpDepartmentId
         ? [{ costCenterId: null, departmentId: dpDepartmentId }]
         : []
-    console.info('[solicitacoes/recebidas] setorKeys calculados', { userId: me.id, setorKeys: setorKeysExpanded })
-
     const gestorAvaliadorFilter = {
       approverId: me.id,
       status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
@@ -179,15 +152,15 @@ export async function GET(req: NextRequest) {
         ? [{ costCenterId: where.costCenterId }]
         : []
 
-      if (receivedFilters.length === 0 && setorFilters.length === 0) {
+      if (receivedFilters.length === 0) {
         where.AND = [
           ...(where.AND ?? []),
-          { OR: [gestorAvaliadorFilter] },
+          { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
       } else {
         where.AND = [
           ...(where.AND ?? []),
-          { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
+          { OR: [...receivedFilters, tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
       }
     } else {
@@ -197,15 +170,15 @@ export async function GET(req: NextRequest) {
         ...dpFilters,
       ]
 
-      if (receivedFilters.length === 0 && setorFilters.length === 0) {
+     if (receivedFilters.length === 0) {
        where.AND = [
           ...(where.AND ?? []),
-          { OR: [gestorAvaliadorFilter] },
+          { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
       } else {
         where.AND = [
           ...(where.AND ?? []),
-          { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
+          { OR: [...receivedFilters, tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
       }
     }
