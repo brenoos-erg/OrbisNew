@@ -26,6 +26,10 @@ function hostOf(url?: string) {
 
 async function main() {
   console.log('🌱 Iniciando seed...')
+  const enableLegacyCleanup = process.env.SEED_LEGACY_CLEANUP === 'true'
+  console.log(
+    `🧹 Legacy cleanup ${enableLegacyCleanup ? 'habilitado' : 'desabilitado'} (SEED_LEGACY_CLEANUP=${process.env.SEED_LEGACY_CLEANUP ?? 'undefined'})`,
+  )
 
   const databaseHost = hostOf(process.env.DATABASE_URL)
   console.log('🔎 Host DATABASE_URL:', databaseHost)
@@ -70,87 +74,130 @@ async function main() {
   })
   if (!tiDepartment) throw new Error('Departamento TI (code=20) não encontrado.')
 
-  await prisma.user.updateMany({
-    where: {
-      department: {
-        code: {
-          notIn: OFFICIAL_DEPARTMENT_CODES as string[],
-        },
-      },
-    },
-    data: {
-      departmentId: tiDepartment.id,
-    },
-  })
-
-  await prisma.userDepartment.deleteMany({
-    where: {
-      department: {
-        code: {
-          notIn: OFFICIAL_DEPARTMENT_CODES as string[],
-        },
-      },
-    },
-  })
-
   const legacyDepartments = await prisma.department.findMany({
     where: {
       code: {
         notIn: OFFICIAL_DEPARTMENT_CODES as string[],
       },
     },
-    select: { id: true },
+    select: { id: true, code: true },
   })
 
   const legacyDepartmentIds = legacyDepartments.map((department) => department.id)
 
-  if (legacyDepartmentIds.length > 0) {
-    const legacyDepartmentFilter = {
-      in: legacyDepartmentIds,
+  if (!enableLegacyCleanup) {
+    if (legacyDepartments.length > 0) {
+      console.warn(
+        `⚠️ Legacy cleanup desabilitado. ${legacyDepartments.length} departamento(s) fora da lista oficial detectado(s): ${legacyDepartments.map((department) => department.code).join(', ')}`,
+      )
     }
 
-    await prisma.solicitation.updateMany({
-      where: { departmentId: legacyDepartmentFilter },
-      data: { departmentId: tiDepartment.id },
+   } else {
+    const usersMovedFromNonOfficialDepartment = await prisma.user.updateMany({
+      where: {
+        department: {
+          code: {
+            notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+          },
+        },
+      },
+      data: {
+        departmentId: tiDepartment.id,
+      },
     })
 
-    await prisma.departmentModule.deleteMany({
-      where: { departmentId: legacyDepartmentFilter },
+    const userDepartmentLinksRemoved = await prisma.userDepartment.deleteMany({
+      where: {
+        department: {
+          code: {
+            notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+          },
+        },
+      },
     })
 
-    await prisma.costCenter.updateMany({
-      where: { departmentId: legacyDepartmentFilter },
-      data: { departmentId: null },
+    let solicitationsMovedToTi = 0
+    let departmentModulesRemoved = 0
+    let costCentersUpdated = 0
+    let positionsUpdated = 0
+    let usersMovedFromLegacyDepartmentId = 0
+    let isoDocumentsMovedToTi = 0
+    let approverGroupsUpdated = 0
+
+    if (legacyDepartmentIds.length > 0) {
+      const legacyDepartmentFilter = {
+        in: legacyDepartmentIds,
+      }
+
+    solicitationsMovedToTi = (
+        await prisma.solicitation.updateMany({
+          where: { departmentId: legacyDepartmentFilter },
+          data: { departmentId: tiDepartment.id },
+        })
+      ).count
+
+      departmentModulesRemoved = (
+        await prisma.departmentModule.deleteMany({
+          where: { departmentId: legacyDepartmentFilter },
+        })
+      ).count
+
+      costCentersUpdated = (
+        await prisma.costCenter.updateMany({
+          where: { departmentId: legacyDepartmentFilter },
+          data: { departmentId: null },
+        })
+      ).count
+
+      positionsUpdated = (
+        await prisma.position.updateMany({
+          where: { departmentId: legacyDepartmentFilter },
+          data: { departmentId: null },
+        })
+      ).count
+
+      usersMovedFromLegacyDepartmentId = (
+        await prisma.user.updateMany({
+          where: { departmentId: legacyDepartmentFilter },
+          data: { departmentId: tiDepartment.id },
+        })
+      ).count
+
+      isoDocumentsMovedToTi = (
+        await prisma.isoDocument.updateMany({
+          where: { ownerDepartmentId: legacyDepartmentFilter },
+          data: { ownerDepartmentId: tiDepartment.id },
+        })
+      ).count
+
+      approverGroupsUpdated = (
+        await prisma.approverGroup.updateMany({
+          where: { departmentId: legacyDepartmentFilter },
+          data: { departmentId: null },
+        })
+      ).count
+    }
+   const legacyDepartmentsRemoved = await prisma.department.deleteMany({
+      where: {
+        code: {
+          notIn: OFFICIAL_DEPARTMENT_CODES as string[],
+        },
+      },
     })
 
-    await prisma.position.updateMany({
-      where: { departmentId: legacyDepartmentFilter },
-      data: { departmentId: null },
-    })
-
-    await prisma.user.updateMany({
-      where: { departmentId: legacyDepartmentFilter },
-      data: { departmentId: tiDepartment.id },
-    })
-
-    await prisma.isoDocument.updateMany({
-      where: { ownerDepartmentId: legacyDepartmentFilter },
-      data: { ownerDepartmentId: tiDepartment.id },
-    })
-
-    await prisma.approverGroup.updateMany({
-      where: { departmentId: legacyDepartmentFilter },
-      data: { departmentId: null },
-    })
+    console.log('🧹 Legacy cleanup executado com sucesso.')
+    console.log(`   • Usuários movidos por relação department.code não oficial: ${usersMovedFromNonOfficialDepartment.count}`)
+    console.log(`   • Vínculos userDepartment removidos: ${userDepartmentLinksRemoved.count}`)
+    console.log(`   • Solicitações movidas para TI: ${solicitationsMovedToTi}`)
+    console.log(`   • departmentModule removidos: ${departmentModulesRemoved}`)
+    console.log(`   • costCenter atualizados (departmentId -> null): ${costCentersUpdated}`)
+    console.log(`   • position atualizados (departmentId -> null): ${positionsUpdated}`)
+    console.log(`   • Usuários movidos por departmentId legado: ${usersMovedFromLegacyDepartmentId}`)
+    console.log(`   • isoDocument atualizados (ownerDepartmentId -> TI): ${isoDocumentsMovedToTi}`)
+    console.log(`   • approverGroup atualizados (departmentId -> null): ${approverGroupsUpdated}`)
+    console.log(`   • Departamentos legados removidos: ${legacyDepartmentsRemoved.count}`)
   }
 
-  await prisma.department.deleteMany({
-    where: {
-      code: {
-        notIn: OFFICIAL_DEPARTMENT_CODES as string[],
-      },
-    },
-  })
 
   console.log('✅ Departamentos cadastrados.')
 
