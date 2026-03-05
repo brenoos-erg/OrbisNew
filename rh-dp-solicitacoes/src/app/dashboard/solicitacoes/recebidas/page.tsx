@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { format } from 'date-fns'
+import { formatDateDDMMYYYY } from '@/lib/date'
 import {
   Row,
   SolicitationDetail,
@@ -318,7 +318,7 @@ export default function ReceivedRequestsPage() {
                     <td className="px-4 py-2 text-xs">{row.protocolo}</td>
                     <td className="px-4 py-2 text-xs">
                       {row.createdAt
-                        ? format(new Date(row.createdAt), 'dd/MM/yyyy HH:mm')
+                         ? formatDateDDMMYYYY(row.createdAt)
                         : '-'}
                      </td>
                     <td className="px-4 py-2 text-xs">

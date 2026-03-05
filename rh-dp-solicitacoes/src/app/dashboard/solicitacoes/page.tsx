@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Search, RefreshCw } from 'lucide-react'
-import { format } from 'date-fns'
+import { formatDateDDMMYYYY } from '@/lib/date'
 export const dynamic = 'force-dynamic'
 
 type Solicitation = {
@@ -115,7 +115,7 @@ export default function SolicitacoesPage() {
                   </td>
                   <td className="px-4 py-2">{item.tipo ? `${item.tipo.codigo} - ${item.tipo.nome}` : '-'}</td>
                   <td className="px-4 py-2 text-slate-500">
-                    {format(new Date(item.createdAt), 'dd/MM/yyyy HH:mm')}
+                    {formatDateDDMMYYYY(item.createdAt)}
                   </td>
                 </tr>
               ))

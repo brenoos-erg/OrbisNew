@@ -1,6 +1,7 @@
 // src/app/dashboard/solicitacoes/aprovacao/page.tsx
 'use client'
 
+import { formatDateDDMMYYYY } from '@/lib/date'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   SolicitationDetailModal,
@@ -244,7 +245,7 @@ export default function ApprovalsPage() {
                     {row.protocolo ?? '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
+                     {row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : '—'}

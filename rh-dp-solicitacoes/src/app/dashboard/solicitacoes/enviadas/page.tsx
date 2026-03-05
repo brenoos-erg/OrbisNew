@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Filter, RefreshCcw, Search, Plus, Info, Copy, Eraser } from 'lucide-react'
 import { format } from 'date-fns'
+import { formatDateDDMMYYYY } from '@/lib/date'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Row,
@@ -291,7 +292,7 @@ export default function SentRequestsPage() {
     const rows = data.map((r) => [
       r.status ?? '',
       r.protocolo ?? '',
-      r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : '',
+      r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '',
       r.titulo ?? r.tipo?.nome ?? '',
       r.sla ?? '',
       r.setorDestino ?? '',
@@ -490,7 +491,7 @@ export default function SentRequestsPage() {
                         {r.protocolo && <button type="button" onClick={(e) => { e.stopPropagation(); onCopyProtocol(r.protocolo) }} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"><Copy size={13} /></button>}
                       </div>
                     </td>
-                    <td className="px-3 py-2">{r.createdAt ? format(new Date(r.createdAt), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                    <td className="px-3 py-2">{r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '-'}</td>
                     <td className="px-3 py-2">{r.titulo ?? r.tipo?.nome ?? '-'}</td>
                     <td className="px-3 py-2">{r.sla ?? '-'}</td>
                     <td className="px-3 py-2">{r.setorDestino ?? '-'}</td>

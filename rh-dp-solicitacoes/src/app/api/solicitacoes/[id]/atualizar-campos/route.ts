@@ -23,6 +23,14 @@ const normalizeConstaValue = (value: unknown): 'CONSTA' | 'NADA_CONSTA' | null =
   return null
 }
 
+
+const normalizeSetorKey = (value: string) =>
+  value
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+
 const normalizeSaudeStatusValue = (value: unknown): 'ASO Válido' | 'Agendamento' | null => {
   if (typeof value !== 'string') return null
   const normalized = value
@@ -80,7 +88,7 @@ export async function POST(
       )
     }
 
-    const normalizedSetor = setor.toUpperCase()
+   const normalizedSetor = normalizeSetorKey(setor)
     const setorMeta = NADA_CONSTA_SETORES.find((s) => s.key === normalizedSetor)
     if (!setorMeta) {
       return NextResponse.json(

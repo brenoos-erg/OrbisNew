@@ -1144,10 +1144,12 @@ export const POST = withModuleLevel(
            4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
            ===================================================================== */
         if (isNadaConsta || routing.multiSetor) {
-          const setoresDestino =
-            routing.targetSetorKeys.length > 0
-              ? routing.targetSetorKeys
-              : NADA_CONSTA_SETORES.map((setor) => setor.key)
+          const setoresDestino = Array.from(
+            new Set([
+              ...NADA_CONSTA_SETORES.map((setor) => setor.key),
+              ...routing.targetSetorKeys,
+            ]),
+          )
 
           await prisma.solicitacaoSetor.createMany({
             data: setoresDestino.map((setor) => ({

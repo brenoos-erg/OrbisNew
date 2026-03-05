@@ -9,8 +9,15 @@ import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 
-function buildWhereFromSearchParams(searchParams: URLSearchParams) {
-  const where: any = {}
+function expandSetorFilterKeys(keys: string[]) {
+  const values = new Set<string>()
+  for (const key of keys) {
+    values.add(key)
+    if (key === 'FINANCEIRO') values.add('Financeiro')
+    if (key === 'FISCAL') values.add('Fiscal')
+  }
+  return Array.from(values)
+}
 
   const dateStart = searchParams.get('dateStart')
   const dateEnd = searchParams.get('dateEnd')
@@ -130,12 +137,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const setorKeysExpanded = expandSetorFilterKeys([...setorKeys])
+
     const setorFilters =
-      setorKeys.size > 0
+      setorKeysExpanded.length > 0
         ? [
             {
               solicitacaoSetores: {
-                some: { setor: { in: [...setorKeys] } },
+                some: { setor: { in: setorKeysExpanded } },
               },
             },
           ]
@@ -155,10 +164,13 @@ export async function GET(req: NextRequest) {
       isDpUser && dpDepartmentId
         ? [{ costCenterId: null, departmentId: dpDepartmentId }]
         : []
+    console.info('[solicitacoes/recebidas] setorKeys calculados', { userId: me.id, setorKeys: setorKeysExpanded })
+
     const gestorAvaliadorFilter = {
       approverId: me.id,
       status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
     }
+
 
     if (where.costCenterId) {
       const receivedFilters = ccIds.has(where.costCenterId)

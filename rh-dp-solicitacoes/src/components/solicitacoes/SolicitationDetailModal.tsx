@@ -1,9 +1,9 @@
 // src/components/solicitacoes/SolicitationDetailModal.tsx
 'use client'
 
-import { format } from 'date-fns'
 import React, { useEffect, useMemo, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
+import { formatDateDDMMYYYY } from '@/lib/date'
 import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
@@ -262,12 +262,7 @@ export type SolicitationDetail = {
 
 
 function formatDate(dateStr?: string | null) {
-  if (!dateStr) return '-'
-  try {
-    return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
-  } catch {
-    return '-'
-  }
+  return formatDateDDMMYYYY(dateStr)
 }
 
 const SAUDE_STATUS_OPTIONS = ['ASO Válido', 'Agendamento'] as const
@@ -288,22 +283,15 @@ function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
 }
 
 
-function formatFieldDateValue(value: unknown) {
-  if (typeof value !== 'string') return ''
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-  const normalized = value.trim()
-  if (!normalized) return ''
-
-  const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (dateOnlyMatch) {
-    const [, year, month, day] = dateOnlyMatch
-    return `${day}-${month}-${year}`
-  }
-
-  const parsed = new Date(normalized)
-  if (Number.isNaN(parsed.getTime())) return normalized
-
-  return format(parsed, 'dd-MM-yyyy')
+function normalizeSetorKey(value: string) {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
 }
 function normalizeConstaValue(value: unknown): ConstaFlag | '' {
   if (typeof value !== 'string') return ''
@@ -770,7 +758,7 @@ export function SolicitationDetailModal({
   }, [camposSchema, setorMeta])
   const selectedSetorRegistro = activeSector
     ? detail?.solicitacaoSetores?.find(
-        (setor) => setor.setor === activeSector,
+        (setor) => normalizeSetorKey(setor.setor) === activeSector,
       )
     : null
   const isSetorConcluido = selectedSetorRegistro?.status === 'CONCLUIDO'
@@ -906,7 +894,7 @@ export function SolicitationDetailModal({
   useEffect(() => {
     if (!isNadaConsta || !activeSector) return
     const registro = detail?.solicitacaoSetores?.find(
-      (setor) => setor.setor === activeSector,
+      (setor) => normalizeSetorKey(setor.setor) === activeSector,
     )
     const storedCampos = (registro?.campos ?? {}) as Record<string, any>
     const nextCampos = camposNadaConstaSetor.reduce<Record<string, string>>(
@@ -974,9 +962,17 @@ export function SolicitationDetailModal({
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
 
+  const costCenterLabel = useMemo(
+    () =>
+      detail?.costCenter
+        ? formatCostCenterLabel(detail.costCenter, '')
+        : payloadSolic?.costCenterText || '',
+    [detail?.costCenter, payloadSolic?.costCenterText],
+  )
+
   const getCampoDisplayValue = (campo: CampoEspecifico) => {
     if (campo.name === 'centroCustoDestinoId') {
-       return String(
+      return String(
         payloadCampos.centroCustoDestinoText ??
           payloadCampos.centroCustoDestinoIdLabel ??
           payloadCampos.centroCustoIdLabel ??
@@ -984,10 +980,21 @@ export function SolicitationDetailModal({
           '',
       )
     }
+    if (
+      ['centroCustoId', 'costCenterId', 'centroCusto', 'funcionarioCostCenterId'].includes(
+        campo.name,
+      )
+    ) {
+      const rawCostCenter = payloadCampos[campo.name]
+      if (typeof rawCostCenter === 'string' && UUID_REGEX.test(rawCostCenter.trim())) {
+        return costCenterLabel || rawCostCenter
+      }
+      return String(rawCostCenter ?? costCenterLabel ?? '')
+    }
 
     const rawValue = payloadCampos[campo.name]
     if (campo.type === 'date') {
-      return formatFieldDateValue(rawValue)
+      return formatDateDDMMYYYY(rawValue)
     }
     return rawValue !== undefined ? String(rawValue) : ''
   }
@@ -1862,8 +1869,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                         <input className={INPUT_RO} readOnly value={payloadSolic.phone ?? ''} />
                       </div>
                       <div>
-                        <label className={LABEL_RO}>Centro de Custo</label>
-                        <textarea className={`${INPUT_RO} min-h-[72px]`} readOnly value={payloadSolic.costCenterText ?? ''} />
+                         <label className={LABEL_RO}>Centro de Custo</label>
+                        <textarea className={`${INPUT_RO} min-h-[72px]`} readOnly value={costCenterLabel || '-'} />
                       </div>
                     </div>
                   </div>
@@ -1965,7 +1972,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     readOnly
                     value={
                       row.setorDestino ??
-                       formatCostCenterLabel(detail.costCenter, '')
+                       costCenterLabel
 
                     }
                   />
@@ -2100,7 +2107,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                             const isConcluida = setor.status === 'CONCLUIDO'
                             const isCurrent = activeSector === setor.key
                             const setorRegistro = detail?.solicitacaoSetores?.find(
-                              (registro) => registro.setor === setor.key,
+                              (registro) =>
+                                normalizeSetorKey(registro.setor) === setor.key,
                             )
                             const constaFlag = (setorRegistro?.constaFlag ?? '').toString().toUpperCase()
                            const saudeStatus = normalizeSaudeStatusValue(setorRegistro?.campos?.saudeStatus)
@@ -2181,7 +2189,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   )}
                 </div>
               ) : isSolicitacaoPessoalTipo || isSolicitacaoAdmissaoTipo ? (
-                <RQ063ResumoCampos payloadCampos={payloadCampos} />
+                 <RQ063ResumoCampos payloadCampos={payloadCampos} costCenterLabel={costCenterLabel} />
                   ) : isDesligamento ? (
                 <RQ247ResumoCampos
                   payloadCampos={payloadCampos}
@@ -2199,6 +2207,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   onDpConsideracoesChange={setDpConsideracoes}
                   rhEditable={false}
                   dpEditable={false}
+                  costCenterLabel={costCenterLabel}
                 />
               ) : (
                 camposSchema.length > 0 && (
@@ -2997,8 +3006,10 @@ async function handleEncaminharAprovacaoComAnexo() {
  */
 function RQ063ResumoCampos({
   payloadCampos,
+  costCenterLabel,
 }: {
   payloadCampos: Record<string, any>
+  costCenterLabel: string
 }) {
   const [activeTab, setActiveTab] = useState<
     'basicas' | 'contratacao' | 'academicos' | 'solicitacoes' | 'projetos' | 'admissao'
@@ -3095,12 +3106,12 @@ function RQ063ResumoCampos({
 
       {activeTab === 'basicas' && (
         <section>
-          <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+           <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
             <div><label className={LABEL_RO}>Cargo</label><input className={INPUT_RO} readOnly value={getFirst('cargoNome', 'cargo', 'cargoFinal')} /></div>
             <div><label className={LABEL_RO}>Setor e/ou Projeto</label><input className={INPUT_RO} readOnly value={get('setorProjeto')} /></div>
             <div><label className={LABEL_RO}>Vaga prevista em contrato</label><input className={INPUT_RO} readOnly value={get('vagaPrevista') || get('vagaPrevistaContrato')} /></div>
             <div><label className={LABEL_RO}>Local de trabalho</label><input className={INPUT_RO} readOnly value={get('localTrabalho')} /></div>
-            <div><label className={LABEL_RO}>Centro de custo</label><input className={INPUT_RO} readOnly value={get('centroCustoForm') || get('centroCustoId')} /></div>
+            <div><label className={LABEL_RO}>Centro de custo</label><input className={INPUT_RO} readOnly value={get('centroCustoForm') || costCenterLabel || get('centroCustoId')} /></div>
             <div><label className={LABEL_RO}>Horário de trabalho</label><input className={INPUT_RO} readOnly value={get('horarioTrabalho')} /></div>
             <div><label className={LABEL_RO}>Chefia imediata</label><input className={INPUT_RO} readOnly value={get('chefiaImediata')} /></div>
             <div><label className={LABEL_RO}>Coordenador do contrato</label><input className={INPUT_RO} readOnly value={get('coordenadorContrato')} /></div>
@@ -3180,7 +3191,7 @@ function RQ063ResumoCampos({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div><label className={LABEL_RO}>Nome do profissional</label><input className={INPUT_RO} readOnly value={getFirst('nomeProfissional', 'nomeCandidato', 'nomeColaborador', 'candidatoNome')} /></div>
             <div><label className={LABEL_RO}>Salário</label><input className={INPUT_RO} readOnly value={get('salario')} /></div>
-            <div><label className={LABEL_RO}>Data de admissão</label><input className={INPUT_RO} readOnly value={getFirst('dataAdmissao', 'dataAdmissaoPrevista')} /></div>
+            <div><label className={LABEL_RO}>Data de admissão</label><input className={INPUT_RO} readOnly value={formatDateDDMMYYYY(getFirst('dataAdmissao', 'dataAdmissaoPrevista'))} /></div>
             <div><label className={LABEL_RO}>CBO</label><input className={INPUT_RO} readOnly value={get('cbo')} /></div>
           </div>
           <div>
@@ -3213,6 +3224,7 @@ function RQ247ResumoCampos({
   onDpConsideracoesChange,
   rhEditable,
   dpEditable,
+  costCenterLabel,
 }: {
   payloadCampos: Record<string, any>
   rhDataExameDemissional: string
@@ -3229,6 +3241,7 @@ function RQ247ResumoCampos({
   onDpConsideracoesChange: (value: string) => void
   rhEditable: boolean
   dpEditable: boolean
+  costCenterLabel: string
 }) {
   const get = (key: string) =>
     payloadCampos[key] !== undefined ? String(payloadCampos[key]) : ''
@@ -3250,20 +3263,20 @@ function RQ247ResumoCampos({
 
   const rhDataExameValue = rhEditable
     ? rhDataExameDemissional
-    : get('rhDataExameDemissional')
+    : formatDateDDMMYYYY(get('rhDataExameDemissional'))
   const rhDataLiberacaoValue = rhEditable
     ? rhDataLiberacaoPpp
-    : get('rhDataLiberacaoPpp')
+    : formatDateDDMMYYYY(get('rhDataLiberacaoPpp'))
   const rhConsideracoesValue = rhEditable
     ? rhConsideracoes
     : get('rhConsideracoes')
 
   const dpDataDemissaoValue = dpEditable
     ? dpDataDemissao
-    : get('dpDataDemissao')
+    : formatDateDDMMYYYY(get('dpDataDemissao'))
   const dpDataPrevistaValue = dpEditable
     ? dpDataPrevistaAcerto
-    : get('dpDataPrevistaAcerto')
+    : formatDateDDMMYYYY(get('dpDataPrevistaAcerto'))
   const dpConsideracoesValue = dpEditable
     ? dpConsideracoes
     : get('dpConsideracoes')
@@ -3349,7 +3362,7 @@ function RQ247ResumoCampos({
             <input
               className={INPUT_RO}
               readOnly
-              value={get('funcionarioCostCenterId') || get('funcionarioCentroCusto')}
+             value={costCenterLabel || get('funcionarioCostCenterId') || get('funcionarioCentroCusto')}
             />
           </div>
           <div>
@@ -3359,7 +3372,7 @@ function RQ247ResumoCampos({
             <input
               className={INPUT_RO}
               readOnly
-              value={get('dataSugeridaUltimoDia')}
+              value={formatDateDDMMYYYY(get('dataSugeridaUltimoDia'))}
             />
           </div>
           <div>
