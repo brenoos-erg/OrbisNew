@@ -95,12 +95,63 @@ export const NADA_CONSTA_SAUDE_FIELDS: NadaConstaCampoDef[] = [
     section: 'Saúde',
   },
 ]
+export const NADA_CONSTA_FINANCEIRO_FIELDS: NadaConstaCampoDef[] = [
+  {
+    name: 'financeiroStatus',
+    label: 'Status (Consta / Nada Consta)',
+    type: 'select',
+    options: ['Consta', 'Nada Consta'],
+    stage: 'financeiro',
+    section: 'Financeiro',
+  },
+  {
+    name: 'financeiroObs',
+    label: 'Obs.:',
+    type: 'textarea',
+    stage: 'financeiro',
+    section: 'Financeiro',
+  },
+  {
+    name: 'financeiroValorTotal',
+    label: 'R$ (valor total)',
+    type: 'number',
+    stage: 'financeiro',
+    section: 'Financeiro',
+  },
+]
+
+export const NADA_CONSTA_FISCAL_FIELDS: NadaConstaCampoDef[] = [
+  {
+    name: 'fiscalStatus',
+    label: 'Status (Consta / Nada Consta)',
+    type: 'select',
+    options: ['Consta', 'Nada Consta'],
+    stage: 'fiscal',
+    section: 'Fiscal',
+  },
+  {
+    name: 'fiscalObs',
+    label: 'Obs.:',
+    type: 'textarea',
+    stage: 'fiscal',
+    section: 'Fiscal',
+  },
+  {
+    name: 'fiscalValorTotal',
+    label: 'R$ (valor total)',
+    type: 'number',
+    stage: 'fiscal',
+    section: 'Fiscal',
+  },
+]
 
 export function getNadaConstaDefaultFieldsForSetor(
   setor: NadaConstaSetorKey,
 ): NadaConstaCampoDef[] {
   if (setor === 'TI') return NADA_CONSTA_TI_FIELDS
   if (setor === 'SAUDE') return NADA_CONSTA_SAUDE_FIELDS
+  if (setor === 'FINANCEIRO') return NADA_CONSTA_FINANCEIRO_FIELDS
+  if (setor === 'FISCAL') return NADA_CONSTA_FISCAL_FIELDS
   return []
 }
 export const NADA_CONSTA_SETORES: {

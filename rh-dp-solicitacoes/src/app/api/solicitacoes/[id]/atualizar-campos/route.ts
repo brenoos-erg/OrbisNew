@@ -176,7 +176,10 @@ export async function POST(
 
     const shouldFinalize =
       action === 'FINALIZAR' || Boolean(finalizarSetor ?? finalizar)
-    if (shouldFinalize && !constaFlag) {
+    const canFinalizeSetor =
+      normalizedSetor === 'SAUDE' ? Boolean(saudeStatus) : Boolean(constaFlag)
+
+    if (shouldFinalize && !canFinalizeSetor) {
       return NextResponse.json(
         {
           error:

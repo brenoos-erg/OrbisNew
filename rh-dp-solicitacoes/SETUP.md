@@ -75,6 +75,14 @@ npm run prisma:generate
 npm run prisma:migrate
 npm run prisma:deploy
 npm run prisma:seed
+
+# valida se os departamentos oficiais de Nada Consta existem
+npx prisma db execute --schema ./prisma/schema.prisma --stdin <<'SQL'
+SELECT code, name
+FROM Department
+WHERE code IN ('06', '10')
+ORDER BY code;
+SQL
 ```
 
 ### PowerShell (executando da raiz do monorepo)
