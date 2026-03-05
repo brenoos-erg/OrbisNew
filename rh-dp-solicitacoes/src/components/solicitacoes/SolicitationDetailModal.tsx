@@ -252,14 +252,13 @@ export type SolicitationDetail = {
     name: string
     code?: string | null
   } | null
-  payload?: Payload
+ payload?: Payload
   anexos?: Attachment[]
   comentarios?: Comment[]
   children?: ChildSolicitation[]
   solicitacaoSetores?: SolicitacaoSetor[]
   timelines?: { id: string; status: string; message?: string | null; createdAt: string }[]
 }
-
 
 
 function formatDate(dateStr?: string | null) {
@@ -270,6 +269,42 @@ function formatDate(dateStr?: string | null) {
     return '-'
   }
 }
+
+const SAUDE_STATUS_OPTIONS = ['ASO Válido', 'Agendamento'] as const
+
+type SaudeStatus = (typeof SAUDE_STATUS_OPTIONS)[number]
+
+function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
+  if (typeof value !== 'string') return ''
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+
+  if (normalized === 'ASO VALIDO') return 'ASO Válido'
+  if (normalized === 'AGENDAMENTO') return 'Agendamento'
+  return ''
+}
+
+
+function formatFieldDateValue(value: unknown) {
+  if (typeof value !== 'string') return ''
+
+  const normalized = value.trim()
+  if (!normalized) return ''
+
+  const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return `${day}-${month}-${year}`
+  }
+
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) return normalized
+
+  return format(parsed, 'dd-MM-yyyy')
+}
 function normalizeConstaValue(value: unknown): ConstaFlag | '' {
   if (typeof value !== 'string') return ''
   const normalized = value
@@ -279,7 +314,10 @@ function normalizeConstaValue(value: unknown): ConstaFlag | '' {
     .toUpperCase()
 
   if (normalized === 'CONSTA') return 'CONSTA'
+  if (normalized === 'AGENDAMENTO') return 'CONSTA'
   if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA')
+    return 'NADA_CONSTA'
+  if (normalized === 'ASO VALIDO' || normalized === 'ASO_VALIDO')
     return 'NADA_CONSTA'
   return ''
 }
@@ -754,15 +792,23 @@ export function SolicitationDetailModal({
     [currentUser],
   )
 
-  const canEditNadaConstaSetor =
+  const userCanEditSetor =
     Boolean(activeSector) &&
     (userIsAdmin ||
       userSectorKeys.has(activeSector as NadaConstaSetorKey)) &&
+    !(activeSector === 'SAUDE' && !userIsAdmin && !userSectorKeys.has('SAUDE'))
+
+  const canEditNadaConstaSetor =
+    Boolean(activeSector) &&
+    userCanEditSetor &&
     !isFinalizadaOuCancelada &&
     !isSetorConcluido
 
-  // pode assumir se não estiver concluída/cancelada
-  const canAssumir = !isFinalizadaOuCancelada
+  // pode assumir se não estiver concluída/cancelada;
+  // em Nada Consta, apenas DP (ou admin) pode assumir
+  const canAssumirNadaConsta = userIsAdmin || userSectorKeys.has('DP')
+  const canAssumir =
+    !isFinalizadaOuCancelada && (!isNadaConsta || canAssumirNadaConsta)
 
   // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH ou DP)
   const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
@@ -800,14 +846,35 @@ export function SolicitationDetailModal({
       (detail.solicitacaoSetores ?? []).map((setor) => [setor.setor, setor]),
     )
 
-    return NADA_CONSTA_SETORES.map((setor) => {
-      const registro = setoresMap.get(setor.key)
-      return {
-        key: setor.key,
-        label: setor.label,
-        status: registro?.status ?? 'PENDENTE',
-      }
-    })
+    const setoresRegistrados = (detail.solicitacaoSetores ?? [])
+      .map((registro) => {
+        const setorMeta = NADA_CONSTA_SETORES.find(
+          (setor) => setor.key === registro.setor,
+        )
+
+        if (!setorMeta) return null
+
+        return {
+          key: setorMeta.key,
+          label: setorMeta.label,
+          status: registro.status ?? 'PENDENTE',
+        }
+      })
+      .filter((setor): setor is {
+        key: NadaConstaSetorKey
+        label: string
+        status: string
+      } => Boolean(setor))
+
+    if (setoresRegistrados.length > 0) {
+      return setoresRegistrados
+    }
+
+    return NADA_CONSTA_SETORES.map((setor) => ({
+      key: setor.key,
+      label: setor.label,
+      status: setoresMap.get(setor.key)?.status ?? 'PENDENTE',
+    }))
   })()
  const visibleSetoresNadaConsta = useMemo(
     () => setoresNadaConsta,
@@ -872,7 +939,9 @@ export function SolicitationDetailModal({
           const rawValue = storedCampos[campo.name]
         const normalizedValue =
           campo.name === constaFieldName
-            ? normalizeConstaValue(rawValue)
+            ? activeSector === 'SAUDE'
+              ? normalizeSaudeStatusValue(rawValue)
+              : normalizeConstaValue(rawValue)
             : rawValue
         acc[campo.name] =
           normalizedValue === undefined || normalizedValue === null
@@ -932,7 +1001,7 @@ export function SolicitationDetailModal({
 
   const getCampoDisplayValue = (campo: CampoEspecifico) => {
     if (campo.name === 'centroCustoDestinoId') {
-      return String(
+       return String(
         payloadCampos.centroCustoDestinoText ??
           payloadCampos.centroCustoDestinoIdLabel ??
           payloadCampos.centroCustoIdLabel ??
@@ -942,6 +1011,9 @@ export function SolicitationDetailModal({
     }
 
     const rawValue = payloadCampos[campo.name]
+    if (campo.type === 'date') {
+      return formatFieldDateValue(rawValue)
+    }
     return rawValue !== undefined ? String(rawValue) : ''
   }
 
@@ -1075,26 +1147,60 @@ export function SolicitationDetailModal({
       'w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-base lg:text-sm'
       const isDisabled = !canEditNadaConstaSetor
     const isConstaField = campo.name === constaFieldName
+    const isSaudeConstaField = activeSector === 'SAUDE' && isConstaField
 
     if (isConstaField) {
+      if (isSaudeConstaField) {
+        const normalizedValue = normalizeSaudeStatusValue(value)
+        return (
+          <div key={campo.name} className="space-y-2 text-xs text-slate-700">
+            <span className="font-semibold">{campo.label}</span>
+            <div className="flex flex-wrap gap-4">
+              {SAUDE_STATUS_OPTIONS.map((option) => (
+                <label key={option} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={campo.name}
+                    value={option}
+                    checked={normalizedValue === option}
+                    onChange={() => handleNadaConstaChange(campo.name, option)}
+                    disabled={isDisabled}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      }
       const normalizedValue = normalizeConstaValue(value) as ConstaFlag | ''
+      const options = isSaudeAsoField
+        ? ([
+            { value: 'NADA_CONSTA' as ConstaFlag, label: 'ASO Válido' },
+            { value: 'CONSTA' as ConstaFlag, label: 'Agendamento' },
+          ] as const)
+        : ([
+            { value: 'CONSTA' as ConstaFlag, label: 'Consta' },
+            { value: 'NADA_CONSTA' as ConstaFlag, label: 'Nada Consta' },
+          ] as const)
+
       return (
         <div key={campo.name} className="space-y-2 text-xs text-slate-700">
           <span className="font-semibold">{campo.label}</span>
           <div className="flex flex-wrap gap-4">
-            {(['CONSTA', 'NADA_CONSTA'] as ConstaFlag[]).map((option) => (
-              <label key={option} className="flex items-center gap-2">
+            {options.map((option) => (
+              <label key={option.value} className="flex items-center gap-2">
                 <input
                   type="radio"
                   name={campo.name}
-                  value={option}
-                  checked={normalizedValue === option}
-                  onChange={() => handleNadaConstaChange(campo.name, option)}
+                  value={option.value}
+                  checked={normalizedValue === option.value}
+                  onChange={() =>
+                    handleNadaConstaChange(campo.name, option.value)
+                  }
                   disabled={isDisabled}
                 />
-                <span>
-                  {option === 'CONSTA' ? 'Consta' : 'Nada Consta'}
-                </span>
+                <span>{option.label}</span>
               </label>
             ))}
           </div>
@@ -2028,12 +2134,21 @@ async function handleEncaminharAprovacaoComAnexo() {
                               (registro) => registro.setor === setor.key,
                             )
                             const constaFlag = (setorRegistro?.constaFlag ?? '').toString().toUpperCase()
+                             const saudeStatus = normalizeSaudeStatusValue(setorRegistro?.campos?.saudeStatus)
+                            const isSaudeSetor = setor.key === 'SAUDE'
                             const badgeClass = isConcluida
-                              ? constaFlag === 'CONSTA'
-                                ? 'border-red-200 bg-red-50 text-red-700'
-                                : constaFlag === 'NADA_CONSTA'
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                  : 'border-slate-200 bg-slate-50 text-slate-700'
+                              ? isSaudeSetor
+                                ? saudeStatus === 'Agendamento'
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : saudeStatus === 'ASO Válido'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                                : constaFlag === 'CONSTA'
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : constaFlag === 'NADA_CONSTA'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700'
                               : 'border-yellow-200 bg-yellow-50 text-yellow-700'
 
                             return (
@@ -2052,11 +2167,15 @@ async function handleEncaminharAprovacaoComAnexo() {
                                 <span className="truncate">{setor.label}</span>
                                 <span className="text-[10px] uppercase tracking-wide">
                                   {isConcluida
-                                    ? constaFlag === 'CONSTA'
-                                      ? 'Concluído / Consta'
-                                      : constaFlag === 'NADA_CONSTA'
-                                        ? 'Concluído / Nada Consta'
+                                     ? isSaudeSetor
+                                      ? saudeStatus
+                                        ? `Concluído / ${saudeStatus}`
                                         : 'Concluído'
+                                      : constaFlag === 'CONSTA'
+                                        ? 'Concluído / Consta'
+                                        : constaFlag === 'NADA_CONSTA'
+                                          ? 'Concluído / Nada Consta'
+                                          : 'Concluído'
                                     : 'Pendente'}
                                 </span>
                               </button>

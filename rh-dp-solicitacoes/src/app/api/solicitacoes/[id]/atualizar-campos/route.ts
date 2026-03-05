@@ -10,6 +10,31 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 
+const normalizeConstaValue = (value: unknown): 'CONSTA' | 'NADA_CONSTA' | null => {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+
+  if (normalized === 'CONSTA') return 'CONSTA'
+  if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA') return 'NADA_CONSTA'
+  return null
+}
+
+const normalizeSaudeStatusValue = (value: unknown): 'ASO Válido' | 'Agendamento' | null => {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+
+  if (normalized === 'ASO VALIDO') return 'ASO Válido'
+  if (normalized === 'AGENDAMENTO') return 'Agendamento'
+  return null
+}
 
 export async function POST(
   req: NextRequest,
@@ -137,27 +162,28 @@ export async function POST(
     }
 
     const statusValue = camposAtualizados[setorMeta.constaField]
-    const normalizedStatus =
-      typeof statusValue === 'string'
-        ? statusValue
-            .trim()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase()
-        : ''
+    const saudeStatus =
+      normalizedSetor === 'SAUDE' ? normalizeSaudeStatusValue(statusValue) : null
     const constaFlag =
-      normalizedStatus === 'CONSTA'
-        ? 'CONSTA'
-        : normalizedStatus === 'NADA CONSTA' ||
-            normalizedStatus === 'NADA_CONSTA'
-          ? 'NADA_CONSTA'
-          : null
+      normalizedSetor === 'SAUDE'
+        ? // Para manter compatibilidade com os badges existentes, mapeamos o status de Saúde em constaFlag.
+          saudeStatus === 'Agendamento'
+          ? 'CONSTA'
+          : saudeStatus === 'ASO Válido'
+            ? 'NADA_CONSTA'
+            : null
+        : normalizeConstaValue(statusValue)
 
     const shouldFinalize =
       action === 'FINALIZAR' || Boolean(finalizarSetor ?? finalizar)
     if (shouldFinalize && !constaFlag) {
       return NextResponse.json(
-        { error: 'Informe o status (Consta ou Nada Consta) antes de finalizar.' },
+        {
+          error:
+            normalizedSetor === 'SAUDE'
+              ? 'Informe o status (ASO Válido ou Agendamento) antes de finalizar.'
+              : 'Informe o status (Consta ou Nada Consta) antes de finalizar.',
+        },
         { status: 400 },
       )
     }

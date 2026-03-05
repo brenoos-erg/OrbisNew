@@ -85,13 +85,24 @@ export const NADA_CONSTA_TI_FIELDS: NadaConstaCampoDef[] = [
   },
 ]
 
+export const NADA_CONSTA_SAUDE_FIELDS: NadaConstaCampoDef[] = [
+  {
+    name: 'saudeStatus',
+    label: 'Status do ASO',
+    type: 'select',
+    options: ['ASO Válido', 'Agendamento'],
+    stage: 'saude',
+    section: 'Saúde',
+  },
+]
+
 export function getNadaConstaDefaultFieldsForSetor(
   setor: NadaConstaSetorKey,
 ): NadaConstaCampoDef[] {
   if (setor === 'TI') return NADA_CONSTA_TI_FIELDS
+  if (setor === 'SAUDE') return NADA_CONSTA_SAUDE_FIELDS
   return []
 }
-
 export const NADA_CONSTA_SETORES: {
   key: NadaConstaSetorKey
   label: string
