@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
       deptIds.add(link.departmentId)
     }
 
-    const tipoApproverViewerFilter = {
+   const tipoApproverViewerFilter = {
       tipo: {
         approvers: {
           some: {
@@ -125,7 +125,6 @@ export async function GET(req: NextRequest) {
         },
       },
     }
-
 
     const isDpUser =
       me.department?.code === '08' ||
@@ -141,6 +140,7 @@ export async function GET(req: NextRequest) {
       isDpUser && dpDepartmentId
         ? [{ costCenterId: null, departmentId: dpDepartmentId }]
         : []
+
     const gestorAvaliadorFilter = {
       approverId: me.id,
       status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
         ? [{ costCenterId: where.costCenterId }]
         : []
 
-      if (receivedFilters.length === 0) {
+       if (receivedFilters.length === 0) {
         where.AND = [
           ...(where.AND ?? []),
           { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
         ...dpFilters,
       ]
 
-     if (receivedFilters.length === 0) {
+      if (receivedFilters.length === 0) {
        where.AND = [
           ...(where.AND ?? []),
           { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
