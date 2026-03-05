@@ -334,7 +334,9 @@ export default function ReceivedRequestsPage() {
                     <td className="px-4 py-2 text-xs">
                       {row.status === 'ABERTA'
                         ? '-'
-                        : row.responsavel?.fullName ?? '-'}
+                        : row.status === 'CONCLUIDA'
+                          ? (row.finalizador?.fullName ?? row.responsavel?.fullName ?? '-')
+                          : (row.responsavel?.fullName ?? '-')}
                     </td>
                   </tr>
                 ))}

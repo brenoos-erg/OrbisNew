@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
       },
     ]
 
-    const [solicitations, total] = await Promise.all([
+   const [solicitations, total] = await Promise.all([
       prisma.solicitation.findMany({
         where,
         skip,
@@ -209,12 +209,25 @@ export async function GET(req: NextRequest) {
           approver: { select: { id: true, fullName: true } },
           assumidaPor: { select: { id: true, fullName: true } },
           solicitante: { select: { id: true, fullName: true } },
+          eventos: {
+            where: {
+              tipo: {
+                in: ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'],
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: { actor: { select: { id: true, fullName: true } } },
+          },
         },
       }),
       prisma.solicitation.count({ where }),
     ])
 
-    const rows = solicitations.map((s) => ({
+   const rows = solicitations.map((s) => {
+      const finalizadorEvent = s.eventos?.[0] ?? null
+
+      return {
       id: s.id,
       titulo: s.titulo,
       status: s.status,
@@ -223,6 +236,10 @@ export async function GET(req: NextRequest) {
       tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
       responsavelId: s.assumidaPor?.id ?? null,
       responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+      finalizadorId: finalizadorEvent?.actor?.id ?? null,
+      finalizador: finalizadorEvent?.actor
+        ? { fullName: finalizadorEvent.actor.fullName }
+        : null,
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
       sla: null,
       setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
@@ -231,7 +248,8 @@ export async function GET(req: NextRequest) {
       approvalStatus: s.approvalStatus,
       costCenterId: s.costCenterId ?? null,
       approverId: s.approver?.id ?? s.approverId ?? null,
-    }))
+      }
+    })
 
     return NextResponse.json({ rows, total })
   } catch (err) {

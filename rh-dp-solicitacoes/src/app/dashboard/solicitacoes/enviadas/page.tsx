@@ -289,15 +289,22 @@ export default function SentRequestsPage() {
 
   const exportCsv = () => {
     const header = ['Status', 'Protocolo', 'Data Abertura', 'Solicitação', 'SLA', 'Departamento responsável', 'Atendente']
-    const rows = data.map((r) => [
-      r.status ?? '',
-      r.protocolo ?? '',
-      r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '',
-      r.titulo ?? r.tipo?.nome ?? '',
-      r.sla ?? '',
-      r.setorDestino ?? '',
-      r.responsavel?.fullName ?? '',
-    ])
+    const rows = data.map((r) => {
+      const atendente =
+        r.status === 'CONCLUIDA'
+          ? (r.finalizador?.fullName ?? r.responsavel?.fullName ?? '')
+          : (r.responsavel?.fullName ?? '')
+
+      return [
+        r.status ?? '',
+        r.protocolo ?? '',
+        r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '',
+        r.titulo ?? r.tipo?.nome ?? '',
+        r.sla ?? '',
+        r.setorDestino ?? '',
+        atendente,
+      ]
+    })
     const csv = [header, ...rows].map((l) => l.map(escapeCsv).join(';')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -495,7 +502,11 @@ export default function SentRequestsPage() {
                     <td className="px-3 py-2">{r.titulo ?? r.tipo?.nome ?? '-'}</td>
                     <td className="px-3 py-2">{r.sla ?? '-'}</td>
                     <td className="px-3 py-2">{r.setorDestino ?? '-'}</td>
-                    <td className="px-3 py-2">{r.responsavel?.fullName ?? '-'}</td>
+                    <td className="px-3 py-2">
+                      {r.status === 'CONCLUIDA'
+                        ? (r.finalizador?.fullName ?? r.responsavel?.fullName ?? '-')
+                        : (r.responsavel?.fullName ?? '-')}
+                    </td>
                   </tr>
                 ))}
               </tbody>

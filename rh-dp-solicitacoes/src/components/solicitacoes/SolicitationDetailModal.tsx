@@ -36,6 +36,8 @@ export type Row = {
   tipo?: { codigo?: string; nome: string } | null
   responsavel?: { fullName: string } | null
   responsavelId?: string | null
+  finalizador?: { fullName: string } | null
+  finalizadorId?: string | null
   autor?: { fullName: string } | null
   sla?: string | null
   setorDestino?: string | null

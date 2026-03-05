@@ -286,7 +286,7 @@ export const GET = withModuleLevel(
           ]
         }
 
-        const listStartedAt = performance.now()
+     const listStartedAt = performance.now()
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
@@ -300,13 +300,26 @@ export const GET = withModuleLevel(
               approver: { select: { id: true, fullName: true } },
               assumidaPor: { select: { id: true, fullName: true } },
               solicitante: { select: { id: true, fullName: true } },
-            },
+              eventos: {
+                where: {
+                  tipo: {
+                    in: ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'],
+                  },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                include: { actor: { select: { id: true, fullName: true } } },
+              },
+           },
           }),
           prisma.solicitation.count({ where }),
         ])
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
 
-        const rows = solicitations.map((s) => ({
+        const rows = solicitations.map((s) => {
+  const finalizadorEvent = s.eventos?.[0] ?? null
+
+  return {
   id: s.id,
   titulo: s.titulo,
   status: s.status,
@@ -316,6 +329,10 @@ export const GET = withModuleLevel(
 
   responsavelId: s.assumidaPor?.id ?? null,
   responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+  finalizadorId: finalizadorEvent?.actor?.id ?? null,
+  finalizador: finalizadorEvent?.actor
+    ? { fullName: finalizadorEvent.actor.fullName }
+    : null,
 
   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
@@ -328,7 +345,8 @@ export const GET = withModuleLevel(
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,
-}))
+}
+})
         return NextResponse.json({ rows, total })
       } catch (e) {
         console.error('GET /api/solicitacoes error', e)
