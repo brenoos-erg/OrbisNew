@@ -180,6 +180,135 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
       return NextResponse.json({ solicitation: updated }, { status: 200 })
     }
 
+     if (isSolicitacaoPessoalTipo) {
+      const agora = new Date()
+      const dpDepartment = await prisma.department.findFirst({
+        where: {
+          OR: [
+            { code: '08' },
+            { code: 'DP' },
+            { name: { contains: 'Pessoal' } },
+            { name: { contains: 'pessoal' } },
+          ],
+        },
+      })
+
+      const dpCostCenter = await prisma.costCenter.findFirst({
+        where: {
+          OR: [
+            { externalCode: '590' },
+            { description: { contains: 'Pessoal' } },
+            { description: { contains: 'pessoal' } },
+          ],
+        },
+      })
+
+      const payloadComCampos = {
+        ...payloadOrigem,
+        campos: {
+          ...camposOrigem,
+          ...(candidatoNome
+            ? { candidatoNome }
+            : camposOrigem.candidatoNome
+              ? { candidatoNome: camposOrigem.candidatoNome }
+              : {}),
+          ...(candidatoDocumento
+            ? { candidatoDocumento }
+            : camposOrigem.candidatoDocumento
+              ? { candidatoDocumento: camposOrigem.candidatoDocumento }
+              : {}),
+          ...(dataAdmissaoPrevista
+            ? { dataAdmissaoPrevista }
+            : camposOrigem.dataAdmissaoPrevista
+              ? { dataAdmissaoPrevista: camposOrigem.dataAdmissaoPrevista }
+              : {}),
+          ...(salario
+            ? { salario }
+            : camposOrigem.salario
+              ? { salario: camposOrigem.salario }
+              : {}),
+          ...(cargo
+            ? { cargoFinal: cargo }
+            : camposOrigem.cargoFinal
+              ? { cargoFinal: camposOrigem.cargoFinal }
+              : {}),
+          ...(outrasInfos ?? {}),
+        },
+      }
+
+      const isDpPending = payloadOrigem?.dpStatus === 'PENDENTE'
+      const isHandoffPhase = isDpDestino || isDpPending || Boolean(payloadOrigem?.dpHandoffAt)
+
+      if (!isHandoffPhase) {
+        const updated = await prisma.solicitation.update({
+          where: { id: solicitation.id },
+          data: {
+            status: 'EM_ATENDIMENTO',
+            departmentId: dpDepartment?.id ?? solicitation.departmentId,
+            costCenterId: dpCostCenter?.id ?? solicitation.costCenterId,
+            payload: {
+              ...payloadComCampos,
+              dpHandoffAt: agora.toISOString(),
+              dpHandoffBy: me.id,
+              dpStatus: 'PENDENTE',
+            },
+          },
+        })
+
+        await prisma.solicitationTimeline.create({
+          data: {
+            solicitationId: solicitation.id,
+            status: 'AGUARDANDO_ATENDIMENTO_DP',
+            message: `Chamado encaminhado para o DP por ${me.fullName ?? me.id} e aguardando conclusão do setor.`,
+          },
+        })
+
+        await prisma.event.create({
+          data: {
+            id: randomUUID(),
+            solicitationId: solicitation.id,
+            actorId: me.id,
+            tipo: 'ENCAMINHADA_DP',
+          },
+        })
+
+        return NextResponse.json({ solicitation: updated, handoff: true }, { status: 200 })
+      }
+
+      const updated = await prisma.solicitation.update({
+        where: { id: solicitation.id },
+        data: {
+          status: 'CONCLUIDA',
+          dataFechamento: agora,
+          payload: {
+            ...payloadComCampos,
+            dpStatus: 'CONCLUIDO',
+            dpFinishedAt: agora.toISOString(),
+            dpFinishedBy: me.id,
+          },
+        },
+      })
+
+      await prisma.solicitationTimeline.create({
+        data: {
+          solicitationId: solicitation.id,
+          status: 'CONCLUIDA',
+          message: `Solicitação concluída pelo DP em ${agora.toLocaleDateString('pt-BR')}.`,
+        },
+      })
+
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: solicitation.id,
+          actorId: me.id,
+          tipo: 'FINALIZADA_DP',
+        },
+      })
+
+      return NextResponse.json({ solicitation: updated, handoff: false }, { status: 200 })
+    }
+
 
 
     if (

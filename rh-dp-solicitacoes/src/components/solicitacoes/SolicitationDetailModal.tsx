@@ -1655,7 +1655,9 @@ async function handleEncaminharAprovacaoComAnexo() {
         isSolicitacaoPessoalTipo
           ? action === 'CANCELAR_VAGA'
             ? 'Vaga cancelada com sucesso.'
-            : 'Solicitação finalizada no RH e chamada de admissão criada no DP.'
+            : isDpDestino
+              ? 'Solicitação concluída pelo DP.'
+              : 'Solicitação encaminhada para o DP e aguardando conclusão do setor.'
           : isDesligamento && isDpDestino
             ? 'Solicitação finalizada pelo DP.'
             : 'Solicitação finalizada no RH e encaminhada ao DP para conclusão.',
