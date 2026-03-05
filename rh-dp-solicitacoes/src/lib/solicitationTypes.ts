@@ -308,7 +308,7 @@ export function isSolicitacaoEquipamento(tipo?: TipoSolicitacaoLike | null) {
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EQUIPAMENTO_TIPO_ID || id === SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT) return true
   const nome = normalizeSolicitacaoName(tipo.nome)
-  return nome.includes('SOLICITACAO DE EQUIPAMENTO')
+  return nome === normalizeSolicitacaoName(SOLICITACAO_EQUIPAMENTO_TIPO_NOME)
 }
 
 export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {
