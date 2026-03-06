@@ -436,15 +436,9 @@ async function buildPayload(
       }
 
   return {
-    solicitante: {
-      fullName: user?.fullName ?? '',
-      email: user?.email ?? '',
-      login: user?.login ?? '',
-      phone: user?.phone ?? '',
-      costCenterText: user?.costCenter
-        ? formatCostCenterLabel(user.costCenter, '')
-        : '',
-    },
+    solicitarParaOutroColaborador,
+    solicitanteManual: solicitarParaOutroColaborador ? payloadSolicitante : null,
+    solicitante: payloadSolicitante,
     campos,
   }
 }
@@ -479,8 +473,13 @@ export const POST = withModuleLevel(
             ? idempotencyKeyRaw.trim()
             : null
         requestId = req.headers.get('x-request-id') ?? crypto.randomUUID()
-        const solicitanteId = me.id
+         const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
+        const solicitarParaOutroColaborador = body.solicitarParaOutroColaborador === true
+        const solicitanteManual =
+          body.solicitanteManual && typeof body.solicitanteManual === 'object'
+            ? (body.solicitanteManual as Record<string, unknown>)
+            : null
 
         console.info('POST /api/solicitacoes request', {
           requestId,
@@ -511,6 +510,22 @@ export const POST = withModuleLevel(
             },
             { status: 400 },
           )
+        }
+         if (solicitarParaOutroColaborador) {
+          const fullName = String(solicitanteManual?.fullName ?? '').trim()
+          const email = String(solicitanteManual?.email ?? '').trim()
+          const login = String(solicitanteManual?.login ?? '').trim()
+          const costCenterIdManual = String(solicitanteManual?.costCenterId ?? '').trim()
+
+          if (!fullName || !email || !login || !costCenterIdManual) {
+            return NextResponse.json(
+              {
+                error:
+                  'Ao solicitar para outro colaborador, informe nome, e-mail, login e centro de custo.',
+              },
+              { status: 400 },
+            )
+          }
         }
 
         const tipo = await prisma.tipoSolicitacao.findUnique({
@@ -569,7 +584,22 @@ export const POST = withModuleLevel(
          if (isSolicitacaoDesligamento(tipo)) {
           campos.gestorSolicitanteInfo = `${me.fullName ?? me.login} / Cargo: gestor solicitante / Data: ${new Date().toISOString().slice(0, 10)}`
         }
-        const payload: any = await buildPayload(solicitanteId, campos)
+        const payload: any = await buildPayload(solicitanteId, campos, {
+          solicitarParaOutroColaborador,
+          solicitanteManual: solicitanteManual
+            ? {
+                fullName: String(solicitanteManual.fullName ?? ''),
+                email: String(solicitanteManual.email ?? ''),
+                login: String(solicitanteManual.login ?? ''),
+                phone: String(solicitanteManual.phone ?? ''),
+                positionName: String(solicitanteManual.positionName ?? ''),
+                departmentName: String(solicitanteManual.departmentName ?? ''),
+                leaderName: String(solicitanteManual.leaderName ?? ''),
+                costCenterId: String(solicitanteManual.costCenterId ?? ''),
+                costCenterText: String(solicitanteManual.costCenterText ?? ''),
+              }
+            : null,
+        })
          const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
 
         if (isAvaliacaoExperiencia) {

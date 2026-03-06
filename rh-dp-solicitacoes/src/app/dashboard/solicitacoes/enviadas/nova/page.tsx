@@ -1492,23 +1492,24 @@ useEffect(() => {
                     value={me.leaderName ?? ''}
                     readOnly
                   />
-                  <input
+                   <input
                     className={inputClass}
                     placeholder="Telefone"
                     value={me.phone ?? ''}
                     readOnly
                   />
                   <input
-                    className={inputClass}
-                    placeholder="Centro de Custo"
-                    value={me.costCenterName ?? ''}
-                    readOnly
-                  />
-                </div>
-              )}
-            </aside>
-          </div>
-
+	                    className={inputClass}
+	                    placeholder="Centro de Custo"
+	                    value={me.costCenterName ?? ''}
+	                    readOnly
+	                  />
+	                </div>
+	              )}
+	            </div>
+	          )}
+	            </aside>
+	          </div>
            </>
           )}
 
