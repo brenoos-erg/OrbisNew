@@ -132,7 +132,7 @@ export async function GET(
       anexos: dedupedAttachments.map((a) => ({
         id: a.id,
         filename: a.filename,
-        url: a.url,
+        url: `/api/solicitacoes/${a.solicitationId}/anexos/${a.id}`,
         mimeType: a.mimeType,
         sizeBytes: a.sizeBytes,
         createdAt: a.createdAt.toISOString(),
