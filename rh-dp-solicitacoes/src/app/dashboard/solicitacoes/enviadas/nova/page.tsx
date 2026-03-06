@@ -39,6 +39,17 @@ type UserMe = {
   costCenterName: string | null;
 };
 
+type SolicitanteManualForm = {
+  fullName: string;
+  email: string;
+  login: string;
+  phone: string;
+  positionName: string;
+  departmentName: string;
+  leaderName: string;
+  costCenterId: string;
+};
+
 
 type Departamento = {
   id: string;
@@ -236,6 +247,18 @@ export default function NovaSolicitacaoPage() {
   const [me, setMe] = useState<UserMe | null>(null);
   const [meLoading, setMeLoading] = useState(true);
   const [meError, setMeError] = useState<string | null>(null);
+  const [solicitarParaOutroColaborador, setSolicitarParaOutroColaborador] = useState(false);
+  const [solicitanteManual, setSolicitanteManual] = useState<SolicitanteManualForm>({
+    fullName: '',
+    email: '',
+    login: '',
+    phone: '',
+    positionName: '',
+    departmentName: '',
+    leaderName: '',
+    costCenterId: '',
+  });
+
 
 // ---------- CAMPOS DO CABEÇALHO ----------
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
@@ -656,6 +679,13 @@ export default function NovaSolicitacaoPage() {
     }));
   };
 
+  const handleSolicitanteManualChange = (name: keyof SolicitanteManualForm, value: string) => {
+    setSolicitanteManual((prev) => ({
+      ...prev,
+      [name]: name === 'phone' ? formatBrazilPhone(value) : value,
+    }));
+  };
+
   const handleCheckboxChange = (name: string, checked: boolean) => {
     if (isRQ247 && RQ247_MOTIVO_FIELDS.includes(name as (typeof RQ247_MOTIVO_FIELDS)[number])) {
       if (!checked) {
@@ -987,12 +1017,52 @@ export default function NovaSolicitacaoPage() {
           }
         }
       }
+      if (solicitarParaOutroColaborador) {
+        if (!solicitanteManual.fullName.trim()) {
+          setSubmitError('Informe o nome completo do colaborador solicitante.');
+          setSubmitting(false);
+          return;
+        }
+
+        if (!solicitanteManual.email.trim()) {
+          setSubmitError('Informe o e-mail do colaborador solicitante.');
+          setSubmitting(false);
+          return;
+        }
+
+        if (!solicitanteManual.login.trim()) {
+          setSubmitError('Informe o login do colaborador solicitante.');
+          setSubmitting(false);
+          return;
+        }
+
+        if (!solicitanteManual.costCenterId.trim()) {
+          setSubmitError('Selecione o centro de custo do colaborador solicitante.');
+          setSubmitting(false);
+          return;
+        }
+      }
+
 
       const body = {
         solicitanteId: me?.id ?? null,
         departmentId: departamentoId,
         tipoId,
         campos,
+        solicitarParaOutroColaborador,
+        solicitanteManual: solicitarParaOutroColaborador
+          ? {
+              fullName: solicitanteManual.fullName.trim(),
+              email: solicitanteManual.email.trim(),
+              login: solicitanteManual.login.trim(),
+              phone: solicitanteManual.phone.trim(),
+              positionName: solicitanteManual.positionName.trim(),
+              departmentName: solicitanteManual.departmentName.trim(),
+              leaderName: solicitanteManual.leaderName.trim(),
+              costCenterId: solicitanteManual.costCenterId,
+              costCenterText: buildCostCenterLabel(solicitanteManual.costCenterId),
+            }
+          : null,
         idempotencyKey: idempotencyKeyRef.current,
        };
 
@@ -1295,12 +1365,97 @@ useEffect(() => {
                 </p>
               )}
 
-              {meError && (
+               {meError && (
                 <p className="mt-2 text-xs text-red-500">{meError}</p>
               )}
 
               {me && (
-                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="mt-3 space-y-3">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                      checked={solicitarParaOutroColaborador}
+                      onChange={(event) => setSolicitarParaOutroColaborador(event.target.checked)}
+                    />
+                    Solicitar para outro colaborador
+                  </label>
+
+                  {solicitarParaOutroColaborador ? (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <input
+                        className={inputClass}
+                        placeholder="Nome completo"
+                        value={solicitanteManual.fullName}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('fullName', event.target.value)
+                        }
+                        required
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="E-mail"
+                        type="email"
+                        value={solicitanteManual.email}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('email', event.target.value)
+                        }
+                        required
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="Login"
+                        value={solicitanteManual.login}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('login', event.target.value)
+                        }
+                        required
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="Cargo"
+                        value={solicitanteManual.positionName}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('positionName', event.target.value)
+                        }
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="Setor"
+                        value={solicitanteManual.departmentName}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('departmentName', event.target.value)
+                        }
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="Líder"
+                        value={solicitanteManual.leaderName}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('leaderName', event.target.value)
+                        }
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="Telefone"
+                        value={solicitanteManual.phone}
+                        onChange={(event: InputChange) =>
+                          handleSolicitanteManualChange('phone', event.target.value)
+                        }
+                      />
+                      <CostCenterSelect
+                        value={solicitanteManual.costCenterId}
+                        options={costCenters}
+                        onValueChange={(nextValue) =>
+                          handleSolicitanteManualChange('costCenterId', nextValue)
+                        }
+                        placeholder="Centro de custo"
+                        name="solicitanteManualCostCenterId"
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <input
                     className={inputClass}
                     placeholder="Nome"

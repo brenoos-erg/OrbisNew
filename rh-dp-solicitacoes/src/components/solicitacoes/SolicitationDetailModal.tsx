@@ -102,12 +102,18 @@ type PayloadSolicitante = {
   email?: string
   login?: string
   phone?: string
-  costCenterText?: string
+  positionName?: string
+  departmentName?: string
+  leaderName?: string
+  costCenterId?: string
+   costCenterText?: string
 }
 
 type Payload = {
   campos?: Record<string, any>
   solicitante?: PayloadSolicitante
+  solicitarParaOutroColaborador?: boolean
+  solicitanteManual?: PayloadSolicitante | null
   [key: string]: any
 }
 type AvaliacaoGestorForm = {
@@ -987,13 +993,19 @@ export function SolicitationDetailModal({
     ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
     : camposSchema
 
-  const costCenterLabel = useMemo(
-    () =>
-      detail?.costCenter
-        ? formatCostCenterLabel(detail.costCenter, '')
-        : payloadSolic?.costCenterText || '',
-    [detail?.costCenter, payloadSolic?.costCenterText],
-  )
+  const costCenterLabel = useMemo(() => {
+    if (payload.solicitarParaOutroColaborador) {
+      return payloadSolic?.costCenterText || ''
+    }
+
+    return detail?.costCenter
+      ? formatCostCenterLabel(detail.costCenter, '')
+      : payloadSolic?.costCenterText || ''
+  }, [
+    detail?.costCenter,
+    payload.solicitarParaOutroColaborador,
+    payloadSolic?.costCenterText,
+  ])
 
   const getCampoDisplayValue = (campo: CampoEspecifico) => {
     if (campo.name === 'centroCustoDestinoId') {
@@ -1894,6 +1906,18 @@ async function handleEncaminharAprovacaoComAnexo() {
                       <div>
                         <label className={LABEL_RO}>Telefone</label>
                         <input className={INPUT_RO} readOnly value={payloadSolic.phone ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Cargo</label>
+                        <input className={INPUT_RO} readOnly value={payloadSolic.positionName ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Setor</label>
+                        <input className={INPUT_RO} readOnly value={payloadSolic.departmentName ?? ''} />
+                      </div>
+                      <div>
+                        <label className={LABEL_RO}>Líder</label>
+                        <input className={INPUT_RO} readOnly value={payloadSolic.leaderName ?? ''} />
                       </div>
                       <div>
                          <label className={LABEL_RO}>Centro de Custo</label>

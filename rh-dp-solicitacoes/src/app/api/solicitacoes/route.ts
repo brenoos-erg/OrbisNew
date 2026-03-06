@@ -370,11 +370,70 @@ export const GET = withModuleLevel(
 async function buildPayload(
   solicitanteId: string,
   campos: Record<string, any>,
+  options?: {
+    solicitarParaOutroColaborador?: boolean
+    solicitanteManual?: {
+      fullName?: string
+      email?: string
+      login?: string
+      phone?: string
+      positionName?: string
+      departmentName?: string
+      leaderName?: string
+      costCenterId?: string
+      costCenterText?: string
+    } | null
+  },
 ) {
+  const solicitarParaOutroColaborador = options?.solicitarParaOutroColaborador === true
+  const solicitanteManual = options?.solicitanteManual ?? null
+
   const user = await prisma.user.findUnique({
     where: { id: solicitanteId },
-    include: { costCenter: true },
+    include: {
+      costCenter: true,
+      position: true,
+      department: true,
+      leader: true,
+    },
   })
+  let manualCostCenterText = ''
+  if (solicitanteManual?.costCenterId) {
+    const manualCostCenter = await prisma.costCenter.findUnique({
+      where: { id: solicitanteManual.costCenterId },
+    })
+
+    if (manualCostCenter) {
+      manualCostCenterText = formatCostCenterLabel(manualCostCenter, '')
+    }
+  }
+
+  const payloadSolicitante = solicitarParaOutroColaborador
+    ? {
+        fullName: solicitanteManual?.fullName ?? '',
+        email: solicitanteManual?.email ?? '',
+        login: solicitanteManual?.login ?? '',
+        phone: solicitanteManual?.phone ?? '',
+        positionName: solicitanteManual?.positionName ?? '',
+        departmentName: solicitanteManual?.departmentName ?? '',
+        leaderName: solicitanteManual?.leaderName ?? '',
+        costCenterId: solicitanteManual?.costCenterId ?? '',
+        costCenterText:
+          manualCostCenterText || solicitanteManual?.costCenterText || '',
+      }
+    : {
+        fullName: user?.fullName ?? '',
+        email: user?.email ?? '',
+        login: user?.login ?? '',
+        phone: user?.phone ?? '',
+        positionName: user?.position?.name ?? '',
+        departmentName: user?.department?.name ?? '',
+        leaderName: user?.leader?.fullName ?? '',
+        costCenterId: user?.costCenterId ?? '',
+        costCenterText: user?.costCenter
+          ? formatCostCenterLabel(user.costCenter, '')
+          : '',
+      }
 
   return {
     solicitante: {
