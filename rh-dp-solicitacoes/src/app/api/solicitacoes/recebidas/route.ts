@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
+import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
@@ -112,8 +113,18 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    for (const link of departmentLinks) {
+     for (const link of departmentLinks) {
       deptIds.add(link.departmentId)
+    }
+
+    const setorKeys = new Set<string>()
+    for (const setor of resolveNadaConstaSetoresByDepartment(me.department)) {
+      setorKeys.add(setor)
+    }
+    for (const link of departmentLinks) {
+      for (const setor of resolveNadaConstaSetoresByDepartment(link.department)) {
+        setorKeys.add(setor)
+      }
     }
 
    const tipoApproverViewerFilter = {
@@ -164,10 +175,13 @@ export async function GET(req: NextRequest) {
         ]
       }
     } else {
-      const receivedFilters = [
+     const receivedFilters = [
         ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
         ...(deptIds.size > 0 ? [{ departmentId: { in: [...deptIds] } }] : []),
         ...dpFilters,
+        ...(setorKeys.size > 0
+          ? [{ solicitacaoSetores: { some: { setor: { in: [...setorKeys] } } } }]
+          : []),
       ]
 
       if (receivedFilters.length === 0) {

@@ -575,8 +575,10 @@ export function SolicitationDetailModal({
   const [valorMensalCurso, setValorMensalCurso] = useState('')
   const [filesToUpload, setFilesToUpload] = useState<FileList | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [novoComentario, setNovoComentario] = useState('')
+  const [salvandoComentario, setSalvandoComentario] = useState(false)
   const [rhDataExameDemissional, setRhDataExameDemissional] = useState('')
    const [rhDataLiberacaoPpp, setRhDataLiberacaoPpp] = useState('')
   const [rhConsideracoes, setRhConsideracoes] = useState('')
@@ -1060,10 +1062,47 @@ export function SolicitationDetailModal({
       const res = await fetch(`/api/solicitacoes/${id}`)
       if (!res.ok) return
 
-      const json = (await res.json()) as SolicitationDetail
+     const json = (await res.json()) as SolicitationDetail
       setDetail(json)
     } catch (err) {
       console.error('Erro ao atualizar detalhes após ação', err)
+    }
+  }
+
+  async function handleAdicionarComentario() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    const texto = novoComentario.trim()
+    if (!texto) {
+      setCloseError('Informe uma observação para registrar no histórico.')
+      return
+    }
+
+    setSalvandoComentario(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/comentarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Erro ao adicionar observação.')
+      }
+
+      setNovoComentario('')
+      setCloseSuccess('Observação adicionada ao histórico de atendimento.')
+      await refreshDetailFromServer()
+    } catch (err: any) {
+      console.error('Erro ao adicionar observação da solicitação', err)
+      setCloseError(err?.message ?? 'Erro ao adicionar observação.')
+    } finally {
+      setSalvandoComentario(false)
     }
   }
   async function handleSalvarAvaliacaoGestor() {
@@ -2978,6 +3017,26 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
               </aside>
             )}
+            {showManagementActions && !isFinalizadaOuCancelada && (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+            <label className={LABEL_RO}>Observação do atendimento</label>
+            <textarea
+              value={novoComentario}
+              onChange={(event) => setNovoComentario(event.target.value)}
+              rows={3}
+              placeholder="Registre comentários ou informações adicionais"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleAdicionarComentario}
+              disabled={salvandoComentario || !novoComentario.trim()}
+              className="mt-2 w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
+            >
+              {salvandoComentario ? 'Salvando observação...' : 'Adicionar observação'}
+            </button>
+          </div>
+        )}
         <div className="mt-4 border-t border-slate-200 pt-3">
               <div className="text-xs">
               {closeError && <p className="text-red-600">{closeError}</p>}
