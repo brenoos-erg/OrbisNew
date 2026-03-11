@@ -77,7 +77,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
    if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
-    const userCostCenterIds = await getUserCostCenterIds(me.id)
+     const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
     const canAccess = canUserAccessNc({
       userId: me.id,
       level,
@@ -128,7 +128,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     if (!current) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
-    const userCostCenterIds = await getUserCostCenterIds(me.id)
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
     const canTreat = canUserTreatNc({
       userId: me.id,
       level,

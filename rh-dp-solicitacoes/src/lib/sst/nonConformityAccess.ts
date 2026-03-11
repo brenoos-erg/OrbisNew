@@ -28,8 +28,8 @@ type NonConformityAccessInput = {
   userId: string
   level: ModuleLevel | undefined
   ncSolicitanteId: string
-  centroQueDetectouId: string
-  centroQueOriginouId: string
+  centroQueDetectouId: string | null
+  centroQueOriginouId: string | null
   userCostCenterIds?: string[]
 }
 
@@ -45,7 +45,10 @@ export function canUserAccessNc({
   if (ncSolicitanteId === userId) return true
 
   const cc = new Set(userCostCenterIds)
-  return cc.has(centroQueDetectouId) || cc.has(centroQueOriginouId)
+  return Boolean(
+    (centroQueDetectouId && cc.has(centroQueDetectouId)) ||
+      (centroQueOriginouId && cc.has(centroQueOriginouId)),
+  )
 }
 
 export function canUserTreatNc(input: NonConformityAccessInput): boolean {

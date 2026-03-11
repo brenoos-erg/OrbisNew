@@ -6,12 +6,14 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
-    if (!hasMinLevel(normalizeSstLevel(levels), ModuleLevel.NIVEL_1)) {
+    const level = normalizeSstLevel(levels)
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
@@ -20,9 +22,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!texto) return NextResponse.json({ error: 'Comentário é obrigatório.' }, { status: 400 })
 
     const id = (await params).id
-    const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { id: true, solicitanteId: true } })
+    const nc = await prisma.nonConformity.findUnique({
+      where: { id },
+      select: { id: true, solicitanteId: true, centroQueDetectouId: true, centroQueOriginouId: true },
+    })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canAccess = canUserAccessNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+
+    if (!canAccess) {
+      return NextResponse.json({ error: 'Sem permissão para comentar nesta NC.' }, { status: 403 })
+    }
     const comment = await prisma.$transaction(async (tx) => {
       const created = await tx.nonConformityComment.create({
         data: { nonConformityId: id, autorId: me.id, texto },

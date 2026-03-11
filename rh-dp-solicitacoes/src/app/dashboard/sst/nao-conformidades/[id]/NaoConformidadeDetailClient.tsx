@@ -8,6 +8,19 @@ import GutRadarCard from '@/components/sst/GutRadarCard'
 import { GUT_OPTIONS } from '@/lib/sst/gut'
 import { actionStatusLabel, nonConformityTypeLabel } from '@/lib/sst/serializers'
 
+type CommentAuthor = {
+  id: string
+  fullName: string | null
+  email: string | null
+}
+
+type CommentItem = {
+  id: string
+  texto: string
+  createdAt: string
+  autor: CommentAuthor | null
+}
+
 type ActionItem = {
   id: string
   descricao: string
@@ -38,14 +51,13 @@ type Detail = {
   status: string
   aprovadoQualidadeStatus: string
   anexos?: any[]
-  comentarios?: any[]
+  comentarios?: CommentItem[]
   timeline?: any[]
   planoDeAcao?: ActionItem[]
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
   permissions?: { canManageAllNc?: boolean }
 }
-
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
 const ACTION_STATUS_OPTIONS = Object.values(NonConformityActionStatus)
@@ -89,6 +101,12 @@ function formatActionDate(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString('pt-BR')
+}
+
+function formatCommentDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('pt-BR')
 }
 
 function csvEscape(value: string) {
@@ -697,10 +715,28 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
       {activeSection === 'comentarios' ? (
         <Card title="Comentários">
-          <form onSubmit={sendComment} className="mb-3 space-y-2">
+          <form onSubmit={sendComment} className="mb-4 space-y-2">
             <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" placeholder="Adicionar comentário" />
             <div className="text-right"><button className="rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white">Enviar comentário</button></div>
           </form>
+
+          {item.comentarios?.length ? (
+            <ul className="space-y-3">
+              {item.comentarios.map((comentario) => (
+                <li key={comentario.id} className="rounded-md border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500">
+                    {comentario.autor?.fullName || 'Sistema'}
+                    {comentario.autor?.email ? ` · ${comentario.autor.email}` : ''}
+                    {' · '}
+                    {formatCommentDate(comentario.createdAt)}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{comentario.texto}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Nenhum comentário registrado.</p>
+          )}
         </Card>
       ) : null}
 

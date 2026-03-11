@@ -41,27 +41,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(req.url)
+     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     const tipoNc = searchParams.get('tipoNc')
     const centroQueDetectouId = searchParams.get('centroQueDetectouId')
-   const centroQueOriginouId = searchParams.get('centroQueOriginouId')
+    const centroQueOriginouId = searchParams.get('centroQueOriginouId')
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
     const q = searchParams.get('q')?.trim()
 
     const where: Prisma.NonConformityWhereInput = {}
+    const userCostCenterIds = !hasMinLevel(level, ModuleLevel.NIVEL_2)
+      ? await getUserCostCenterIds(me.id)
+      : []
+
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-      const userCostCenterIds = await getUserCostCenterIds(me.id)
-      where.OR = [
-        { solicitanteId: me.id },
-        ...(userCostCenterIds.length > 0
-          ? [
-              { centroQueDetectouId: { in: userCostCenterIds } },
-              { centroQueOriginouId: { in: userCostCenterIds } },
-            ]
-          : []),
-      ]
+      const accessClause: Prisma.NonConformityWhereInput = {
+        OR: [
+          { solicitanteId: me.id },
+          { centroQueDetectouId: { in: userCostCenterIds } },
+          { centroQueOriginouId: { in: userCostCenterIds } },
+        ],
+      }
+      where.AND = [accessClause]
     }
     if (status && Object.values(NonConformityStatus).includes(status as NonConformityStatus)) {
       where.status = status as NonConformityStatus
@@ -130,8 +132,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
-    const body = await req.json().catch(() => ({} as any))
-     const descricao = String(body?.descricao || '').trim()
+     const body = await req.json().catch(() => ({} as any))
+    const descricao = String(body?.descricao || '').trim()
     const evidenciaObjetiva = String(body?.evidenciaObjetiva || '').trim()
     const centroQueDetectouId = String(body?.centroQueDetectouId || '').trim()
     const centroQueOriginouId = String(body?.centroQueOriginouId || '').trim()
@@ -156,7 +158,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Centro de custo inválido.' }, { status: 400 })
     }
 
-      const created = await prisma.$transaction(async (tx) => {
+     const created = await prisma.$transaction(async (tx) => {
       const numeroRnc = await nextRncNumber(tx)
       const createdAt = new Date()
       const prazoAtendimento = new Date(createdAt)

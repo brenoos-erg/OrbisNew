@@ -18,9 +18,9 @@ async function assertEditable(id: string, userId: string, level: ModuleLevel | u
       centroQueOriginouId: true,
     },
   })  
-  if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
+   if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
   if (nc.aprovadoQualidadeStatus !== 'APROVADO') return { error: 'Plano de ação só pode ser alterado após aprovação da qualidade.', status: 403 }
-   const userCostCenterIds = await getUserCostCenterIds(userId)
+  const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(userId)
   const canTreat = canUserTreatNc({
     userId,
     level,
