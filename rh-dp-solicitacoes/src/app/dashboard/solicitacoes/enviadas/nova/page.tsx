@@ -464,6 +464,8 @@ export default function NovaSolicitacaoPage() {
    const isAvaliacaoExperiencia = selectedTipo?.id === EXPERIENCE_EVALUATION_TIPO_ID;
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
+  const isSolicitacaoExamesSst =
+    selectedTipo?.id === 'RQ_092' || selectedTipo?.codigo?.toUpperCase() === 'RQ.SST.002';
   const isRQ247 = selectedTipo?.id === 'RQ_247';
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
@@ -499,7 +501,35 @@ export default function NovaSolicitacaoPage() {
       };
     });
 
-    if (!isSolicitacaoEquipamentoTi) return baseCampos;
+    const camposExamesSst: CampoEspecifico[] = isSolicitacaoExamesSst
+      ? [
+          {
+            name: 'dataAgendamentoExame',
+            label: 'Data de Agendamento do Exame',
+            type: 'date',
+            stage: 'solicitante',
+            section: 'Formulário',
+          },
+          {
+            name: 'observacoes',
+            label: 'Observações',
+            type: 'textarea',
+            stage: 'solicitante',
+            section: 'Formulário',
+          },
+        ]
+      : [];
+
+    const mergedBaseCampos = [...baseCampos];
+    const mergedNames = new Set(baseCampos.map((campo) => campo.name));
+    for (const campo of camposExamesSst) {
+      if (!mergedNames.has(campo.name)) {
+        mergedBaseCampos.push(campo);
+        mergedNames.add(campo.name);
+      }
+    }
+
+    if (!isSolicitacaoEquipamentoTi) return mergedBaseCampos;
 
     const equipmentTypeOptions = Object.keys(TI_EQUIPMENT_CONFIGS);
     const selectedEquipmentType = extras.tipoEquipamentoTi ?? '';
@@ -525,9 +555,15 @@ export default function NovaSolicitacaoPage() {
       },
     ];
 
-     const existingNames = new Set(baseCampos.map((campo) => campo.name));
-    return [...baseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
-  }, [camposSolicitante, destinoOptions, extras.tipoEquipamentoTi, isSolicitacaoEquipamentoTi]);
+      const existingNames = new Set(mergedBaseCampos.map((campo) => campo.name));
+    return [...mergedBaseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
+  }, [
+    camposSolicitante,
+    destinoOptions,
+    extras.tipoEquipamentoTi,
+    isSolicitacaoEquipamentoTi,
+    isSolicitacaoExamesSst,
+  ]);
   const shouldFieldUseFullWidth = (campo: CampoEspecifico) =>
     campo.type === 'textarea' || campo.name === 'observacoes';
 

@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import { formatDateDDMMYYYY } from '@/lib/date'
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYYHHMM } from '@/lib/date'
 import {
   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
@@ -294,6 +294,10 @@ export type SolicitationDetail = {
 
 function formatDate(dateStr?: string | null) {
   return formatDateDDMMYYYY(dateStr)
+}
+
+function formatDateTime(dateStr?: string | null) {
+  return formatDateTimeDDMMYYYYHHMM(dateStr)
 }
 
 const SAUDE_STATUS_OPTIONS = ['ASO Válido', 'Agendamento'] as const
@@ -2069,14 +2073,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
                 <div>
                   <label className={LABEL_RO}>Data Abertura</label>
-                  <input
+                 <input
                     className={INPUT_RO}
                     readOnly
                     value={
-                      formatDate(detail.dataAbertura) ||
-                      (row.createdAt
-                        ? formatDate(row.createdAt)
-                        : '-')
+                      formatDateTime(detail.dataAbertura ?? row.createdAt)
                     }
                   />
                 </div>
@@ -2636,7 +2637,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           </span>
                           <span>
                              <span className="font-semibold">Abertura:</span>{' '}
-                            {formatDate(child.dataAbertura)}
+                            {formatDateTime(child.dataAbertura)}
                           </span>
                           {child.setorDestino && (
                             <span>

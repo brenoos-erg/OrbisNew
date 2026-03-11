@@ -126,6 +126,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Somente nível 3 pode encerrar.' }, { status: 403 })
     }
 
+    if (nextStatus === NonConformityStatus.CANCELADA && !canManageAllNc(level)) {
+      return NextResponse.json({ error: 'Somente nível 3 pode cancelar.' }, { status: 403 })
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const item = await tx.nonConformity.update({
         where: { id },
@@ -150,7 +154,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         tipo: nextStatus && nextStatus !== current.status ? 'STATUS_CHANGE' : 'ATUALIZACAO',
         fromStatus: nextStatus && nextStatus !== current.status ? current.status : undefined,
         toStatus: nextStatus && nextStatus !== current.status ? nextStatus : undefined,
-        message: nextStatus && nextStatus !== current.status ? `Status alterado para ${nextStatus}` : 'Não conformidade atualizada',
+         message: nextStatus && nextStatus !== current.status
+          ? nextStatus === NonConformityStatus.CANCELADA
+            ? 'Não conformidade cancelada'
+            : `Status alterado para ${nextStatus}`
+          : 'Não conformidade atualizada',
       })
 
       return item

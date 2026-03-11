@@ -193,6 +193,23 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     load()
   }
 
+  async function cancelarNaoConformidade() {
+    if (!confirm('Deseja cancelar esta não conformidade?')) return
+
+    const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'CANCELADA' }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      alert(data?.error || 'Erro ao cancelar não conformidade.')
+      return
+    }
+
+    load()
+  }
   async function aprovar(aprovadoValor: boolean) {
     await fetch(`/api/sst/nao-conformidades/${id}/aprovacao`, {
       method: 'POST',
@@ -375,7 +392,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     setActiveSection(section)
   }
 
-  const podeAprovar = useMemo(() => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE', [item])
+ const podeAprovar = useMemo(() => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE', [item])
+  const podeCancelarNc = useMemo(() => item?.status !== 'CANCELADA' && item?.status !== 'ENCERRADA', [item])
 
   if (loading && !item) return <p className="text-sm text-slate-600">Carregando...</p>
   if (error && !item) return <p className="text-sm text-rose-700">{error}</p>
@@ -400,9 +418,15 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
           <p className="text-sm uppercase text-slate-500">Não conformidades</p>
           <h1 className="text-2xl font-bold text-slate-900">{item.numeroRnc}</h1>
         </div>
-        <Link href="/dashboard/sst/nao-conformidades" className="ml-auto text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
+       <div className="ml-auto flex items-center gap-2">
+          {podeCancelarNc ? (
+            <button onClick={cancelarNaoConformidade} className="rounded bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700">
+              Cancelar não conformidade
+            </button>
+          ) : null}
+          <Link href="/dashboard/sst/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
+        </div>
       </div>
-
       {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Ações em modo somente leitura.</div> : null}
       {podeAprovar ? <div className="flex gap-2"><button onClick={() => aprovar(true)} className="rounded bg-emerald-600 px-3 py-2 text-sm text-white">Aprovar</button><button onClick={() => aprovar(false)} className="rounded bg-rose-600 px-3 py-2 text-sm text-white">Reprovar</button></div> : null}
 

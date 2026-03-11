@@ -15,5 +15,5 @@ export function isApproved(approvalStatus: NonConformityApprovalStatus) {
 }
 
 export function shouldSetClosedAt(status?: NonConformityStatus) {
-  return status === NonConformityStatus.ENCERRADA
+  return status === NonConformityStatus.ENCERRADA || status === NonConformityStatus.CANCELADA
 }
