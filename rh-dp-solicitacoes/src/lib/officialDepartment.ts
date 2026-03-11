@@ -8,6 +8,7 @@ export const OFFICIAL_DEPARTMENTS = [
   { code: '20', name: 'Tecnologia da Informação', sigla: 'TI' },
   { code: '19', name: 'Segurança do Trabalho', sigla: 'SST' },
   { code: '21', name: 'Saúde Ocupacional', sigla: 'SAUDE' },
+  { code: '22', name: 'Qualidade', sigla: 'QUA' },
 ] as const
 
 export const OFFICIAL_DEPARTMENT_CODES = OFFICIAL_DEPARTMENTS.map((item) => item.code)

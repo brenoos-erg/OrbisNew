@@ -211,7 +211,7 @@ async function main() {
       passwordHash: await hashPassword(defaultPassword),
       mustChangePassword: false,
     },
-    create: {
+   create: {
       login: 'superadmin',
       fullName: 'Super Administrador',
       email: 'superadmin@ergengenharia.com.br',
@@ -225,14 +225,35 @@ async function main() {
   })
   console.log('✅ Usuário super admin local criado/atualizado:', superAdminUser.email)
 
+  const externalSolicitationUser = await prisma.user.upsert({
+    where: { email: 'externo.solicitacoes@ergengenharia.com.br' },
+    update: {
+      fullName: 'Portal Externo de Solicitações',
+      login: 'externo.portal',
+      status: UserStatus.ATIVO,
+      role: 'COLABORADOR',
+      departmentId: tiDepartment.id,
+    },
+    create: {
+      fullName: 'Portal Externo de Solicitações',
+      email: 'externo.solicitacoes@ergengenharia.com.br',
+      login: 'externo.portal',
+      status: UserStatus.ATIVO,
+      role: 'COLABORADOR',
+      departmentId: tiDepartment.id,
+    },
+  })
+
+  console.log('✅ Usuário técnico externo criado/atualizado:', externalSolicitationUser.email)
 
   const rhDepartment = await prisma.department.findUnique({ where: { code: '17' } })
   const dpDepartment = await prisma.department.findUnique({ where: { code: '08' } })
   const sstDepartment = await prisma.department.findUnique({ where: { code: '19' } })
   const saudeDepartment = await prisma.department.findUnique({ where: { code: '21' } })
+  const qualidadeDepartment = await prisma.department.findUnique({ where: { code: '22' } })
   if (!sstDepartment) throw new Error('Departamento SST (code=19) não encontrado.')
+  if (!qualidadeDepartment) throw new Error('Departamento Qualidade (code=22) não encontrado.')
      const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' } })
-
  const rhTipoDepartamentos = [rhDepartment?.id].filter(
     (value): value is string => Boolean(value),
   )
@@ -507,6 +528,214 @@ async function main() {
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+
+  if (qualidadeDepartment) {
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_QUA_001' },
+      update: {
+        codigo: 'RQ.QUA.001',
+        nome: 'RQ.QUA.001 – Elaboração, alteração e exclusão de documentos',
+        descricao: 'Solicitação para elaboração, alteração e exclusão de documentos.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            {
+              name: 'tipoSolicitacao',
+              label: 'Tipo de solicitação',
+              type: 'select',
+              required: true,
+              options: ['Elaboração', 'Alteração', 'Exclusão'],
+            },
+            {
+              name: 'documento',
+              label: 'Documento',
+              type: 'text',
+              required: true,
+            },
+            {
+              name: 'dataDocumento',
+              label: 'Data do Documento',
+              type: 'date',
+              required: true,
+            },
+            {
+              name: 'anexo',
+              label: 'Anexo',
+              type: 'file',
+              required: true,
+            },
+            {
+              name: 'justificativa',
+              label: 'Justificativa',
+              type: 'textarea',
+              required: true,
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_QUA_001',
+        codigo: 'RQ.QUA.001',
+        nome: 'RQ.QUA.001 – Elaboração, alteração e exclusão de documentos',
+        descricao: 'Solicitação para elaboração, alteração e exclusão de documentos.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            {
+              name: 'tipoSolicitacao',
+              label: 'Tipo de solicitação',
+              type: 'select',
+              required: true,
+              options: ['Elaboração', 'Alteração', 'Exclusão'],
+            },
+            {
+              name: 'documento',
+              label: 'Documento',
+              type: 'text',
+              required: true,
+            },
+            {
+              name: 'dataDocumento',
+              label: 'Data do Documento',
+              type: 'date',
+              required: true,
+            },
+            {
+              name: 'anexo',
+              label: 'Anexo',
+              type: 'file',
+              required: true,
+            },
+            {
+              name: 'justificativa',
+              label: 'Justificativa',
+              type: 'textarea',
+              required: true,
+            },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RECLAMACOES_OUVIDORIA' },
+      update: {
+        codigo: 'OUV.001',
+        nome: 'RECLAMAÇÕES (OUVIDORIA)',
+        descricao: 'Canal de ouvidoria para recebimento de reclamações.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+            requiresAttachment: false,
+            allowExternalAccess: true,
+          },
+          camposEspecificos: [
+            { name: 'assunto', label: 'Assunto', type: 'text', required: true },
+            {
+              name: 'suaMensagem',
+              label: 'Sua mensagem',
+              type: 'textarea',
+              required: true,
+            },
+            { name: 'anexo', label: 'Anexo', type: 'file', required: false },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RECLAMACOES_OUVIDORIA',
+        codigo: 'OUV.001',
+        nome: 'RECLAMAÇÕES (OUVIDORIA)',
+        descricao: 'Canal de ouvidoria para recebimento de reclamações.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+            requiresAttachment: false,
+            allowExternalAccess: true,
+          },
+          camposEspecificos: [
+            { name: 'assunto', label: 'Assunto', type: 'text', required: true },
+            {
+              name: 'suaMensagem',
+              label: 'Sua mensagem',
+              type: 'textarea',
+              required: true,
+            },
+            { name: 'anexo', label: 'Anexo', type: 'file', required: false },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'FALE_CONOSCO' },
+      update: {
+        codigo: 'FC.001',
+        nome: 'FALE CONOSCO: ELOGIOS, DÚVIDAS E SUGESTÕES',
+        descricao: 'Canal fale conosco para elogios, dúvidas e sugestões.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+            allowExternalAccess: true,
+          },
+          camposEspecificos: [
+            { name: 'nome', label: 'Nome', type: 'text', required: true },
+            { name: 'telefone', label: 'Telefone', type: 'text', required: true },
+            { name: 'email', label: 'E-mail', type: 'text', required: true },
+            { name: 'assunto', label: 'Assunto', type: 'text', required: true },
+            {
+              name: 'suaMensagem',
+              label: 'Sua mensagem',
+              type: 'textarea',
+              required: true,
+            },
+            { name: 'anexo', label: 'Anexo', type: 'file', required: false },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'FALE_CONOSCO',
+        codigo: 'FC.001',
+        nome: 'FALE CONOSCO: ELOGIOS, DÚVIDAS E SUGESTÕES',
+        descricao: 'Canal fale conosco para elogios, dúvidas e sugestões.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: false,
+            allowExternalAccess: true,
+          },
+          camposEspecificos: [
+            { name: 'nome', label: 'Nome', type: 'text', required: true },
+            { name: 'telefone', label: 'Telefone', type: 'text', required: true },
+            { name: 'email', label: 'E-mail', type: 'text', required: true },
+            { name: 'assunto', label: 'Assunto', type: 'text', required: true },
+            {
+              name: 'suaMensagem',
+              label: 'Sua mensagem',
+              type: 'textarea',
+              required: true,
+            },
+            { name: 'anexo', label: 'Anexo', type: 'file', required: false },
+          ],
+        },
         updatedAt: new Date(),
       },
     })
