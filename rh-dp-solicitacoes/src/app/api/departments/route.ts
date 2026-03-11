@@ -8,6 +8,8 @@ import { OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartment'
 import { requireActiveUser } from '@/lib/auth'
 import { DEFAULT_DEPARTMENT_CODE, ensureDefaultDepartmentExists } from '@/lib/defaultDepartment'
 
+const LEGACY_QUALITY_DEPARTMENT_CODES = ['540']
+
 export async function GET() {
   return withRequestMetrics('GET /api/departments', async () => {
     try {
@@ -18,11 +20,12 @@ export async function GET() {
         await ensureDefaultDepartmentExists()
       }
 
-      const data = await prisma.department.findMany({
+       const data = await prisma.department.findMany({
         where: {
           ...(isAdmin ? {} : { code: { not: DEFAULT_DEPARTMENT_CODE } }),
           OR: [
             { code: { in: OFFICIAL_DEPARTMENT_CODES as string[] } },
+            { code: { in: LEGACY_QUALITY_DEPARTMENT_CODES } },
             ...(isAdmin ? [{ code: DEFAULT_DEPARTMENT_CODE }] : []),
           ],
         },
