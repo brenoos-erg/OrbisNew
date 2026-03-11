@@ -6,6 +6,8 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -43,14 +45,23 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status')
     const tipoNc = searchParams.get('tipoNc')
     const centroQueDetectouId = searchParams.get('centroQueDetectouId')
-    const centroQueOriginouId = searchParams.get('centroQueOriginouId')
+   const centroQueOriginouId = searchParams.get('centroQueOriginouId')
     const dataInicio = searchParams.get('dataInicio')
     const dataFim = searchParams.get('dataFim')
     const q = searchParams.get('q')?.trim()
 
-    const where: any = {}
+    const where: Prisma.NonConformityWhereInput = {}
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-      where.solicitanteId = me.id
+      const userCostCenterIds = await getUserCostCenterIds(me.id)
+      where.OR = [
+        { solicitanteId: me.id },
+        ...(userCostCenterIds.length > 0
+          ? [
+              { centroQueDetectouId: { in: userCostCenterIds } },
+              { centroQueOriginouId: { in: userCostCenterIds } },
+            ]
+          : []),
+      ]
     }
     if (status && Object.values(NonConformityStatus).includes(status as NonConformityStatus)) {
       where.status = status as NonConformityStatus
@@ -66,12 +77,22 @@ export async function GET(req: NextRequest) {
         ...(dataFim ? { lte: new Date(dataFim) } : {}),
       }
     }
-     if (q) {
-      where.OR = [
-        { numeroRnc: { contains: q } },
-        { descricao: { contains: q } },
-        { evidenciaObjetiva: { contains: q } },
-      ]
+    if (q) {
+      const searchClause: Prisma.NonConformityWhereInput = {
+        OR: [
+          { numeroRnc: { contains: q } },
+          { descricao: { contains: q } },
+          { evidenciaObjetiva: { contains: q } },
+        ],
+      }
+
+      const currentAnd = where.AND
+      const andClauses = Array.isArray(currentAnd)
+        ? currentAnd
+        : currentAnd
+          ? [currentAnd]
+          : []
+      where.AND = [...andClauses, searchClause]
     }
 
 
@@ -174,6 +195,13 @@ export async function POST(req: NextRequest) {
       })
 
       return created
+    })
+
+
+    void notifyNonConformityStakeholders({
+      nonConformityId: created.id,
+      actorId: me.id,
+      trigger: 'created',
     })
 
     return NextResponse.json(created, { status: 201 })

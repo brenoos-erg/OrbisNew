@@ -7,6 +7,7 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -74,9 +75,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
-     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_2) && nc.solicitanteId !== me.id) {
-      return NextResponse.json({ error: 'Você só pode visualizar as suas não conformidades.' }, { status: 403 })
+   if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+
+    const userCostCenterIds = await getUserCostCenterIds(me.id)
+    const canAccess = canUserAccessNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canAccess) {
+      return NextResponse.json({ error: 'Sem permissão para visualizar esta NC.' }, { status: 403 })
     }
 
     return NextResponse.json({
@@ -106,12 +117,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const id = (await params).id
     const current = await prisma.nonConformity.findUnique({
       where: { id },
-      select: { id: true, status: true, solicitanteId: true, aprovadoQualidadeStatus: true },
+     select: {
+        id: true,
+        status: true,
+        solicitanteId: true,
+        aprovadoQualidadeStatus: true,
+        centroQueDetectouId: true,
+        centroQueOriginouId: true,
+      },
     })
     if (!current) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
-    const isOwner = current.solicitanteId === me.id
-    if (!isOwner && !hasMinLevel(level, ModuleLevel.NIVEL_2)) {
+    const userCostCenterIds = await getUserCostCenterIds(me.id)
+    const canTreat = canUserTreatNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: current.solicitanteId,
+      centroQueDetectouId: current.centroQueDetectouId,
+      centroQueOriginouId: current.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canTreat) {
       return NextResponse.json({ error: 'Sem permissão para editar esta NC.' }, { status: 403 })
     }
 

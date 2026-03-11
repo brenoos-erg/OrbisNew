@@ -7,6 +7,8 @@ import { nonConformityTypeLabel } from '@/lib/sst/serializers'
 
 type Status = 'ABERTA' | 'AGUARDANDO_APROVACAO_QUALIDADE' | 'APROVADA_QUALIDADE' | 'EM_TRATATIVA' | 'AGUARDANDO_VERIFICACAO' | 'ENCERRADA' | 'CANCELADA'
 
+type CostCenterOption = { id: string; code?: string | null; description: string }
+
 type Item = {
   id: string
   numeroRnc: string
@@ -35,13 +37,37 @@ export default function NaoConformidadesClient() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
+  const [centroQueDetectouId, setCentroQueDetectouId] = useState('')
+  const [centroQueOriginouId, setCentroQueOriginouId] = useState('')
+  const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
 
   const qs = useMemo(() => {
     const query = new URLSearchParams()
     if (status) query.set('status', status)
     if (q) query.set('q', q)
+    if (centroQueDetectouId) query.set('centroQueDetectouId', centroQueDetectouId)
+    if (centroQueOriginouId) query.set('centroQueOriginouId', centroQueOriginouId)
     return query.toString()
-  }, [q, status])
+  }, [centroQueDetectouId, centroQueOriginouId, q, status])
+
+
+  async function loadCostCenters() {
+    try {
+      const res = await fetch('/api/cost-centers/select', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setCostCenters(Array.isArray(data) ? data : [])
+    } catch {
+      setCostCenters([])
+    }
+  }
+
+  function clearFilters() {
+    setQ('')
+    setStatus('')
+    setCentroQueDetectouId('')
+    setCentroQueOriginouId('')
+  }
 
   async function load() {
     try {
@@ -62,17 +88,29 @@ export default function NaoConformidadesClient() {
   }
 
   useEffect(() => {
+    loadCostCenters()
+  }, [])
+
+  useEffect(() => {
     load()
   }, [qs])
-
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por número, descrição ou evidência" className="min-w-[240px] flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm" />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
-          <option value="">Todos os status</option>
+           <option value="">Todos os status</option>
           {Object.entries(STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
         </select>
+        <select value={centroQueDetectouId} onChange={(e) => setCentroQueDetectouId(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+          <option value="">Centro que detectou</option>
+          {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code ? `${cc.code} - ` : ''}{cc.description}</option>)}
+        </select>
+        <select value={centroQueOriginouId} onChange={(e) => setCentroQueOriginouId(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+          <option value="">Centro que originou</option>
+          {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code ? `${cc.code} - ` : ''}{cc.description}</option>)}
+        </select>
+        <button type="button" onClick={clearFilters} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Limpar filtros</button>
         <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><RefreshCcw size={14} />Atualizar</button>
       </div>
 

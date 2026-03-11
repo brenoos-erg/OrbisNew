@@ -6,12 +6,31 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 async function assertEditable(id: string, userId: string, level: ModuleLevel | undefined) {
-  const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
+  const nc = await prisma.nonConformity.findUnique({
+    where: { id },
+    select: {
+      solicitanteId: true,
+      aprovadoQualidadeStatus: true,
+      centroQueDetectouId: true,
+      centroQueOriginouId: true,
+    },
+  })  
   if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
   if (nc.aprovadoQualidadeStatus !== 'APROVADO') return { error: 'Plano de ação só pode ser alterado após aprovação da qualidade.', status: 403 }
-  if (nc.solicitanteId !== userId && !hasMinLevel(level, ModuleLevel.NIVEL_2)) return { error: 'Sem permissão para esta NC.', status: 403 }
+   const userCostCenterIds = await getUserCostCenterIds(userId)
+  const canTreat = canUserTreatNc({
+    userId,
+    level,
+    ncSolicitanteId: nc.solicitanteId,
+    centroQueDetectouId: nc.centroQueDetectouId,
+    centroQueOriginouId: nc.centroQueOriginouId,
+    userCostCenterIds,
+  })
+  if (!canTreat) return { error: 'Sem permissão para esta NC.', status: 403 }
+
   return null
 }
 

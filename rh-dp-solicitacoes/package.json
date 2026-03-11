@@ -18,7 +18,8 @@
     "test:pdf-termo": "node scripts/generate-termo-pdf.mjs",
     "prisma:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
     "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma",
-    "test:workflow-notifications": "node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-rules.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-workflow-notification-link.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/tipo-approver-resolution.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/workflow-approval-recipients.test.cjs"
+    "test:workflow-notifications": "node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-rules.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-workflow-notification-link.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/tipo-approver-resolution.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/workflow-approval-recipients.test.cjs",
+    "nc:retroactive-alerts": "node -r ts-node/register -r tsconfig-paths/register scripts/retroactive-nc-alerts.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
