@@ -74,12 +74,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
-    if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2) && nc.solicitanteId !== me.id) {
       return NextResponse.json({ error: 'Você só pode visualizar as suas não conformidades.' }, { status: 403 })
     }
 
-    return NextResponse.json({ item: nc })
+    return NextResponse.json({
+      item: {
+        ...nc,
+        permissions: {
+          canManageAllNc: canManageAllNc(level),
+        },
+      },
+    })
   } catch (error) {
     console.error('GET /api/sst/nao-conformidades/[id] error', error)
     return NextResponse.json({ error: 'Erro ao carregar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
@@ -126,8 +133,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Somente nível 3 pode encerrar.' }, { status: 403 })
     }
 
-    if (nextStatus === NonConformityStatus.CANCELADA && !canManageAllNc(level)) {
+     if (nextStatus === NonConformityStatus.CANCELADA && !canManageAllNc(level)) {
       return NextResponse.json({ error: 'Somente nível 3 pode cancelar.' }, { status: 403 })
+    }
+
+    const isReopen =
+      (current.status === NonConformityStatus.ENCERRADA || current.status === NonConformityStatus.CANCELADA) &&
+      nextStatus === NonConformityStatus.EM_TRATATIVA
+
+    if (isReopen && !canManageAllNc(level)) {
+      return NextResponse.json({ error: 'Somente nível 3 pode reabrir.' }, { status: 403 })
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -143,8 +158,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           causaRaiz: body?.causaRaiz !== undefined ? (body.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined,
           gravidade: parseGutValue(body?.gravidade),
           urgencia: parseGutValue(body?.urgencia),
-          tendencia: parseGutValue(body?.tendencia),
-          fechamentoEm: shouldSetClosedAt(nextStatus) ? new Date() : undefined,
+           tendencia: parseGutValue(body?.tendencia),
+          fechamentoEm: isReopen ? null : shouldSetClosedAt(nextStatus) ? new Date() : undefined,
         },
       })
 
@@ -154,11 +169,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         tipo: nextStatus && nextStatus !== current.status ? 'STATUS_CHANGE' : 'ATUALIZACAO',
         fromStatus: nextStatus && nextStatus !== current.status ? current.status : undefined,
         toStatus: nextStatus && nextStatus !== current.status ? nextStatus : undefined,
-         message: nextStatus && nextStatus !== current.status
-          ? nextStatus === NonConformityStatus.CANCELADA
-            ? 'Não conformidade cancelada'
-            : `Status alterado para ${nextStatus}`
-          : 'Não conformidade atualizada',
+          message:
+          nextStatus && nextStatus !== current.status
+            ? isReopen
+              ? 'Não conformidade reaberta'
+              : nextStatus === NonConformityStatus.CANCELADA
+                ? 'Não conformidade cancelada'
+                : `Status alterado para ${nextStatus}`
+            : 'Não conformidade atualizada',
       })
 
       return item

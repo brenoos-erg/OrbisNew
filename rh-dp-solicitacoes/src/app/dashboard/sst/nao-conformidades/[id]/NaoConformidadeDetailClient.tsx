@@ -43,6 +43,7 @@ type Detail = {
   planoDeAcao?: ActionItem[]
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
+  permissions?: { canManageAllNc?: boolean }
 }
 
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
@@ -195,16 +196,40 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
   async function cancelarNaoConformidade() {
     if (!confirm('Deseja cancelar esta não conformidade?')) return
+    const justificativa = prompt('Informe a justificativa do cancelamento:')?.trim() || ''
+    if (!justificativa) {
+      alert('A justificativa de cancelamento é obrigatória.')
+      return
+    }
 
     const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'CANCELADA' }),
+      body: JSON.stringify({ status: 'CANCELADA', justificativaCancelamento: justificativa }),
     })
 
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       alert(data?.error || 'Erro ao cancelar não conformidade.')
+      return
+    }
+
+    load()
+  }
+
+
+  async function reabrirNaoConformidade() {
+    if (!confirm('Deseja reabrir esta não conformidade?')) return
+
+    const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'EM_TRATATIVA' }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      alert(data?.error || 'Erro ao reabrir não conformidade.')
       return
     }
 
@@ -392,8 +417,25 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     setActiveSection(section)
   }
 
- const podeAprovar = useMemo(() => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE', [item])
+  const podeAprovar = useMemo(() => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE', [item])
   const podeCancelarNc = useMemo(() => item?.status !== 'CANCELADA' && item?.status !== 'ENCERRADA', [item])
+  const podeReabrirNc = useMemo(
+    () => (item?.status === 'CANCELADA' || item?.status === 'ENCERRADA') && item?.permissions?.canManageAllNc,
+    [item],
+  )
+  const justificativaCancelamento = useMemo(() => {
+    const eventoCancelamento = item?.timeline
+      ?.slice()
+      .reverse()
+      .find((evento: any) => evento?.toStatus === 'CANCELADA' && typeof evento?.message === 'string')
+
+    if (!eventoCancelamento?.message) return null
+    const marcador = 'Justificativa:'
+    const posicaoMarcador = eventoCancelamento.message.indexOf(marcador)
+    if (posicaoMarcador === -1) return null
+
+    return eventoCancelamento.message.slice(posicaoMarcador + marcador.length).trim() || null
+  }, [item])
 
   if (loading && !item) return <p className="text-sm text-slate-600">Carregando...</p>
   if (error && !item) return <p className="text-sm text-rose-700">{error}</p>
@@ -421,7 +463,15 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
        <div className="ml-auto flex items-center gap-2">
           {podeCancelarNc ? (
             <button onClick={cancelarNaoConformidade} className="rounded bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700">
-              Cancelar não conformidade
+             Cancelar não conformidade
+            </button>
+          ) : null}
+          {podeReabrirNc ? (
+            <button
+              onClick={reabrirNaoConformidade}
+              className="rounded bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700"
+            >
+              Reabrir não conformidade
             </button>
           ) : null}
           <Link href="/dashboard/sst/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
@@ -460,7 +510,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
             <Info label="Prazo atendimento" value={new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')} />
             <Info label="Referência SIG" value={item.referenciaSig || '-'} />
              <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
-            <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
+           <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
+            {item.status === 'CANCELADA' ? <Info label="Justificativa do cancelamento" value={justificativaCancelamento || '-'} /> : null}
           </Card>
 
           <div className="space-y-4">
