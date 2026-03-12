@@ -150,9 +150,9 @@
         }
       },
       {
-        "order": 3,
+         "order": 3,
         "stepKey": "DP",
-        "label": "Departamento Pessoal recebe cópia e trata",
+        "label": "Departamento Pessoal trata no mesmo chamado",
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
         "posX": 560,

@@ -330,8 +330,10 @@ export function isSolicitacaoEpiUniforme(tipo?: TipoSolicitacaoLike | null) {
 export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
+  if (id === 'RQ_247') return false
   if (id === 'RQ_063') return true
   const nome = normalizeSolicitacaoName(tipo.nome)
+  if (nome.includes('DESLIGAMENTO')) return false
   return nome.includes('RQ_063') || nome.includes('RQ.063') || nome.includes('SOLICITACAO DE PESSOAL')
 }
 export function isSolicitacaoAdmissao(tipo?: TipoSolicitacaoLike | null) {
@@ -341,6 +343,7 @@ export function isSolicitacaoAdmissao(tipo?: TipoSolicitacaoLike | null) {
   const nome = normalizeSolicitacaoName(tipo.nome)
   return nome.includes('SOLICITACAO DE ADMISSAO')
 }
+
 
 export function isSolicitacaoVeiculos(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false

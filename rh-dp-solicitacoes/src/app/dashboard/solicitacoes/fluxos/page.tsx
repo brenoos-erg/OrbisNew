@@ -92,13 +92,13 @@ function buildWorkflowTemplates(tipos: RefItem[]): WorkflowDraft[] {
       steps: [
         toStep(1, 'USUARIO_ABRE', 'Usuário abre chamado', 'DEPARTAMENTO', { canAssume: true }),
         toStep(2, 'APROVACAO_USUARIO', 'Aprovação obrigatória', 'APROVACAO', { requiresApproval: true }),
-        toStep(3, 'DP_COPIA', 'Cópia enviada ao Departamento Pessoal', 'DEPARTAMENTO'),
-        toStep(4, 'DP_TRATATIVA', 'Departamento Pessoal trata e finaliza', 'DEPARTAMENTO', { canFinalize: true }),
+        toStep(3, 'DP', 'Departamento Pessoal trata no mesmo chamado', 'DEPARTAMENTO'),
+        toStep(4, 'FIM', 'Finalização DP no mesmo chamado', 'FIM', { canFinalize: true }),
       ],
       transitions: [
         { fromStepKey: 'USUARIO_ABRE', toStepKey: 'APROVACAO_USUARIO' },
-        { fromStepKey: 'APROVACAO_USUARIO', toStepKey: 'DP_COPIA' },
-        { fromStepKey: 'DP_COPIA', toStepKey: 'DP_TRATATIVA' },
+        { fromStepKey: 'APROVACAO_USUARIO', toStepKey: 'DP' },
+        { fromStepKey: 'DP', toStepKey: 'FIM' },
       ],
     },
     {
