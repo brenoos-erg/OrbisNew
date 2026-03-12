@@ -8,6 +8,7 @@ export const MODULE_KEYS = {
   EQUIPAMENTOS_TI: 'controle-equipamentos-ti',
   CELULAR: 'celular',
   MEUS_DOCUMENTOS: 'meus-documentos',
+  CONTROLE_DOCUMENTOS: 'controle-documentos',
   SST: 'sst',
 } as const
 

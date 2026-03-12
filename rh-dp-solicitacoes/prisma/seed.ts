@@ -2659,6 +2659,7 @@ async function main() {
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
   const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
+  const controleDocumentosModule = await ensureModule(MODULE_KEYS.CONTROLE_DOCUMENTOS, 'Controle de Documentos')
   const sstModule = await ensureModule(MODULE_KEYS.SST, 'Não Conformidades')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
@@ -2673,6 +2674,7 @@ async function main() {
     celularModule,
     equipmentsModule,
     meusDocumentosModule,
+    controleDocumentosModule,
     sstModule,
   ]
 
@@ -2826,11 +2828,23 @@ async function main() {
     create: { departmentId: tiDepartment.id, moduleId: equipmentsModule.id },
   })
 
-  await prisma.departmentModule.upsert({
+ await prisma.departmentModule.upsert({
     where: { departmentId_moduleId: { departmentId: tiDepartment.id, moduleId: meusDocumentosModule.id } },
     update: {},
     create: { departmentId: tiDepartment.id, moduleId: meusDocumentosModule.id },
   })
+
+  const qualityDepartment = await prisma.department.findUnique({ where: { code: '16' } })
+  const sigDepartment = await prisma.department.findUnique({ where: { code: '18' } })
+
+  for (const dept of [qualityDepartment, sigDepartment]) {
+    if (!dept) continue
+    await prisma.departmentModule.upsert({
+      where: { departmentId_moduleId: { departmentId: dept.id, moduleId: controleDocumentosModule.id } },
+      update: {},
+      create: { departmentId: dept.id, moduleId: controleDocumentosModule.id },
+    })
+  }
   /* =========================
      FEATURES E GRANTS POR FEATURE
      ========================= */
@@ -3036,9 +3050,6 @@ async function main() {
       })
     }
 
-   const qualityDepartment = await prisma.department.findUnique({ where: { code: '16' } })
-    const sigDepartment = await prisma.department.findUnique({ where: { code: '18' } })
-
     const qualityGroup =
       (await isoPrisma.approverGroup.findFirst({ where: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } })) ??
       (await isoPrisma.approverGroup.create({ data: { name: 'QUALIDADE', departmentId: qualityDepartment?.id } }))
@@ -3081,6 +3092,40 @@ async function main() {
     console.log('✅ Seed do módulo ISO aplicada.')
   }
 
+
+  const moduleSst = await prisma.module.findUnique({ where: { key: MODULE_KEYS.SST }, select: { id: true } })
+  const moduleDocumentControl = await prisma.module.findUnique({ where: { key: MODULE_KEYS.CONTROLE_DOCUMENTOS }, select: { id: true } })
+  const qualityAdmins = [
+    { label: 'Eduardo Vidal', terms: ['eduardo vidal'] },
+    { label: 'Jacqueline', terms: ['jacqueline'] },
+    { label: 'Rangel', terms: ['rangel'] },
+  ]
+
+  for (const target of qualityAdmins) {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...target.terms.map((term) => ({ fullName: { contains: term } })),
+          ...target.terms.map((term) => ({ email: { contains: term } })),
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (!user) {
+      console.warn(`⚠️ Usuário não encontrado para concessão NIVEL_3: ${target.label}`)
+      continue
+    }
+
+    for (const moduleTarget of [moduleSst, moduleDocumentControl]) {
+      if (!moduleTarget) continue
+      await prisma.userModuleAccess.upsert({
+        where: { userId_moduleId: { userId: user.id, moduleId: moduleTarget.id } },
+        update: { level: ModuleLevel.NIVEL_3 },
+        create: { userId: user.id, moduleId: moduleTarget.id, level: ModuleLevel.NIVEL_3 },
+      })
+    }
+  }
 
   console.log('🎉 Seed concluído com sucesso!')
   await prisma.$disconnect()

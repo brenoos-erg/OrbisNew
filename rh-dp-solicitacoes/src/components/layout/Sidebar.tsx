@@ -38,6 +38,7 @@ type Props = {
   showSst: boolean
   showEquipments: boolean
   showMyDocuments: boolean
+  showDocumentControl: boolean
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
@@ -93,6 +94,7 @@ export default function Sidebar({
   showSst,
   showEquipments,
   showMyDocuments,
+  showDocumentControl,
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
@@ -334,7 +336,7 @@ export default function Sidebar({
               {!collapsed && <span className={labelBase}>Meus documentos</span>}
             </Link>
           )}
-           {showMyDocuments && (
+          {showDocumentControl && (
             <div>
               <button
                 type="button"

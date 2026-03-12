@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// src/app/api/solicitacoes/[id]/route.ts
+/ src/app/api/solicitacoes/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
@@ -9,6 +9,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -77,9 +78,18 @@ export async function GET(
     }
 
 
-    const me = await requireActiveUser()
-    const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
-    const canView = canViewSensitiveHiringRequest({
+   const me = await requireActiveUser()
+    const [userDepartmentIds, userDepartments] = await Promise.all([
+      getUserDepartmentIds(me.id, me.departmentId),
+      prisma.userDepartment.findMany({
+        where: { userId: me.id },
+        include: {
+          department: { select: { id: true, code: true, name: true } },
+        },
+      }),
+    ])
+
+    const canViewSensitive = canViewSensitiveHiringRequest({
       user: { id: me.id, role: me.role },
       solicitation: {
         solicitanteId: item.solicitanteId,
@@ -94,10 +104,42 @@ export async function GET(
             }
           : null,
       },
-      isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
+       isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
     })
 
-    if (!canView) {
+    const departmentRecords = new Map<string, { id?: string | null; code?: string | null; name?: string | null }>()
+    if (me.department) {
+      departmentRecords.set(me.department.id, me.department)
+    }
+    for (const link of userDepartments) {
+      if (link.department) {
+        departmentRecords.set(link.department.id, link.department)
+      }
+    }
+
+    const canViewNadaConsta = canUserViewNadaConsta(
+      {
+        id: me.id,
+        role: me.role,
+        departments: Array.from(departmentRecords.values()),
+      },
+      {
+        solicitanteId: item.solicitanteId,
+        assumidaPorId: item.assumidaPorId,
+        approverId: item.approverId,
+        tipo: item.tipo
+          ? {
+              id: item.tipo.id,
+              nome: item.tipo.nome,
+              schemaJson: item.tipo.schemaJson,
+            }
+          : null,
+        solicitacaoSetores: item.solicitacaoSetores,
+        payload: item.payload,
+      },
+    )
+
+    if (!canViewSensitive || !canViewNadaConsta) {
       return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
     }
 

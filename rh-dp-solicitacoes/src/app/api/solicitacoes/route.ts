@@ -18,10 +18,11 @@ import {
   isSolicitacaoNadaConsta,
   isSolicitacaoPessoal,
   isSolicitacaoVeiculos,
-  NADA_CONSTA_SETORES,
+   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
+import { buildNadaConstaReceivedFilters } from '@/lib/nadaConstaAccess'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
@@ -193,17 +194,22 @@ export const GET = withModuleLevel(
             }
           }
 
+          const nadaConstaTypeFilters = buildNadaConstaReceivedFilters(setorKeys)
           const setorFilters =
             setorKeys.size > 0
               ? [
                   {
-                    solicitacaoSetores: {
-                      some: { setor: { in: [...setorKeys] } },
-                    },
+                    AND: [
+                      { OR: nadaConstaTypeFilters },
+                      {
+                        solicitacaoSetores: {
+                          some: { setor: { in: [...setorKeys] } },
+                        },
+                      },
+                    ],
                   },
                 ]
               : []
-
 
           const isDpUser =
             me.department?.code === '08' ||
