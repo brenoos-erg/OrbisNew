@@ -375,7 +375,74 @@ async function main() {
         updatedAt: new Date(),
       },
     })
-  }
+
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_301' },
+      update: {
+        codigo: 'RQ.DP.008',
+        nome: 'Autorização de inclusão no plano odontológico e / ou plano médico para dependentes',
+        descricao:
+          'Formulário para solicitação de inclusão ou exclusão de dependentes em benefícios da empresa.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            categoria: 'SERVIÇOS DE DP',
+            centroResponsavel: 'DEPARTAMENTO PESSOAL',
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            { name: 'nomeFuncionario', label: 'Nome do Funcionário', type: 'text', required: true, stage: 'solicitante', section: 'Dados do funcionário' },
+            { name: 'cpfFuncionario', label: 'CPF Funcionário', type: 'text', required: true, stage: 'solicitante', section: 'Dados do funcionário' },
+            { name: 'nomeDependente', label: 'Nome do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'parentesco', label: 'Parentesco', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'dataNascimentoDependente', label: 'Data de Nascimento do Dependente', type: 'date', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'nomeMaeDependente', label: 'Nome da Mãe do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'rgDependente', label: 'RG', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'dataEmissaoRg', label: 'Data da Emissão', type: 'date', required: false, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'orgaoEmissor', label: 'Órgão Emissor', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'cpfDependente', label: 'CPF do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'planoSaude', label: 'Plano de Saúde', type: 'checkbox', required: false, stage: 'solicitante', section: 'Benefícios' },
+            { name: 'planoOdontologico', label: 'Plano Odontológico', type: 'checkbox', required: false, stage: 'solicitante', section: 'Benefícios' },
+            { name: 'dataAssinatura', label: 'Data', type: 'date', required: true, stage: 'solicitante', section: 'Assinatura' },
+            { name: 'assinatura', label: 'Assinatura', type: 'text', required: true, stage: 'solicitante', section: 'Assinatura' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_301',
+        codigo: 'RQ.DP.008',
+        nome: 'Autorização de inclusão no plano odontológico e / ou plano médico para dependentes',
+        descricao:
+          'Formulário para solicitação de inclusão ou exclusão de dependentes em benefícios da empresa.',
+        schemaJson: {
+          meta: {
+            departamentos: [dpDepartment.id],
+            categoria: 'SERVIÇOS DE DP',
+            centroResponsavel: 'DEPARTAMENTO PESSOAL',
+            requiresApproval: false,
+          },
+          camposEspecificos: [
+            { name: 'nomeFuncionario', label: 'Nome do Funcionário', type: 'text', required: true, stage: 'solicitante', section: 'Dados do funcionário' },
+            { name: 'cpfFuncionario', label: 'CPF Funcionário', type: 'text', required: true, stage: 'solicitante', section: 'Dados do funcionário' },
+            { name: 'nomeDependente', label: 'Nome do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'parentesco', label: 'Parentesco', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'dataNascimentoDependente', label: 'Data de Nascimento do Dependente', type: 'date', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'nomeMaeDependente', label: 'Nome da Mãe do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Dados do dependente' },
+            { name: 'rgDependente', label: 'RG', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'dataEmissaoRg', label: 'Data da Emissão', type: 'date', required: false, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'orgaoEmissor', label: 'Órgão Emissor', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'cpfDependente', label: 'CPF do Dependente', type: 'text', required: true, stage: 'solicitante', section: 'Documentação do dependente' },
+            { name: 'planoSaude', label: 'Plano de Saúde', type: 'checkbox', required: false, stage: 'solicitante', section: 'Benefícios' },
+            { name: 'planoOdontologico', label: 'Plano Odontológico', type: 'checkbox', required: false, stage: 'solicitante', section: 'Benefícios' },
+            { name: 'dataAssinatura', label: 'Data', type: 'date', required: true, stage: 'solicitante', section: 'Assinatura' },
+            { name: 'assinatura', label: 'Assinatura', type: 'text', required: true, stage: 'solicitante', section: 'Assinatura' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })  }
 
  if (logisticaDepartment) {
     await prisma.tipoSolicitacao.upsert({
@@ -522,12 +589,71 @@ async function main() {
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
         updatedAt: new Date(),
       },
-      create: {
+       create: {
         id: 'RQ_063',
         codigo: 'RQ.RH.001',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
+        updatedAt: new Date(),
+      },
+    })
+
+
+    const incentivoEducacaoSchema = {
+      meta: {
+        departamentos: [rhDepartment.id],
+        categoria: 'SERVIÇOS DE RH',
+        centroResponsavel: 'RECURSOS HUMANOS',
+        empresaPadrao: 'ERG ENGENHARIA',
+        prazoPadraoDias: 3,
+        requiresApproval: true,
+      },
+      camposEspecificos: [
+        { name: 'nomeColaborador', label: 'Nome do Colaborador', type: 'text', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'matricula', label: 'Matricula', type: 'text', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'cargo', label: 'Cargo', type: 'text', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'contratoSetor', label: 'Contrato\Setor', type: 'text', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'dataAdmissao', label: 'Data de admissao', type: 'date', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'escolaridade', label: 'Escolaridade', type: 'text', required: true, stage: 'solicitante', section: 'Dados do colaborador' },
+        { name: 'educacaoBasica', label: 'Educacao Basica', type: 'checkbox', required: false, stage: 'solicitante', section: 'Tipo de formação' },
+        { name: 'cursoTecnico', label: 'Curso Tecnico', type: 'checkbox', required: false, stage: 'solicitante', section: 'Tipo de formação' },
+        { name: 'graduacao', label: 'Graduacao', type: 'checkbox', required: false, stage: 'solicitante', section: 'Tipo de formação' },
+        { name: 'posGraduacao', label: 'Pos-Graduacao', type: 'checkbox', required: false, stage: 'solicitante', section: 'Tipo de formação' },
+        { name: 'nomeCurso', label: 'Nome do Curso', type: 'text', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'instituicaoEnsino', label: 'Instituicao de Ensino', type: 'text', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'cidade', label: 'Cidade', type: 'text', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'inicioCurso', label: 'Inicio', type: 'date', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'previsaoTermino', label: 'Previsao de Termino', type: 'date', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'valorMensalidade', label: 'Valor da Mensalidade', type: 'number', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'dataRequisicao', label: 'Data da Requisicao', type: 'date', required: true, stage: 'solicitante', section: 'Dados do curso' },
+        { name: 'anexosObrigatoriosConferidos', label: 'Obrigatório anexar o Termo de Compromisso assinado, Comprovante de Matrícula e Comprovante de Pagamento da Mensalidade. Se anexado, marque este checkbox.', type: 'checkbox', required: false, stage: 'solicitante', section: 'Anexos' },
+        { name: 'contratadoHaMinimoUmAno', label: 'Contratado há, no mínimo, 01 ano', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'ausenciaAdvertenciasDisciplinares', label: 'Ausencia de hist. de advertencias disciplinares.', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'cursoCondizFuncaoEmpresa', label: 'Curso condiz com a funcao/empresa', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'deferido', label: 'Deferido', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'indeferido', label: 'Indeferido', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'assinaturaRecursosHumanos', label: 'Assinatura Recursos Humanos', type: 'text', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'calculoValorMensalPagar', label: 'Calculo do valor mensal a ser pago', type: 'number', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+        { name: 'observacoesRh', label: 'Observacoes', type: 'textarea', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
+      ],
+    }
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_091' },
+      update: {
+        codigo: 'RQ.RH.003',
+        nome: 'Solicitação de incentivo à educação',
+        descricao: 'FORMULÁRIO PARA REQUISIÇÃO DE VERBA PARA INCENTIVO À EDUCAÇÃO.',
+        schemaJson: incentivoEducacaoSchema,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_091',
+        codigo: 'RQ.RH.003',
+        nome: 'Solicitação de incentivo à educação',
+        descricao: 'FORMULÁRIO PARA REQUISIÇÃO DE VERBA PARA INCENTIVO À EDUCAÇÃO.',
+        schemaJson: incentivoEducacaoSchema,
         updatedAt: new Date(),
       },
     })

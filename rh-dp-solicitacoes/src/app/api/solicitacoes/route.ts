@@ -15,6 +15,8 @@ import {
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
+  isSolicitacaoInclusaoPlanoDependentes,
+  isSolicitacaoIncentivoEducacao,
   isSolicitacaoNadaConsta,
   isSolicitacaoPessoal,
   isSolicitacaoVeiculos,
@@ -647,10 +649,67 @@ export const POST = withModuleLevel(
               { status: 400 },
             )
           }
-
-          payload.campos = {
+   payload.campos = {
             ...(payload.campos ?? {}),
             gestorImediatoAvaliadorId,
+          }
+        }
+
+        if (isSolicitacaoInclusaoPlanoDependentes(tipo)) {
+          const hasPlanoSaude = String(campos.planoSaude ?? '').toLowerCase() === 'true'
+          const hasPlanoOdontologico =
+            String(campos.planoOdontologico ?? '').toLowerCase() === 'true'
+
+          if (!hasPlanoSaude && !hasPlanoOdontologico) {
+            return NextResponse.json(
+              {
+                error:
+                  'Marque ao menos uma opção de benefício: Plano de Saúde ou Plano Odontológico.',
+              },
+              { status: 400 },
+            )
+          }
+        }
+
+
+        if (isSolicitacaoIncentivoEducacao(tipo)) {
+          const hasTipoFormacao = [
+            'educacaoBasica',
+            'cursoTecnico',
+            'graduacao',
+            'posGraduacao',
+          ].some((field) => String(campos[field] ?? '').toLowerCase() === 'true')
+
+          if (!hasTipoFormacao) {
+            return NextResponse.json(
+              {
+                error:
+                  'Marque ao menos um tipo de formação: Educação Básica, Curso Técnico, Graduação ou Pós-Graduação.',
+              },
+              { status: 400 },
+            )
+          }
+
+          if (String(campos.anexosObrigatoriosConferidos ?? '').toLowerCase() !== 'true') {
+            return NextResponse.json(
+              {
+                error:
+                  'Confirme os anexos obrigatórios marcando o checkbox de conferência antes de enviar.',
+              },
+              { status: 400 },
+            )
+          }
+
+          const deferido = String(campos.deferido ?? '').toLowerCase() === 'true'
+          const indeferido = String(campos.indeferido ?? '').toLowerCase() === 'true'
+          if (deferido && indeferido) {
+            return NextResponse.json(
+              {
+                error:
+                  'Não é permitido marcar Deferido e Indeferido ao mesmo tempo.',
+              },
+              { status: 400 },
+            )
           }
         }
 
@@ -721,8 +780,7 @@ export const POST = withModuleLevel(
         }
 
         const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
-        const isSolicitacaoIncentivo =
-          tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+        const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
         const isDesligamento = isSolicitacaoDesligamento(tipo)
         const isNadaConsta = isSolicitacaoNadaConsta(tipo)
         const isAbonoEducacional =

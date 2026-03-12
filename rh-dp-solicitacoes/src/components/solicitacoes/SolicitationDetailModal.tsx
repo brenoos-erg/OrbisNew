@@ -10,6 +10,7 @@ import {
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
+  isSolicitacaoIncentivoEducacao,
   isSolicitacaoPessoal,
   isSolicitacaoAdmissao,
   NADA_CONSTA_SETORES,
@@ -18,6 +19,7 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
+
 
 
 const LABEL_RO =
@@ -697,11 +699,10 @@ export function SolicitationDetailModal({
   const camposSchema: CampoEspecifico[] =
     detail?.tipo?.schemaJson?.camposEspecificos ?? []
 
-    // Fluxos especiais
+  // Fluxos especiais
  const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(detail?.tipo)
   const isSolicitacaoAdmissaoTipo = isSolicitacaoAdmissao(detail?.tipo)
-  const isSolicitacaoIncentivo =
-    detail?.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+  const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(detail?.tipo)
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)

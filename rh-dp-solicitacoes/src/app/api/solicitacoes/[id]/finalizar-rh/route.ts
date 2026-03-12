@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
-import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoIncentivoEducacao, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 
@@ -106,9 +106,8 @@ export async function POST(
     })
 
 
-    const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solicitation.tipo)
-    const isSolicitacaoIncentivo =
-      solicitation.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solicitation.tipo)
+    const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(solicitation.tipo)
     const isDesligamento = isSolicitacaoDesligamento(solicitation.tipo)
     const isAdmissaoGerada = isAdmissionType(solicitation.tipo)
     const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(solicitation.tipo)
@@ -740,12 +739,12 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
 
       if (isSolicitacaoIncentivo) {
         const tipoIncentivo = await tx.tipoSolicitacao.findFirst({
-          where: { nome: 'RQ_091 - Solicitação de Incentivo à Educação' },
+          where: { id: 'RQ_091' },
         })
 
         if (!tipoIncentivo) {
           throw new Error(
-            'Tipo "RQ_091 - Solicitação de Incentivo à Educação" não cadastrado.',
+            'Tipo "RQ_091 - Solicitação de incentivo à educação" não cadastrado.',
           )
         }
 
@@ -770,13 +769,13 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
 
         dpSolicitation = await tx.solicitation.create({
           data: {
-            protocolo: await nextSolicitationProtocolo(tx),
+              protocolo: await nextSolicitationProtocolo(tx),
             tipoId: tipoIncentivo.id,
             costCenterId: ccDp.id,
             departmentId: deptDp?.id ?? solicitation.departmentId,
             solicitanteId: solicitation.solicitanteId,
             parentId: solicitation.id,
-            titulo: 'RQ_091 - Solicitação de Incentivo à Educação',
+            titulo: 'Solicitação de incentivo à educação',
             descricao: ` ${solicitation.protocolo}.`,
             requiresApproval: false,
             approvalStatus: 'APROVADO',

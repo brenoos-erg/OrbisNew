@@ -5,11 +5,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
-import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoIncentivoEducacao, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
-
 
 export async function POST(
   req: NextRequest,
@@ -67,9 +66,8 @@ export async function POST(
       return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
     }
 
-   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
-    const isSolicitacaoIncentivo =
-      solic.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+  const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
+    const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(solic.tipo)
     const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
     const isFerias = isSolicitacaoAgendamentoFerias(solic.tipo)
     const isVeiculos = isSolicitacaoVeiculos(solic.tipo)    

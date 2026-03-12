@@ -14,7 +14,12 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
-import { isSolicitacaoEpiUniforme, isSolicitacaoEquipamento } from '@/lib/solicitationTypes';
+import {
+  isSolicitacaoEpiUniforme,
+  isSolicitacaoEquipamento,
+  isSolicitacaoInclusaoPlanoDependentes,
+  isSolicitacaoIncentivoEducacao,
+} from '@/lib/solicitationTypes';
 import {
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_TIPO_ID,
@@ -456,8 +461,8 @@ export default function NovaSolicitacaoPage() {
     (selectedTipo.id.toUpperCase() === 'RQ_063' ||
       selectedTipo.nome.toUpperCase().includes('RQ_063'));
 
+  const isIncentivoEducacaoTipo = isSolicitacaoIncentivoEducacao(selectedTipo);
   const isAbonoEducacional =
-    selectedTipo?.nome === 'Solicitação de Incentivo à Educação' ||
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
   const isTiMaintenance = isTiMaintenanceRequest(selectedTipo);
@@ -945,10 +950,56 @@ export default function NovaSolicitacaoPage() {
             (k) => extras[k] === 'true',
           );
           if (!anyBeneficio && !(extras.renunciaOutros ?? '').trim()) {
-            setSubmitError('Marque ao menos um benefício de renúncia ou preencha "Outros".');
+           setSubmitError('Marque ao menos um benefício de renúncia ou preencha "Outros".');
             setSubmitting(false);
             return;
            }
+        }
+
+        if (isSolicitacaoInclusaoPlanoDependentes(selectedTipo)) {
+          const hasPlanoSaude = extras.planoSaude === 'true';
+          const hasPlanoOdontologico = extras.planoOdontologico === 'true';
+
+          if (!hasPlanoSaude && !hasPlanoOdontologico) {
+            setSubmitError('Marque ao menos uma opção de benefício: Plano de Saúde ou Plano Odontológico.');
+            setSubmitting(false);
+            return;
+          }
+        }
+
+
+        if (isIncentivoEducacaoTipo) {
+          const hasTipoFormacao = [
+            'educacaoBasica',
+            'cursoTecnico',
+            'graduacao',
+            'posGraduacao',
+          ].some((field) => extras[field] === 'true');
+
+          if (!hasTipoFormacao) {
+            setSubmitError('Marque ao menos um tipo de formação para continuar.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (extras.anexosObrigatoriosConferidos !== 'true') {
+            setSubmitError('Confirme os anexos obrigatórios marcando o checkbox de conferência.');
+            setSubmitting(false);
+            return;
+          }
+
+          const hasAttachment = Object.values(extraFiles).some((files) => files.length > 0);
+          if (!hasAttachment) {
+            setSubmitError('Anexe ao menos os documentos obrigatórios para continuar.');
+            setSubmitting(false);
+            return;
+          }
+
+          if (extras.deferido === 'true' && extras.indeferido === 'true') {
+            setSubmitError('Não é permitido marcar Deferido e Indeferido ao mesmo tempo.');
+            setSubmitting(false);
+            return;
+          }
         }
 
         if (isRQ247) {

@@ -8,6 +8,7 @@ import {
   SolicitationDetail,
   SolicitationDetailModal,
 } from '@/components/solicitacoes/SolicitationDetailModal'
+import { isSolicitacaoIncentivoEducacao } from '@/lib/solicitationTypes'
 
 type FilterState = {
   dateStart?: string
@@ -138,12 +139,11 @@ export default function ReceivedRequestsPage() {
     setDetailLoading(true)
     setDetailError(null)
     const shouldOpenInApprovalMode =
-      row.tipo?.nome === 'RQ_091 - Solicitação de Incentivo à Educação' &&
+      isSolicitacaoIncentivoEducacao(row.tipo) &&
       row.requiresApproval &&
       row.approvalStatus === 'PENDENTE'
 
     setDetailMode(shouldOpenInApprovalMode ? 'approval' : 'default')
-
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}`)
       if (!res.ok) {
