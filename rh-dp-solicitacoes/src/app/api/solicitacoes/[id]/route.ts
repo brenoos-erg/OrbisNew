@@ -9,6 +9,10 @@ import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
+import {
+  canUserViewSolicitationByDepartment,
+  resolveUserSetorKeysFromDepartments,
+} from '@/lib/solicitationVisibility'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -106,7 +110,7 @@ export async function GET(
        isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
     })
 
-    const departmentRecords = new Map<string, { id?: string | null; code?: string | null; name?: string | null }>()
+      const departmentRecords = new Map<string, { id?: string | null; code?: string | null; name?: string | null }>()
     if (me.department) {
       departmentRecords.set(me.department.id, me.department)
     }
@@ -115,6 +119,27 @@ export async function GET(
         departmentRecords.set(link.department.id, link.department)
       }
     }
+
+    const userSetorKeys = resolveUserSetorKeysFromDepartments(
+      Array.from(departmentRecords.values()),
+    )
+
+    const canViewByDepartment = canUserViewSolicitationByDepartment(
+      {
+        userId: me.id,
+        role: me.role,
+        userDepartmentIds,
+        userSetorKeys,
+      },
+      {
+        solicitanteId: item.solicitanteId,
+        approverId: item.approverId,
+        assumidaPorId: item.assumidaPorId,
+        departmentId: item.departmentId,
+        solicitacaoSetores: item.solicitacaoSetores,
+      },
+    )
+
 
     const canViewNadaConsta = canUserViewNadaConsta(
       {
@@ -138,7 +163,7 @@ export async function GET(
       },
     )
 
-    if (!canViewSensitive || !canViewNadaConsta) {
+    if (!canViewSensitive || !canViewNadaConsta || !canViewByDepartment) {
       return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
     }
 

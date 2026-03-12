@@ -7,8 +7,11 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
-import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import {
+  buildReceivedSolicitationVisibilityWhere,
+  resolveUserSetorKeysFromDepartments,
+} from '@/lib/solicitationVisibility'
 
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
@@ -86,25 +89,6 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * pageSize
     const where = buildWhereFromSearchParams(searchParams)
 
-    const ccIds = new Set<string>()
-    const deptIds = new Set<string>()
-
-    if (me.costCenterId) {
-      ccIds.add(me.costCenterId)
-    }
-
-    if (me.departmentId) {
-      deptIds.add(me.departmentId)
-    }
-
-    const links = await prisma.userCostCenter.findMany({
-      where: { userId: me.id },
-      select: { costCenterId: true },
-    })
-
-    for (const link of links) {
-      ccIds.add(link.costCenterId)
-    }
 
     const departmentLinks = await prisma.userDepartment.findMany({
       where: { userId: me.id },
@@ -114,89 +98,39 @@ export async function GET(req: NextRequest) {
       },
     })
 
-     for (const link of departmentLinks) {
-      deptIds.add(link.departmentId)
-    }
+     const userDepartmentIds = new Set<string>()
+    if (me.departmentId) userDepartmentIds.add(me.departmentId)
+    for (const link of departmentLinks) userDepartmentIds.add(link.departmentId)
 
-    const setorKeys = new Set<string>()
-    for (const setor of resolveNadaConstaSetoresByDepartment(me.department)) {
-      setorKeys.add(setor)
-    }
-    for (const link of departmentLinks) {
-      for (const setor of resolveNadaConstaSetoresByDepartment(link.department)) {
-        setorKeys.add(setor)
-      }
-    }
+    const userDepartments = [
+      ...(me.department ? [me.department] : []),
+      ...departmentLinks
+        .map((link) => link.department)
+        .filter((department): department is { code: string; name: string } => Boolean(department)),
+    ]
 
-   const tipoApproverViewerFilter = {
-      tipo: {
-        approvers: {
-          some: {
-            userId: me.id,
-          },
-        },
-      },
-    }
+    const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
 
-    const isDpUser =
-      me.department?.code === '08' ||
-      departmentLinks.some((link) => link.department?.code === '08')
-
-    const dpDepartmentId =
-      me.department?.code === '08'
-        ? me.departmentId
-        : departmentLinks.find((link) => link.department?.code === '08')
-            ?.departmentId
-
-    const dpFilters =
-      isDpUser && dpDepartmentId
-        ? [{ costCenterId: null, departmentId: dpDepartmentId }]
-        : []
-
-    const gestorAvaliadorFilter = {
+  const gestorAvaliadorFilter = {
       approverId: me.id,
       status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
     }
 
 
-    if (where.costCenterId) {
-      const receivedFilters = ccIds.has(where.costCenterId)
-        ? [{ costCenterId: where.costCenterId }]
-        : []
-
-       if (receivedFilters.length === 0) {
-        where.AND = [
-          ...(where.AND ?? []),
-          { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
-        ]
-      } else {
-        where.AND = [
-          ...(where.AND ?? []),
-          { OR: [...receivedFilters, tipoApproverViewerFilter, gestorAvaliadorFilter] },
-        ]
-      }
-    } else {
-     const receivedFilters = [
-        ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
-        ...(deptIds.size > 0 ? [{ departmentId: { in: [...deptIds] } }] : []),
-        ...dpFilters,
-        ...(setorKeys.size > 0
-          ? [{ solicitacaoSetores: { some: { setor: { in: [...setorKeys] } } } }]
-          : []),
-      ]
-
-      if (receivedFilters.length === 0) {
-       where.AND = [
-          ...(where.AND ?? []),
-          { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
-        ]
-       } else {
-        where.AND = [
-          ...(where.AND ?? []),
-          { OR: [...receivedFilters, tipoApproverViewerFilter, gestorAvaliadorFilter] },
-        ]
-      }
-    }
+    where.AND = [
+      ...(where.AND ?? []),
+      {
+        OR: [
+          buildReceivedSolicitationVisibilityWhere({
+            userId: me.id,
+            role: me.role,
+            userDepartmentIds: [...userDepartmentIds],
+            userSetorKeys,
+          }),
+          gestorAvaliadorFilter,
+        ],
+      },
+    ]
 
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)

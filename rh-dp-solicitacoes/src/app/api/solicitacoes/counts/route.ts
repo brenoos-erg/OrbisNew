@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import {
+  buildReceivedSolicitationVisibilityWhere,
+  resolveUserSetorKeysFromDepartments,
+} from '@/lib/solicitationVisibility'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -11,43 +14,28 @@ export async function GET() {
   try {
     const me = await requireActiveUser()
 
-    const ccIds = new Set<string>()
-    const deptIds = new Set<string>()
+    const departmentLinks = await prisma.userDepartment.findMany({
+      where: { userId: me.id },
+      select: { departmentId: true, department: { select: { code: true, name: true } } },
+    })
 
-    if (me.costCenterId) ccIds.add(me.costCenterId)
-    if (me.departmentId) deptIds.add(me.departmentId)
+    const userDepartmentIds = new Set<string>()
+    if (me.departmentId) userDepartmentIds.add(me.departmentId)
+    for (const link of departmentLinks) userDepartmentIds.add(link.departmentId)
 
-    const [costCenterLinks, departmentLinks] = await Promise.all([
-      prisma.userCostCenter.findMany({ where: { userId: me.id }, select: { costCenterId: true } }),
-      prisma.userDepartment.findMany({
-        where: { userId: me.id },
-        select: { departmentId: true, department: { select: { code: true, name: true } } },
-      }),
-    ])
-
-    for (const link of costCenterLinks) ccIds.add(link.costCenterId)
-    for (const link of departmentLinks) deptIds.add(link.departmentId)
-
-    const setorKeys = new Set<string>()
-    for (const setor of resolveNadaConstaSetoresByDepartment(me.department)) {
-      setorKeys.add(setor)
-    }
-    for (const link of departmentLinks) {
-      for (const setor of resolveNadaConstaSetoresByDepartment(link.department)) {
-        setorKeys.add(setor)
-      }
-    }
-
-    const isDpUser = me.department?.code === '08' || departmentLinks.some((link) => link.department?.code === '08')
-    const dpDepartmentId =
-      me.department?.code === '08' ? me.departmentId : departmentLinks.find((link) => link.department?.code === '08')?.departmentId
-
-    const receivedFilters = [
-      ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
-      ...(deptIds.size > 0 ? [{ departmentId: { in: [...deptIds] } }] : []),
-       ...(isDpUser && dpDepartmentId ? [{ costCenterId: null, departmentId: dpDepartmentId }] : []),
-      ...(setorKeys.size > 0 ? [{ solicitacaoSetores: { some: { setor: { in: [...setorKeys] } } } }] : []),
+    const userDepartments = [
+      ...(me.department ? [me.department] : []),
+      ...departmentLinks.map((link) => link.department).filter((department): department is { code: string; name: string } => Boolean(department)),
     ]
+
+    const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
+
+    const receivedVisibilityWhere = buildReceivedSolicitationVisibilityWhere({
+      userId: me.id,
+      role: me.role,
+      userDepartmentIds: [...userDepartmentIds],
+      userSetorKeys,
+    })
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
 
@@ -62,21 +50,18 @@ export async function GET() {
       OR: [
         {
           status: 'ABERTA',
-          AND:
-            receivedFilters.length > 0
-              ? [
-                  { OR: receivedFilters },
-                  {
-                    NOT: {
-                      AND: [
-                        { requiresApproval: true },
-                        { approvalStatus: 'PENDENTE' },
-                        { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
-                      ],
-                    },
-                  },
-                ]
-              : [{ id: '__never__' }],
+          AND: [
+            receivedVisibilityWhere,
+            {
+              NOT: {
+                AND: [
+                  { requiresApproval: true },
+                  { approvalStatus: 'PENDENTE' },
+                  { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                ],
+              },
+            },
+          ],
         },
         {
           status: 'AGUARDANDO_AVALIACAO_GESTOR',
@@ -85,7 +70,7 @@ export async function GET() {
       ],
     }
 
-   const approvalsPendingWhere: Record<string, any> = {
+    const approvalsPendingWhere: Record<string, any> = {
       AND: [
         buildSensitiveHiringVisibilityWhere({
           userId: me.id,

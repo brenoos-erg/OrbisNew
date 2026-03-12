@@ -1,0 +1,104 @@
+import { Prisma, Role } from '@prisma/client'
+import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+
+type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
+
+type SolicitationVisibilityInput = {
+  userId: string
+  role: Role
+  userDepartmentIds: string[]
+  userSetorKeys: string[]
+}
+
+type SolicitationLike = {
+  solicitanteId: string
+  approverId?: string | null
+  assumidaPorId?: string | null
+  departmentId?: string | null
+  solicitacaoSetores?: { setor?: string | null }[]
+}
+
+export function resolveUserSetorKeysFromDepartments(departments: DepartmentLike[]) {
+  const setorKeys = new Set<string>()
+
+  for (const department of departments) {
+    for (const setor of resolveNadaConstaSetoresByDepartment(department)) {
+      setorKeys.add(setor)
+    }
+  }
+
+  return [...setorKeys]
+}
+
+export function buildReceivedSolicitationVisibilityWhere(
+  input: SolicitationVisibilityInput,
+): Prisma.SolicitationWhereInput {
+  if (input.role === 'ADMIN') {
+    return {}
+  }
+
+  const orFilters: Prisma.SolicitationWhereInput[] = [
+    { approverId: input.userId },
+    { assumidaPorId: input.userId },
+  ]
+
+  if (input.userDepartmentIds.length > 0) {
+    orFilters.push({
+      departmentId: {
+        in: input.userDepartmentIds,
+      },
+    })
+  }
+
+  if (input.userSetorKeys.length > 0) {
+    orFilters.push({
+      solicitacaoSetores: {
+        some: {
+          setor: {
+            in: input.userSetorKeys,
+          },
+        },
+      },
+    })
+  }
+
+  return {
+    OR: orFilters,
+  }
+}
+
+export function canUserViewSolicitationByDepartment(
+  input: SolicitationVisibilityInput,
+  solicitation: SolicitationLike,
+) {
+  if (input.role === 'ADMIN') return true
+  if (solicitation.solicitanteId === input.userId) return true
+  if (solicitation.approverId === input.userId) return true
+  if (solicitation.assumidaPorId === input.userId) return true
+
+  if (isUserInResponsibleDepartment(input.userDepartmentIds, solicitation.departmentId)) {
+    return true
+  }
+
+  const solicitationSetores = new Set(
+    (solicitation.solicitacaoSetores ?? [])
+      .map((setor) => setor.setor)
+      .filter((setor): setor is string => Boolean(setor)),
+  )
+
+  if (solicitationSetores.size > 0) {
+    for (const userSetor of input.userSetorKeys) {
+      if (solicitationSetores.has(userSetor)) return true
+    }
+  }
+
+  return false
+}
+
+export function isUserInResponsibleDepartment(
+  userDepartmentIds: string[],
+  solicitationDepartmentId?: string | null,
+) {
+  if (!solicitationDepartmentId) return false
+  return userDepartmentIds.includes(solicitationDepartmentId)
+}
