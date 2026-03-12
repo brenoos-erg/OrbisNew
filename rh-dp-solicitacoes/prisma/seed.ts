@@ -1499,13 +1499,12 @@ async function main() {
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "Solicitação de Férias" ok.')
+   console.log('✅ Tipo "Solicitação de Férias" ok.')
     const desligamentoSchema = {
       meta: {
         departamentos: [dpDepartment.id],
         fluxo: {
           rhApproval: true,
-          rhToDp: true,
           dpDepartmentCode: '08',
         },
       },

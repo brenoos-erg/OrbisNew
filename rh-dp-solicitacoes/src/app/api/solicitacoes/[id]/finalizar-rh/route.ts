@@ -177,10 +177,10 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
         },
       })
 
-      return NextResponse.json({ solicitation: updated }, { status: 200 })
+       return NextResponse.json({ solicitation: updated }, { status: 200 })
     }
 
-     if (isSolicitacaoPessoalTipo) {
+     if (isSolicitacaoPessoalTipo || isDesligamento) {
       const agora = new Date()
       const dpDepartment = await prisma.department.findFirst({
         where: {
@@ -428,47 +428,10 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
         },
       })
 
-      return NextResponse.json({ dp: updated }, { status: 200 })
+        return NextResponse.json({ dp: updated }, { status: 200 })
     }
-     if (isDesligamento && (vemDeRh || isDpDestino)) {
-      const agora = new Date()
-      const updated = await prisma.solicitation.update({
-        where: { id: solicitation.id },
-        data: {
-          status: 'CONCLUIDA',
-          dataFechamento: agora,
-          payload: {
-            ...payloadOrigem,
-            campos: {
-              ...camposOrigem,
-              ...(outrasInfos ?? {}),
-            },
-          },
-        },
-      })
+     if (isSolicitacaoIncentivo && vemDeRh) {
 
-      await prisma.solicitationTimeline.create({
-        data: {
-          solicitationId: solicitation.id,
-          status: 'CONCLUIDA',
-          message: `Solicitação finalizada pelo DP em ${agora.toLocaleDateString('pt-BR')}.`,
-        },
-      })
-
-      await prisma.event.create({
-        data: {
-          id: randomUUID(),
-          solicitationId: solicitation.id,
-          actorId: me.id,
-          tipo: 'FINALIZADA_DP',
-        },
-      })
-
-      return NextResponse.json({ dp: updated }, { status: 200 })
-    }
-
-
-    if (isSolicitacaoIncentivo && vemDeRh) {
       const agora = new Date()
       const updated = await prisma.solicitation.update({
         where: { id: solicitation.id },
@@ -899,80 +862,6 @@ const payloadOrigem = (solicitation.payload ?? {}) as any
           })
         }
       }
-       if (isDesligamento) {
-        const ccDp = await tx.costCenter.findFirst({
-          where: { externalCode: '590' },
-        })
-
-        if (!ccDp) {
-          throw new Error(
-            'Centro de custo do DP (externalCode = 590) não encontrado.',
-          )
-        }
-        const deptDp = await tx.department.findUnique({
-          where: { code: '08' },
-        })
-
-        dpSolicitation = await tx.solicitation.create({
-          data: {
-            protocolo: await nextSolicitationProtocolo(tx),
-            tipoId: solicitation.tipoId,
-            costCenterId: ccDp.id,
-            departmentId: deptDp?.id ?? solicitation.departmentId,
-            solicitanteId: solicitation.solicitanteId,
-            parentId: solicitation.id,
-            titulo: solicitation.titulo,
-            descricao: `Solicitação encaminhada pelo RH para o DP a partir da ${solicitation.protocolo}.`,
-            requiresApproval: false,
-            approvalStatus: 'APROVADO',
-            status: 'ABERTA',
-            payload: {
-              origem: {
-                rhSolicitationId: solicitation.id,
-                rhProtocolo: solicitation.protocolo,
-              },
-              campos: {
-                ...camposOrigem,
-                ...(outrasInfos ?? {}),
-              },
-              solicitante: solicitanteOrigem,
-            },
-          },
-        })
-
-        await tx.solicitationTimeline.create({
-          data: {
-            solicitationId: dpSolicitation.id,
-            status: 'AGUARDANDO_ATENDIMENTO',
-            message:
-              `Solicitação de desligamento encaminhada para o DP a partir da ${solicitation.protocolo} e aguardando atendimento.`,
-          },
-        })
-
-        await tx.event.create({
-          data: {
-            id: randomUUID(),
-            solicitationId: dpSolicitation.id,
-            actorId: me.id,
-            tipo: 'CRIACAO_AUTOMATICA_DESLIGAMENTO',
-          },
-        })
-
-        if (solicitation.anexos && solicitation.anexos.length > 0) {
-          await tx.attachment.createMany({
-            data: solicitation.anexos.map((a) => ({
-              id: randomUUID(),
-              solicitationId: dpSolicitation.id,
-              filename: a.filename,
-              url: a.url,
-              mimeType: a.mimeType,
-              sizeBytes: a.sizeBytes,
-              createdAt: a.createdAt,
-            })),
-          })
-        }
-      }
-
 
       return {
         rh: updatedRh,

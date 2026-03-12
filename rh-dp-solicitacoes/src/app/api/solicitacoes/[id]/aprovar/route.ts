@@ -107,7 +107,7 @@ export async function POST(
     let rhCostCenter = null
     let rhDepartment: { id: string; name: string } | null = null
 
-     if (isSolicitacaoPessoalTipo) {
+     if (isSolicitacaoPessoalTipo || isDesligamento) {
       rhDepartment = await prisma.department.findFirst({
         where: {
           OR: [
@@ -154,7 +154,7 @@ export async function POST(
       status: isSolicitacaoEpi ? 'EM_ATENDIMENTO' : 'ABERTA',
     }
 
-    if (isSolicitacaoPessoalTipo && rhDepartmentId) {
+  if ((isSolicitacaoPessoalTipo || isDesligamento) && rhDepartmentId) {
       updateData.costCenterId = rhCostCenter?.id ?? null
       updateData.departmentId = rhDepartmentId
     } else if (isFerias && dpDepartment) {
@@ -182,8 +182,8 @@ export async function POST(
 
     if (approvalComment && approvalComment.length > 0) {
       timelineMessage = approvalComment
-    } else if (isDesligamento && dpDepartment) {
-      timelineMessage = `Solicitação aprovada. Cópia enviada para ${dpDepartment.name}.`
+    } else if (isDesligamento && rhDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para ${rhDepartment.name}.`
     } else if (isFerias && dpDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${dpDepartment.name}.`
     } else if (isVeiculos && logisticaDepartment) {
@@ -194,32 +194,6 @@ export async function POST(
       timelineMessage = `Solicitação aprovada e encaminhada para o departamento ${rhDepartment.name}.`
     } else {
       timelineMessage = `Solicitação aprovada por ${me.fullName ?? me.id}.`
-    }
-     if (isDesligamento && dpDepartment) {
-      const child = await prisma.solicitation.create({
-        data: {
-          protocolo: `COPIA-${Date.now()}`,
-          tipoId: solic.tipoId,
-          titulo: `${solic.titulo} (Cópia DP)`,
-          descricao: solic.descricao,
-          payload: solic.payload as any,
-          solicitanteId: solic.solicitanteId,
-          parentId: solic.id,
-          departmentId: dpDepartment.id,
-          costCenterId: null,
-          status: 'ABERTA',
-          requiresApproval: false,
-          approvalStatus: 'NAO_PRECISA',
-        },
-      })
-
-      await prisma.solicitationTimeline.create({
-        data: {
-          solicitationId: child.id,
-          status: 'ABERTA',
-          message: 'Cópia criada automaticamente para tratamento do Departamento Pessoal.',
-        },
-      })
     }
 
 
