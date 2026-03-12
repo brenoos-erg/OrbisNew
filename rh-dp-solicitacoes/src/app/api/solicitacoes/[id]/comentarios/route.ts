@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -36,6 +37,7 @@ export async function POST(
         assumidaPorId: true,
         solicitanteId: true,
         solicitacaoSetores: { select: { setor: true } },
+        tipo: { select: { id: true, codigo: true, nome: true } },
       },
     })
 
@@ -76,6 +78,21 @@ export async function POST(
       }
     }
 
+
+    const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
+    const canViewSensitive = canViewSensitiveHiringRequest({
+      user: { id: me.id, role: me.role },
+      solicitation: {
+        solicitanteId: solicitation.solicitanteId,
+        assumidaPorId: solicitation.assumidaPorId,
+        approverId: solicitation.approverId,
+        departmentId: solicitation.departmentId,
+        tipo: solicitation.tipo,
+      },
+      isResponsibleDepartmentMember: userDepartmentIds.includes(solicitation.departmentId),
+      isExplicitRecipient: solicitation.approverId === me.id,
+    })
+
     const canComment =
       me.role === 'ADMIN' ||
       solicitation.solicitanteId === me.id ||
@@ -85,7 +102,9 @@ export async function POST(
       Boolean(solicitation.departmentId && deptIds.has(solicitation.departmentId)) ||
       solicitation.solicitacaoSetores.some((setor) => setorKeys.has(setor.setor))
 
-    if (!canComment) {
+    const canCommentWithSensitivity = canComment && canViewSensitive
+
+    if (!canCommentWithSensitivity) {
       return NextResponse.json(
         { error: 'Você não possui permissão para registrar observações nesta solicitação.' },
         { status: 403 },

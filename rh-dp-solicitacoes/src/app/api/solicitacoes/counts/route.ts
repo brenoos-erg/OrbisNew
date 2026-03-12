@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -44,12 +45,21 @@ export async function GET() {
     const receivedFilters = [
       ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
       ...(deptIds.size > 0 ? [{ departmentId: { in: [...deptIds] } }] : []),
-      ...(isDpUser && dpDepartmentId ? [{ costCenterId: null, departmentId: dpDepartmentId }] : []),
+       ...(isDpUser && dpDepartmentId ? [{ costCenterId: null, departmentId: dpDepartmentId }] : []),
       ...(setorKeys.size > 0 ? [{ solicitacaoSetores: { some: { setor: { in: [...setorKeys] } } } }] : []),
     ]
 
+    const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
+
     const receivedOpenWhere: Record<string, any> = {
-       OR: [
+      AND: [
+        buildSensitiveHiringVisibilityWhere({
+          userId: me.id,
+          role: me.role,
+          departmentIds: userDepartmentIdsForSensitive,
+        }),
+      ],
+      OR: [
         {
           status: 'ABERTA',
           AND:
@@ -75,7 +85,14 @@ export async function GET() {
       ],
     }
 
-    const approvalsPendingWhere: Record<string, any> = {
+   const approvalsPendingWhere: Record<string, any> = {
+      AND: [
+        buildSensitiveHiringVisibilityWhere({
+          userId: me.id,
+          role: me.role,
+          departmentIds: userDepartmentIdsForSensitive,
+        }),
+      ],
       requiresApproval: true,
       approvalStatus: 'PENDENTE',
       OR: [

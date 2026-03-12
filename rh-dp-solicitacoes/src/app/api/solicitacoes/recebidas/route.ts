@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
@@ -189,13 +190,24 @@ export async function GET(req: NextRequest) {
           ...(where.AND ?? []),
           { OR: [tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
-      } else {
+       } else {
         where.AND = [
           ...(where.AND ?? []),
           { OR: [...receivedFilters, tipoApproverViewerFilter, gestorAvaliadorFilter] },
         ]
       }
     }
+
+
+    const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
+    where.AND = [
+      ...(where.AND ?? []),
+      buildSensitiveHiringVisibilityWhere({
+        userId: me.id,
+        role: me.role,
+        departmentIds: userDepartmentIdsForSensitive,
+      }),
+    ]
 
     where.AND = [
       ...(where.AND ?? []),

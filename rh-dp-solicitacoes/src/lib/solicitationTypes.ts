@@ -1,5 +1,6 @@
 type TipoSolicitacaoLike = {
   id?: string | null
+  codigo?: string | null
   nome?: string | null
 }
 function normalizeSolicitacaoName(value?: string | null) {

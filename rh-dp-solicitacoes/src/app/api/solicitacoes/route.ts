@@ -22,6 +22,7 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
+import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
@@ -286,6 +287,17 @@ export const GET = withModuleLevel(
           ]
         }
 
+        const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
+
+        where.AND = [
+          ...(where.AND ?? []),
+          buildSensitiveHiringVisibilityWhere({
+            userId: me.id,
+            role: me.role,
+            departmentIds: userDepartmentIdsForSensitive,
+          }),
+        ]
+
      const listStartedAt = performance.now()
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
@@ -517,11 +529,11 @@ export const POST = withModuleLevel(
           const login = String(solicitanteManual?.login ?? '').trim()
           const costCenterIdManual = String(solicitanteManual?.costCenterId ?? '').trim()
 
-          if (!fullName || !email || !login || !costCenterIdManual) {
+           if (!fullName || !email || !costCenterIdManual) {
             return NextResponse.json(
               {
                 error:
-                  'Ao solicitar para outro colaborador, informe nome, e-mail, login e centro de custo.',
+                  'Ao solicitar para outro colaborador, informe nome, e-mail e centro de custo.',
               },
               { status: 400 },
             )

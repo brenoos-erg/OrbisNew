@@ -8,6 +8,7 @@ import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
+import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -73,6 +74,31 @@ export async function GET(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
       )
+    }
+
+
+    const me = await requireActiveUser()
+    const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
+    const canView = canViewSensitiveHiringRequest({
+      user: { id: me.id, role: me.role },
+      solicitation: {
+        solicitanteId: item.solicitanteId,
+        assumidaPorId: item.assumidaPorId,
+        approverId: item.approverId,
+        departmentId: item.departmentId,
+        tipo: item.tipo
+          ? {
+              id: item.tipo.id,
+              nome: item.tipo.nome,
+              codigo: (item.tipo as { codigo?: string | null }).codigo ?? null,
+            }
+          : null,
+      },
+      isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
+    })
+
+    if (!canView) {
+      return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
     }
 
     const attachmentIds = [item.id, item.parentId].filter(Boolean) as string[]

@@ -1066,11 +1066,6 @@ export default function NovaSolicitacaoPage() {
           return;
         }
 
-        if (!solicitanteManual.login.trim()) {
-          setSubmitError('Informe o login do colaborador solicitante.');
-          setSubmitting(false);
-          return;
-        }
 
         if (!solicitanteManual.costCenterId.trim()) {
           setSubmitError('Selecione o centro de custo do colaborador solicitante.');
@@ -1440,12 +1435,11 @@ useEffect(() => {
                       />
                       <input
                         className={inputClass}
-                        placeholder="Login"
+                        placeholder="Login (opcional)"
                         value={solicitanteManual.login}
                         onChange={(event: InputChange) =>
                           handleSolicitanteManualChange('login', event.target.value)
                         }
-                        required
                       />
                       <input
                         className={inputClass}
