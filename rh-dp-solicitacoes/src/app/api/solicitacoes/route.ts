@@ -65,11 +65,14 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (departmentId) where.departmentId = departmentId
   if (costCenterId) where.costCenterId = costCenterId
   if (tipoId) where.tipoId = tipoId
-  if (status) where.status = status
+  const protocoloNormalizado = protocolo?.trim() ?? ''
+  const hasProtocoloFilter = protocoloNormalizado.length > 0
 
-  if (protocolo) {
+  if (status && !hasProtocoloFilter) where.status = status
+
+  if (hasProtocoloFilter) {
     where.protocolo = {
-      contains: protocolo,
+      contains: protocoloNormalizado,
     }
   }
 
