@@ -132,144 +132,149 @@ export const GET = withModuleLevel(
         if (scope === 'sent') {
           where.solicitanteId = me.id
         } else if (scope === 'received') {
-          const ccIds = new Set<string>()
+          const isAdmin = me.role === 'ADMIN'
 
-          if (me.costCenterId) {
-            ccIds.add(me.costCenterId)
-          }
+          if (!isAdmin) {
+            const ccIds = new Set<string>()
 
-          const links = await prisma.userCostCenter.findMany({
-            where: { userId: me.id },
-            select: { costCenterId: true },
-          })
+            if (me.costCenterId) {
+              ccIds.add(me.costCenterId)
+            }
 
-          for (const l of links) {
-            ccIds.add(l.costCenterId)
-          }
-
-          const departmentLinks = await prisma.userDepartment.findMany({
-            where: { userId: me.id },
-            select: {
-              departmentId: true,
-              department: { select: { code: true, name: true } },
-            },
-          })
-
-          const userDepartmentIds = new Set<string>()
-          if (me.departmentId) {
-            userDepartmentIds.add(me.departmentId)
-          }
-
-
-          for (const link of departmentLinks) {
-            userDepartmentIds.add(link.departmentId)
-          }
-
-          if (userDepartmentIds.size > 0) {
-            const departmentCostCenters = await prisma.costCenter.findMany({
-              where: {
-                departmentId: {
-                  in: [...userDepartmentIds],
-                },
-              },
-              select: { id: true },
+            const links = await prisma.userCostCenter.findMany({
+              where: { userId: me.id },
+              select: { costCenterId: true },
             })
 
-            for (const cc of departmentCostCenters) {
-              ccIds.add(cc.id)
+            for (const l of links) {
+              ccIds.add(l.costCenterId)
             }
-          }
 
-          const setorKeys = new Set<string>()
-          const primarySetores = resolveNadaConstaSetoresByDepartment(
-            me.department,
-          )
-          for (const setor of primarySetores) {
-            setorKeys.add(setor)
-          }
+            const departmentLinks = await prisma.userDepartment.findMany({
+              where: { userId: me.id },
+              select: {
+                departmentId: true,
+                department: { select: { code: true, name: true } },
+              },
+            })
+
+            const userDepartmentIds = new Set<string>()
+            if (me.departmentId) {
+              userDepartmentIds.add(me.departmentId)
+            }
+
 
           for (const link of departmentLinks) {
-            const resolved = resolveNadaConstaSetoresByDepartment(
-              link.department,
+              userDepartmentIds.add(link.departmentId)
+            }
+
+            if (userDepartmentIds.size > 0) {
+              const departmentCostCenters = await prisma.costCenter.findMany({
+                where: {
+                  departmentId: {
+                    in: [...userDepartmentIds],
+                  },
+                },
+                select: { id: true },
+              })
+
+              for (const cc of departmentCostCenters) {
+                ccIds.add(cc.id)
+              }
+            }
+
+            const setorKeys = new Set<string>()
+            const primarySetores = resolveNadaConstaSetoresByDepartment(
+              me.department,
             )
-            for (const setor of resolved) {
+            for (const setor of primarySetores) {
               setorKeys.add(setor)
             }
-          }
 
-          const nadaConstaTypeFilters = buildNadaConstaReceivedFilters(setorKeys)
-          const setorFilters =
-            setorKeys.size > 0
-              ? [
-                  {
-                    AND: [
-                      { OR: nadaConstaTypeFilters },
-                      {
-                        solicitacaoSetores: {
-                          some: { setor: { in: [...setorKeys] } },
+            for (const link of departmentLinks) {
+              const resolved = resolveNadaConstaSetoresByDepartment(
+                link.department,
+              )
+              for (const setor of resolved) {
+                setorKeys.add(setor)
+              }
+            }
+
+            const nadaConstaTypeFilters = buildNadaConstaReceivedFilters(setorKeys)
+            const setorFilters =
+              setorKeys.size > 0
+                ? [
+                    {
+                      AND: [
+                        { OR: nadaConstaTypeFilters },
+                        {
+                          solicitacaoSetores: {
+                            some: { setor: { in: [...setorKeys] } },
+                          },
                         },
-                      },
-                    ],
-                  },
+                      ],
+                    },
+                  ]
+                : []
+
+            const isDpUser =
+              me.department?.code === '08' ||
+              departmentLinks.some((link) => link.department?.code === '08')
+
+            const dpDepartmentId =
+              me.department?.code === '08'
+                ? me.departmentId
+                : departmentLinks.find((link) => link.department?.code === '08')
+                    ?.departmentId
+
+            const dpFilters =
+              isDpUser && dpDepartmentId
+                ? [{ costCenterId: null, departmentId: dpDepartmentId }]
+                : []
+            const gestorAvaliadorFilter = {
+              approverId: me.id,
+              status: EXPERIENCE_EVALUATION_STATUS,
+            }
+
+            if (where.costCenterId) {
+              const receivedFilters = ccIds.has(where.costCenterId)
+                ? [{ costCenterId: where.costCenterId }]
+                : []
+
+              if (receivedFilters.length === 0 && setorFilters.length === 0) {
+                where.AND = [
+                  ...(where.AND ?? []),
+                  { OR: [gestorAvaliadorFilter] },
                 ]
-              : []
-
-          const isDpUser =
-            me.department?.code === '08' ||
-            departmentLinks.some((link) => link.department?.code === '08')
-
-          const dpDepartmentId =
-            me.department?.code === '08'
-              ? me.departmentId
-              : departmentLinks.find((link) => link.department?.code === '08')
-                  ?.departmentId
-
-          const dpFilters =
-            isDpUser && dpDepartmentId
-              ? [{ costCenterId: null, departmentId: dpDepartmentId }]
-              : []
-           const gestorAvaliadorFilter = {
-            approverId: me.id,
-            status: EXPERIENCE_EVALUATION_STATUS,
-          }
-
-          if (where.costCenterId) {
-            const receivedFilters = ccIds.has(where.costCenterId)
-              ? [{ costCenterId: where.costCenterId }]
-              : []
-
-            if (receivedFilters.length === 0 && setorFilters.length === 0) {
-              where.AND = [
-                ...(where.AND ?? []),
-                { OR: [gestorAvaliadorFilter] },
-              ]
+              } else {
+                where.AND = [
+                  ...(where.AND ?? []),
+                  { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
+                ]
+              }
             } else {
-              where.AND = [
-                ...(where.AND ?? []),
-                { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
-              ]
-            }
-          } else {
-            const receivedFilters = [
-              ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
-              ...(userDepartmentIds.size > 0
-                ? [{ departmentId: { in: [...userDepartmentIds] } }]
-                : []),
-              ...dpFilters,
-            ]
+              const receivedFilters = [
+                ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
+                ...(userDepartmentIds.size > 0
+                  ? [{ departmentId: { in: [...userDepartmentIds] } }]
+                  : []),
+                ...dpFilters,
+               ]
 
-            if (receivedFilters.length === 0 && setorFilters.length === 0) {
-             where.AND = [
-                ...(where.AND ?? []),
-                { OR: [gestorAvaliadorFilter] },
-              ]
-            } else {
-              where.AND = [
-                ...(where.AND ?? []),
-                { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
-              ]
+              if (receivedFilters.length === 0 && setorFilters.length === 0) {
+                where.AND = [
+                  ...(where.AND ?? []),
+                  { OR: [gestorAvaliadorFilter] },
+                ]
+              } else {
+                where.AND = [
+                  ...(where.AND ?? []),
+                  { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
+                ]
+              }
             }
           }
+
            // RQ_063 só deve chegar na fila após aprovação (nível 3)
           where.AND = [
             ...(where.AND ?? []),
