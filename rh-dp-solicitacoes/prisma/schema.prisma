@@ -220,6 +220,7 @@ model Solicitation {
   vagaPrevista       Boolean                @default(false)
   assumidaPorId      String?
   assumidaEm         DateTime?
+  nonConformityId    String?
   anexos             Attachment[]
   comentarios        Comment[]
   eventos            Event[]
@@ -234,12 +235,14 @@ model Solicitation {
   timelines          SolicitationTimeline[]
   solicitacaoSetores SolicitacaoSetor[]
   documents          Document[]
+  nonConformity      NonConformity?          @relation(fields: [nonConformityId], references: [id])
 
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
   @@index([departmentId, dataAbertura])
   @@index([requiresApproval, approvalStatus, dataAbertura])
   @@index([status, dataAbertura])
+  @@index([nonConformityId])
 }
 
 model Document {
@@ -994,6 +997,7 @@ model NonConformity {
   anexos                           NonConformityAttachment[]
   comentarios                      NonConformityComment[]
   timeline                         NonConformityTimeline[]
+  linkedSolicitations              Solicitation[]
 
   @@index([status, createdAt])
   @@index([centroQueDetectouId, centroQueOriginouId])

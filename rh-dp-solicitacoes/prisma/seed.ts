@@ -731,7 +731,7 @@ async function main() {
               label: 'Documento',
               type: 'text',
               required: true,
-            },
+             },
             {
               name: 'dataDocumento',
               label: 'Data do Documento',
@@ -750,6 +750,64 @@ async function main() {
               type: 'textarea',
               required: true,
             },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+    })
+
+
+    await prisma.tipoSolicitacao.upsert({
+      where: { id: 'RQ_QUA_148' },
+      update: {
+        codigo: 'RQ.QUA.148',
+        nome: 'RQ.QUA.148 - Gestão de Mudanças',
+        descricao: 'Solicitação de gestão de mudanças da Qualidade / SGI.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: true,
+          },
+          camposEspecificos: [
+            { name: 'identificacaoMudanca', label: 'Identificação da mudança', type: 'text', required: true, section: 'Identificação da mudança' },
+            { name: 'tipoMudanca', label: 'Tipo da mudança', type: 'select', required: true, options: ['Processo', 'Produto', 'Serviço', 'Sistema', 'Outro'], section: 'Identificação da mudança' },
+            { name: 'descricaoNecessidade', label: 'Descrição da necessidade', type: 'textarea', required: true, section: 'Descrição da necessidade' },
+            { name: 'analiseImpactoRisco', label: 'Análise de impacto e risco', type: 'textarea', required: true, section: 'Análise de impacto e risco' },
+            { name: 'planejamentoExecucao', label: 'Planejamento e execução', type: 'textarea', required: true, section: 'Planejamento e execução' },
+            { name: 'equipeMultidisciplinar', label: 'Equipe multidisciplinar', type: 'textarea', required: false, section: 'Equipe multidisciplinar' },
+            { name: 'planoAcaoMudanca', label: 'Plano de ação', type: 'textarea', required: true, section: 'Plano de ação' },
+            { name: 'liberacaoMudanca', label: 'Liberação da mudança', type: 'textarea', required: false, section: 'Liberação da mudança' },
+            { name: 'analiseCritica', label: 'Análise crítica', type: 'textarea', required: false, section: 'Análise crítica' },
+            { name: 'origem', label: 'Origem', type: 'text', required: false, defaultValue: 'MANUAL', section: 'Vínculo com não conformidade' },
+            { name: 'nonConformityNumero', label: 'Número da não conformidade', type: 'text', required: false, section: 'Vínculo com não conformidade' },
+            { name: 'nonConformityId', label: 'ID da não conformidade', type: 'text', required: false, section: 'Vínculo com não conformidade' },
+          ],
+        },
+        updatedAt: new Date(),
+      },
+      create: {
+        id: 'RQ_QUA_148',
+        codigo: 'RQ.QUA.148',
+        nome: 'RQ.QUA.148 - Gestão de Mudanças',
+        descricao: 'Solicitação de gestão de mudanças da Qualidade / SGI.',
+        schemaJson: {
+          meta: {
+            departamentos: [qualidadeDepartment.id],
+            requiresApproval: true,
+          },
+          camposEspecificos: [
+            { name: 'identificacaoMudanca', label: 'Identificação da mudança', type: 'text', required: true, section: 'Identificação da mudança' },
+            { name: 'tipoMudanca', label: 'Tipo da mudança', type: 'select', required: true, options: ['Processo', 'Produto', 'Serviço', 'Sistema', 'Outro'], section: 'Identificação da mudança' },
+            { name: 'descricaoNecessidade', label: 'Descrição da necessidade', type: 'textarea', required: true, section: 'Descrição da necessidade' },
+            { name: 'analiseImpactoRisco', label: 'Análise de impacto e risco', type: 'textarea', required: true, section: 'Análise de impacto e risco' },
+            { name: 'planejamentoExecucao', label: 'Planejamento e execução', type: 'textarea', required: true, section: 'Planejamento e execução' },
+            { name: 'equipeMultidisciplinar', label: 'Equipe multidisciplinar', type: 'textarea', required: false, section: 'Equipe multidisciplinar' },
+            { name: 'planoAcaoMudanca', label: 'Plano de ação', type: 'textarea', required: true, section: 'Plano de ação' },
+            { name: 'liberacaoMudanca', label: 'Liberação da mudança', type: 'textarea', required: false, section: 'Liberação da mudança' },
+            { name: 'analiseCritica', label: 'Análise crítica', type: 'textarea', required: false, section: 'Análise crítica' },
+            { name: 'origem', label: 'Origem', type: 'text', required: false, defaultValue: 'MANUAL', section: 'Vínculo com não conformidade' },
+            { name: 'nonConformityNumero', label: 'Número da não conformidade', type: 'text', required: false, section: 'Vínculo com não conformidade' },
+            { name: 'nonConformityId', label: 'ID da não conformidade', type: 'text', required: false, section: 'Vínculo com não conformidade' },
           ],
         },
         updatedAt: new Date(),

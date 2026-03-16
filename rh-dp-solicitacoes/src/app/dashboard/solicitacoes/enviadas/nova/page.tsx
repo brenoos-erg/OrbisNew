@@ -11,7 +11,7 @@ import {
 } from 'react';
 import * as Select from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
 import {
@@ -237,11 +237,12 @@ function createClientRequestId() {
 
 
 /* ================================================================
-  COMPONENTE PRINCIPAL
+   COMPONENTE PRINCIPAL
 ================================================================ */
 
 export default function NovaSolicitacaoPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toasts, pushToast, removeToast } = useSolicitacoesToast();
 
  // controle de envio
@@ -278,6 +279,19 @@ export default function NovaSolicitacaoPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
+
+
+  const prefillFromNc = useMemo(() => ({
+    departamentoId: searchParams.get('departamentoId') ?? '',
+    tipoCodigo: (searchParams.get('tipoCodigo') ?? '').toUpperCase(),
+    origem: (searchParams.get('origem') ?? '').toUpperCase(),
+    nonConformityId: searchParams.get('nonConformityId') ?? '',
+    nonConformityNumero: searchParams.get('nonConformityNumero') ?? '',
+    descricaoResumida: searchParams.get('descricaoResumida') ?? '',
+    justificativaInicial: searchParams.get('justificativaInicial') ?? '',
+    areaImpactada: searchParams.get('areaImpactada') ?? '',
+  }), [searchParams]);
+
   const [extraFiles, setExtraFiles] = useState<Record<string, File[]>>({});
   const [abonoCampos, setAbonoCampos] = useState<Extras>({});
   const [step, setStep] = useState<1 | 2>(1);
@@ -289,7 +303,6 @@ export default function NovaSolicitacaoPage() {
   } | null>(null);
 
   const canGoNext = Boolean(departamentoId && tipoId);
-
 
   /* ============================================================
    1) /api/me
@@ -332,6 +345,13 @@ export default function NovaSolicitacaoPage() {
 
      loadDepartments();
   }, []);
+
+  useEffect(() => {
+    if (prefillFromNc.departamentoId) {
+      setDepartamentoId(prefillFromNc.departamentoId);
+    }
+  }, [prefillFromNc.departamentoId]);
+
   useEffect(() => {
   async function loadCostCenters() {
       try {
@@ -376,13 +396,30 @@ export default function NovaSolicitacaoPage() {
         setCostCenters([]);
       }
     }
-
-    loadCostCenters();
+  loadCostCenters();
   }, []);
 
   /* ============================================================
    3) /api/tipos-solicitacao?departamentoId=
   ============================================================ */
+
+  useEffect(() => {
+    async function resolveTipoByCodigo() {
+      if (!prefillFromNc.tipoCodigo || prefillFromNc.departamentoId || !departamentos.length || tipoId) return;
+      for (const dep of departamentos) {
+        const res = await fetch(`/api/tipos-solicitacao?departamentoId=${dep.id}`);
+        if (!res.ok) continue;
+        const data = (await res.json()) as TipoSolicitacao[];
+        const found = data.find((tipo) => (tipo.codigo ?? '').toUpperCase() === prefillFromNc.tipoCodigo);
+        if (found) {
+          setDepartamentoId(dep.id);
+          break;
+        }
+      }
+    }
+    resolveTipoByCodigo();
+  }, [departamentos, prefillFromNc.departamentoId, prefillFromNc.tipoCodigo, tipoId]);
+
   useEffect(() => {
     if (!departamentoId) {
       setTipos([]);
@@ -444,6 +481,28 @@ export default function NovaSolicitacaoPage() {
   const selectedTipoLabel = selectedTipo
     ? getTipoOptionLabel(selectedTipo)
     : '';
+
+  useEffect(() => {
+    if (!tipos.length || !prefillFromNc.tipoCodigo || tipoId) return;
+    const found = tipos.find((tipo) => (tipo.codigo ?? '').toUpperCase() === prefillFromNc.tipoCodigo);
+    if (found) {
+      setTipoId(found.id);
+    }
+  }, [tipos, prefillFromNc.tipoCodigo, tipoId]);
+
+  useEffect(() => {
+    if (!selectedTipo || prefillFromNc.origem !== 'NAO_CONFORMIDADE') return;
+    setExtras((prev) => ({
+      ...prev,
+      origem: 'NAO_CONFORMIDADE',
+      nonConformityId: prefillFromNc.nonConformityId,
+      nonConformityNumero: prefillFromNc.nonConformityNumero,
+      descricaoNecessidade: prev.descricaoNecessidade || prefillFromNc.descricaoResumida,
+      analiseImpactoRisco: prev.analiseImpactoRisco || prefillFromNc.justificativaInicial,
+      planejamentoExecucao: prev.planejamentoExecucao || prefillFromNc.areaImpactada,
+    }));
+  }, [selectedTipo, prefillFromNc]);
+
     useEffect(() => {
     if (!me || !selectedTipo) return;
     setExtras((prev) => {
@@ -1134,7 +1193,7 @@ export default function NovaSolicitacaoPage() {
         solicitarParaOutroColaborador,
         solicitanteManual: solicitarParaOutroColaborador
           ? {
-              fullName: solicitanteManual.fullName.trim(),
+               fullName: solicitanteManual.fullName.trim(),
               email: solicitanteManual.email.trim(),
               login: solicitanteManual.login.trim(),
               phone: solicitanteManual.phone.trim(),
@@ -1146,6 +1205,9 @@ export default function NovaSolicitacaoPage() {
             }
           : null,
         idempotencyKey: idempotencyKeyRef.current,
+        origem: extras.origem ?? (prefillFromNc.origem === 'NAO_CONFORMIDADE' ? 'NAO_CONFORMIDADE' : 'MANUAL'),
+        nonConformityId: extras.nonConformityId ?? prefillFromNc.nonConformityId ?? null,
+        nonConformityNumero: extras.nonConformityNumero ?? prefillFromNc.nonConformityNumero ?? null,
        };
 
       const res = await fetch('/api/solicitacoes', {

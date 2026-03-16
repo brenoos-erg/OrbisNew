@@ -291,7 +291,9 @@ export type SolicitationDetail = {
   children?: ChildSolicitation[]
   solicitacaoSetores?: SolicitacaoSetor[]
   timelines?: { id: string; status: string; message?: string | null; createdAt: string }[]
+  nonConformity?: { id: string; numeroRnc: string; status?: string | null } | null
 }
+
 
 
 function formatDate(dateStr?: string | null) {
@@ -2042,11 +2044,22 @@ async function handleEncaminharAprovacaoComAnexo() {
                 <div>
                   <label className={LABEL_RO}>Protocolo</label>
                   <input
-                    className={INPUT_RO}
+                     className={INPUT_RO}
                     readOnly
                     value={detail.protocolo ?? row.protocolo ?? ''}
                   />
                 </div>
+
+                {detail.nonConformity ? (
+                  <div>
+                    <label className={LABEL_RO}>NC de origem</label>
+                    <div className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80">
+                      <a className="text-orange-700 hover:underline" href={`/dashboard/sst/nao-conformidades/${detail.nonConformity.id}`}>
+                        {detail.nonConformity.numeroRnc}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
                 <div>
                   <label className={LABEL_RO}>Solicitação</label>
                   <input

@@ -484,7 +484,7 @@ export const POST = withModuleLevel(
           )
         }
 
-        const tipoId = body.tipoId as string | undefined
+         const tipoId = body.tipoId as string | undefined
         const costCenterId = body.costCenterId as string | null | undefined
         const departmentId = body.departmentId as string | undefined
         const idempotencyKeyRaw = body.idempotencyKey
@@ -495,6 +495,10 @@ export const POST = withModuleLevel(
         requestId = req.headers.get('x-request-id') ?? crypto.randomUUID()
          const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
+        const origemMudancaRaw = typeof body.origem === 'string' ? body.origem.toUpperCase() : undefined
+        const origemMudanca = origemMudancaRaw === 'NAO_CONFORMIDADE' ? 'NAO_CONFORMIDADE' : 'MANUAL'
+        const nonConformityId = typeof body.nonConformityId === 'string' && body.nonConformityId.trim() ? body.nonConformityId.trim() : null
+        const nonConformityNumero = typeof body.nonConformityNumero === 'string' && body.nonConformityNumero.trim() ? body.nonConformityNumero.trim() : null
         const solicitarParaOutroColaborador = body.solicitarParaOutroColaborador === true
         const solicitanteManual =
           body.solicitanteManual && typeof body.solicitanteManual === 'object'
@@ -663,7 +667,7 @@ export const POST = withModuleLevel(
           if (!hasPlanoSaude && !hasPlanoOdontologico) {
             return NextResponse.json(
               {
-                error:
+                  error:
                   'Marque ao menos uma opção de benefício: Plano de Saúde ou Plano Odontológico.',
               },
               { status: 400 },
@@ -671,6 +675,16 @@ export const POST = withModuleLevel(
           }
         }
 
+
+        const isGestaoMudancas = tipo.codigo?.toUpperCase() === 'RQ.QUA.148'
+        if (isGestaoMudancas) {
+          payload.campos = {
+            ...(payload.campos ?? {}),
+            origem: origemMudanca,
+            nonConformityId,
+            nonConformityNumero,
+          }
+        }
 
         if (isSolicitacaoIncentivoEducacao(tipo)) {
           const hasTipoFormacao = [
@@ -727,6 +741,7 @@ export const POST = withModuleLevel(
             dataPrevista,
             payload,
             idempotencyKey,
+            nonConformityId: isGestaoMudancas ? nonConformityId : null,
           },
         })
 
@@ -746,6 +761,32 @@ export const POST = withModuleLevel(
             message: 'Solicitação criada pelo solicitante.',
           },
         })
+
+        if (isGestaoMudancas && nonConformityId) {
+          const nc = await prisma.nonConformity.findUnique({
+            where: { id: nonConformityId },
+            select: { id: true, numeroRnc: true },
+          })
+
+          if (nc) {
+            await prisma.solicitationTimeline.create({
+              data: {
+                solicitationId: created.id,
+                status: 'ABERTA',
+                message: `Originada da não conformidade ${nc.numeroRnc}.`,
+              },
+            })
+
+            await prisma.nonConformityTimeline.create({
+              data: {
+                nonConformityId: nc.id,
+                actorId: solicitanteId,
+                tipo: 'GESTAO_MUDANCAS_VINCULADA',
+                message: `Gestão de Mudanças vinculada: ${created.protocolo}.`,
+              },
+            })
+          }
+        }
         if (isAvaliacaoExperiencia) {
           const gestorImediatoAvaliadorId = String(
             payload?.campos?.gestorImediatoAvaliadorId ?? '',

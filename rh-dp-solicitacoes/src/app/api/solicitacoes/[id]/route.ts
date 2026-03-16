@@ -29,6 +29,7 @@ export async function GET(
         tipo: true,
         costCenter: true,
         department: { select: { id: true, name: true, code: true } },
+        nonConformity: { select: { id: true, numeroRnc: true, status: true } },
         comentarios: {
           include: {
             autor: {
@@ -219,8 +220,11 @@ export async function GET(
             name: item.department.name,
             code: item.department.code,
           }
-        : null,
+         : null,
       payload: item.payload as any,
+      nonConformity: item.nonConformity
+        ? { id: item.nonConformity.id, numeroRnc: item.nonConformity.numeroRnc, status: item.nonConformity.status }
+        : null,
       anexos: dedupedAttachments.map((a) => ({
         id: a.id,
         filename: a.filename,

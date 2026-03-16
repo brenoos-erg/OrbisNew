@@ -56,7 +56,8 @@ type Detail = {
   planoDeAcao?: ActionItem[]
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
-  permissions?: { canManageAllNc?: boolean }
+  linkedSolicitations?: Array<{ id: string; protocolo: string; status: string }>
+  permissions?: { canManageAllNc?: boolean; canOpenChangeManagement?: boolean }
 }
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
@@ -253,6 +254,22 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
     load()
   }
+
+  async function abrirGestaoMudancas() {
+    if (!item) return
+    const params = new URLSearchParams({
+      tipoCodigo: 'RQ.QUA.148',
+      origem: 'NAO_CONFORMIDADE',
+      nonConformityId: item.id,
+      nonConformityNumero: item.numeroRnc,
+      descricaoResumida: item.descricao ?? '',
+      justificativaInicial: item.evidenciaObjetiva ?? '',
+      areaImpactada:
+        item.centroQueOriginou?.description || item.centroQueDetectou?.description || '',
+    })
+    router.push(`/dashboard/solicitacoes/enviadas/nova?${params.toString()}`)
+  }
+
   async function aprovar(aprovadoValor: boolean) {
     await fetch(`/api/sst/nao-conformidades/${id}/aprovacao`, {
       method: 'POST',
@@ -489,7 +506,16 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
               onClick={reabrirNaoConformidade}
               className="rounded bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700"
             >
-              Reabrir não conformidade
+                Reabrir não conformidade
+            </button>
+          ) : null}
+          {item.permissions?.canOpenChangeManagement ? (
+            <button
+              type="button"
+              onClick={abrirGestaoMudancas}
+              className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Abrir Gestão de Mudanças
             </button>
           ) : null}
           <Link href="/dashboard/sst/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
@@ -517,7 +543,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
         </div>
       </div>
 
-      {activeSection === 'naoConformidade' ? (
+       {activeSection === 'naoConformidade' ? (
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card title="Não conformidade">
             <Info label="Descrição" value={item.descricao} />
@@ -529,9 +555,25 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
             <Info label="Referência SIG" value={item.referenciaSig || '-'} />
              <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
            <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
+            <div className="mt-4 rounded-lg border border-slate-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gestão de Mudanças vinculada</p>
+              {item.linkedSolicitations?.length ? (
+                <ul className="mt-2 space-y-2">
+                  {item.linkedSolicitations.map((sol) => (
+                    <li key={sol.id} className="text-sm text-slate-700">
+                      <span className="font-medium">{sol.protocolo}</span> · {sol.status} ·{' '}
+                      <Link href={`/dashboard/solicitacoes/${sol.id}`} className="text-orange-700 hover:underline">
+                        Abrir
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">Nenhuma solicitação de Gestão de Mudanças vinculada.</p>
+              )}
+            </div>
             {item.status === 'CANCELADA' ? <Info label="Justificativa do cancelamento" value={justificativaCancelamento || '-'} /> : null}
           </Card>
-
           <div className="space-y-4">
             <Card title="Matriz GUT">
               <FieldSelectNumeric label="Gravidade" value={gut.gravidade} options={GUT_OPTIONS.gravidade} onChange={(value) => setGut((prev) => ({ ...prev, gravidade: value }))} disabled={bloqueado} />

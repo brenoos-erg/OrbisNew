@@ -72,6 +72,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         centroQueOriginou: { select: { id: true, description: true } },
         aprovadoQualidadePor: { select: { id: true, fullName: true, email: true } },
         verificacaoEficaciaAprovadoPor: { select: { id: true, fullName: true, email: true } },
+        linkedSolicitations: {
+          where: { tipo: { codigo: 'RQ.QUA.148' } },
+          select: { id: true, protocolo: true, status: true, dataAbertura: true },
+          orderBy: { dataAbertura: 'desc' },
+        },
       },
     })
 
@@ -79,6 +84,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
      const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
     const canAccess = canUserAccessNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    const canTreat = canUserTreatNc({
       userId: me.id,
       level,
       ncSolicitanteId: nc.solicitanteId,
@@ -95,6 +108,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         ...nc,
         permissions: {
           canManageAllNc: canManageAllNc(level),
+          canOpenChangeManagement: hasMinLevel(level, ModuleLevel.NIVEL_3) || canTreat,
         },
       },
     })
