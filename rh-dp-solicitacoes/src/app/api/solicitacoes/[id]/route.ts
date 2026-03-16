@@ -9,10 +9,7 @@ import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
-import {
-  canUserViewSolicitationByDepartment,
-  resolveUserSetorKeysFromDepartments,
-} from '@/lib/solicitationVisibility'
+import { canViewSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -82,14 +79,14 @@ export async function GET(
     }
 
 
-   const me = await requireActiveUser()
-    const [userDepartmentIds, userDepartments] = await Promise.all([
+  const me = await requireActiveUser()
+    const [userDepartmentIds, userAccess] = await Promise.all([
       getUserDepartmentIds(me.id, me.departmentId),
-      prisma.userDepartment.findMany({
-        where: { userId: me.id },
-        include: {
-          department: { select: { id: true, code: true, name: true } },
-        },
+      resolveUserAccessContext({
+        userId: me.id,
+        role: me.role,
+        primaryDepartmentId: me.departmentId,
+        primaryDepartment: me.department,
       }),
     ])
 
@@ -111,27 +108,8 @@ export async function GET(
        isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
     })
 
-      const departmentRecords = new Map<string, { id?: string | null; code?: string | null; name?: string | null }>()
-    if (me.department) {
-      departmentRecords.set(me.department.id, me.department)
-    }
-    for (const link of userDepartments) {
-      if (link.department) {
-        departmentRecords.set(link.department.id, link.department)
-      }
-    }
-
-    const userSetorKeys = resolveUserSetorKeysFromDepartments(
-      Array.from(departmentRecords.values()),
-    )
-
-    const canViewByDepartment = canUserViewSolicitationByDepartment(
-      {
-        userId: me.id,
-        role: me.role,
-        userDepartmentIds,
-        userSetorKeys,
-      },
+    const canViewByDepartment = canViewSolicitation(
+      userAccess,
       {
         solicitanteId: item.solicitanteId,
         approverId: item.approverId,
@@ -141,12 +119,17 @@ export async function GET(
       },
     )
 
-
     const canViewNadaConsta = canUserViewNadaConsta(
       {
-        id: me.id,
+       id: me.id,
         role: me.role,
-        departments: Array.from(departmentRecords.values()),
+        departments: [
+          ...(me.department ? [me.department] : []),
+          ...(await prisma.userDepartment.findMany({
+            where: { userId: me.id },
+            include: { department: { select: { id: true, code: true, name: true } } },
+          })).map((link) => link.department).filter((d): d is { id: string; code: string; name: string } => Boolean(d)),
+        ],
       },
       {
         solicitanteId: item.solicitanteId,

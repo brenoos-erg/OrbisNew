@@ -8,10 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
-import {
-  buildReceivedSolicitationVisibilityWhere,
-  resolveUserSetorKeysFromDepartments,
-} from '@/lib/solicitationVisibility'
+import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
@@ -94,27 +91,12 @@ export async function GET(req: NextRequest) {
     const where = buildWhereFromSearchParams(searchParams)
 
 
-    const departmentLinks = await prisma.userDepartment.findMany({
-      where: { userId: me.id },
-      select: {
-        departmentId: true,
-        department: { select: { code: true, name: true } },
-      },
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
     })
-
-     const userDepartmentIds = new Set<string>()
-    if (me.departmentId) userDepartmentIds.add(me.departmentId)
-    for (const link of departmentLinks) userDepartmentIds.add(link.departmentId)
-
-    const userDepartments = [
-      ...(me.department ? [me.department] : []),
-      ...departmentLinks
-        .map((link) => link.department)
-        .filter((department): department is { code: string; name: string } => Boolean(department)),
-    ]
-
-    const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
-
   const gestorAvaliadorFilter = {
       approverId: me.id,
       status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
@@ -125,12 +107,7 @@ export async function GET(req: NextRequest) {
       ...(where.AND ?? []),
       {
         OR: [
-          buildReceivedSolicitationVisibilityWhere({
-            userId: me.id,
-            role: me.role,
-            userDepartmentIds: [...userDepartmentIds],
-            userSetorKeys,
-          }),
+          buildReceivedWhereByPolicy(userAccess),
           gestorAvaliadorFilter,
         ],
       },
@@ -154,7 +131,7 @@ export async function GET(req: NextRequest) {
           AND: [
             { requiresApproval: true },
             { approvalStatus: 'PENDENTE' },
-            { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+            { OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }] },
           ],
         },
       },

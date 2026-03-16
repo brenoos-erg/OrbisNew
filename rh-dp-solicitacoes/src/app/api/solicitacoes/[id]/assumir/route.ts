@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
+import { canAssumeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 export async function POST(
   _req: NextRequest,
@@ -17,6 +18,7 @@ export async function POST(
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
+      include: { solicitacaoSetores: { select: { setor: true } } },
     })
 
 
@@ -24,6 +26,28 @@ export async function POST(
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
+      )
+    }
+
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    })
+
+    const canAssume = canAssumeSolicitation(userAccess, {
+      solicitanteId: solic.solicitanteId,
+      approverId: solic.approverId,
+      assumidaPorId: solic.assumidaPorId,
+      departmentId: solic.departmentId,
+      solicitacaoSetores: solic.solicitacaoSetores,
+    })
+
+    if (!canAssume) {
+      return NextResponse.json(
+        { error: 'Você não possui permissão para assumir este chamado.' },
+        { status: 403 },
       )
     }
 

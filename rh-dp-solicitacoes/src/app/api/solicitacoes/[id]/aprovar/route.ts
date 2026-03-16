@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
-import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoIncentivoEducacao, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
+import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
@@ -67,7 +67,6 @@ export async function POST(
     }
 
   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
-    const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(solic.tipo)
     const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
     const isFerias = isSolicitacaoAgendamentoFerias(solic.tipo)
     const isVeiculos = isSolicitacaoVeiculos(solic.tipo)    
@@ -75,32 +74,6 @@ export async function POST(
 
     
 
-    if (isSolicitacaoIncentivo) {
-      const allowedCostCenters = new Set<string>()
-
-      if (me.costCenterId) {
-        allowedCostCenters.add(me.costCenterId)
-      }
-
-      const links = await prisma.userCostCenter.findMany({
-        where: { userId: me.id },
-       select: { costCenterId: true },
-      })
-
-      for (const link of links) {
-        allowedCostCenters.add(link.costCenterId)
-      }
-
-      if (!solic.costCenterId || !allowedCostCenters.has(solic.costCenterId)) {
-        return NextResponse.json(
-          {
-            error:
-              'Somente usuários do setor responsável podem aprovar esta solicitação.',
-          },
-          { status: 403 },
-        )
-      }
-    }
 
     let rhCostCenter = null
     let rhDepartment: { id: string; name: string } | null = null

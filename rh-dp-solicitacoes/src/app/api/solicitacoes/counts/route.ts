@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
-import {
-  buildReceivedSolicitationVisibilityWhere,
-  resolveUserSetorKeysFromDepartments,
-} from '@/lib/solicitationVisibility'
+import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -14,28 +11,15 @@ export async function GET() {
   try {
     const me = await requireActiveUser()
 
-    const departmentLinks = await prisma.userDepartment.findMany({
-      where: { userId: me.id },
-      select: { departmentId: true, department: { select: { code: true, name: true } } },
-    })
-
-    const userDepartmentIds = new Set<string>()
-    if (me.departmentId) userDepartmentIds.add(me.departmentId)
-    for (const link of departmentLinks) userDepartmentIds.add(link.departmentId)
-
-    const userDepartments = [
-      ...(me.department ? [me.department] : []),
-      ...departmentLinks.map((link) => link.department).filter((department): department is { code: string; name: string } => Boolean(department)),
-    ]
-
-    const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
-
-    const receivedVisibilityWhere = buildReceivedSolicitationVisibilityWhere({
+    const userAccess = await resolveUserAccessContext({
       userId: me.id,
       role: me.role,
-      userDepartmentIds: [...userDepartmentIds],
-      userSetorKeys,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
     })
+
+    const receivedVisibilityWhere = buildReceivedWhereByPolicy(userAccess)
+
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
 
@@ -48,7 +32,7 @@ export async function GET() {
         }),
       ],
       OR: [
-        {
+         {
           status: 'ABERTA',
           AND: [
             receivedVisibilityWhere,
@@ -57,7 +41,7 @@ export async function GET() {
                 AND: [
                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
-                  { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+                  { OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }] },
                 ],
               },
             },

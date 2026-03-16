@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 export async function PATCH(
   _req: Request,
@@ -29,6 +30,7 @@ export async function PATCH(
             schemaJson: true,
           },
         },
+        solicitacaoSetores: { select: { setor: true } },
       },
     })
 
@@ -57,17 +59,27 @@ export async function PATCH(
       )
     }
 
-    const isResponsavelEtapa =
-      me.role === 'ADMIN' ||
-      me.departmentId === solicitation.departmentId
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    })
 
-    if (!isResponsavelEtapa) {
+    const canFinalize = canFinalizeSolicitation(userAccess, {
+      solicitanteId: solicitation.solicitanteId,
+      approverId: solicitation.approverId,
+      assumidaPorId: solicitation.assumidaPorId,
+      departmentId: solicitation.departmentId,
+      solicitacaoSetores: solicitation.solicitacaoSetores,
+    })
+
+    if (!canFinalize) {
       return NextResponse.json(
-        { error: 'Você não pode finalizar solicitações deste departamento.' },
+        { error: 'Você não pode finalizar solicitações desta etapa/departamento.' },
         { status: 403 },
       )
     }
-
     const now = new Date()
 
     const updated = await prisma.solicitation.update({

@@ -21,10 +21,8 @@ import {
   isSolicitacaoPessoal,
   isSolicitacaoVeiculos,
    NADA_CONSTA_SETORES,
-  resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
-import { buildNadaConstaReceivedFilters } from '@/lib/nadaConstaAccess'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
@@ -34,7 +32,7 @@ import {
   EXPERIENCE_EVALUATION_TIPO_ID,
   listExperienceEvaluators,
 } from '@/lib/experienceEvaluation'
-
+import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -135,150 +133,29 @@ export const GET = withModuleLevel(
         if (scope === 'sent') {
           where.solicitanteId = me.id
         } else if (scope === 'received') {
-          const isAdmin = me.role === 'ADMIN'
+           const userAccess = await resolveUserAccessContext({
+            userId: me.id,
+            role: me.role,
+            primaryDepartmentId: me.departmentId,
+            primaryDepartment: me.department,
+          })
 
-          if (!isAdmin) {
-            const ccIds = new Set<string>()
-
-            if (me.costCenterId) {
-              ccIds.add(me.costCenterId)
-            }
-
-            const links = await prisma.userCostCenter.findMany({
-              where: { userId: me.id },
-              select: { costCenterId: true },
-            })
-
-            for (const l of links) {
-              ccIds.add(l.costCenterId)
-            }
-
-            const departmentLinks = await prisma.userDepartment.findMany({
-              where: { userId: me.id },
-              select: {
-                departmentId: true,
-                department: { select: { code: true, name: true } },
-              },
-            })
-
-            const userDepartmentIds = new Set<string>()
-            if (me.departmentId) {
-              userDepartmentIds.add(me.departmentId)
-            }
-
-
-          for (const link of departmentLinks) {
-              userDepartmentIds.add(link.departmentId)
-            }
-
-            if (userDepartmentIds.size > 0) {
-              const departmentCostCenters = await prisma.costCenter.findMany({
-                where: {
-                  departmentId: {
-                    in: [...userDepartmentIds],
-                  },
-                },
-                select: { id: true },
-              })
-
-              for (const cc of departmentCostCenters) {
-                ccIds.add(cc.id)
-              }
-            }
-
-            const setorKeys = new Set<string>()
-            const primarySetores = resolveNadaConstaSetoresByDepartment(
-              me.department,
-            )
-            for (const setor of primarySetores) {
-              setorKeys.add(setor)
-            }
-
-            for (const link of departmentLinks) {
-              const resolved = resolveNadaConstaSetoresByDepartment(
-                link.department,
-              )
-              for (const setor of resolved) {
-                setorKeys.add(setor)
-              }
-            }
-
-            const nadaConstaTypeFilters = buildNadaConstaReceivedFilters(setorKeys)
-            const setorFilters =
-              setorKeys.size > 0
-                ? [
-                    {
-                      AND: [
-                        { OR: nadaConstaTypeFilters },
-                        {
-                          solicitacaoSetores: {
-                            some: { setor: { in: [...setorKeys] } },
-                          },
-                        },
-                      ],
-                    },
-                  ]
-                : []
-
-            const isDpUser =
-              me.department?.code === '08' ||
-              departmentLinks.some((link) => link.department?.code === '08')
-
-            const dpDepartmentId =
-              me.department?.code === '08'
-                ? me.departmentId
-                : departmentLinks.find((link) => link.department?.code === '08')
-                    ?.departmentId
-
-            const dpFilters =
-              isDpUser && dpDepartmentId
-                ? [{ costCenterId: null, departmentId: dpDepartmentId }]
-                : []
-            const gestorAvaliadorFilter = {
-              approverId: me.id,
-              status: EXPERIENCE_EVALUATION_STATUS,
-            }
-
-            if (where.costCenterId) {
-              const receivedFilters = ccIds.has(where.costCenterId)
-                ? [{ costCenterId: where.costCenterId }]
-                : []
-
-              if (receivedFilters.length === 0 && setorFilters.length === 0) {
-                where.AND = [
-                  ...(where.AND ?? []),
-                  { OR: [gestorAvaliadorFilter] },
-                ]
-              } else {
-                where.AND = [
-                  ...(where.AND ?? []),
-                  { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
-                ]
-              }
-            } else {
-              const receivedFilters = [
-                ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
-                ...(userDepartmentIds.size > 0
-                  ? [{ departmentId: { in: [...userDepartmentIds] } }]
-                  : []),
-                ...dpFilters,
-               ]
-
-              if (receivedFilters.length === 0 && setorFilters.length === 0) {
-                where.AND = [
-                  ...(where.AND ?? []),
-                  { OR: [gestorAvaliadorFilter] },
-                ]
-              } else {
-                where.AND = [
-                  ...(where.AND ?? []),
-                  { OR: [...receivedFilters, ...setorFilters, gestorAvaliadorFilter] },
-                ]
-              }
-            }
+          const gestorAvaliadorFilter = {
+            approverId: me.id,
+            status: EXPERIENCE_EVALUATION_STATUS,
           }
 
-           // RQ_063 só deve chegar na fila após aprovação (nível 3)
+          where.AND = [
+            ...(where.AND ?? []),
+            {
+              OR: [
+                buildReceivedWhereByPolicy(userAccess),
+                gestorAvaliadorFilter,
+              ],
+            },
+          ]
+
+          // RQ_063 só deve chegar na fila após aprovação (nível 3)
           where.AND = [
             ...(where.AND ?? []),
             {
@@ -286,10 +163,8 @@ export const GET = withModuleLevel(
                 AND: [
                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
-                  {
-                    OR: [
-                      { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
-                    ],
+                   {
+                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }],
                   },
                 ],
               },
