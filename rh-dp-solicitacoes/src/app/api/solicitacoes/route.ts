@@ -133,14 +133,9 @@ export const GET = withModuleLevel(
           where.solicitanteId = me.id
         } else if (scope === 'received') {
           const ccIds = new Set<string>()
-          const deptIds = new Set<string>()
 
           if (me.costCenterId) {
             ccIds.add(me.costCenterId)
-          }
-
-          if (me.departmentId) {
-            deptIds.add(me.departmentId)
           }
 
           const links = await prisma.userCostCenter.findMany({
@@ -160,15 +155,21 @@ export const GET = withModuleLevel(
             },
           })
 
-          for (const link of departmentLinks) {
-            deptIds.add(link.departmentId)
+          const userDepartmentIds = new Set<string>()
+          if (me.departmentId) {
+            userDepartmentIds.add(me.departmentId)
           }
 
-          if (deptIds.size > 0) {
+
+          for (const link of departmentLinks) {
+            userDepartmentIds.add(link.departmentId)
+          }
+
+          if (userDepartmentIds.size > 0) {
             const departmentCostCenters = await prisma.costCenter.findMany({
               where: {
                 departmentId: {
-                  in: [...deptIds],
+                  in: [...userDepartmentIds],
                 },
               },
               select: { id: true },
@@ -227,7 +228,7 @@ export const GET = withModuleLevel(
             isDpUser && dpDepartmentId
               ? [{ costCenterId: null, departmentId: dpDepartmentId }]
               : []
-          const gestorAvaliadorFilter = {
+           const gestorAvaliadorFilter = {
             approverId: me.id,
             status: EXPERIENCE_EVALUATION_STATUS,
           }
@@ -251,8 +252,8 @@ export const GET = withModuleLevel(
           } else {
             const receivedFilters = [
               ...(ccIds.size > 0 ? [{ costCenterId: { in: [...ccIds] } }] : []),
-              ...(deptIds.size > 0
-                ? [{ departmentId: { in: [...deptIds] } }]
+              ...(userDepartmentIds.size > 0
+                ? [{ departmentId: { in: [...userDepartmentIds] } }]
                 : []),
               ...dpFilters,
             ]
