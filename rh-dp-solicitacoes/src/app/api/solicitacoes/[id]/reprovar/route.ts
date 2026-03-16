@@ -10,6 +10,7 @@ import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -48,14 +49,20 @@ export const POST = withModuleLevel<RouteParams>(
         )
       }
 
-        const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
+         const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
       if (!isNivel3) {
         return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
       }
 
-       const tipoApproverIds = await resolveTipoApproverIds(solicit.tipoId)
+      const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
+      const tipoApproverIds = await resolveTipoApproverIds(solicit.tipoId)
+      const canApproveByDepartment =
+        userDepartmentIds.includes(solicit.departmentId) &&
+        me.moduleLevels?.solicitacoes === 'NIVEL_3'
       const canApproveSolicitation =
-        solicit.approverId === me.id || tipoApproverIds.includes(me.id)
+        solicit.approverId === me.id ||
+        tipoApproverIds.includes(me.id) ||
+        canApproveByDepartment
 
       if (!canApproveSolicitation) {
         return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })

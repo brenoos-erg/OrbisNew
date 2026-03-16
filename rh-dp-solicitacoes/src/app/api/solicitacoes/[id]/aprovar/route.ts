@@ -9,6 +9,7 @@ import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPesso
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 export async function POST(
   req: NextRequest,
@@ -28,6 +29,13 @@ export async function POST(
       include: {
         tipo: true,
         costCenter: true,
+        department: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
       },
     })
 
@@ -53,19 +61,24 @@ export async function POST(
       )
     }
 
-    const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
+   const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
     if (!isNivel3) {
       return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
     }
 
-   const tipoApproverIds = await resolveTipoApproverIds(solic.tipoId)
+    const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
+    const tipoApproverIds = await resolveTipoApproverIds(solic.tipoId)
+    const canApproveByDepartment =
+      userDepartmentIds.includes(solic.departmentId) &&
+      me.moduleLevels?.solicitacoes === 'NIVEL_3'
     const canApproveSolicitation =
-      solic.approverId === me.id || tipoApproverIds.includes(me.id)
+      solic.approverId === me.id ||
+      tipoApproverIds.includes(me.id) ||
+      canApproveByDepartment
 
     if (!canApproveSolicitation) {
       return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
     }
-
   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
     const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
     const isFerias = isSolicitacaoAgendamentoFerias(solic.tipo)
@@ -113,16 +126,23 @@ export async function POST(
     }
 
     const rhDepartmentId = rhDepartment?.id
-     const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
+      const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
 
 
+    const isFeriasDpStage = isFerias && solic.department?.code === '08'
+
     const updateData: Record<string, any> = {
-      approvalStatus: 'APROVADO',
+      approvalStatus: isFerias && !isFeriasDpStage ? 'PENDENTE' : 'APROVADO',
       approvalAt: new Date(),
       approverId: me.id,
       approvalComment: approvalComment ?? null,
-      status: isSolicitacaoEpi ? 'EM_ATENDIMENTO' : 'ABERTA',
+      requiresApproval: isFerias && !isFeriasDpStage,
+      status: isSolicitacaoEpi
+        ? 'EM_ATENDIMENTO'
+        : isFerias && !isFeriasDpStage
+          ? 'AGUARDANDO_APROVACAO'
+          : 'ABERTA',
     }
 
   if ((isSolicitacaoPessoalTipo || isDesligamento) && rhDepartmentId) {
@@ -130,6 +150,10 @@ export async function POST(
       updateData.departmentId = rhDepartmentId
     } else if (isFerias && dpDepartment) {
       updateData.departmentId = dpDepartment.id
+      if (!isFeriasDpStage) {
+        updateData.approverId = null
+        updateData.approvalAt = null
+      }
     } else if ((isVeiculos || isSolicitacaoEpi) && logisticaDepartment) {
       updateData.departmentId = logisticaDepartment.id
     }
@@ -155,8 +179,10 @@ export async function POST(
       timelineMessage = approvalComment
     } else if (isDesligamento && rhDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${rhDepartment.name}.`
-    } else if (isFerias && dpDepartment) {
-      timelineMessage = `Solicitação aprovada e encaminhada para ${dpDepartment.name}.`
+    } else if (isFerias && dpDepartment && !isFeriasDpStage) {
+      timelineMessage = `Solicitação aprovada pelo gestor e encaminhada para aprovação do ${dpDepartment.name}.`
+    } else if (isFerias && dpDepartment && isFeriasDpStage) {
+      timelineMessage = `Solicitação aprovada pelo ${dpDepartment.name} e liberada para atendimento.`
     } else if (isVeiculos && logisticaDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
     } else if (isSolicitacaoEpi && logisticaDepartment) {
@@ -183,12 +209,12 @@ export async function POST(
           status: 'ENCAMINHADA_LOGISTICA',
           message: `Solicitação encaminhada para ${logisticaDepartment.name} após aprovação do setor.`,
         },
-      })
+       })
     } else {
       await prisma.solicitationTimeline.create({
         data: {
           solicitationId,
-          status: 'AGUARDANDO_ATENDIMENTO',
+          status: isFerias && !isFeriasDpStage ? 'AGUARDANDO_APROVACAO' : 'AGUARDANDO_ATENDIMENTO',
           message: timelineMessage,
         },
       })
