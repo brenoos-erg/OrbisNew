@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { NonConformityActionStatus } from '@prisma/client'
+import { NonConformityActionPlanOrigin, NonConformityActionStatus } from '@prisma/client'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { actionStatusLabel } from '@/lib/sst/serializers'
 
@@ -12,13 +12,14 @@ type ActionRow = {
   prazo?: string | null
   status: NonConformityActionStatus
   createdAt: string
-  nonConformityId: string
-  nonConformity: {
+  origemPlano: NonConformityActionPlanOrigin
+  nonConformityId?: string | null
+  nonConformity?: {
     id: string
     numeroRnc: string
     centroQueOriginou?: { description: string } | null
     centroQueDetectou?: { description: string } | null
-  }
+  } | null
 }
 
 function toDateOnly(dateValue?: string | null) {
@@ -53,6 +54,7 @@ export default function PlanosDeAcaoClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<ActionRow[]>([])
+  const [saving, setSaving] = useState(false)
 
   const [qDraft, setQDraft] = useState('')
   const [responsavelDraft, setResponsavelDraft] = useState('')
@@ -63,6 +65,10 @@ export default function PlanosDeAcaoClient() {
   const [responsavel, setResponsavel] = useState('')
   const [status, setStatus] = useState<FilterStatus>('TODOS')
   const [emAtraso, setEmAtraso] = useState(false)
+
+  const [novoDescricao, setNovoDescricao] = useState('')
+  const [novoResponsavel, setNovoResponsavel] = useState('')
+  const [novoPrazo, setNovoPrazo] = useState('')
 
   async function load() {
     try {
@@ -86,6 +92,35 @@ export default function PlanosDeAcaoClient() {
     }
   }
 
+  async function handleCreateStandalonePlan(e: FormEvent) {
+    e.preventDefault()
+    if (!novoDescricao.trim()) return
+
+    try {
+      setSaving(true)
+      const res = await fetch('/api/sst/plano-de-acao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao: novoDescricao,
+          responsavelNome: novoResponsavel || null,
+          prazo: novoPrazo || null,
+          origem: 'PLANO AVULSO',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Erro ao criar plano avulso.')
+
+      setNovoDescricao('')
+      setNovoResponsavel('')
+      setNovoPrazo('')
+      await load()
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao criar plano avulso.')
+    } finally {
+      setSaving(false)
+    }
+  }
   useEffect(() => {
     load()
   }, [q, responsavel, status, emAtraso])
@@ -111,67 +146,46 @@ export default function PlanosDeAcaoClient() {
     setEmAtraso(false)
   }
 
-  return (
+ return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
+          <p className="text-sm font-semibold uppercase text-slate-500">SST</p>
           <h1 className="text-3xl font-bold text-slate-900">Planos de ação</h1>
-          <p className="max-w-3xl text-slate-600">Visualize todos os planos registrados e clique em um item para abrir a tela completa do plano.</p>
+          <p className="max-w-3xl text-slate-600">Visualize planos vinculados à não conformidade e também planos avulsos.</p>
         </div>
         <Link href="/dashboard/sst/nao-conformidades" className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
           Voltar para não conformidades
         </Link>
       </div>
 
+      <form onSubmit={handleCreateStandalonePlan} className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Novo plano avulso</p>
+        <div className="grid gap-3 md:grid-cols-3">
+          <input value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)} placeholder="Descrição do plano" className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2" required />
+          <input value={novoResponsavel} onChange={(e) => setNovoResponsavel(e.target.value)} placeholder="Responsável" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <input type="date" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <button disabled={saving} className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{saving ? 'Salvando...' : 'Criar plano avulso'}</button>
+      </form>
+
       <form onSubmit={handleSearch} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-sm font-medium text-slate-700">
-            Buscar
-            <input
-              value={qDraft}
-              onChange={(e) => setQDraft(e.target.value)}
-              placeholder="Nº RNC, descrição ou evidência"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="text-sm font-medium text-slate-700">Buscar
+            <input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="Nº RNC, descrição ou evidência" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </label>
-
-          <label className="text-sm font-medium text-slate-700">
-            Responsável
-            <input
-              value={responsavelDraft}
-              onChange={(e) => setResponsavelDraft(e.target.value)}
-              placeholder="Nome do responsável"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+          <label className="text-sm font-medium text-slate-700">Responsável
+            <input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} placeholder="Nome do responsável" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </label>
-
-          <label className="text-sm font-medium text-slate-700">
-            Status
-            <select
-              value={statusDraft}
-              onChange={(e) => setStatusDraft(e.target.value as FilterStatus)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
+          <label className="text-sm font-medium text-slate-700">Status
+            <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
               {ACTION_STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}
-                </option>
+                <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>
               ))}
             </select>
           </label>
-
-          <label className="mt-6 flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={emAtrasoDraft}
-              onChange={(e) => setEmAtrasoDraft(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-            Somente em atraso
-          </label>
+          <label className="mt-6 flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={emAtrasoDraft} onChange={(e) => setEmAtrasoDraft(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />Somente em atraso</label>
         </div>
-
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="submit" className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600">Pesquisar</button>
           <button type="button" onClick={limparFiltros} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Limpar filtros</button>
@@ -181,59 +195,43 @@ export default function PlanosDeAcaoClient() {
       <section className="grid gap-3 md:grid-cols-3">
         <StatCard label="Total de planos" value={String(items.length)} />
         <StatCard label="Em atraso" value={String(totalAtrasadas)} />
-        <StatCard
-          label="Concluídas"
-          value={String(items.filter((item) => item.status === NonConformityActionStatus.CONCLUIDA).length)}
-        />
+        <StatCard label="Concluídas" value={String(items.filter((item) => item.status === NonConformityActionStatus.CONCLUIDA).length)} />
       </section>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
             <tr>
+              <th className="px-3 py-2">Origem</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Nº processo</th>
               <th className="px-3 py-2">Data criação</th>
               <th className="px-3 py-2">Prazo</th>
               <th className="px-3 py-2">O quê</th>
-              <th className="px-3 py-2">Centro responsável</th>
               <th className="px-3 py-2">Responsável</th>
-            </tr>
+             </tr>
           </thead>
           <tbody>
             {items.map((item) => {
               const atrasada = isOverdue(item)
+              const detailHref = item.nonConformityId
+                ? `/dashboard/sst/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`
+                : `/dashboard/sst/planos-de-acao/${item.id}`
+
               return (
                 <tr key={item.id} className="border-t border-slate-100 hover:bg-orange-50/60">
-                  <td className="px-3 py-2">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${atrasada ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>
-                      {atrasada ? 'Em atraso' : actionStatusLabel[item.status]}
-                    </span>
-                  </td>
+                  <td className="px-3 py-2 text-xs font-semibold text-slate-700">{item.origemPlano === 'PLANO_AVULSO' ? 'PLANO AVULSO' : 'NÃO CONFORMIDADE'}</td>
+                  <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${atrasada ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>{atrasada ? 'Em atraso' : actionStatusLabel[item.status]}</span></td>
                   <td className="px-3 py-2 font-medium text-slate-900">{item.nonConformity?.numeroRnc || '-'}</td>
                   <td className="px-3 py-2 text-slate-600">{formatDate(item.createdAt)}</td>
                   <td className="px-3 py-2 text-slate-600">{formatDate(item.prazo)}</td>
                   <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
-                  <td className="px-3 py-2 text-slate-700">{item.nonConformity?.centroQueOriginou?.description || item.nonConformity?.centroQueDetectou?.description || '-'}</td>
-                  <td className="px-3 py-2 text-slate-700">
-                    <div className="flex items-center justify-between gap-2">
-                      <span>{item.responsavelNome || '-'}</span>
-                      <Link
-                        href={`/dashboard/sst/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`}
-                        className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700"
-                      >
-                        Abrir plano
-                      </Link>
-                    </div>
-                  </td>
+                  <td className="px-3 py-2 text-slate-700"><div className="flex items-center justify-between gap-2"><span>{item.responsavelNome || '-'}</span><Link href={detailHref} className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700">Abrir plano</Link></div></td>
                 </tr>
               )
             })}
-            {!loading && items.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">Nenhum plano de ação encontrado com os filtros atuais.</td>
-              </tr>
-            ) : null}
+            {!loading && items.length === 0 ? <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">Nenhum plano de ação encontrado com os filtros atuais.</td></tr> : null}
+
           </tbody>
         </table>
       </div>

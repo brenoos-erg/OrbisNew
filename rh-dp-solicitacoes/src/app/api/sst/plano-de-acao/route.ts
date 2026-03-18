@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityActionStatus, Prisma } from '@prisma/client'
+import {
+  ModuleLevel,
+  NonConformityActionPlanOrigin,
+  NonConformityActionStatus,
+  NonConformityActionType,
+  Prisma,
+} from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
@@ -45,9 +51,10 @@ export async function GET(req: NextRequest) {
         : {}),
       ...(q
         ? {
-            OR: [
+               OR: [
               { descricao: { contains: q } },
               { evidencias: { contains: q } },
+              { referencia: { contains: q } },
               { nonConformity: { numeroRnc: { contains: q } } },
             ],
           }
@@ -55,12 +62,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-      where.nonConformity = {
-        solicitanteId: me.id,
-      }
+      where.OR = [
+        ...(where.OR ?? []),
+        { createdById: me.id },
+        { responsavelId: me.id },
+        { nonConformity: { solicitanteId: me.id } },
+      ]
     }
 
-    const items = await prisma.nonConformityActionItem.findMany({
+     const items = await prisma.nonConformityActionItem.findMany({
       where,
       orderBy: [{ createdAt: 'desc' }],
       select: {
@@ -71,7 +81,9 @@ export async function GET(req: NextRequest) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        origemPlano: true,
         nonConformityId: true,
+        createdBy: { select: { id: true, fullName: true, email: true } },
         nonConformity: {
           select: {
             id: true,
@@ -89,7 +101,10 @@ export async function GET(req: NextRequest) {
       ? items.filter((item) => {
           const prazo = toDateOnly(item.prazo?.toISOString())
           if (!prazo || !today) return false
-          if (item.status === NonConformityActionStatus.CONCLUIDA || item.status === NonConformityActionStatus.CANCELADA) {
+          if (
+            item.status === NonConformityActionStatus.CONCLUIDA ||
+            item.status === NonConformityActionStatus.CANCELADA
+          ) {
             return false
           }
           return prazo < today
@@ -100,5 +115,60 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('GET /api/sst/planos-de-acao error', error)
     return NextResponse.json({ error: 'Erro ao listar planos de ação.', detail: devErrorDetail(error) }, { status: 500 })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const me = await requireActiveUser()
+    const { levels } = await getUserModuleContext(me.id)
+    const level = normalizeSstLevel(levels)
+
+    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+      return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
+    }
+
+    const body = await req.json().catch(() => ({} as Record<string, unknown>))
+    const descricao = String(body?.descricao || '').trim()
+    if (!descricao) {
+      return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
+    }
+
+    const created = await prisma.nonConformityActionItem.create({
+      data: {
+        nonConformityId: null,
+        origemPlano: NonConformityActionPlanOrigin.PLANO_AVULSO,
+        createdById: me.id,
+        descricao,
+        motivoBeneficio: body?.motivoBeneficio ? String(body.motivoBeneficio).trim() : null,
+        atividadeComo: body?.atividadeComo ? String(body.atividadeComo).trim() : null,
+        centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
+        centroImpactadoDescricao: body?.centroImpactadoDescricao ? String(body.centroImpactadoDescricao).trim() : null,
+        centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
+        dataInicioPrevista: body?.dataInicioPrevista ? new Date(String(body.dataInicioPrevista)) : null,
+        dataFimPrevista: body?.dataFimPrevista ? new Date(String(body.dataFimPrevista)) : null,
+        custo: body?.custo ? Number(body.custo) : null,
+        dataConclusao: body?.dataConclusao ? new Date(String(body.dataConclusao)) : null,
+        tipo: Object.values(NonConformityActionType).includes(body?.tipo as NonConformityActionType)
+          ? (body.tipo as NonConformityActionType)
+          : NonConformityActionType.ACAO_CORRETIVA,
+        origem: body?.origem ? String(body.origem).trim() : 'PLANO AVULSO',
+        referencia: body?.referencia ? String(body.referencia).trim() : null,
+        rapidez: body?.rapidez ? Number(body.rapidez) : null,
+        autonomia: body?.autonomia ? Number(body.autonomia) : null,
+        beneficio: body?.beneficio ? Number(body.beneficio) : null,
+        responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
+        responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
+        prazo: body?.prazo ? new Date(String(body.prazo)) : null,
+        status: Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
+          ? (body.status as NonConformityActionStatus)
+          : NonConformityActionStatus.PENDENTE,
+        evidencias: body?.evidencias ? String(body.evidencias).trim() : null,
+      },
+    })
+
+    return NextResponse.json(created, { status: 201 })
+  } catch (error) {
+    return NextResponse.json({ error: 'Erro ao criar plano de ação avulso.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

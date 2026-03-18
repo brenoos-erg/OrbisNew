@@ -982,13 +982,25 @@ export default function NovaSolicitacaoPage() {
           return;
         }
 
-        const obrigatorios = camposSolicitanteComTi
-          .filter((c) => c.required)
+        const obrigatoriosTexto = camposSolicitanteComTi
+          .filter((c) => c.required && c.type !== 'file')
           .map((c) => c.name);
 
-        const faltantes = obrigatorios.filter((name) => !extras[name]);
+        const faltantes = obrigatoriosTexto.filter((name) => !extras[name]);
         if (faltantes.length > 0) {
           setSubmitError('Preencha os campos obrigatórios do formulário.');
+          setSubmitting(false);
+          return;
+        }
+
+        const obrigatoriosArquivo = camposSolicitanteComTi
+          .filter((c) => c.required && c.type === 'file')
+          .map((c) => c.name);
+        const faltandoArquivoObrigatorio = obrigatoriosArquivo.some(
+          (fieldName) => (extraFiles[fieldName]?.length ?? 0) < 1,
+        );
+        if (faltandoArquivoObrigatorio) {
+          setSubmitError('Anexe os arquivos obrigatórios do formulário para continuar.');
           setSubmitting(false);
           return;
         }
@@ -2869,6 +2881,20 @@ useEffect(() => {
                         <p className="text-xs text-orange-700">
                           Anexe o documento referente à multa para prosseguirmos.
                         </p>
+                      )}
+                      {isIncentivoEducacaoTipo && !camposSolicitanteComTi.some((campo) => campo.type === 'file') && (
+                        <section className="space-y-2">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Anexos</h3>
+                          <p className="text-xs text-slate-600">Anexe o Termo de Compromisso assinado, Comprovante de Matrícula, Comprovante de Pagamento da Mensalidade e Boleto.</p>
+                          <input
+                            id="anexosComprobatoriosEducacao"
+                            name="anexosComprobatoriosEducacao"
+                            type="file"
+                            multiple
+                            onChange={(e: InputChange) => handleFileChange('anexosComprobatoriosEducacao', e.target.files)}
+                            className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                          />
+                        </section>
                       )}
                       {Object.entries(grouped).map(([section, campos]) => (
                         <section key={section} className="space-y-3">

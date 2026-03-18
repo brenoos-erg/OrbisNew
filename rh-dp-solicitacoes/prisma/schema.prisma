@@ -350,6 +350,7 @@ model User {
   nonConformitiesAsQualityApprover           NonConformity[]              @relation("NonConformityQualityApprover")
   nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
+  nonConformityActionItemsCreated            NonConformityActionItem[]      @relation("NonConformityActionItemCreatedBy")
   nonConformityAttachments                   NonConformityAttachment[]
   nonConformityComments                      NonConformityComment[]
   nonConformityTimelineEvents                NonConformityTimeline[]
@@ -363,6 +364,7 @@ model User {
   isoDistributionTargets                     DistributionTarget[]
   isoReadReceipts                            ReadReceipt[]
   isoPrintCopiesIssued                       PrintCopy[]                  @relation("IsoPrintCopyIssuedBy")
+
 
   @@map("User")
 }
@@ -1005,7 +1007,9 @@ model NonConformity {
 
 model NonConformityActionItem {
   id                       String                    @id @default(cuid())
-  nonConformityId          String
+  nonConformityId          String?
+  origemPlano              NonConformityActionPlanOrigin @default(NAO_CONFORMIDADE)
+  createdById              String?
   descricao                String
   motivoBeneficio          String?                   @db.LongText
   atividadeComo            String?                   @db.LongText
@@ -1029,8 +1033,9 @@ model NonConformityActionItem {
   evidencias               String?                   @db.LongText
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
-  nonConformity            NonConformity             @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  nonConformity            NonConformity?            @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
   responsavel              User?                     @relation(fields: [responsavelId], references: [id])
+  createdBy                User?                     @relation("NonConformityActionItemCreatedBy", fields: [createdById], references: [id])
   centroImpactado          CostCenter?               @relation("NcActionImpactCenter", fields: [centroImpactadoId], references: [id])
   centroResponsavel        CostCenter?               @relation("NcActionResponsibleCenter", fields: [centroResponsavelId], references: [id])
 
@@ -1220,6 +1225,11 @@ enum NonConformityActionStatus {
   CONCLUIDA
   CANCELADA
 }
+enum NonConformityActionPlanOrigin {
+  NAO_CONFORMIDADE
+  PLANO_AVULSO
+}
+
 enum NonConformityActionType {
   ACAO_CORRETIVA
   ACAO_PREVENTIVA

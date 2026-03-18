@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
+import { ModuleLevel, NonConformityActionPlanOrigin, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
@@ -96,10 +96,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const descricao = String(body?.descricao || '').trim()
     if (!descricao) return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
 
-    const row = await prisma.$transaction(async (tx) => {
+  const row = await prisma.$transaction(async (tx) => {
       const created = await tx.nonConformityActionItem.create({
         data: {
           nonConformityId: id,
+          origemPlano: NonConformityActionPlanOrigin.NAO_CONFORMIDADE,
+          createdById: me.id,
           descricao,
           motivoBeneficio: toOptionalString(body?.motivoBeneficio),
           atividadeComo: toOptionalString(body?.atividadeComo),
