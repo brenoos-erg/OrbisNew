@@ -1032,8 +1032,12 @@ export function SolicitationDetailModal({
       )
     ) {
       const rawCostCenter = payloadCampos[campo.name]
-      if (typeof rawCostCenter === 'string' && UUID_REGEX.test(rawCostCenter.trim())) {
-        return costCenterLabel || rawCostCenter
+      if (typeof rawCostCenter === 'string') {
+        const normalized = rawCostCenter.trim()
+        const looksTechnicalId = UUID_REGEX.test(normalized) || /^[a-f0-9]{24,}$/i.test(normalized)
+        if (looksTechnicalId) {
+          return costCenterLabel || ''
+        }
       }
       return String(rawCostCenter ?? costCenterLabel ?? '')
     }

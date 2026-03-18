@@ -161,11 +161,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
     }
 
-    if (!approved) {
+    if (!approved && !canManageAllNc(level)) {
       const onlyBasic = ['descricao', 'evidenciaObjetiva']
       const touched = Object.keys(body).filter((key) => body[key] !== undefined)
       if (touched.some((key) => !onlyBasic.includes(key))) {
-        return NextResponse.json({ error: 'Antes da aprovação da qualidade só é permitido editar descrição e evidência objetiva.' }, { status: 403 })
+        return NextResponse.json({ error: 'Antes da aprovação da qualidade só é permitido editar descrição e evidência objetiva para usuários sem perfil de gestão da Qualidade.' }, { status: 403 })
       }
     }
 

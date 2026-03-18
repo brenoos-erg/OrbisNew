@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
@@ -98,13 +99,20 @@ export async function PATCH(
       },
     })
 
-    await prisma.event.create({
+     await prisma.event.create({
       data: {
         id: randomUUID(),
         solicitationId: id,
         actorId: me.id,
         tipo: 'FINALIZADA',
       },
+    })
+
+    await notifySolicitationEvent({
+      solicitationId: id,
+      event: 'FINALIZED',
+      actorName: me.fullName ?? me.id,
+      dedupeKey: `FINALIZED:${id}` ,
     })
 
     return NextResponse.json(updated)

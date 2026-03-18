@@ -21,7 +21,9 @@ type CostCenterSelectProps = {
 }
 
 export function formatCostCenterOption(cc: CostCenterOption) {
-  return [cc.code, cc.description].filter(Boolean).join(' - ')
+  const code = cc.externalCode?.trim() || cc.code?.trim() || ''
+  const description = cc.description?.trim() || ''
+  return [code, description].filter(Boolean).join(' - ')
 }
 
 export default function CostCenterSelect({
@@ -33,11 +35,14 @@ export default function CostCenterSelect({
   disabled,
   name,
 }: CostCenterSelectProps) {
+  const selectedLabel = options.find((cc) => cc.id === value)
+  const triggerLabel = selectedLabel ? formatCostCenterOption(selectedLabel) : ''
+
   return (
     <Select.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <Select.Trigger className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-orange-500/70">
         <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-          <Select.Value placeholder={placeholder} />
+          <Select.Value placeholder={placeholder}>{triggerLabel || placeholder}</Select.Value>
         </span>
         <Select.Icon>
           <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />

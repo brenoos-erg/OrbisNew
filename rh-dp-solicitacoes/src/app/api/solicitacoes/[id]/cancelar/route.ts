@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { randomUUID } from 'crypto'
 
 export async function PATCH(
@@ -65,6 +66,7 @@ export async function PATCH(
       },
     })
 
+   
     await prisma.event.create({
       data: {
         id: randomUUID(),
@@ -72,6 +74,14 @@ export async function PATCH(
         actorId: me.id,
         tipo: 'REPROVACAO',
       },
+    })
+
+    await notifySolicitationEvent({
+      solicitationId: id,
+      event: 'CANCELED',
+      actorName: me.fullName ?? me.id,
+      reason: motivo,
+      dedupeKey: `CANCELED:${id}` ,
     })
 
     return NextResponse.json(updated)

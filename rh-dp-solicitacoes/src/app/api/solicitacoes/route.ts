@@ -20,11 +20,12 @@ import {
   isSolicitacaoNadaConsta,
   isSolicitacaoPessoal,
   isSolicitacaoVeiculos,
-   NADA_CONSTA_SETORES,
+  NADA_CONSTA_SETORES,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import {
@@ -190,13 +191,13 @@ export const GET = withModuleLevel(
           }),
         ]
 
-     const listStartedAt = performance.now()
+    const listStartedAt = performance.now()
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
             skip,
             take: pageSize,
-            orderBy: { dataAbertura: 'desc' },
+            orderBy: [{ updatedAt: 'desc' }, { dataAbertura: 'desc' }],
             include: {
              tipo: { select: { codigo: true, nome: true } },
               department: { select: { name: true } },
@@ -219,8 +220,7 @@ export const GET = withModuleLevel(
           prisma.solicitation.count({ where }),
         ])
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
-
-        const rows = solicitations.map((s) => {
+   const rows = solicitations.map((s) => {
   const finalizadorEvent = s.eventos?.[0] ?? null
 
   return {
@@ -229,6 +229,7 @@ export const GET = withModuleLevel(
   status: s.status,
   protocolo: s.protocolo,
   createdAt: s.dataAbertura.toISOString(),
+  updatedAt: s.updatedAt.toISOString(),
   tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
 
   responsavelId: s.assumidaPor?.id ?? null,
@@ -239,7 +240,6 @@ export const GET = withModuleLevel(
     : null,
 
   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
-
   sla: null,
 
   setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
@@ -646,11 +646,19 @@ export const POST = withModuleLevel(
           },
         })
 
+        await notifySolicitationEvent({
+          solicitationId: created.id,
+          event: 'OPENED',
+          actorName: me.fullName ?? me.id,
+          dedupeKey: `OPENED:${created.id}`,
+        })
+
         if (isGestaoMudancas && nonConformityId) {
           const nc = await prisma.nonConformity.findUnique({
             where: { id: nonConformityId },
             select: { id: true, numeroRnc: true },
           })
+
 
           if (nc) {
             await prisma.solicitationTimeline.create({

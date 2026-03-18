@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { requireActiveUser } from '@/lib/auth'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
@@ -379,6 +380,14 @@ export async function PATCH(
         actorId: me.id,
         tipo: 'REPROVACAO',
       },
+    })
+
+    await notifySolicitationEvent({
+      solicitationId,
+      event: 'REJECTED',
+      actorName: me.fullName ?? me.id,
+      reason: comment,
+      dedupeKey: `REJECTED:${solicitationId}` ,
     })
 
     return NextResponse.json(updated)

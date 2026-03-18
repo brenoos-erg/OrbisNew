@@ -152,8 +152,9 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   }, [initialSection])
 
 
-  const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
-  const bloqueado = !aprovado
+ const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
+  const qualityCanEditBeforeApproval = item?.permissions?.canManageAllNc === true
+  const bloqueado = !aprovado && !qualityCanEditBeforeApproval
 
   async function load() {
     try {
@@ -521,7 +522,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
           <Link href="/dashboard/sst/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
         </div>
       </div>
-      {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Ações em modo somente leitura.</div> : null}
+        {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Ações em modo somente leitura.</div> : null}
+      {!aprovado && qualityCanEditBeforeApproval ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Perfil da Qualidade com gestão habilitada: edição permitida antes da aprovação final, com rastreabilidade em histórico.</div> : null}
       {podeAprovar ? <div className="flex gap-2"><button onClick={() => aprovar(true)} className="rounded bg-emerald-600 px-3 py-2 text-sm text-white">Aprovar</button><button onClick={() => aprovar(false)} className="rounded bg-rose-600 px-3 py-2 text-sm text-white">Reprovar</button></div> : null}
 
       <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">

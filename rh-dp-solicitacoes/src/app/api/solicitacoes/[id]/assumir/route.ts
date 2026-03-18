@@ -5,9 +5,9 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import crypto from 'crypto'
 import { canAssumeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -76,13 +76,21 @@ export async function POST(
       },
     })
 
-    await prisma.event.create({
+     await prisma.event.create({
       data: {
         id: crypto.randomUUID(),
         solicitationId,
         actorId: me.id,
         tipo: 'ASSUMIU_CHAMADO',
       },
+    })
+
+    await notifySolicitationEvent({
+      solicitationId,
+      event: 'UPDATED',
+      actorName: me.fullName ?? me.id,
+      reason: 'Chamado assumido por responsável.',
+      dedupeKey: `ASSUMIR:${solicitationId}:${me.id}`,
     })
 
     return NextResponse.json(updated)

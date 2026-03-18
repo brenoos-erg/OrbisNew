@@ -2,12 +2,12 @@ import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -120,12 +120,20 @@ export async function POST(
       },
     })
 
-    await prisma.solicitationTimeline.create({
+  await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
         status: solicitation.status,
         message: `Observação registrada por ${me.fullName ?? me.id}: ${text}`,
       },
+    })
+
+    await notifySolicitationEvent({
+      solicitationId,
+      event: 'UPDATED',
+      actorName: me.fullName ?? me.id,
+      reason: text,
+      dedupeKey: `COMMENT:${solicitationId}:${text.slice(0, 80)}` ,
     })
 
     return NextResponse.json({ ok: true })

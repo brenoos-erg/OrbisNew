@@ -11,8 +11,10 @@ import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 
 type RouteParams = { params: Promise<{ id: string }> }
+
 
 
 // 🔒 Somente NIVEL_3 no módulo "solicitacoes"
@@ -94,13 +96,21 @@ export const POST = withModuleLevel<RouteParams>(
         })
       }
 
-      await prisma.event.create({
+       await prisma.event.create({
         data: {
           id: crypto.randomUUID(),
           solicitationId,
           actorId: me.id,
           tipo: 'REPROVACAO',
         },
+      })
+
+      await notifySolicitationEvent({
+        solicitationId,
+        event: 'REJECTED',
+        actorName: me.fullName ?? me.id,
+        reason: comment,
+        dedupeKey: `REJECTED:${solicitationId}` ,
       })
 
       return NextResponse.json(updated)

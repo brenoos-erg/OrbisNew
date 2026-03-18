@@ -8,6 +8,7 @@ import { normalizeModuleKey } from '@/lib/moduleKey'
 import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificationRecipients'
 import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 
 type NotifyInput = {
   solicitationId: string
@@ -208,7 +209,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     return { skipped: true, reason: 'send_failed' as const, result }
   }
 
-  await prisma.solicitation.update({
+    await prisma.solicitation.update({
     where: { id: solicitation.id },
     data: {
       payload: {
@@ -221,6 +222,12 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
         },
       },
     },
+  })
+
+  await notifySolicitationEvent({
+    solicitationId: solicitation.id,
+    event: targetStep.kind === 'APROVACAO' ? 'AWAITING_APPROVAL' : 'STEP_CHANGED',
+    dedupeKey: `WORKFLOW:${targetStep.stepKey}:${solicitation.id}`,
   })
 
   return { skipped: false, targetStep: targetStep.stepKey, result }

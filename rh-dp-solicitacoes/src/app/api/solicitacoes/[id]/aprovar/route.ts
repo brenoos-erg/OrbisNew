@@ -7,6 +7,7 @@ import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
@@ -229,9 +230,17 @@ export async function POST(
       },
     })
 
-    await notifyWorkflowStepEntry({
+     await notifyWorkflowStepEntry({
       solicitationId,
       preferredDepartmentId: updated.departmentId,
+    })
+
+    await notifySolicitationEvent({
+      solicitationId,
+      event: updated.approvalStatus === 'PENDENTE' ? 'AWAITING_APPROVAL' : 'APPROVED',
+      actorName: me.fullName ?? me.id,
+      reason: timelineMessage,
+      dedupeKey: `APPROVE:${updated.id}:${updated.departmentId}:${updated.approvalStatus}` ,
     })
 
     return NextResponse.json(updated)
