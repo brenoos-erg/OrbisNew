@@ -41,9 +41,9 @@ type UserMe = {
   positionName: string | null;
   departmentName: string | null;
   leaderName: string | null;
+  costCenterId?: string | null;
   costCenterName: string | null;
 };
-
 type SolicitanteManualForm = {
   fullName: string;
   email: string;
@@ -937,7 +937,7 @@ export default function NovaSolicitacaoPage() {
         if (extras.solicitacaoPostoTrabalho === 'true')
           enxovalParts.push('Ponto / Posto de trabalho');
 
-        campos = {
+         campos = {
           ...extras,
           cargo: extras.cargo ?? '',
           setorProjeto: extras.setorProjeto ?? '',
@@ -955,7 +955,11 @@ export default function NovaSolicitacaoPage() {
           competenciasComportamentais: extras.competenciasComportamentais ?? '',
           enxoval: enxovalParts.join(' / '),
           outros: extras.solicitacaoOutros ?? '',
-          centroCustoId: extras.centroCustoForm ?? me?.costCenterName ?? '',
+          centroCustoId: extras.centroCustoForm ?? me?.costCenterId ?? '',
+          centroCustoIdLabel:
+            buildCostCenterLabel(extras.centroCustoForm ?? me?.costCenterId ?? '') ||
+            me?.costCenterName ||
+            '',
           observacoes: extras.observacoesRh ?? '',
         };
       } else if (isAbonoEducacional) {

@@ -316,7 +316,7 @@ function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
 
-  if (normalized === 'ASO VALIDO') return 'ASO Válido'
+   if (normalized === 'ASO VALIDO') return 'ASO Válido'
   if (normalized === 'AGENDAMENTO') return 'Agendamento'
   return ''
 }
@@ -324,6 +324,47 @@ function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const looksTechnicalCostCenterId = (value: string) =>
+  UUID_REGEX.test(value) || /^[a-f0-9]{24,}$/i.test(value)
+
+function resolveFriendlyCostCenterValue(
+  key: string,
+  payloadCampos: Record<string, any>,
+  fallbackLabel?: string,
+) {
+  const rawValue = payloadCampos[key]
+  if (rawValue === undefined || rawValue === null) return fallbackLabel || ''
+  const rawAsString = String(rawValue).trim()
+  if (!rawAsString) return fallbackLabel || ''
+
+  const normalizedBaseKey = key.replace(/(id|uuid)$/i, '')
+  const candidateKeys = [
+    `${key}Label`,
+    `${key}Text`,
+    `${normalizedBaseKey}Label`,
+    `${normalizedBaseKey}Text`,
+    'centroCustoDestinoText',
+    'centroCustoDestinoIdLabel',
+    'centroCustoIdLabel',
+    'centroCustoLabel',
+    'costCenterText',
+    'costCenterLabel',
+  ]
+
+  for (const candidateKey of candidateKeys) {
+    const candidateValue = payloadCampos[candidateKey]
+    if (typeof candidateValue === 'string' && candidateValue.trim()) {
+      return candidateValue.trim()
+    }
+  }
+
+  if (looksTechnicalCostCenterId(rawAsString)) {
+    return fallbackLabel || ''
+  }
+
+  return rawAsString
+}
 
 function normalizeSetorKey(value: string) {
   return value
@@ -1027,19 +1068,10 @@ export function SolicitationDetailModal({
       )
     }
     if (
-      ['centroCustoId', 'costCenterId', 'centroCusto', 'funcionarioCostCenterId'].includes(
-        campo.name,
-      )
+      campo.name.toLowerCase().includes('centrocusto') ||
+      campo.name.toLowerCase().includes('costcenter')
     ) {
-      const rawCostCenter = payloadCampos[campo.name]
-      if (typeof rawCostCenter === 'string') {
-        const normalized = rawCostCenter.trim()
-        const looksTechnicalId = UUID_REGEX.test(normalized) || /^[a-f0-9]{24,}$/i.test(normalized)
-        if (looksTechnicalId) {
-          return costCenterLabel || ''
-        }
-      }
-      return String(rawCostCenter ?? costCenterLabel ?? '')
+      return resolveFriendlyCostCenterValue(campo.name, payloadCampos, costCenterLabel)
     }
 
     const rawValue = payloadCampos[campo.name]
@@ -3152,7 +3184,12 @@ function RQ063ResumoCampos({
     'basicas' | 'contratacao' | 'academicos' | 'solicitacoes' | 'projetos' | 'admissao'
   >('basicas')
 
-  const get = (key: string) => formatDisplayValue(payloadCampos[key])
+ const get = (key: string) => {
+    if (key.toLowerCase().includes('centrocusto') || key.toLowerCase().includes('costcenter')) {
+      return resolveFriendlyCostCenterValue(key, payloadCampos, costCenterLabel)
+    }
+    return formatDisplayValue(payloadCampos[key])
+  }
   const getFirst = (...keys: string[]) => {
     for (const key of keys) {
       const value = payloadCampos[key]
@@ -3162,6 +3199,7 @@ function RQ063ResumoCampos({
     }
     return ''
   }
+
 
 
   const bool = (key: string) => {
@@ -3379,7 +3417,12 @@ function RQ247ResumoCampos({
   dpEditable: boolean
   costCenterLabel: string
 }) {
-  const get = (key: string) => formatDisplayValue(payloadCampos[key])
+   const get = (key: string) => {
+    if (key.toLowerCase().includes('centrocusto') || key.toLowerCase().includes('costcenter')) {
+      return resolveFriendlyCostCenterValue(key, payloadCampos, costCenterLabel)
+    }
+    return formatDisplayValue(payloadCampos[key])
+  }
   const joinIfTrue = (entries: [string, string][]) =>
     entries
       .filter(

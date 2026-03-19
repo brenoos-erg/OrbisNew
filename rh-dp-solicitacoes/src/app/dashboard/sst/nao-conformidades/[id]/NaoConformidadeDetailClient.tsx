@@ -5,6 +5,7 @@ import { NonConformityActionStatus } from '@prisma/client'
 import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GutRadarCard from '@/components/sst/GutRadarCard'
+import SstModuleTabs from '@/components/sst/SstModuleTabs'
 import { GUT_OPTIONS } from '@/lib/sst/gut'
 import { actionStatusLabel, nonConformityTypeLabel } from '@/lib/sst/serializers'
 
@@ -13,7 +14,6 @@ type CommentAuthor = {
   fullName: string | null
   email: string | null
 }
-
 type CommentItem = {
   id: string
   texto: string
@@ -56,8 +56,8 @@ type Detail = {
   planoDeAcao?: ActionItem[]
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
-  linkedSolicitations?: Array<{ id: string; protocolo: string; status: string }>
-  permissions?: { canManageAllNc?: boolean; canOpenChangeManagement?: boolean }
+   linkedSolicitations?: Array<{ id: string; protocolo: string; status: string }>
+  permissions?: { canManageAllNc?: boolean; canOpenChangeManagement?: boolean; canApproveQuality?: boolean }
 }
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
@@ -453,7 +453,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     setActiveSection(section)
   }
 
-  const podeAprovar = useMemo(() => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE', [item])
+  const podeAprovar = useMemo(
+    () => item?.status === 'AGUARDANDO_APROVACAO_QUALIDADE' && item?.permissions?.canApproveQuality,
+    [item],
+  )
   const podeCancelarNc = useMemo(() => item?.status !== 'CANCELADA' && item?.status !== 'ENCERRADA', [item])
   const podeReabrirNc = useMemo(
     () => (item?.status === 'CANCELADA' || item?.status === 'ENCERRADA') && item?.permissions?.canManageAllNc,
@@ -481,7 +484,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     { key: 'naoConformidade', label: 'Não conformidade' },
     { key: 'evidencias', label: 'Evidências' },
     { key: 'estudoCausa', label: 'Estudo de causa' },
-    { key: 'planoDeAcao', label: 'Ações da Não Conformidade' },
+    { key: 'planoDeAcao', label: 'Plano de ação vinculado à NC' },
     { key: 'verificacao', label: 'Verificação de eficácia' },
     { key: 'comentarios', label: 'Comentários' },
     { key: 'timeline', label: 'Histórico' },
@@ -491,6 +494,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
   return (
     <div className="space-y-5">
+      <SstModuleTabs active="nao-conformidades" />
       <div className="flex items-center gap-3">
         <div>
           <p className="text-sm uppercase text-slate-500">Não conformidades</p>
@@ -637,8 +641,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
           </form>
         </Card>
       ) : null}
-        {activeSection === 'planoDeAcao' ? (
-        <Card title="Ações da Não Conformidade">
+       {activeSection === 'planoDeAcao' ? (
+        <Card title="Plano de ação vinculado à não conformidade">
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
               <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">

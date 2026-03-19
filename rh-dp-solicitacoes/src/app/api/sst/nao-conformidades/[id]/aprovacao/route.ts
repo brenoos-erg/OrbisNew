@@ -18,12 +18,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Somente qualidade (nível 2/3) pode aprovar ou reprovar.' }, { status: 403 })
     }
 
-    const body = await req.json().catch(() => ({} as any))
+     const body = await req.json().catch(() => ({} as any))
     const aprovado = Boolean(body?.aprovado)
     const observacao = body?.observacao ? String(body.observacao).trim() : null
     const id = (await params).id
 
-    const status = aprovado ? NonConformityStatus.APROVADA_QUALIDADE : NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE
+    const current = await prisma.nonConformity.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    })
+    if (!current) {
+      return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+    }
+    if (current.status !== NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE) {
+      return NextResponse.json(
+        { error: 'A aprovação/reprovação só é permitida na etapa de aprovação da qualidade.' },
+        { status: 409 },
+      )
+    }
+
+    const status = aprovado
+      ? NonConformityStatus.APROVADA_QUALIDADE
+      : NonConformityStatus.EM_TRATATIVA
     const approvalStatus = aprovado ? NonConformityApprovalStatus.APROVADO : NonConformityApprovalStatus.REPROVADO
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -42,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         nonConformityId: id,
         actorId: me.id,
         tipo: 'APROVACAO_QUALIDADE',
-        fromStatus: row.status,
+        fromStatus: current.status,
         toStatus: status,
         message: aprovado ? 'Aprovação da qualidade concluída' : 'Não conformidade reprovada pela qualidade',
       })

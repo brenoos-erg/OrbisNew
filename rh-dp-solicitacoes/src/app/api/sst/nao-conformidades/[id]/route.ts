@@ -5,7 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
-import { canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
+import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
@@ -20,6 +20,7 @@ function parseGutValue(value: unknown) {
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 5) return undefined
   return parsed
 }
+
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -103,12 +104,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Sem permissão para visualizar esta NC.' }, { status: 403 })
     }
 
-    return NextResponse.json({
+     return NextResponse.json({
       item: {
         ...nc,
         permissions: {
           canManageAllNc: canManageAllNc(level),
           canOpenChangeManagement: hasMinLevel(level, ModuleLevel.NIVEL_3) || canTreat,
+          canApproveQuality: canApproveNc(level),
         },
       },
     })
@@ -117,7 +119,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Erro ao carregar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()

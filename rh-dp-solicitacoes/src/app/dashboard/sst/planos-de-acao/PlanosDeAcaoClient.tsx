@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { NonConformityActionPlanOrigin, NonConformityActionStatus } from '@prisma/client'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { actionStatusLabel } from '@/lib/sst/serializers'
+import SstModuleTabs from '@/components/sst/SstModuleTabs'
 
 type ActionRow = {
   id: string
@@ -148,6 +149,7 @@ export default function PlanosDeAcaoClient() {
 
  return (
     <div className="space-y-5">
+      <SstModuleTabs active="planos-de-acao" />
       <div className="flex flex-wrap items-start gap-3">
         <div>
           <p className="text-sm font-semibold uppercase text-slate-500">SST</p>

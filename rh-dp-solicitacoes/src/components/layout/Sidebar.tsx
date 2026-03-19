@@ -660,14 +660,14 @@ export default function Sidebar({
             {showSst && (
             <div>
               <button
-                type="button"
+                 type="button"
                 onClick={() => setOpenSst((v) => !v)}
                 className={`${baseSection} ${inSst ? activeSection : inactiveSection}`}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
                   <ShieldAlert className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className={labelBase}>Não Conformidades</span>}
+                {!collapsed && <span className={labelBase}>SST</span>}
               </button>
 
               {openSst && !collapsed && (
@@ -692,7 +692,7 @@ export default function Sidebar({
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <ClipboardList size={16} /> <span className={labelBase}>Planos de Ações</span>
+                    <ClipboardList size={16} /> <span className={labelBase}>Plano de ação</span>
                   </Link>
                 </div>
               )}
