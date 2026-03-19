@@ -70,6 +70,8 @@ export default function PlanosDeAcaoClient() {
   const [novoDescricao, setNovoDescricao] = useState('')
   const [novoResponsavel, setNovoResponsavel] = useState('')
   const [novoPrazo, setNovoPrazo] = useState('')
+  const [novoStatus, setNovoStatus] = useState<NonConformityActionStatus>(NonConformityActionStatus.PENDENTE)
+  const [novaEvidencia, setNovaEvidencia] = useState('')
 
   async function load() {
     try {
@@ -97,7 +99,7 @@ export default function PlanosDeAcaoClient() {
     e.preventDefault()
     if (!novoDescricao.trim()) return
 
-    try {
+     try {
       setSaving(true)
       const res = await fetch('/api/sst/plano-de-acao', {
         method: 'POST',
@@ -107,6 +109,8 @@ export default function PlanosDeAcaoClient() {
           responsavelNome: novoResponsavel || null,
           prazo: novoPrazo || null,
           origem: 'PLANO AVULSO',
+          status: novoStatus,
+          evidencias: novaEvidencia || null,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -115,6 +119,8 @@ export default function PlanosDeAcaoClient() {
       setNovoDescricao('')
       setNovoResponsavel('')
       setNovoPrazo('')
+      setNovoStatus(NonConformityActionStatus.PENDENTE)
+      setNovaEvidencia('')
       await load()
     } catch (e: any) {
       setError(e?.message || 'Erro ao criar plano avulso.')
@@ -166,7 +172,13 @@ export default function PlanosDeAcaoClient() {
         <div className="grid gap-3 md:grid-cols-3">
           <input value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)} placeholder="Descrição do plano" className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2" required />
           <input value={novoResponsavel} onChange={(e) => setNovoResponsavel(e.target.value)} placeholder="Responsável" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
-          <input type="date" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            <input type="date" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
+          <select value={novoStatus} onChange={(e) => setNovoStatus(e.target.value as NonConformityActionStatus)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+            {Object.values(NonConformityActionStatus).map((option) => (
+              <option key={option} value={option}>{actionStatusLabel[option]}</option>
+            ))}
+          </select>
+          <input value={novaEvidencia} onChange={(e) => setNovaEvidencia(e.target.value)} placeholder="Histórico/observação inicial" className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2" />
         </div>
         <button disabled={saving} className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{saving ? 'Salvando...' : 'Criar plano avulso'}</button>
       </form>

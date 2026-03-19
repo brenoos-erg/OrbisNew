@@ -22,6 +22,35 @@ function toDateOnly(dateValue?: string | null) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
+function toDate(value: unknown) {
+  if (value === undefined) return undefined
+  if (!value) return null
+  return new Date(String(value))
+}
+
+function toOptionalString(value: unknown) {
+  if (value === undefined) return undefined
+  const parsed = String(value || '').trim()
+  return parsed || null
+}
+
+function toOptionalIntBetween(value: unknown, min = 1, max = 5) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return undefined
+  return parsed
+}
+
+function toOptionalDecimal(value: unknown) {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return undefined
+  return parsed
+}
+
+
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
@@ -140,26 +169,26 @@ export async function POST(req: NextRequest) {
         origemPlano: NonConformityActionPlanOrigin.PLANO_AVULSO,
         createdById: me.id,
         descricao,
-        motivoBeneficio: body?.motivoBeneficio ? String(body.motivoBeneficio).trim() : null,
-        atividadeComo: body?.atividadeComo ? String(body.atividadeComo).trim() : null,
+       motivoBeneficio: toOptionalString(body?.motivoBeneficio),
+        atividadeComo: toOptionalString(body?.atividadeComo),
         centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
-        centroImpactadoDescricao: body?.centroImpactadoDescricao ? String(body.centroImpactadoDescricao).trim() : null,
+        centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
         centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
-        dataInicioPrevista: body?.dataInicioPrevista ? new Date(String(body.dataInicioPrevista)) : null,
-        dataFimPrevista: body?.dataFimPrevista ? new Date(String(body.dataFimPrevista)) : null,
-        custo: body?.custo ? Number(body.custo) : null,
-        dataConclusao: body?.dataConclusao ? new Date(String(body.dataConclusao)) : null,
+        dataInicioPrevista: toDate(body?.dataInicioPrevista),
+        dataFimPrevista: toDate(body?.dataFimPrevista),
+        custo: toOptionalDecimal(body?.custo),
+        dataConclusao: toDate(body?.dataConclusao),
         tipo: Object.values(NonConformityActionType).includes(body?.tipo as NonConformityActionType)
           ? (body.tipo as NonConformityActionType)
           : NonConformityActionType.ACAO_CORRETIVA,
-        origem: body?.origem ? String(body.origem).trim() : 'PLANO AVULSO',
-        referencia: body?.referencia ? String(body.referencia).trim() : null,
-        rapidez: body?.rapidez ? Number(body.rapidez) : null,
-        autonomia: body?.autonomia ? Number(body.autonomia) : null,
-        beneficio: body?.beneficio ? Number(body.beneficio) : null,
+        origem: toOptionalString(body?.origem) ?? 'PLANO AVULSO',
+        referencia: toOptionalString(body?.referencia),
+        rapidez: toOptionalIntBetween(body?.rapidez),
+        autonomia: toOptionalIntBetween(body?.autonomia),
+        beneficio: toOptionalIntBetween(body?.beneficio),
         responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
         responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
-        prazo: body?.prazo ? new Date(String(body.prazo)) : null,
+        prazo: body?.prazo ? new Date(String(body.prazo)) : toDate(body?.dataFimPrevista),
         status: Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
           ? (body.status as NonConformityActionStatus)
           : NonConformityActionStatus.PENDENTE,
