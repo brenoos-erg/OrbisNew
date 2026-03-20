@@ -627,7 +627,7 @@ async function main() {
         { name: 'previsaoTermino', label: 'Previsao de Termino', type: 'date', required: true, stage: 'solicitante', section: 'Dados do curso' },
         { name: 'valorMensalidade', label: 'Valor da Mensalidade', type: 'number', required: true, stage: 'solicitante', section: 'Dados do curso' },
         { name: 'dataRequisicao', label: 'Data da Requisicao', type: 'date', required: true, stage: 'solicitante', section: 'Dados do curso' },
-         { name: 'anexosComprobatoriosEducacao', label: 'Anexar Termo de Compromisso assinado, Comprovante de Matrícula, Comprovante de Pagamento da Mensalidade e Boleto', type: 'file', required: true, stage: 'solicitante', section: 'Anexos' },
+        { name: 'anexosComprobatoriosEducacao', label: 'Anexar Termo de Compromisso assinado, Comprovante de Matrícula, Comprovante de Pagamento da Mensalidade e Boleto', type: 'file', required: true, stage: 'solicitante', section: 'Anexos' },
         { name: 'anexosObrigatoriosConferidos', label: 'É obrigatório anexar o Termo de Compromisso assinado, o Comprovante de Matrícula, o Comprovante de Pagamento da Mensalidade e o Boleto. Após anexar os documentos, marque este checkbox de conferência.', type: 'checkbox', required: false, stage: 'solicitante', section: 'Anexos' },
         { name: 'contratadoHaMinimoUmAno', label: 'Contratado há, no mínimo, 01 ano', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
         { name: 'ausenciaAdvertenciasDisciplinares', label: 'Ausencia de hist. de advertencias disciplinares.', type: 'checkbox', required: false, stage: 'rh', section: 'Preenchimento abaixo pelo setor de RH' },
