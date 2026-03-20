@@ -10,6 +10,37 @@ function normalizeSolicitacaoName(value?: string | null) {
     .trim()
     .toUpperCase()
 }
+
+export const SOLICITACAO_PESSOAL_MOTIVO_VAGA_VALUES = [
+  'Aumento',
+  'Substituição',
+] as const
+
+export type SolicitacaoPessoalMotivoVaga =
+  (typeof SOLICITACAO_PESSOAL_MOTIVO_VAGA_VALUES)[number]
+
+function normalizeText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+}
+
+export function normalizeSolicitacaoPessoalMotivoVaga(
+  value: unknown,
+): SolicitacaoPessoalMotivoVaga | null {
+  if (typeof value !== 'string') return null
+  const normalized = normalizeText(value)
+
+  if (normalized === 'AUMENTO' || normalized === 'AUMENTO DE QUADRO') {
+    return 'Aumento'
+  }
+  if (normalized === 'SUBSTITUICAO') {
+    return 'Substituição'
+  }
+  return null
+}
 export const AGENDAMENTO_FERIAS_TIPO_ID = 'AGENDAMENTO_DE_FERIAS'
 export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'

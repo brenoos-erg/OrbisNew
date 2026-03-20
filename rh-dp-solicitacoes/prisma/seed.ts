@@ -586,16 +586,59 @@ async function main() {
         codigo: 'RQ.RH.001',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
-        schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
-        updatedAt: new Date(),
+        schemaJson: {
+          meta: { departamentos: rhTipoDepartamentos },
+          camposEspecificos: [
+            {
+              name: 'vagaPrevistaContrato',
+              label: 'Vaga prevista em contrato?',
+              type: 'select',
+              required: true,
+              options: ['SIM', 'NAO'],
+              stage: 'solicitante',
+              section: 'Informações básicas',
+            },
+            {
+              name: 'motivoVaga',
+              label: 'Motivo da vaga',
+              type: 'select',
+              required: true,
+              options: ['Aumento', 'Substituição'],
+              stage: 'solicitante',
+              section: 'Motivo da vaga',
+            },
+          ],
+        },
+         updatedAt: new Date(),
       },
        create: {
         id: 'RQ_063',
         codigo: 'RQ.RH.001',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
-        schemaJson: { meta: { departamentos: rhTipoDepartamentos } },
-        updatedAt: new Date(),
+        schemaJson: {
+          meta: { departamentos: rhTipoDepartamentos },
+          camposEspecificos: [
+            {
+              name: 'vagaPrevistaContrato',
+              label: 'Vaga prevista em contrato?',
+              type: 'select',
+              required: true,
+              options: ['SIM', 'NAO'],
+              stage: 'solicitante',
+              section: 'Informações básicas',
+            },
+            {
+              name: 'motivoVaga',
+              label: 'Motivo da vaga',
+              type: 'select',
+              required: true,
+              options: ['Aumento', 'Substituição'],
+              stage: 'solicitante',
+              section: 'Motivo da vaga',
+            },
+          ],
+        },        updatedAt: new Date(),
       },
     })
 

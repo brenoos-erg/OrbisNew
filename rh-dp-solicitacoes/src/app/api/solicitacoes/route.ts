@@ -10,7 +10,7 @@ import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
-     isSolicitacaoAgendamentoFerias,
+   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
@@ -21,6 +21,7 @@ import {
   isSolicitacaoPessoal,
   isSolicitacaoVeiculos,
   NADA_CONSTA_SETORES,
+  normalizeSolicitacaoPessoalMotivoVaga,
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
@@ -105,6 +106,41 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   }
 
   return where
+}
+
+function normalizeSimpleText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+}
+
+async function resolveRhRoutingTarget() {
+  const rhDepartment = await prisma.department.findFirst({
+    where: {
+      OR: [{ code: '17' }, { sigla: { contains: 'RH' } }, { name: { contains: 'Recursos Humanos' } }],
+    },
+    select: { id: true },
+  })
+
+  if (!rhDepartment) return null
+
+  const rhCostCenter = await prisma.costCenter.findFirst({
+    where: {
+      OR: [
+        { departmentId: rhDepartment.id },
+        { externalCode: '490' },
+        { description: { contains: 'Recursos Humanos' } },
+        { abbreviation: { contains: 'RH' } },
+        { code: { contains: 'RH' } },
+      ],
+    },
+    orderBy: [{ departmentId: 'desc' }, { description: 'asc' }],
+    select: { id: true, departmentId: true },
+  })
+
+  return { rhDepartmentId: rhDepartment.id, rhCostCenter }
 }
 
 /**
@@ -436,7 +472,7 @@ export const POST = withModuleLevel(
           }
         }
 
-        const tipo = await prisma.tipoSolicitacao.findUnique({
+         const tipo = await prisma.tipoSolicitacao.findUnique({
           where: { id: tipoId },
         })
 
@@ -446,6 +482,7 @@ export const POST = withModuleLevel(
             { status: 400 },
           )
         }
+        const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
 
           
           const protocolo = await nextSolicitationProtocolo()
@@ -611,6 +648,34 @@ export const POST = withModuleLevel(
           }
         }
 
+        if (isSolicitacaoPessoalTipo) {
+          const motivoNormalizado =
+            normalizeSolicitacaoPessoalMotivoVaga(campos.motivoVaga) ??
+            normalizeSolicitacaoPessoalMotivoVaga(campos.motivoDaVaga) ??
+            (String(campos.motivoSubstituicao ?? '').toLowerCase() === 'true'
+              ? 'Substituição'
+              : null) ??
+            (String(campos.motivoAumentoQuadro ?? '').toLowerCase() === 'true'
+              ? 'Aumento'
+              : null)
+
+          if (!motivoNormalizado) {
+            return NextResponse.json(
+              {
+                error:
+                  'Motivo da vaga é obrigatório para Solicitação de Pessoal. Valores aceitos: Aumento ou Substituição.',
+              },
+              { status: 400 },
+            )
+          }
+
+          payload.campos = {
+            ...(payload.campos ?? {}),
+            motivoVaga: motivoNormalizado,
+            motivoDaVaga: motivoNormalizado,
+          }
+        }
+
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({
           data: {
@@ -712,8 +777,7 @@ export const POST = withModuleLevel(
           return NextResponse.json(updated, { status: 201 })
         }
 
-        const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
-        const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
+         const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
         const isDesligamento = isSolicitacaoDesligamento(tipo)
         const isNadaConsta = isSolicitacaoNadaConsta(tipo)
         const isAbonoEducacional =
@@ -724,25 +788,8 @@ export const POST = withModuleLevel(
         const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
         const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
 
-        const rhCostCenter = await prisma.costCenter.findFirst({
-          where: {
-            OR: [
-              {
-                description: {
-                  contains: 'Recursos Humanos',
-                                  },
-              },
-              {
-                abbreviation: {
-                  contains: 'RH',
-                },
-              },
-              {
-                code: { contains: 'RH' },
-              },
-            ],
-          },
-        })
+        const rhTarget = await resolveRhRoutingTarget()
+        const rhCostCenter = rhTarget?.rhCostCenter ?? null
 
         const sstDepartment = await prisma.department.findUnique({
           where: { code: '19' },
@@ -915,17 +962,11 @@ export const POST = withModuleLevel(
             (payload?.campos?.vagaPrevista as string | undefined) ??
             ''
 
-          const normalized = rawCampo
-            ? rawCampo
-                .toString()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .trim()
-                .toUpperCase()
-            : ''
+          const normalized = rawCampo ? normalizeSimpleText(rawCampo.toString()) : ''
 
 
           const isSim = normalized === 'SIM' || normalized === 'S'
+
 
           if (isSim) {
             if (!rhCostCenter) {
@@ -948,7 +989,8 @@ export const POST = withModuleLevel(
                 approverId: null,
                 status: 'ABERTA',
                 costCenterId: rhCostCenter.id,
-                 departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
+                 departmentId:
+                  rhCostCenter.departmentId ?? rhTarget?.rhDepartmentId ?? resolvedDepartmentId,
               },
             })
 
@@ -1175,6 +1217,7 @@ export const POST = withModuleLevel(
             return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
           }
 
+         
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
@@ -1183,10 +1226,10 @@ export const POST = withModuleLevel(
               approverId,
               status: 'AGUARDANDO_APROVACAO',
               costCenterId: rhCostCenter.id,
-              departmentId: rhCostCenter.departmentId ?? resolvedDepartmentId,
+              departmentId:
+                rhCostCenter.departmentId ?? rhTarget?.rhDepartmentId ?? resolvedDepartmentId,
             },
           })
-
           await prisma.event.create({
             data: {
               id: crypto.randomUUID(),

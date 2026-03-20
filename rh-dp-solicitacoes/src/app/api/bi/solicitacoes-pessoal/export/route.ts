@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const { searchParams } = new URL(req.url)
+   const { searchParams } = new URL(req.url)
 
     const where = buildBiSolicitacaoPessoalWhere({
       dateStart: searchParams.get('dateStart'),
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
         payload: true,
         solicitante: { select: { fullName: true } },
         costCenter: { select: { description: true, externalCode: true, code: true } },
+        department: { select: { name: true } },
       },
     })
 

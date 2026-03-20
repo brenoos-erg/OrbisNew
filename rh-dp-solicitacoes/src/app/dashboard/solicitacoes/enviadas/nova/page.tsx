@@ -911,13 +911,20 @@ export default function NovaSolicitacaoPage() {
         }
       };
 
-      if (isRQ063) {
+       if (isRQ063) {
+        const motivoSelecionado =
+          extras.motivoVagaTipo === 'SUBSTITUICAO'
+            ? 'Substituição'
+            : extras.motivoVagaTipo === 'AUMENTO'
+              ? 'Aumento'
+              : null;
 
-        const motivoParts: string[] = [];
-        if (extras.motivoSubstituicao === 'true')
-          motivoParts.push('Substituição');
-        if (extras.motivoAumentoQuadro === 'true')
-          motivoParts.push('Aumento de quadro');
+        if (!motivoSelecionado) {
+          setSubmitError('Selecione o motivo da vaga (Aumento ou Substituição).');
+          setSubmitting(false);
+          return;
+        }
+
 
         const tipoContrParts: string[] = [];
         if (extras.contratacaoTemporaria === 'true')
@@ -937,14 +944,15 @@ export default function NovaSolicitacaoPage() {
         if (extras.solicitacaoPostoTrabalho === 'true')
           enxovalParts.push('Ponto / Posto de trabalho');
 
-         campos = {
+          campos = {
           ...extras,
           cargo: extras.cargo ?? '',
           setorProjeto: extras.setorProjeto ?? '',
           localTrabalho: extras.localTrabalho ?? '',
           horarioTrabalho: extras.horarioTrabalho ?? '',
           vagaPrevistaContrato: extras.vagaPrevista ?? '',
-          motivoVaga: motivoParts.join(' / '),
+          motivoVaga: motivoSelecionado,
+          motivoDaVaga: motivoSelecionado,
           tipoContratacao: tipoContrParts.join(' / '),
           principaisAtividades: extras.principaisAtividades ?? '',
           atividadesComplementares: extras.atividadesComplementares ?? '',
@@ -1848,7 +1856,7 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* =================== MOTIVO DA VAGA =================== */}
+                 {/* =================== MOTIVO DA VAGA =================== */}
                 <section className="space-y-3 border-t border-slate-100 pt-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Motivo da Vaga
@@ -1856,29 +1864,26 @@ useEffect(() => {
                   <div className="flex flex-wrap gap-4 text-xs">
                     <label className="flex items-center gap-1">
                       <input
-                        type="checkbox"
-                        checked={extras.motivoSubstituicao === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'motivoSubstituicao',
-                            e.target.checked,
-                          )
+                        type="radio"
+                        name="motivoVagaTipo"
+                        checked={extras.motivoVagaTipo === 'SUBSTITUICAO'}
+                        onChange={() =>
+                          handleExtraChange('motivoVagaTipo', 'SUBSTITUICAO')
                         }
+                        required
                       />
                       <span>Substituição</span>
                     </label>
                     <label className="flex items-center gap-1">
                       <input
-                        type="checkbox"
-                        checked={extras.motivoAumentoQuadro === 'true'}
-                        onChange={(e: InputChange) =>
-                          handleCheckboxChange(
-                            'motivoAumentoQuadro',
-                            e.target.checked,
-                          )
+                        type="radio"
+                        name="motivoVagaTipo"
+                        checked={extras.motivoVagaTipo === 'AUMENTO'}
+                        onChange={() =>
+                          handleExtraChange('motivoVagaTipo', 'AUMENTO')
                         }
                       />
-                      <span>Aumento de quadro</span>
+                      <span>Aumento</span>
                     </label>
                   </div>
                 </section>

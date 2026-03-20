@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
         payload: true,
         solicitante: { select: { fullName: true } },
         costCenter: { select: { description: true, externalCode: true, code: true } },
+        department: { select: { name: true } },
       },
     })
 

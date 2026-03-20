@@ -1,5 +1,6 @@
 import { Prisma, SolicitationStatus } from '@prisma/client'
 import { formatCostCenterLabel } from '@/lib/costCenter'
+import { normalizeSolicitacaoPessoalMotivoVaga } from '@/lib/solicitationTypes'
 
 export type BiSolicitacaoPessoalFilters = {
   dateStart?: string | null
@@ -136,10 +137,12 @@ export function mapSolicitacaoPessoalBiRow(item: {
   payload: unknown
   solicitante: { fullName: string | null } | null
   costCenter: { description: string | null; externalCode: string | null; code: string | null } | null
+  department: { name: string | null } | null
 }): BiSolicitacaoPessoalRow {
   const campos = parsePayloadCampos(item.payload)
   const cargo = pickFirstString(campos, ['cargoNome', 'cargoFinal', 'cargo', 'cargoColaborador'])
-  const motivoDaVaga = pickFirstString(campos, ['motivoVaga', 'justificativaVaga', 'motivoDaVaga'])
+  const motivoDaVagaRaw = pickFirstString(campos, ['motivoVaga', 'motivoDaVaga'])
+  const motivoDaVaga = normalizeSolicitacaoPessoalMotivoVaga(motivoDaVagaRaw)
   const ordem = pickFirstString(campos, ['ordem', 'ordemVaga', 'ordemServico', 'numeroOrdem'])
   const payloadCostCenter = asCostCenterLike(campos.centroCusto)
   const centroCustoPayloadText = pickFirstString(campos, [
@@ -150,6 +153,7 @@ export function mapSolicitacaoPessoalBiRow(item: {
   ])
   const centroCustoAmigavel =
     formatCostCenterLabel(item.costCenter, '') ||
+    item.department?.name?.trim() ||
     formatCostCenterLabel(payloadCostCenter, '') ||
     centroCustoPayloadText ||
     '-'
