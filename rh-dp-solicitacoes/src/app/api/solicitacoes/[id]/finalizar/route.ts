@@ -60,7 +60,7 @@ export async function PATCH(
       )
     }
 
-    const userAccess = await resolveUserAccessContext({
+     const userAccess = await resolveUserAccessContext({
       userId: me.id,
       role: me.role,
       primaryDepartmentId: me.departmentId,
@@ -68,6 +68,8 @@ export async function PATCH(
     })
 
     const canFinalize = canFinalizeSolicitation(userAccess, {
+      tipoId: solicitation.tipoId,
+      status: solicitation.status,
       solicitanteId: solicitation.solicitanteId,
       approverId: solicitation.approverId,
       assumidaPorId: solicitation.assumidaPorId,

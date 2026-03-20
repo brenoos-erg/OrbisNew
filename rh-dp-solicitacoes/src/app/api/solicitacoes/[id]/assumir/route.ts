@@ -37,6 +37,8 @@ export async function POST(
     })
 
     const canAssume = canAssumeSolicitation(userAccess, {
+      tipoId: solic.tipoId,
+      status: solic.status,
       solicitanteId: solic.solicitanteId,
       approverId: solic.approverId,
       assumidaPorId: solic.assumidaPorId,

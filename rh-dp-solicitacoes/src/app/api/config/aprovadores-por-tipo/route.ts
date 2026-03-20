@@ -53,12 +53,17 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = (await req.json().catch(() => null)) as
-      | { tipoId?: string; approvers?: string[]; viewers?: string[] }
+      | { tipoId?: string; approvers?: string[]; viewers?: string[]; finalizers?: string[] }
       | null
 
     const tipoId = body?.tipoId?.trim()
     const approvers = Array.from(new Set((body?.approvers ?? []).filter(Boolean)))
-    const viewers = Array.from(new Set((body?.viewers ?? []).filter(Boolean))).filter((id) => !approvers.includes(id))
+    const finalizers = Array.from(new Set((body?.finalizers ?? []).filter(Boolean))).filter(
+      (id) => !approvers.includes(id),
+    )
+    const viewers = Array.from(new Set((body?.viewers ?? []).filter(Boolean))).filter(
+      (id) => !approvers.includes(id) && !finalizers.includes(id),
+    )
 
     if (!tipoId) {
       return NextResponse.json({ error: 'tipoId é obrigatório.' }, { status: 400 })
@@ -69,6 +74,7 @@ export async function PUT(req: NextRequest) {
 
       const data = [
         ...approvers.map((userId) => ({ tipoId, userId, role: TipoApproverRole.APPROVER })),
+        ...finalizers.map((userId) => ({ tipoId, userId, role: TipoApproverRole.FINALIZER })),
         ...viewers.map((userId) => ({ tipoId, userId, role: TipoApproverRole.VIEWER })),
       ]
 

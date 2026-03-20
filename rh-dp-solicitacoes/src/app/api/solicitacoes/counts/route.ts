@@ -39,7 +39,7 @@ export async function GET() {
             {
               NOT: {
                 AND: [
-                  { requiresApproval: true },
+                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
                   { OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }] },
                 ],
@@ -50,6 +50,10 @@ export async function GET() {
         {
           status: 'AGUARDANDO_AVALIACAO_GESTOR',
           approverId: me.id,
+        },
+        {
+          status: 'AGUARDANDO_FINALIZACAO_AVALIACAO',
+          AND: [receivedVisibilityWhere],
         },
       ],
     }

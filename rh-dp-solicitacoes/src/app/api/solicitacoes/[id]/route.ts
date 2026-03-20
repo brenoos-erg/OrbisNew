@@ -112,6 +112,8 @@ export async function GET(
     const canViewByDepartment = canViewSolicitation(
       userAccess,
       {
+        tipoId: item.tipoId,
+        status: item.status,
         solicitanteId: item.solicitanteId,
         approverId: item.approverId,
         assumidaPorId: item.assumidaPorId,

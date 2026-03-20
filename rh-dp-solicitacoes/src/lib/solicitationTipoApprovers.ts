@@ -39,6 +39,10 @@ export async function resolveTipoViewerIds(tipoId: string): Promise<string[]> {
   return resolveTipoRoleUserIds(tipoId, TipoApproverRole.VIEWER)
 }
 
+export async function resolveTipoFinalizerIds(tipoId: string): Promise<string[]> {
+  return resolveTipoRoleUserIds(tipoId, TipoApproverRole.FINALIZER)
+}
+
 export async function resolveTipoApproverId(tipoId: string): Promise<string | null> {
   const ids = await resolveTipoApproverIds(tipoId)
   return pickEligibleTipoApproverId(ids)

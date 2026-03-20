@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import {
+  EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
@@ -104,16 +105,16 @@ export async function POST(
       where: { id },
       data: {
         payload: updatedPayload,
-        status: 'CONCLUIDA',
-        dataFechamento: new Date(),
+        status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS as any,
+        dataFechamento: null,
       },
     })
 
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId: id,
-        status: 'CONCLUIDA',
-        message: 'Avaliação do gestor concluída.',
+        status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS as any,
+        message: 'Avaliação do gestor concluída. Aguardando finalização da área responsável.',
       },
     })
 

@@ -1,5 +1,9 @@
 import { Prisma, Role } from '@prisma/client'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+import {
+  EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from '@/lib/experienceEvaluation'
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
 
@@ -8,9 +12,12 @@ type SolicitationVisibilityInput = {
   role: Role
   userDepartmentIds: string[]
   userSetorKeys: string[]
+  finalizerTipoIds: string[]
 }
 
 type SolicitationLike = {
+  tipoId?: string | null
+  status?: string | null
   solicitanteId: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -62,6 +69,15 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
+  if (input.finalizerTipoIds.length > 0) {
+    orFilters.push({
+      tipoId: {
+        in: input.finalizerTipoIds,
+      },
+      status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+    })
+  }
+
   return {
     OR: orFilters,
   }
@@ -75,6 +91,13 @@ export function canUserViewSolicitationByDepartment(
   if (solicitation.solicitanteId === input.userId) return true
   if (solicitation.approverId === input.userId) return true
   if (solicitation.assumidaPorId === input.userId) return true
+  if (
+    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
+    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
+    input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)
+  ) {
+    return true
+  }
 
   if (isUserInResponsibleDepartment(input.userDepartmentIds, solicitation.departmentId)) {
     return true
