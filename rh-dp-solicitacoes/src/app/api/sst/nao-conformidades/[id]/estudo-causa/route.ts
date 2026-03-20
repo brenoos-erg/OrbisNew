@@ -5,6 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { canManageAllNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
-    if (nc.aprovadoQualidadeStatus !== 'APROVADO') {
+    if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !canManageAllNc(level)) {
       return NextResponse.json({ error: 'Estudo de causa só pode ser preenchido após aprovação da qualidade.' }, { status: 403 })
     }
     if (nc.solicitanteId !== me.id && !hasMinLevel(level, ModuleLevel.NIVEL_2)) {

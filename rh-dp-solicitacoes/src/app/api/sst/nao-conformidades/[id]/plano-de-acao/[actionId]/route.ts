@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { canManageAllNc } from '@/lib/sst/nonConformity'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; actionId: string }> }) {
   try {
@@ -64,11 +65,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       take: 40,
     })
 
-    return NextResponse.json({
+     return NextResponse.json({
       item: {
         action,
         nonConformity: nc,
-        editable: nc.aprovadoQualidadeStatus === 'APROVADO' && (nc.solicitanteId === me.id || hasMinLevel(level, ModuleLevel.NIVEL_2)),
+        editable:
+          canManageAllNc(level) ||
+          (nc.aprovadoQualidadeStatus === 'APROVADO' && (nc.solicitanteId === me.id || hasMinLevel(level, ModuleLevel.NIVEL_2))),
         timeline,
       },
     })

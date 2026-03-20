@@ -5,6 +5,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { canManageAllNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
@@ -19,7 +20,9 @@ async function assertEditable(id: string, userId: string, level: ModuleLevel | u
     },
   })  
    if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
-  if (nc.aprovadoQualidadeStatus !== 'APROVADO') return { error: 'Plano de ação só pode ser alterado após aprovação da qualidade.', status: 403 }
+  if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !canManageAllNc(level)) {
+    return { error: 'Plano de ação só pode ser alterado após aprovação da qualidade.', status: 403 }
+  }
   const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(userId)
   const canTreat = canUserTreatNc({
     userId,
