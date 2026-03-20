@@ -1856,10 +1856,10 @@ useEffect(() => {
                   </div>
                 </section>
 
-                 {/* =================== MOTIVO DA VAGA =================== */}
+                  {/* =================== MOTIVO DA VAGA =================== */}
                 <section className="space-y-3 border-t border-slate-100 pt-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Motivo da Vaga
+                    Motivo da Vaga <span className="text-red-500">*</span>
                   </h3>
                   <div className="flex flex-wrap gap-4 text-xs">
                     <label className="flex items-center gap-1">
@@ -1882,6 +1882,7 @@ useEffect(() => {
                         onChange={() =>
                           handleExtraChange('motivoVagaTipo', 'AUMENTO')
                         }
+                        required
                       />
                       <span>Aumento</span>
                     </label>
