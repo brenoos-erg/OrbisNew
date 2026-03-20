@@ -134,7 +134,7 @@ const filteredUsers = useMemo(() => {
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={isApprover}
+                         checked={isApprover}
                         onChange={(e) => toggleRole('APPROVER', u.id, e.target.checked)}
                       />
                       Aprovador
@@ -159,6 +159,7 @@ const filteredUsers = useMemo(() => {
                   {(isApprover || isFinalizer || isViewer) && (
                     <span className="inline-flex rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
                       {isApprover ? 'Aprovador' : isFinalizer ? 'Finalizador' : 'Visualizador'}
+                    </span>
                   )}
                 </div>
               )
