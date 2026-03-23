@@ -1232,14 +1232,14 @@ export default function NovaSolicitacaoPage() {
             return;
           }
 
-          delete campos.anexosSolicitacao;
+           delete campos.anexosSolicitacao;
           delete campos.anexosSolicitante;
         }
 
         if (isAvaliacaoExperiencia) {
           campos.gestorImediatoAvaliadorId = extras.gestorImediatoAvaliadorId ?? '';
+          campos.gestorImediatoAvaliador = extras.gestorImediatoAvaliador ?? '';
         }
-
         if (selectedTipo?.id === 'RQ_043') {
           const centroDestinoId =
             campos.centroCustoDestinoId ??
@@ -2765,11 +2765,20 @@ useEffect(() => {
                               {getDisplayLabel(campo)} <span className="text-red-500">*</span>
                             </span>
                             <select
-                              className="w-full border rounded px-3 py-2 text-sm bg-white"
+                                className="w-full border rounded px-3 py-2 text-sm bg-white"
                               value={extras.gestorImediatoAvaliadorId ?? ''}
-                              onChange={(e: SelectChange) =>
-                                handleExtraChange('gestorImediatoAvaliadorId', e.target.value)
-                              }
+                              onChange={(e: SelectChange) => {
+                                const selectedId = e.target.value;
+                                const selectedCoordinator = coordinators.find(
+                                  (coordinator) => coordinator.id === selectedId,
+                                );
+
+                                handleExtraChange('gestorImediatoAvaliadorId', selectedId);
+                                handleExtraChange(
+                                  'gestorImediatoAvaliador',
+                                  selectedCoordinator?.fullName ?? '',
+                                );
+                              }}
                               required
                             >
                               <option value="">Selecione...</option>

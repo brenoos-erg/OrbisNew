@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
+  listExperienceEvaluators,
 } from '@/lib/experienceEvaluation'
 import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
@@ -18,6 +19,14 @@ function escapeHtml(input: unknown) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
+}
+
+function toDisplayValue(input: unknown) {
+  if (input === null || input === undefined) return ''
+  if (typeof input === 'string') return input.trim()
+  if (typeof input === 'number' || typeof input === 'boolean') return String(input)
+  if (Array.isArray(input)) return input.filter(Boolean).map((item) => String(item)).join(', ')
+  return String(input)
 }
 
 export async function GET(
@@ -33,7 +42,7 @@ export async function GET(
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
       include: {
-        tipo: { select: { nome: true } },
+        tipo: { select: { nome: true, schemaJson: true } },
         solicitante: { select: { fullName: true } },
         solicitacaoSetores: { select: { setor: true } },
       },
@@ -77,25 +86,66 @@ export async function GET(
       )
     }
 
-    const payload = (solicitation.payload ?? {}) as Record<string, any>
-    const campos = (payload.campos ?? {}) as Record<string, any>
+     const payload = (solicitation.payload ?? {}) as Record<string, any>
+    const campos = ((payload.campos ?? payload.formData ?? payload.dadosFormulario ?? {}) ??
+      {}) as Record<string, any>
     const avaliacao = (payload.avaliacaoGestor ?? {}) as Record<string, any>
-    const rows = [
-      ['Colaborador avaliado', campos.colaboradorAvaliado],
-      ['Contrato / setor', campos.contratoSetor],
-      ['Cargo do colaborador', campos.cargoColaborador],
-      ['Data de admissão', campos.dataAdmissao],
-      ['Gestor avaliador', campos.gestorImediatoAvaliador],
-      ['Relacionamento', avaliacao.relacionamentoNota],
-      ['Comunicação', avaliacao.comunicacaoNota],
-      ['Atitude', avaliacao.atitudeNota],
-      ['Saúde e segurança', avaliacao.saudeSegurancaNota],
-      ['Domínio técnico e processos', avaliacao.dominioTecnicoProcessosNota],
-      ['Adaptação à mudança', avaliacao.adaptacaoMudancaNota],
-      ['Autogestão e gestão de pessoas', avaliacao.autogestaoGestaoPessoasNota],
-      ['Comentário final', avaliacao.comentarioFinal],
-      ['Avaliado em', avaliacao.avaliadoEm],
+    let gestorAvaliador = toDisplayValue(campos.gestorImediatoAvaliador)
+
+    if (!gestorAvaliador && toDisplayValue(campos.gestorImediatoAvaliadorId)) {
+      const coordenadores = await listExperienceEvaluators()
+      gestorAvaliador =
+        coordenadores.find((coordenador) => coordenador.id === campos.gestorImediatoAvaliadorId)
+          ?.fullName ?? ''
+    }
+
+    const baseRows: Array<[string, string]> = [
+      ['Colaborador avaliado', toDisplayValue(campos.colaboradorAvaliado)],
+      ['Contrato / setor', toDisplayValue(campos.contratoSetor)],
+      ['Gestor imediato avaliador', gestorAvaliador],
+      ['Cargo do colaborador', toDisplayValue(campos.cargoColaborador)],
+      ['Data de admissão', toDisplayValue(campos.dataAdmissao)],
+      ['Cargo do avaliador', toDisplayValue(campos.cargoAvaliador)],
+      ['Relacionamento', toDisplayValue(avaliacao.relacionamentoNota)],
+      ['Comunicação', toDisplayValue(avaliacao.comunicacaoNota)],
+      ['Atitude', toDisplayValue(avaliacao.atitudeNota)],
+      ['Saúde e segurança', toDisplayValue(avaliacao.saudeSegurancaNota)],
+      [
+        'Domínio técnico e processos',
+        toDisplayValue(avaliacao.dominioTecnicoProcessosNota),
+      ],
+      ['Adaptação à mudança', toDisplayValue(avaliacao.adaptacaoMudancaNota)],
+      [
+        'Autogestão e gestão de pessoas',
+        toDisplayValue(avaliacao.autogestaoGestaoPessoasNota),
+      ],
+      ['Comentário final', toDisplayValue(avaliacao.comentarioFinal)],
+      ['Avaliado em', toDisplayValue(avaliacao.avaliadoEm)],
     ]
+
+    const schemaFields = (
+      (solicitation.tipo?.schemaJson as { camposEspecificos?: Array<{ name?: string; label?: string }> })
+        ?.camposEspecificos ?? []
+    )
+      .filter((field) => field?.name && field?.label)
+      .map((field) => ({ name: String(field.name), label: String(field.label) }))
+
+    const includedFieldNames = new Set([
+      'colaboradorAvaliado',
+      'contratoSetor',
+      'gestorImediatoAvaliador',
+      'cargoColaborador',
+      'dataAdmissao',
+      'cargoAvaliador',
+    ])
+
+    const dynamicRows: Array<[string, string]> = schemaFields
+      .filter((field) => !includedFieldNames.has(field.name))
+      .map((field) => [field.label, toDisplayValue(campos[field.name])])
+      .filter(([, value]) => Boolean(value))
+
+    const rows = [...baseRows, ...dynamicRows]
+    const hasAnyDataRow = rows.some(([, value]) => Boolean(value))
 
     const html = `<!doctype html>
       <html lang="pt-BR">
@@ -120,14 +170,18 @@ export async function GET(
         <table>
           ${rows
             .map(
-              ([label, value]) =>
+                ([label, value]) =>
                 `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`,
             )
             .join('')}
         </table>
+        ${
+          hasAnyDataRow
+            ? ''
+            : '<p style="margin-top:16px;font-size:12px;color:#64748b">Sem dados preenchidos para exibir no momento da geração.</p>'
+        }
       </body>
       </html>`
-
     browser = await chromium.launch({ headless: true })
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle' })

@@ -125,3 +125,4 @@ export async function POST(req: NextRequest) {
     console.error('Erro ao criar documento ISO', error)
     return NextResponse.json({ error: 'Erro ao criar documento.' }, { status: 500 })
   }
+}

@@ -601,11 +601,11 @@ export const POST = withModuleLevel(
           }
 
           const coordenadores = await listExperienceEvaluators()
-          const gestorValido = coordenadores.some(
+          const gestorSelecionado = coordenadores.find(
             (coordenador) => coordenador.id === gestorImediatoAvaliadorId,
           )
 
-          if (!gestorValido) {
+          if (!gestorSelecionado) {
             return NextResponse.json(
               {
                 error:
@@ -614,9 +614,10 @@ export const POST = withModuleLevel(
               { status: 400 },
             )
           }
-   payload.campos = {
+          payload.campos = {
             ...(payload.campos ?? {}),
             gestorImediatoAvaliadorId,
+            gestorImediatoAvaliador: gestorSelecionado.fullName,
           }
         }
 
