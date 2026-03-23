@@ -1033,17 +1033,22 @@ export function SolicitationDetailModal({
     return ids
   }, [currentUser])
 
-  const canApproveByDepartment =
+ const canApproveByDepartment =
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' &&
     !!detail?.department?.id &&
     currentUserDepartmentIds.has(detail.department.id)
   const userIsCurrentDepartmentResponsible =
     !!detail?.department?.id && currentUserDepartmentIds.has(detail.department.id)
+  const isExperienceEvaluationPdfAvailableStatus =
+    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' || effectiveStatus === 'CONCLUIDA'
   const canFinalizeExperienceByRh =
     isAvaliacaoExperiencia &&
     effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' &&
     (userIsAdmin || userIsCurrentDepartmentResponsible)
-  const canDownloadExperiencePdf = canFinalizeExperienceByRh
+  const canDownloadExperiencePdf =
+    isAvaliacaoExperiencia &&
+    isExperienceEvaluationPdfAvailableStatus &&
+    (userIsAdmin || userIsCurrentDepartmentResponsible)
   const canShowApprovalActions =
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
@@ -2932,7 +2937,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   {canDownloadExperiencePdf && (
                     <button
                       onClick={handleBaixarPdfAvaliacaoExperiencia}
-                      disabled={closing || isFinalizadaOuCancelada}
+                      disabled={closing}
                       className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Gerando...' : 'Baixar PDF da avaliação'}

@@ -9,7 +9,7 @@ import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
-import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 function escapeHtml(input: unknown) {
   return String(input ?? '')
@@ -43,12 +43,17 @@ export async function GET(
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     }
 
-    if (
-      solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID ||
-      solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS
-    ) {
+    const isExperienceEvaluation = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+    const isAllowedStatus =
+      solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS ||
+      solicitation.status === 'CONCLUIDA'
+
+    if (!isExperienceEvaluation || !isAllowedStatus) {
       return NextResponse.json(
-        { error: 'PDF disponível apenas na etapa final da Avaliação do Período de Experiência.' },
+        {
+          error:
+            'PDF disponível somente na etapa final da Avaliação do Período de Experiência e após conclusão.',
+        },
         { status: 400 },
       )
     }
@@ -60,19 +65,14 @@ export async function GET(
       primaryDepartment: me.department,
     })
 
-    const canDownload = canFinalizeSolicitation(userAccess, {
-      tipoId: solicitation.tipoId,
-      status: solicitation.status,
-      solicitanteId: solicitation.solicitanteId,
-      approverId: solicitation.approverId,
-      assumidaPorId: solicitation.assumidaPorId,
-      departmentId: solicitation.departmentId,
-      solicitacaoSetores: solicitation.solicitacaoSetores,
-    })
+    const canDownload =
+      me.role === 'ADMIN' ||
+      (Boolean(solicitation.departmentId) &&
+        userAccess.userDepartmentIds.includes(solicitation.departmentId as string))
 
     if (!canDownload) {
       return NextResponse.json(
-        { error: 'Somente RH (ou admin) pode gerar o PDF na etapa final.' },
+        { error: 'Somente RH (ou admin) pode gerar o PDF na etapa final e após conclusão.' },
         { status: 403 },
       )
     }
