@@ -51,6 +51,17 @@ const formatDisplayValue = (value: unknown, _campoType?: string) => {
   return String(value)
 }
 
+const escapePrintHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const formatPrintDateTime = (value?: string | null) =>
+  value ? formatDateTimeDDMMYYYYHHMM(value) : '-'
+
 
 // ===== Tipos que a página de lista já usa =====
 export type Row = {
@@ -1922,41 +1933,89 @@ async function handleEncaminharAprovacaoComAnexo() {
 
   function handlePrintSolicitacao() {
     if (!detail) return
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800')
+    const printWindow = window.open('about:blank', '_blank', 'width=1000,height=800')
     if (!printWindow) return
 
-    const rows = [
-      ['Solicitante', payloadSolic.fullName ?? '-'],
-      ['Solicitação', detail.titulo ?? detail.tipo?.nome ?? row?.titulo ?? '-'],
-      ['Período aquisitivo', `${formatDisplayValue(payloadCampos.periodoAquisitivoInicio)} até ${formatDisplayValue(payloadCampos.periodoAquisitivoFim)}`],
-      ['Início do gozo', formatDisplayValue(payloadCampos.inicioGozo)],
-      ['Fim do gozo', formatDisplayValue(payloadCampos.fimGozo)],
-      ['Qtd. dias corridos', formatDisplayValue(payloadCampos.qtdDiasCorridos)],
-      ['Qtd. dias de abono', formatDisplayValue(payloadCampos.abonoDias)],
-      ['Data de retorno', formatDisplayValue(payloadCampos.dataRetorno)],
+    const observacoes =
+      (detail.comentarios ?? [])
+        .map((comentario) => {
+          const autor = comentario.autor?.fullName ?? 'Sistema'
+          return `${autor}: ${comentario.texto}`
+        })
+        .join(' | ') || '-'
+
+    const principaisRows = [
+      ['Protocolo', detail.protocolo ?? '-'],
+      ['Tipo da solicitação', detail.tipo?.nome ?? detail.titulo],
+      ['Setor responsável', detail.department?.name ?? detail.costCenter?.description ?? row?.setorDestino ?? '-'],
       ['Status', statusLabel],
-      ['Observações', (detail.comentarios ?? []).map((comentario) => comentario.texto).join(' | ') || '-'],
+      ['Data de abertura', formatPrintDateTime(detail.dataAbertura)],
+      ['Data prevista', formatPrintDateTime(detail.dataPrevista)],
+      ['Data de fechamento', formatPrintDateTime(detail.dataFechamento)],
+      ['Responsável atual / atendente', (detail as any)?.assumidaPor?.fullName ?? row?.responsavel?.fullName ?? '-'],
     ]
 
-    const htmlRows = rows
-      .map(([label, value]) => `<tr><th>${label}</th><td>${value || '-'}</td></tr>`)
-      .join('')
+    const solicitanteRows = [
+      ['Nome', payloadSolic.fullName ?? '-'],
+      ['Login', payloadSolic.login ?? '-'],
+      ['E-mail', payloadSolic.email ?? '-'],
+      ['Telefone', payloadSolic.phone ?? '-'],
+      ['Cargo', payloadSolic.positionName ?? '-'],
+      ['Departamento', payloadSolic.departmentName ?? '-'],
+      ['Centro de custo', payloadSolic.costCenterText ?? '-'],
+    ]
 
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Impressão - ${detail.protocolo ?? ''}</title><style>
+    const dadosFormularioRows = Object.entries(payloadCampos ?? {}).map(([key, value]) => [
+      key,
+      formatDisplayValue(value),
+    ])
+
+    const buildTableRows = (rowsToRender: Array<[string, unknown]>) =>
+      rowsToRender
+        .map(
+          ([label, value]) =>
+            `<tr><th>${escapePrintHtml(label)}</th><td>${escapePrintHtml(value || '-')}</td></tr>`,
+        )
+        .join('')
+
+    const html = `<!DOCTYPE html><html><head><title>Impressão - ${escapePrintHtml(
+      detail.protocolo ?? '',
+    )}</title><style>
       body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}
       h1{font-size:20px;margin-bottom:4px}
+      h2{font-size:14px;margin:20px 0 8px;color:#334155;text-transform:uppercase;letter-spacing:.03em}
       p{margin-top:0;color:#475569}
-      table{border-collapse:collapse;width:100%;margin-top:16px}
-      th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top}
+      table{border-collapse:collapse;width:100%;margin-top:8px}
+      th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top;font-size:12px}
       th{width:280px;background:#f8fafc}
+      .observacoes{border:1px solid #cbd5e1;border-radius:6px;padding:10px;white-space:pre-wrap;font-size:12px}
+      @media print { body { padding: 8px; } }
     </style></head><body>
-      <h1>Solicitação de Férias</h1>
-      <p>Protocolo: ${detail.protocolo ?? '-'}</p>
-      <table>${htmlRows}</table>
-    </body></html>`)
+      <h1>Impressão da solicitação</h1>
+      <p>Protocolo: ${escapePrintHtml(detail.protocolo ?? '-')}</p>
+      <h2>Dados principais</h2>
+      <table>${buildTableRows(principaisRows as Array<[string, unknown]>)}</table>
+      <h2>Dados do solicitante</h2>
+      <table>${buildTableRows(solicitanteRows as Array<[string, unknown]>)}</table>
+      <h2>Dados do formulário</h2>
+      <table>${buildTableRows(
+        dadosFormularioRows.length > 0
+          ? (dadosFormularioRows as Array<[string, unknown]>)
+          : [['Sem dados de formulário', '-']],
+      )}</table>
+      <h2>Observações relevantes</h2>
+      <div class="observacoes">${escapePrintHtml(observacoes)}</div>
+      <script>
+        window.onload = function () {
+          window.focus();
+          window.print();
+        };
+      </script>
+    </body></html>`
+
+    printWindow.document.open()
+    printWindow.document.write(html)
     printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
   }
   // Aprovação pelo gestor (modo approval)
   async function handleAprovarGestor(comment?: string) {

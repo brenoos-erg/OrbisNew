@@ -14,18 +14,33 @@ import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/soli
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const where: any = {}
 
-  const dateStart = searchParams.get('dateStart')
-  const dateEnd = searchParams.get('dateEnd')
+  const openedDate = searchParams.get('openedDate')
+  const dateStart = searchParams.get('dateStart') ?? searchParams.get('openedStart')
+  const dateEnd = searchParams.get('dateEnd') ?? searchParams.get('openedEnd')
+  const closedDate = searchParams.get('closedDate')
+  const closedStart = searchParams.get('closedStart')
+  const closedEnd = searchParams.get('closedEnd')
   const centerId = searchParams.get('centerId')
   const costCenterId = searchParams.get('costCenterId') ?? centerId
   const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
   const protocolo = searchParams.get('protocolo')
   const solicitante = searchParams.get('solicitante')
+  const solicitanteNome = searchParams.get('solicitanteNome')
+  const solicitanteLogin = searchParams.get('solicitanteLogin')
+  const matricula = searchParams.get('matricula')
   const status = searchParams.get('status')
+  const situacao = searchParams.get('situacao')
+  const responsavel = searchParams.get('responsavel')
   const text = searchParams.get('text')
-  if (dateStart || dateEnd) {
-    where.dataAbertura = {}
+
+  if (openedDate) {
+    where.dataAbertura = {
+      gte: new Date(`${openedDate}T00:00:00`),
+      lte: new Date(`${openedDate}T23:59:59`),
+    }
+  } else if (dateStart || dateEnd) {
+   where.dataAbertura = {}
     if (dateStart) {
       where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
     }
@@ -39,26 +54,90 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   if (costCenterId) where.costCenterId = costCenterId
   if (tipoId) where.tipoId = tipoId
 
+  if (closedDate) {
+    where.dataFechamento = {
+      gte: new Date(`${closedDate}T00:00:00`),
+      lte: new Date(`${closedDate}T23:59:59`),
+    }
+  } else if (closedStart || closedEnd) {
+    where.dataFechamento = {}
+    if (closedStart) {
+      where.dataFechamento.gte = new Date(`${closedStart}T00:00:00`)
+    }
+    if (closedEnd) {
+      where.dataFechamento.lte = new Date(`${closedEnd}T23:59:59`)
+    }
+  }
+
   const protocoloNormalizado = protocolo?.trim() ?? ''
   const hasProtocoloFilter = protocoloNormalizado.length > 0
 
-  if (status && !hasProtocoloFilter) where.status = status
+  if (status && !hasProtocoloFilter) {
+    where.status = status
+  } else if (situacao && !hasProtocoloFilter) {
+    const statusBySituacao: Record<string, string[]> = {
+      PENDENTE: ['ABERTA', 'AGUARDANDO_APROVACAO', 'AGUARDANDO_TERMO'],
+      EM_ATENDIMENTO: ['EM_ATENDIMENTO', 'AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
+      FINALIZADO: ['CONCLUIDA'],
+      REJEITADO: ['CANCELADA'],
+    }
+    if (statusBySituacao[situacao]) {
+      where.status = { in: statusBySituacao[situacao] }
+    }
+  }
 
-  if (hasProtocoloFilter) {
+
+if (hasProtocoloFilter) {
     where.protocolo = {
       contains: protocoloNormalizado,
     }
   }
 
-  if (solicitante) {
+  const solicitanteBusca = solicitanteNome ?? solicitante
+  if (solicitanteBusca) {
     where.solicitante = {
       OR: [
-        { fullName: { contains: solicitante } },
-        { email: { contains: solicitante } },
+        { fullName: { contains: solicitanteBusca } },
+        { email: { contains: solicitanteBusca } },
       ],
     }
   }
 
+  if (solicitanteLogin) {
+    where.solicitante = {
+      ...(where.solicitante ?? {}),
+      ...(where.solicitante?.OR ? {} : { OR: [] }),
+      login: { contains: solicitanteLogin },
+    }
+  }
+
+  if (responsavel) {
+    where.assumidaPor = {
+      fullName: { contains: responsavel },
+    }
+  }
+
+  if (matricula) {
+    where.AND = [
+      ...(where.AND ?? []),
+      {
+        OR: [
+          {
+            payload: {
+              path: ['campos', 'matricula'],
+              string_contains: matricula,
+            },
+          },
+          {
+            payload: {
+              path: ['solicitante', 'matricula'],
+              string_contains: matricula,
+            },
+          },
+        ],
+      },
+    ]
+  }
   if (text) {
     const or: any[] = [
       { titulo: { contains: text } },
