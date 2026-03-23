@@ -115,7 +115,7 @@ export async function GET(request: Request) {
         },
       ],
     })
-    const resposta = tipos
+     const resposta = tipos
       .filter((tipo) =>
         shouldIncludeTipo({
           schema: tipo.schemaJson as SchemaJson,
@@ -123,9 +123,25 @@ export async function GET(request: Request) {
           departamentoId,
         }),
       )
-       .map((tipo) => {
+      .map((tipo) => {
         const schema = tipo.schemaJson as SchemaJson
-        const campos = (schema?.camposEspecificos ?? schema?.campos ?? []).map(normalizeCampo)
+        let campos = (schema?.camposEspecificos ?? schema?.campos ?? []).map(normalizeCampo)
+        const isAgendamentoFerias = tipo.id === 'AGENDAMENTO_DE_FERIAS'
+
+        if (isAgendamentoFerias) {
+          campos = campos
+            .filter((campo) => !['anexosSolicitacao', 'anexosSolicitante'].includes(campo.name))
+            .map((campo) => {
+              if (campo.name === 'abonoPecuniarioSim') return { ...campo, label: 'Abono' }
+              if (campo.name === 'pagamentoAbonoQuando') {
+                return {
+                  ...campo,
+                  options: (campo.options ?? []).filter((option) => option !== 'Na folha do mês'),
+                }
+              }
+              return campo
+            })
+        }
 
         return {
           id: tipo.id,

@@ -117,6 +117,27 @@ function normalizeSimpleText(value: string) {
     .toUpperCase()
 }
 
+function parseDateOnly(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+function formatDateOnly(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function computeFimGozoInclusive(inicioGozo: unknown, qtdDiasCorridos: unknown) {
+  const startDate = parseDateOnly(inicioGozo)
+  const days = Number.parseInt(String(qtdDiasCorridos ?? ''), 10)
+  if (!startDate || !Number.isFinite(days) || days < 1) return null
+
+  const endDate = new Date(startDate)
+  endDate.setDate(endDate.getDate() + (days - 1))
+  return formatDateOnly(endDate)
+}
+
 async function resolveRhRoutingTarget() {
   const rhDepartment = await prisma.department.findFirst({
     where: {
@@ -473,7 +494,7 @@ export const POST = withModuleLevel(
           }
         }
 
-         const tipo = await prisma.tipoSolicitacao.findUnique({
+        const tipo = await prisma.tipoSolicitacao.findUnique({
           where: { id: tipoId },
         })
 
@@ -484,6 +505,24 @@ export const POST = withModuleLevel(
           )
         }
         const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
+        const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
+
+        if (isAgendamentoFerias) {
+          const fimGozoCalculado = computeFimGozoInclusive(campos.inicioGozo, campos.qtdDiasCorridos)
+          if (!fimGozoCalculado) {
+            return NextResponse.json(
+              {
+                error:
+                  'Informe Início do gozo e quantidade de dias corridos válidos para calcular o Fim do gozo.',
+              },
+              { status: 400 },
+            )
+          }
+
+          campos.fimGozo = fimGozoCalculado
+          delete campos.anexosSolicitacao
+          delete campos.anexosSolicitante
+        }
 
           
           const protocolo = await nextSolicitationProtocolo()
@@ -788,12 +827,11 @@ export const POST = withModuleLevel(
           return NextResponse.json(updated, { status: 201 })
         }
 
-         const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
+          const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
         const isDesligamento = isSolicitacaoDesligamento(tipo)
         const isNadaConsta = isSolicitacaoNadaConsta(tipo)
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
-        const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
         const isSolicitacaoVeiculosTipo = isSolicitacaoVeiculos(tipo)
         const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
         const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)

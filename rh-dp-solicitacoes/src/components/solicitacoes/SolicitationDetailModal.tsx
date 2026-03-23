@@ -11,6 +11,7 @@ import {
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
   isSolicitacaoIncentivoEducacao,
+  isSolicitacaoAgendamentoFerias,
   isSolicitacaoPessoal,
   isSolicitacaoAdmissao,
   NADA_CONSTA_SETORES,
@@ -612,6 +613,8 @@ export function SolicitationDetailModal({
   const [showContratadoForm, setShowContratadoForm] = useState(false)
   const [showCancelarVagaForm, setShowCancelarVagaForm] = useState(false)
   const [cancelamentoVagaMotivo, setCancelamentoVagaMotivo] = useState('')
+  const [showRecusaDpForm, setShowRecusaDpForm] = useState(false)
+  const [recusaDpMotivo, setRecusaDpMotivo] = useState('')
   const [showAdminCancelForm, setShowAdminCancelForm] = useState(false)
   const [adminCancelReason, setAdminCancelReason] = useState('')
   const [candidatoNome, setCandidatoNome] = useState('')
@@ -751,6 +754,7 @@ export function SolicitationDetailModal({
   const isDesligamento = isSolicitacaoDesligamento(detail?.tipo)
   const isNadaConsta = isSolicitacaoNadaConsta(detail?.tipo)
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
+  const isSolicitacaoFerias = isSolicitacaoAgendamentoFerias(detail?.tipo)
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
@@ -759,6 +763,7 @@ export function SolicitationDetailModal({
     Boolean(currentUser?.id) &&
     currentUser?.id === detail?.approverId &&
     effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
+
 
   const missingGestorAvaliacaoFields = useMemo(() => {
     return EXPERIENCE_EVALUATION_REQUIRED_FIELDS.filter((field) => {
@@ -1054,9 +1059,27 @@ export function SolicitationDetailModal({
     approvalStatus === 'PENDENTE' &&
     canApproveByDepartment &&
     (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme)
-  const camposFormSolicitante = isSolicitacaoEpiUniformeTipo
-    ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
-    : camposSchema
+  const camposFormSolicitante = (
+    isSolicitacaoEpiUniformeTipo
+      ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
+      : camposSchema
+  )
+    .filter((campo) => {
+      if (!isSolicitacaoFerias) return true
+      return !['anexosSolicitacao', 'anexosSolicitante', 'abonoPecuniarioNao'].includes(campo.name)
+    })
+    .map((campo) => {
+      if (isSolicitacaoFerias && campo.name === 'abonoPecuniarioSim') {
+        return { ...campo, label: 'Abono' }
+      }
+      if (isSolicitacaoFerias && campo.name === 'pagamentoAbonoQuando') {
+        return {
+          ...campo,
+          options: (campo.options ?? []).filter((opt) => opt !== 'Na folha do mês'),
+        }
+      }
+      return campo
+    })
 
   const costCenterLabel = useMemo(() => {
     if (payload.solicitarParaOutroColaborador) {
@@ -1103,6 +1126,11 @@ export function SolicitationDetailModal({
     hasAttachments &&
     !isFinalizadaOuCancelada &&
     approvalStatus === 'NAO_PRECISA'
+  const canRecusarFeriasDp =
+    showManagementActions &&
+    isSolicitacaoFerias &&
+    isDpDestino &&
+    !isFinalizadaOuCancelada
   
   // ===== AÇÕES =====
   const handleNadaConstaChange = (name: string, value: string) => {
@@ -1851,6 +1879,85 @@ async function handleEncaminharAprovacaoComAnexo() {
     }
   }
 
+  async function handleRecusarFeriasDp() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    const motivo = recusaDpMotivo.trim()
+    if (!motivo) {
+      setCloseError('Informe o motivo da recusa.')
+      return
+    }
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/recusar-dp`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao recusar solicitação.')
+      }
+
+      await refreshDetailFromServer()
+      setShowRecusaDpForm(false)
+      setRecusaDpMotivo('')
+      setCloseSuccess('Solicitação recusada pelo Departamento Pessoal.')
+      onFinalized?.()
+    } catch (err: any) {
+      console.error('Erro ao recusar solicitação no DP', err)
+      setCloseError(err?.message ?? 'Erro ao recusar solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  function handlePrintSolicitacao() {
+    if (!detail) return
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800')
+    if (!printWindow) return
+
+    const rows = [
+      ['Solicitante', payloadSolic.fullName ?? '-'],
+      ['Solicitação', detail.titulo ?? detail.tipo?.nome ?? row?.titulo ?? '-'],
+      ['Período aquisitivo', `${formatDisplayValue(payloadCampos.periodoAquisitivoInicio)} até ${formatDisplayValue(payloadCampos.periodoAquisitivoFim)}`],
+      ['Início do gozo', formatDisplayValue(payloadCampos.inicioGozo)],
+      ['Fim do gozo', formatDisplayValue(payloadCampos.fimGozo)],
+      ['Qtd. dias corridos', formatDisplayValue(payloadCampos.qtdDiasCorridos)],
+      ['Qtd. dias de abono', formatDisplayValue(payloadCampos.abonoDias)],
+      ['Data de retorno', formatDisplayValue(payloadCampos.dataRetorno)],
+      ['Status', statusLabel],
+      ['Observações', (detail.comentarios ?? []).map((comentario) => comentario.texto).join(' | ') || '-'],
+    ]
+
+    const htmlRows = rows
+      .map(([label, value]) => `<tr><th>${label}</th><td>${value || '-'}</td></tr>`)
+      .join('')
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Impressão - ${detail.protocolo ?? ''}</title><style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}
+      h1{font-size:20px;margin-bottom:4px}
+      p{margin-top:0;color:#475569}
+      table{border-collapse:collapse;width:100%;margin-top:16px}
+      th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;vertical-align:top}
+      th{width:280px;background:#f8fafc}
+    </style></head><body>
+      <h1>Solicitação de Férias</h1>
+      <p>Protocolo: ${detail.protocolo ?? '-'}</p>
+      <table>${htmlRows}</table>
+    </body></html>`)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
   // Aprovação pelo gestor (modo approval)
   async function handleAprovarGestor(comment?: string) {
     const solicitationId = detail?.id ?? row?.id
@@ -2932,6 +3039,48 @@ async function handleEncaminharAprovacaoComAnexo() {
                       className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : 'Finalizar chamado'}
+                    </button>
+                  )}
+                  {canRecusarFeriasDp && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowRecusaDpForm((prev) => !prev)}
+                        className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
+                      >
+                        {showRecusaDpForm ? 'Ocultar recusa da solicitação' : 'Recusar solicitação (DP)'}
+                      </button>
+
+                      {showRecusaDpForm && (
+                        <div className="mt-3 space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wide text-rose-800">
+                            Motivo da recusa (obrigatório)
+                          </label>
+                          <textarea
+                            value={recusaDpMotivo}
+                            onChange={(event) => setRecusaDpMotivo(event.target.value)}
+                            className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                            placeholder="Descreva o motivo da recusa"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRecusarFeriasDp}
+                            disabled={closing}
+                            className="w-full rounded-md bg-rose-600 px-4 py-3 text-base font-semibold text-white hover:bg-rose-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          >
+                            {closing ? 'Recusando...' : 'Confirmar recusa'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {isSolicitacaoFerias && (
+                    <button
+                      type="button"
+                      onClick={handlePrintSolicitacao}
+                      className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 lg:w-auto lg:text-sm"
+                    >
+                      Imprimir solicitação
                     </button>
                   )}
                   {canDownloadExperiencePdf && (

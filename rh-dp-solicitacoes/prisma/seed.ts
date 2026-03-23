@@ -1665,7 +1665,7 @@ async function main() {
         },
         {
           name: 'abonoPecuniarioSim',
-          label: 'Sim',
+         label: 'Abono',
           type: 'checkbox',
           stage: 'solicitante',
           section: 'Abono Pecuniário',
@@ -1688,23 +1688,9 @@ async function main() {
           name: 'pagamentoAbonoQuando',
           label: 'Pagar quando?',
           type: 'select',
-          options: ['Na folha do mês', 'Na folha seguinte', 'Outro'],
+          options: ['Na folha seguinte', 'Outro'],
           stage: 'solicitante',
           section: 'Pagamento do Abono Pecuniário',
-        },
-        {
-          name: 'anexosSolicitacao',
-          label: 'Anexo(s) da Solicitação',
-          type: 'text',
-          stage: 'solicitante',
-          section: 'Anexos',
-        },
-        {
-          name: 'anexosSolicitante',
-          label: 'Anexo(s) do Solicitante',
-          type: 'text',
-          stage: 'solicitante',
-          section: 'Anexos',
         },
       ],
     }

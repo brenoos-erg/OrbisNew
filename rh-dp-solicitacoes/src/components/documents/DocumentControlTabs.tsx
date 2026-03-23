@@ -3,19 +3,26 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const TABS = [
+type TabItem = { href: string; label: string; adminOnly?: boolean }
+
+const TABS: TabItem[] = [
   { href: '/dashboard/controle-documentos/publicados', label: 'Documentos Publicados' },
   { href: '/dashboard/controle-documentos/para-aprovacao', label: 'Documentos para Aprovação' },
   { href: '/dashboard/controle-documentos/em-analise-qualidade', label: 'Documentos em Revisão da Qualidade' },
-  { href: '/dashboard/controle-documentos/controle-aprovadores', label: 'Controle de Aprovadores' },
+  { href: '/dashboard/controle-documentos/controle-aprovadores', label: 'Controle de Aprovadores', adminOnly: true },
 ]
 
-export default function DocumentControlTabs() {
+type Props = {
+  isAdmin?: boolean
+}
+
+export default function DocumentControlTabs({ isAdmin = false }: Props) {
   const pathname = usePathname()
+  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || isAdmin)
 
   return (
     <div className="flex flex-wrap gap-2 rounded-xl border bg-white p-3">
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const active = pathname.startsWith(tab.href)
         return (
           <Link

@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
 import {
+  isSolicitacaoAgendamentoFerias,
   isSolicitacaoEpiUniforme,
   isSolicitacaoEquipamento,
   isSolicitacaoInclusaoPlanoDependentes,
@@ -234,6 +235,27 @@ function createClientRequestId() {
 
   return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+
+function toDateOnly(value: string) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function computeFimGozo(inicioGozo: string, qtdDiasCorridos: string) {
+  const startDate = toDateOnly(inicioGozo);
+  const days = Number.parseInt(qtdDiasCorridos, 10);
+  if (!startDate || !Number.isFinite(days) || days < 1) return '';
+  const result = new Date(startDate);
+  result.setDate(result.getDate() + (days - 1));
+  return formatDateInput(result);
+}
+
 
 
 /* ================================================================
@@ -528,6 +550,7 @@ export default function NovaSolicitacaoPage() {
    const isAvaliacaoExperiencia = selectedTipo?.id === EXPERIENCE_EVALUATION_TIPO_ID;
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
+  const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(selectedTipo);
   const isSolicitacaoExamesSst =
     selectedTipo?.id === 'RQ_092' || selectedTipo?.codigo?.toUpperCase() === 'RQ.SST.002';
   const isRQ247 = selectedTipo?.id === 'RQ_247';
@@ -551,6 +574,12 @@ export default function NovaSolicitacaoPage() {
       return false;
     }
     if (isSolicitacaoEpi && ['emailSolicitante', 'local', 'data'].includes(campo.name)) {
+      return false;
+    }
+    if (
+      isAgendamentoFerias &&
+      ['anexosSolicitacao', 'anexosSolicitante'].includes(campo.name)
+    ) {
       return false;
     }
     return true;
@@ -619,12 +648,13 @@ export default function NovaSolicitacaoPage() {
       },
     ];
 
-      const existingNames = new Set(mergedBaseCampos.map((campo) => campo.name));
+       const existingNames = new Set(mergedBaseCampos.map((campo) => campo.name));
     return [...mergedBaseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
   }, [
     camposSolicitante,
     destinoOptions,
     extras.tipoEquipamentoTi,
+    isAgendamentoFerias,
     isSolicitacaoEquipamentoTi,
     isSolicitacaoExamesSst,
   ]);
@@ -646,6 +676,7 @@ export default function NovaSolicitacaoPage() {
       ? [selectedOption.code, selectedOption.description].filter(Boolean).join(' - ')
       : '';
   };
+
 
 
 
@@ -731,13 +762,37 @@ export default function NovaSolicitacaoPage() {
       return;
     }
 
-    if (name === 'itemManutencao') {
+     if (name === 'itemManutencao') {
       setExtras((prev) => ({
         ...prev,
         [name]: value,
         nomeSistemaManutencao: value === 'Sistema' ? prev.nomeSistemaManutencao ?? '' : '',
         tipoEquipamentoManutencao: value === 'Equipamento' ? prev.tipoEquipamentoManutencao ?? '' : '',
       }));
+      return;
+    }
+
+    if (isAgendamentoFerias && (name === 'abonoPecuniarioSim' || name === 'abonoPecuniarioNao')) {
+      const hasAbono = name === 'abonoPecuniarioSim' ? value === 'true' : value !== 'true';
+      setExtras((prev) => ({
+        ...prev,
+        abonoPecuniarioSim: hasAbono ? 'true' : 'false',
+        abonoPecuniarioNao: hasAbono ? 'false' : 'true',
+      }));
+      return;
+    }
+
+    if (isAgendamentoFerias && (name === 'inicioGozo' || name === 'qtdDiasCorridos')) {
+      setExtras((prev) => {
+        const next = {
+          ...prev,
+          [name]: value,
+        };
+        return {
+          ...next,
+          fimGozo: computeFimGozo(next.inicioGozo ?? '', next.qtdDiasCorridos ?? ''),
+        };
+      });
       return;
     }
 
@@ -756,8 +811,12 @@ export default function NovaSolicitacaoPage() {
 
   const getDisplayLabel = (campo: CampoEspecifico) => {
     if (isNomeFuncionarioField(campo.name)) return 'Nome do funcionário';
+    if (isAgendamentoFerias && (campo.name === 'abonoPecuniarioSim' || campo.name === 'abonoPecuniarioNao')) {
+      return 'Abono';
+    }
     return campo.label;
   };
+
 
   const getAutoFillValueFromMe = (fieldName: string): string | null => {
     if (!me) return null;
@@ -1161,9 +1220,21 @@ export default function NovaSolicitacaoPage() {
             }
 
             return acc;
-          },
-          {},
-        );
+        },
+        {},
+      );
+
+        if (isAgendamentoFerias) {
+          campos.fimGozo = computeFimGozo(campos.inicioGozo ?? '', campos.qtdDiasCorridos ?? '');
+          if (!campos.fimGozo) {
+            setSubmitError('Informe Início do gozo e quantidade de dias corridos válidos para calcular o fim do gozo.');
+            setSubmitting(false);
+            return;
+          }
+
+          delete campos.anexosSolicitacao;
+          delete campos.anexosSolicitante;
+        }
 
         if (isAvaliacaoExperiencia) {
           campos.gestorImediatoAvaliadorId = extras.gestorImediatoAvaliadorId ?? '';
@@ -2714,6 +2785,34 @@ useEffect(() => {
                     }
 
                     if (campo.type === 'checkbox') {
+                      const isFeriasAbonoField =
+                        isAgendamentoFerias &&
+                        (campo.name === 'abonoPecuniarioSim' || campo.name === 'abonoPecuniarioNao');
+
+                      if (isFeriasAbonoField && campo.name === 'abonoPecuniarioNao') {
+                        return null;
+                      }
+
+                      if (isFeriasAbonoField && campo.name === 'abonoPecuniarioSim') {
+                        const hasAbono = value === 'true';
+                        return (
+                          <div key={campo.name}>
+                            <label className="space-y-1 text-sm block">
+                              <span className="block text-xs font-semibold text-gray-700">Abono</span>
+                              <select
+                                className="w-full border rounded px-3 py-2 text-sm bg-white"
+                                value={hasAbono ? 'Sim' : 'Não'}
+                                onChange={(e: SelectChange) =>
+                                  handleExtraChange('abonoPecuniarioSim', e.target.value === 'Sim' ? 'true' : 'false')
+                                }
+                              >
+                                <option value="Sim">Sim</option>
+                                <option value="Não">Não</option>
+                              </select>
+                            </label>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={campo.name} className="md:col-span-2">
                           <label className="flex items-start gap-2 text-xs">
@@ -2777,10 +2876,16 @@ useEffect(() => {
                             />
                           )}
 
-                           {normalizedType === 'select' && campo.options && (
+                            {normalizedType === 'select' && campo.options && (
                              <select {...(commonProps as any)} disabled={campo.disabled}>
                               <option value="">Selecione...</option>
-                              {(campo.name === 'tipoEquipamentoManutencao' ? TI_STOCK_EQUIPMENT_OPTIONS : campo.options).map((opt) => (
+                              {(
+                                campo.name === 'tipoEquipamentoManutencao'
+                                  ? TI_STOCK_EQUIPMENT_OPTIONS
+                                  : isAgendamentoFerias && campo.name === 'pagamentoAbonoQuando'
+                                    ? campo.options.filter((opt) => opt !== 'Na folha do mês')
+                                    : campo.options
+                              ).map((opt) => (
                                 <option key={opt} value={opt}>
                                   {opt}
                                 </option>
@@ -2850,7 +2955,11 @@ useEffect(() => {
                             normalizedType !== 'select' &&
                             normalizedType !== 'cost_center' &&
                             normalizedType !== 'file' && (
-                              <input type={normalizedType} {...commonProps} />
+                              <input
+                                type={normalizedType}
+                                {...commonProps}
+                                readOnly={commonProps.readOnly || (isAgendamentoFerias && campo.name === 'fimGozo')}
+                              />
                             )}
                         </label>
                       </div>
