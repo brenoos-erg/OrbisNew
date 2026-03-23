@@ -1,4 +1,4 @@
-import { ModuleLevel, SolicitationStatus } from '@prisma/client'
+import { ApprovalStatus, ModuleLevel, SolicitationStatus } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserModuleLevel, withModuleLevel } from '@/lib/access'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
@@ -18,6 +18,24 @@ const STATUS_LABEL: Record<SolicitationStatus, string> = {
   CANCELADA: 'Cancelada',
 }
 
+const approvalStatusMap: Record<ApprovalStatus, 'PENDING' | 'APPROVED' | 'REJECTED'> = {
+  PENDENTE: 'PENDING',
+  APROVADO: 'APPROVED',
+  REPROVADO: 'REJECTED',
+  NAO_PRECISA: 'PENDING',
+}
+
+function resolveStatusLabel(status: unknown) {
+  return typeof status === 'string' && status in STATUS_LABEL
+    ? STATUS_LABEL[status as SolicitationStatus]
+    : String(status ?? '')
+}
+
+function resolveApprovalCardStatus(status: unknown): 'PENDING' | 'APPROVED' | 'REJECTED' {
+  return typeof status === 'string' && status in approvalStatusMap
+    ? approvalStatusMap[status as ApprovalStatus]
+    : 'PENDING'
+}
 type UpdateBody =
   | { mode: 'EDIT_FIELDS'; titulo?: string; descricao?: string | null; campos?: Record<string, unknown>; reason?: string }
   | {
@@ -106,8 +124,10 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
       ? [{ id: solicitation.approver.id, fullName: solicitation.approver.fullName }]
       : []
 
-  const approvalStatusMap = { PENDENTE: 'PENDING', APROVADO: 'APPROVED', REPROVADO: 'REJECTED', NAO_PRECISA: 'PENDING' } as const
-  const aprovacoes = approvers.map((aprovador) => ({ aprovador: aprovador.fullName, status: approvalStatusMap[solicitation.approvalStatus] ?? 'PENDING' }))
+  const aprovacoes = approvers.map((aprovador) => ({
+    aprovador: aprovador.fullName,
+    status: resolveApprovalCardStatus(solicitation.approvalStatus),
+  }))
 
   const timelinePoints = solicitation.timelines ?? []
   const currentStepIndex = solicitation.status === 'CONCLUIDA' ? Number.MAX_SAFE_INTEGER : 0
@@ -138,7 +158,7 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
       solicitante: solicitation.solicitante?.fullName ?? '—',
       solicitanteId: solicitation.solicitante?.id ?? '',
       status: solicitation.status,
-      statusLabel: STATUS_LABEL[solicitation.status] ?? solicitation.status,
+      statusLabel: resolveStatusLabel(solicitation.status),
       titulo: solicitation.titulo,
       descricao: solicitation.descricao,
       dataAbertura: solicitation.dataAbertura,

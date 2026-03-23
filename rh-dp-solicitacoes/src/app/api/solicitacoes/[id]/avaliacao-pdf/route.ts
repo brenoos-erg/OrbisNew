@@ -139,9 +139,9 @@ export async function GET(
       'cargoAvaliador',
     ])
 
-    const dynamicRows: Array<[string, string]> = schemaFields
+   const dynamicRows: Array<[string, string]> = schemaFields
       .filter((field) => !includedFieldNames.has(field.name))
-      .map((field) => [field.label, toDisplayValue(campos[field.name])])
+      .map<[string, string]>((field) => [field.label, toDisplayValue(campos[field.name])])
       .filter(([, value]) => Boolean(value))
 
     const rows = [...baseRows, ...dynamicRows]
