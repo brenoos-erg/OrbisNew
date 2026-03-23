@@ -21,6 +21,18 @@ type Option = { id: string; name?: string; description?: string; fullName?: stri
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
+const STATUS_STYLES: Record<string, string> = {
+  PUBLICADO: 'bg-emerald-100 text-emerald-700',
+  AG_APROVACAO: 'bg-amber-100 text-amber-700',
+  EM_ANALISE_QUALIDADE: 'bg-indigo-100 text-indigo-700',
+  EM_REVISAO: 'bg-sky-100 text-sky-700',
+  EM_ELABORACAO: 'bg-slate-200 text-slate-700',
+}
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  'Documentos Publicados': 'Acompanhe versões publicadas, consulte detalhes e exporte a listagem quando necessário.',
+  'Documentos para Aprovação': 'Analise documentos pendentes de aprovação e registre decisões com mais clareza.',
+  'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
+}
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const [items, setItems] = useState<GridRow[]>([])
@@ -32,6 +44,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showFiltersMobile, setShowFiltersMobile] = useState(false)
   const [canApprove, setCanApprove] = useState(false)
+
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
   const [pendingVersionId, setPendingVersionId] = useState<string | null>(null)
@@ -242,23 +255,23 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const FiltersContent = (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
-      <input className="rounded border px-3 py-2" placeholder="Código" value={draftFilters.code} onChange={(e) => setDraftFilters((v) => ({ ...v, code: e.target.value }))} />
-      <input className="rounded border px-3 py-2" placeholder="Título" value={draftFilters.title} onChange={(e) => setDraftFilters((v) => ({ ...v, title: e.target.value }))} />
-      <select className="rounded border px-3 py-2" value={draftFilters.documentTypeId} onChange={(e) => setDraftFilters((v) => ({ ...v, documentTypeId: e.target.value }))}>
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+      <input className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" placeholder="Código" value={draftFilters.code} onChange={(e) => setDraftFilters((v) => ({ ...v, code: e.target.value }))} />
+      <input className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" placeholder="Título" value={draftFilters.title} onChange={(e) => setDraftFilters((v) => ({ ...v, title: e.target.value }))} />
+      <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.documentTypeId} onChange={(e) => setDraftFilters((v) => ({ ...v, documentTypeId: e.target.value }))}>
         <option value="">Tipo Documento</option>
         {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
       </select>
-      <select className="rounded border px-3 py-2" value={draftFilters.ownerDepartmentId} onChange={(e) => setDraftFilters((v) => ({ ...v, ownerDepartmentId: e.target.value }))}>
+      <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.ownerDepartmentId} onChange={(e) => setDraftFilters((v) => ({ ...v, ownerDepartmentId: e.target.value }))}>
         <option value="">Centro Responsável</option>
         {meta.departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>
-      <select className="rounded border px-3 py-2" value={draftFilters.authorUserId} onChange={(e) => setDraftFilters((v) => ({ ...v, authorUserId: e.target.value }))}>
+      <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.authorUserId} onChange={(e) => setDraftFilters((v) => ({ ...v, authorUserId: e.target.value }))}>
         <option value="">Elaborador / Revisor</option>
         {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
       </select>
       {!fixedStatus ? (
-        <select className="rounded border px-3 py-2" value={draftFilters.status} onChange={(e) => setDraftFilters((v) => ({ ...v, status: e.target.value }))}>
+        <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.status} onChange={(e) => setDraftFilters((v) => ({ ...v, status: e.target.value }))}>
           <option value="">Status</option>
           <option value="PUBLICADO">PUBLICADO</option>
           <option value="AG_APROVACAO">AG_APROVACAO</option>
@@ -268,30 +281,39 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         </select>
       ) : <div />}
 
-      <div className="col-span-full flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-2 rounded bg-blue-700 px-3 py-2 text-white" onClick={onSearch}><Search size={16} />Pesquisar</button>
-        <button className="inline-flex items-center gap-2 rounded border px-3 py-2" onClick={clearFilters}><X size={16} />Limpar filtros</button>
+      <div className="col-span-full mt-1 flex flex-wrap gap-2">
+        <button className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-800" onClick={onSearch}><Search size={16} />Pesquisar</button>
+        <button className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100" onClick={clearFilters}><X size={16} />Limpar filtros</button>
       </div>
     </div>
   )
 
   return (
-    <div className="space-y-4 rounded-xl border bg-white p-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-xl font-semibold">{title}</h1>
-        <div className="flex flex-wrap gap-2">
-          {allowCreate ? (
-            <button className="inline-flex items-center gap-2 rounded bg-orange-500 px-3 py-2 text-white" onClick={() => setShowCreate(true)}><Plus size={16} />Novo documento</button>
-          ) : null}
-          <a className="rounded bg-emerald-600 px-3 py-2 text-white" href={`/api/documents/export?${buildQuery('csv')}`}>Exportar CSV</a>
-          <a className="rounded bg-slate-700 px-3 py-2 text-white" href={`/api/documents/export?${buildQuery('pdf')}`}>Exportar PDF</a>
-        </div>
+    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-orange-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Gestão de Documentos</p>
+        <h1 className="mt-1 text-2xl font-semibold text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-slate-600">{PAGE_DESCRIPTIONS[title] ?? 'Consulte documentos, aplique filtros e acompanhe o fluxo da documentação.'}</p>
       </div>
 
-      <div className="hidden md:block">{FiltersContent}</div>
-      <button className="inline-flex items-center gap-2 rounded border px-3 py-2 md:hidden" onClick={() => setShowFiltersMobile(true)}><Filter size={16} />Filtros</button>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {allowCreate ? (
+            <button className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600" onClick={() => setShowCreate(true)}><Plus size={16} />Novo documento</button>
+          ) : null}
+          <a className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700" href={`/api/documents/export?${buildQuery('csv')}`}><Download size={15} />Exportar CSV</a>
+          <a className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800" href={`/api/documents/export?${buildQuery('pdf')}`}><Download size={15} />Exportar PDF</a>
+        </div>
+        {loading ? <span className="text-sm text-slate-500">Atualizando listagem...</span> : null}
+      </div>
+
+      <div className="hidden rounded-xl border border-slate-200 bg-slate-50/80 p-4 md:block">
+        <p className="mb-3 text-sm font-medium text-slate-800">Filtros da listagem</p>
+        {FiltersContent}
+      </div>
+      <button className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm md:hidden" onClick={() => setShowFiltersMobile(true)}><Filter size={16} />Filtros</button>
       {createSuccess ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
           <p>{createSuccess.message}</p>
           {endpoint.includes(createSuccess.targetTab) ? (
             <p className="mt-1 text-emerald-800">O item já está disponível nesta aba. Se não localizar, limpe os filtros.</p>
@@ -303,44 +325,49 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         </div>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left">
-              <th className="cursor-pointer" onClick={() => changeSort('publishedAt')}>Data Publicação</th>
-              <th className="cursor-pointer" onClick={() => changeSort('code')}>Código</th>
-              <th className="cursor-pointer" onClick={() => changeSort('revisionNumber')}>Nº Revisão</th>
-              <th>Título</th>
-              <th>Centro Responsável</th>
-              <th>Elaborador</th>
-              <th className="cursor-pointer" onClick={() => changeSort('expiresAt')}>Vencimento</th>
-              <th>Status</th>
-              <th>Ações</th>
+            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+              <th className="cursor-pointer px-3 py-3 font-semibold" onClick={() => changeSort('publishedAt')}>Data Publicação</th>
+              <th className="cursor-pointer px-3 py-3 font-semibold" onClick={() => changeSort('code')}>Código</th>
+              <th className="cursor-pointer px-3 py-3 font-semibold" onClick={() => changeSort('revisionNumber')}>Nº Revisão</th>
+              <th className="px-3 py-3 font-semibold">Título</th>
+              <th className="px-3 py-3 font-semibold">Centro Responsável</th>
+              <th className="px-3 py-3 font-semibold">Elaborador</th>
+              <th className="cursor-pointer px-3 py-3 font-semibold" onClick={() => changeSort('expiresAt')}>Vencimento</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              [...Array(4)].map((_, idx) => <tr key={idx} className="border-t"><td colSpan={9} className="animate-pulse px-2 py-3 text-slate-400">Carregando...</td></tr>)
+              [...Array(4)].map((_, idx) => <tr key={idx} className="border-t border-slate-100"><td colSpan={9} className="animate-pulse px-3 py-4 text-slate-400">Carregando...</td></tr>)
             ) : items.length === 0 ? (
-              <tr className="border-t"><td colSpan={9} className="px-2 py-3 text-slate-500">{hasActiveFilters ? 'Nenhum resultado encontrado com os filtros aplicados. Clique em "Limpar filtros".' : 'Nenhum resultado encontrado.'}</td></tr>
+              <tr className="border-t border-slate-100">
+                <td colSpan={9} className="px-3 py-10 text-center">
+                  <p className="font-medium text-slate-700">Nenhum resultado encontrado</p>
+                  <p className="mt-1 text-sm text-slate-500">{hasActiveFilters ? 'Revise os filtros aplicados ou clique em “Limpar filtros” para ampliar a busca.' : 'Quando houver documentos disponíveis, eles aparecerão nesta listagem.'}</p>
+                </td>
+              </tr>
             ) : (
               items.map((row) => (
-                <tr key={row.versionId} className="border-t">
-                  <td>{row.dataPublicacao ? new Date(row.dataPublicacao).toLocaleDateString('pt-BR') : '-'}</td>
-                  <td>{row.codigo}</td>
-                  <td>{row.nrRevisao}</td>
-                  <td>{row.titulo}</td>
-                  <td>{row.centroResponsavel}</td>
-                  <td>{row.elaborador}</td>
-                  <td>{row.vencimento ? new Date(row.vencimento).toLocaleDateString('pt-BR') : '-'}</td>
-                  <td>{row.status}</td>
-                  <td className="space-x-2">
-                    <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Visualizar</button>
-                    <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Download</button>
+                <tr key={row.versionId} className="border-t border-slate-100 text-slate-700 transition hover:bg-slate-50/70">
+                  <td className="px-3 py-3">{row.dataPublicacao ? new Date(row.dataPublicacao).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td className="px-3 py-3 font-medium">{row.codigo}</td>
+                  <td className="px-3 py-3">{row.nrRevisao}</td>
+                  <td className="px-3 py-3">{row.titulo}</td>
+                  <td className="px-3 py-3">{row.centroResponsavel}</td>
+                  <td className="px-3 py-3">{row.elaborador}</td>
+                  <td className="px-3 py-3">{row.vencimento ? new Date(row.vencimento).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[row.status] ?? 'bg-slate-200 text-slate-700'}`}>{row.status}</span></td>
+                  <td className="space-x-2 px-3 py-3">
+                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Visualizar</button>
+                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Download</button>
                     {approvalStage ? (
                       <>
-                        <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
-                        <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
                       </>
                     ) : null}
                   </td>
@@ -352,20 +379,21 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       </div>
 
       <div className="space-y-3 md:hidden">
-        {loading ? <div className="rounded border p-3 text-slate-400">Carregando...</div> : null}
+        {loading ? <div className="rounded-xl border border-slate-200 bg-white p-3 text-slate-400">Carregando...</div> : null}
         {!loading && items.length === 0 ? (
-          <div className="rounded border p-3 text-slate-500">
-            {hasActiveFilters ? 'Nenhum resultado encontrado com os filtros aplicados. Limpe os filtros para listar todos os itens.' : 'Nenhum resultado encontrado.'}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
+            <p className="font-medium text-slate-700">Nenhum resultado encontrado</p>
+            <p className="mt-1 text-sm text-slate-500">{hasActiveFilters ? 'Limpe os filtros para listar todos os itens disponíveis.' : 'Quando houver documentos cadastrados, eles aparecerão aqui.'}</p>
           </div>
         ) : null}        {items.map((row) => (
-          <article key={row.versionId} className="space-y-2 rounded border p-3">
-            <div className="flex items-center justify-between"><strong>{row.codigo}</strong><span className="rounded bg-slate-100 px-2 py-0.5 text-xs">Rev {row.nrRevisao} · {row.status}</span></div>
+          <article key={row.versionId} className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center justify-between"><strong>{row.codigo}</strong><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[row.status] ?? 'bg-slate-100 text-slate-700'}`}>Rev {row.nrRevisao} · {row.status}</span></div>
             <p className="text-sm font-medium">{row.titulo}</p>
             <p className="text-xs text-slate-600">{row.centroResponsavel} · {row.elaborador}</p>
             <p className="text-xs text-slate-600">Pub: {row.dataPublicacao ? new Date(row.dataPublicacao).toLocaleDateString('pt-BR') : '-'} · Venc: {row.vencimento ? new Date(row.vencimento).toLocaleDateString('pt-BR') : '-'}</p>
             <div className="flex gap-2">
-              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded border px-3 py-2" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Ver</button>
-              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded bg-slate-800 px-3 py-2 text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar</button>
+              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Ver</button>
+              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar</button>
             </div>
           </article>
         ))}
@@ -373,22 +401,22 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm">Mostrar</span>
-          <select className="rounded border px-2 py-1" value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)) }}>
+          <span className="text-sm text-slate-600">Mostrar</span>
+          <select className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm" value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)) }}>
             {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded border px-3 py-1" disabled={page <= 1} onClick={() => setPage((v) => Math.max(1, v - 1))}>Anterior</button>
-          <span className="text-sm">Página {page} de {totalPages}</span>
-          <button className="rounded border px-3 py-1" disabled={page >= totalPages} onClick={() => setPage((v) => Math.min(totalPages, v + 1))}>Próximo</button>
+          <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((v) => Math.max(1, v - 1))}>Anterior</button>
+          <span className="text-sm text-slate-600">Página <span className="font-semibold text-slate-900">{page}</span> de <span className="font-semibold text-slate-900">{totalPages}</span></span>
+          <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-40" disabled={page >= totalPages} onClick={() => setPage((v) => Math.min(totalPages, v + 1))}>Próximo</button>
         </div>
       </div>
 
       {showFiltersMobile ? (
         <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setShowFiltersMobile(false)}>
           <div className="ml-auto h-full w-[90%] max-w-sm overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Filtros</h2><button className="rounded border px-2 py-1" onClick={() => setShowFiltersMobile(false)}>Fechar</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Filtros</h2><button className="rounded-lg border border-slate-300 px-2 py-1 text-sm" onClick={() => setShowFiltersMobile(false)}>Fechar</button></div>
             {FiltersContent}
           </div>
         </div>
