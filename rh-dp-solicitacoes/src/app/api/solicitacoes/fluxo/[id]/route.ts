@@ -1,117 +1,270 @@
-import { ModuleLevel } from '@prisma/client'
+import { ModuleLevel, SolicitationStatus } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-import { withModuleLevel } from '@/lib/access'
+import { getUserModuleLevel, withModuleLevel } from '@/lib/access'
+import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
 
 const TIMELINE_DONE = new Set(['CONCLUIDA', 'ENCERRADA', 'APROVADA'])
 
-export const GET = withModuleLevel(
-  'configuracoes',
-  ModuleLevel.NIVEL_1,
-  async (_req: NextRequest, ctx) => {
-    const { id } = await ctx.params
-    const term = decodeURIComponent(id).trim()
+const STATUS_LABEL: Record<SolicitationStatus, string> = {
+  ABERTA: 'Aberta',
+  EM_ATENDIMENTO: 'Em atendimento',
+  AGUARDANDO_APROVACAO: 'Aguardando aprovação',
+  AGUARDANDO_TERMO: 'Aguardando termo',
+  AGUARDANDO_AVALIACAO_GESTOR: 'Aguardando avaliação do gestor',
+  AGUARDANDO_FINALIZACAO_AVALIACAO: 'Aguardando finalização de avaliação',
+  CONCLUIDA: 'Concluída',
+  CANCELADA: 'Cancelada',
+}
 
-    const solicitation = await prisma.solicitation.findFirst({
-      where: {
-        OR: [
-          { id: term },
-          { protocolo: term },
-          { solicitante: { fullName: { contains: term } } },
-        ],
-      },
-      include: {
-        tipo: { select: { nome: true } },
-        solicitante: { select: { fullName: true } },
-        department: { select: { id: true, name: true } },
-        assumidaPor: { select: { fullName: true } },
-        approver: { select: { id: true, fullName: true } },
-        timelines: { orderBy: { createdAt: 'asc' } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    if (!solicitation) {
-      return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+type UpdateBody =
+  | { mode: 'EDIT_FIELDS'; titulo?: string; descricao?: string | null; campos?: Record<string, unknown>; reason?: string }
+  | {
+      mode: 'UPDATE_STATUS'
+      status: SolicitationStatus
+      departmentId?: string | null
+      responsavelId?: string | null
+      reason?: string
     }
 
-    const workflows = await readWorkflowRows()
-    const workflow = workflows.find((row) => row.tipoId === solicitation.tipoId)
-    const orderedSteps = workflow?.steps?.filter((step) => step.kind !== 'FIM') ?? []
+function summarizePayloadBlocks(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return []
+  const root = payload as Record<string, unknown>
+  const sections: Array<{ secao: string; campos: Array<{ chave: string; valor: unknown }> }> = []
 
-    const inApproval = solicitation.approvalStatus === 'PENDENTE'
-    const currentType = inApproval ? 'APPROVERS' : 'DEPARTMENT'
-    const currentLabel = inApproval
-      ? 'Aprovação'
-      : orderedSteps.find((step) => step.kind === 'DEPARTAMENTO')?.label ?? solicitation.department?.name ?? 'Etapa atual'
+  const addSection = (secao: string, value: unknown) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    const entries = Object.entries(value as Record<string, unknown>).map(([chave, valor]) => ({ chave, valor }))
+    if (entries.length > 0) sections.push({ secao, campos: entries })
+  }
 
-    const approverIds = Array.from(
-      new Set(orderedSteps.filter((step) => step.kind === 'APROVACAO').flatMap((step) => step.approverUserIds ?? [])),
+  addSection('Solicitante', root.solicitante)
+  addSection('Campos do Formulário', root.campos)
+
+  for (const [key, value] of Object.entries(root)) {
+    if (key === 'solicitante' || key === 'campos') continue
+    addSection(key, value)
+  }
+
+  return sections
+}
+
+export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (_req: NextRequest, ctx) => {
+  const { id } = await ctx.params
+  const term = decodeURIComponent(id).trim()
+  const moduleLevel = await getUserModuleLevel(ctx.me.id, 'configuracoes')
+  const canEdit = moduleLevel ? isModuleLevelAtLeast(moduleLevel, ModuleLevel.NIVEL_2) : false
+  const canChangeStatus = moduleLevel ? isModuleLevelAtLeast(moduleLevel, ModuleLevel.NIVEL_3) : false
+
+  const solicitation: any = await (prisma as any).solicitation.findFirst({
+    where: {
+      OR: [
+        { id: term },
+        { protocolo: term },
+        { solicitante: { fullName: { contains: term } } },
+        { payload: { path: '$.campos.matricula', string_contains: term } },
+        { payload: { path: '$.solicitante.matricula', string_contains: term } },
+        { tipo: { nome: { contains: term } } },
+      ],
+    },
+    include: {
+      tipo: { select: { id: true, nome: true, schemaJson: true } },
+      solicitante: { select: { id: true, fullName: true, email: true, login: true } },
+      department: { select: { id: true, name: true } },
+      assumidaPor: { select: { id: true, fullName: true } },
+      approver: { select: { id: true, fullName: true } },
+      timelines: { orderBy: { createdAt: 'asc' } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+
+  const [departments, approverCandidates] = await Promise.all([
+    prisma.department.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    prisma.user.findMany({ where: { status: 'ATIVO' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' }, take: 200 }),
+  ])
+
+  const workflows = await readWorkflowRows()
+  const workflow = workflows.find((row) => row.tipoId === solicitation.tipoId)
+  const orderedSteps = workflow?.steps?.filter((step) => step.kind !== 'FIM') ?? []
+
+  const inApproval = solicitation.approvalStatus === 'PENDENTE'
+  const currentType = inApproval ? 'APPROVERS' : 'DEPARTMENT'
+  const currentLabel = inApproval
+    ? 'Aprovação'
+    : orderedSteps.find((step) => step.kind === 'DEPARTAMENTO')?.label ?? solicitation.department?.name ?? 'Etapa atual'
+
+  const approverIds = Array.from(
+    new Set(orderedSteps.filter((step) => step.kind === 'APROVACAO').flatMap((step) => step.approverUserIds ?? [])),
+  )
+
+  const approvers = approverIds.length
+    ? await prisma.user.findMany({ where: { id: { in: approverIds } }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' } })
+    : solicitation.approver
+      ? [{ id: solicitation.approver.id, fullName: solicitation.approver.fullName }]
+      : []
+
+  const approvalStatusMap = { PENDENTE: 'PENDING', APROVADO: 'APPROVED', REPROVADO: 'REJECTED', NAO_PRECISA: 'PENDING' } as const
+  const aprovacoes = approvers.map((aprovador) => ({ aprovador: aprovador.fullName, status: approvalStatusMap[solicitation.approvalStatus] ?? 'PENDING' }))
+
+  const timelinePoints = solicitation.timelines ?? []
+  const currentStepIndex = solicitation.status === 'CONCLUIDA' ? Number.MAX_SAFE_INTEGER : 0
+
+  const historico = (orderedSteps.length
+    ? orderedSteps
+    : [{ order: 1, label: currentLabel, kind: inApproval ? 'APROVACAO' : ('DEPARTAMENTO' as const) }]
+  ).map((step, index) => {
+    const isDone = index < currentStepIndex
+    const isCurrent = !isDone && index === currentStepIndex
+    return {
+      etapa: step.label,
+      tipo: step.kind === 'APROVACAO' ? 'APPROVERS' : 'DEPARTMENT',
+      status: isDone ? 'FINALIZADO' : isCurrent ? 'EM ANDAMENTO' : 'PENDENTE',
+      dataInicio: timelinePoints[index]?.createdAt ?? null,
+      dataFim: isDone ? timelinePoints[index + 1]?.createdAt ?? solicitation.dataFechamento : null,
+    }
+  })
+
+   const currentTimelineStatus = timelinePoints.at(-1)?.status ?? solicitation.status
+
+  return NextResponse.json({
+    solicitacao: {
+      id: solicitation.id,
+      protocolo: solicitation.protocolo,
+      tipo: solicitation.tipo?.nome ?? '—',
+      tipoId: solicitation.tipo?.id ?? '',
+      solicitante: solicitation.solicitante?.fullName ?? '—',
+      solicitanteId: solicitation.solicitante?.id ?? '',
+      status: solicitation.status,
+      statusLabel: STATUS_LABEL[solicitation.status] ?? solicitation.status,
+      titulo: solicitation.titulo,
+      descricao: solicitation.descricao,
+      dataAbertura: solicitation.dataAbertura,
+      dataPrevista: solicitation.dataPrevista,
+      dataFechamento: solicitation.dataFechamento,
+    },
+    etapaAtual: {
+      id: solicitation.id,
+      nome: currentLabel,
+      tipo: currentType,
+      departamento: solicitation.department?.name ?? null,
+      responsavelAtual: solicitation.assumidaPor?.fullName ?? solicitation.approver?.fullName ?? null,
+      status: TIMELINE_DONE.has(currentTimelineStatus) ? 'FINALIZADO' : 'EM ANDAMENTO',
+    },
+    dadosChamado: { payload: solicitation.payload, secoes: summarizePayloadBlocks(solicitation.payload) },
+    aprovacoes,
+    historico,
+    movimentacoes: timelinePoints.map((item: any) => ({ id: item.id, status: item.status, mensagem: item.message, data: item.createdAt })),
+    permissions: { canEdit, canChangeStatus },
+    statusOptions: Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
+    statusAtual: solicitation.status,
+    departamentos: departments,
+    responsaveis: approverCandidates,
+    valoresEdicao: {
+      titulo: solicitation.titulo,
+      descricao: solicitation.descricao,
+      campos: ((solicitation.payload as Record<string, unknown>)?.campos ?? {}) as Record<string, unknown>,
+    },
+    metadata: {
+      solicitanteEmail: solicitation.solicitante?.email ?? null,
+      solicitanteLogin: solicitation.solicitante?.login ?? null,
+      departamentoAtualId: solicitation.departmentId,
+      responsavelAtualId: solicitation.assumidaPorId,
+    },
+  })
+})
+
+export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (req: NextRequest, ctx) => {
+  const moduleLevel = await getUserModuleLevel(ctx.me.id, 'configuracoes')
+  const canEdit = moduleLevel ? isModuleLevelAtLeast(moduleLevel, ModuleLevel.NIVEL_2) : false
+  const canChangeStatus = moduleLevel ? isModuleLevelAtLeast(moduleLevel, ModuleLevel.NIVEL_3) : false
+
+  const { id } = await ctx.params
+  const body = (await req.json().catch(() => null)) as UpdateBody | null
+  if (!body || typeof body !== 'object' || !('mode' in body)) {
+    return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 })
+  }
+
+  const solicitation = await prisma.solicitation.findUnique({ where: { id } })
+  if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+
+  if (body.mode === 'EDIT_FIELDS') {
+    if (!canEdit) return NextResponse.json({ error: 'Sem permissão para editar os dados do chamado.' }, { status: 403 })
+
+    const currentPayload = (solicitation.payload as Record<string, unknown>) ?? {}
+    const currentCampos = ((currentPayload.campos ?? {}) as Record<string, unknown>) ?? {}
+    const incomingCampos = body.campos ?? {}
+
+    const sanitizedCampos = Object.fromEntries(
+      Object.entries(incomingCampos).filter(([key]) => Object.prototype.hasOwnProperty.call(currentCampos, key)),
     )
 
-    const approvers = approverIds.length
-      ? await prisma.user.findMany({
-          where: { id: { in: approverIds } },
-          select: { id: true, fullName: true },
-          orderBy: { fullName: 'asc' },
-        })
-      : solicitation.approver
-        ? [{ id: solicitation.approver.id, fullName: solicitation.approver.fullName }]
-        : []
+    const updatedPayload = {
+      ...currentPayload,
+      campos: { ...currentCampos, ...sanitizedCampos },
+    }
 
-    const approvalStatusMap = {
-      PENDENTE: 'PENDING',
-      APROVADO: 'APPROVED',
-      REPROVADO: 'REJECTED',
-      NAO_PRECISA: 'PENDING',
-    } as const
-
-    const aprovacoes = approvers.map((aprovador) => ({
-      aprovador: aprovador.fullName,
-      status: approvalStatusMap[solicitation.approvalStatus] ?? 'PENDING',
-    }))
-
-    const timelinePoints = solicitation.timelines
-    const currentStepIndex = solicitation.status === 'CONCLUIDA' ? Number.MAX_SAFE_INTEGER : 0
-
-    const historico = (
-      orderedSteps.length
-        ? orderedSteps
-        : [{ order: 1, label: currentLabel, kind: inApproval ? 'APROVACAO' : 'DEPARTAMENTO' as const }]
-    ).map((step, index) => {
-      const isDone = index < currentStepIndex
-      const isCurrent = !isDone && index === currentStepIndex
-
-      return {
-        etapa: step.label,
-        tipo: step.kind === 'APROVACAO' ? 'APPROVERS' : 'DEPARTMENT',
-        status: isDone ? 'FINALIZADO' : isCurrent ? 'EM ANDAMENTO' : 'PENDENTE',
-        dataInicio: timelinePoints[index]?.createdAt ?? null,
-        dataFim: isDone ? timelinePoints[index + 1]?.createdAt ?? solicitation.dataFechamento : null,
-      }
+    const updated = await prisma.solicitation.update({
+      where: { id },
+      data: {
+        titulo: typeof body.titulo === 'string' ? body.titulo : solicitation.titulo,
+        descricao: typeof body.descricao === 'string' || body.descricao === null ? body.descricao : solicitation.descricao,
+        payload: updatedPayload as any,
+      },
     })
 
-    const currentTimelineStatus = solicitation.timelines.at(-1)?.status ?? solicitation.status
-
-    return NextResponse.json({
-      solicitacao: {
-        id: solicitation.id,
-        protocolo: solicitation.protocolo,
-        tipo: solicitation.tipo.nome,
-        solicitante: solicitation.solicitante.fullName,
-        status: solicitation.status,
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId: id,
+        status: 'EM_ATENDIMENTO',
+        message: `Dados do chamado atualizados por ${ctx.me.fullName ?? ctx.me.id}${body.reason ? `: ${body.reason}` : '.'}`,
       },
-      etapaAtual: {
-        id: solicitation.id,
-        nome: currentLabel,
-        tipo: currentType,
-        departamento: solicitation.department?.name ?? null,
-        responsavelAtual: solicitation.assumidaPor?.fullName ?? solicitation.approver?.fullName ?? null,
-        status: TIMELINE_DONE.has(currentTimelineStatus) ? 'FINALIZADO' : 'EM ANDAMENTO',
-      },
-      aprovacoes,
-      historico,
     })
-  },
-)
+
+    return NextResponse.json({ ok: true, updatedId: updated.id })
+  }
+
+  if (body.mode === 'UPDATE_STATUS') {
+    if (!canChangeStatus) return NextResponse.json({ error: 'Sem permissão para alterar status/tramitação.' }, { status: 403 })
+
+    const nextStatus = body.status
+    if (!nextStatus || !(nextStatus in STATUS_LABEL)) return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
+
+    const updated = await prisma.solicitation.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+        departmentId: typeof body.departmentId === 'string' && body.departmentId ? body.departmentId : solicitation.departmentId,
+        assumidaPorId:
+          body.responsavelId === null
+            ? null
+            : typeof body.responsavelId === 'string' && body.responsavelId
+              ? body.responsavelId
+              : solicitation.assumidaPorId,
+        dataFechamento: nextStatus === 'CONCLUIDA' ? new Date() : solicitation.dataFechamento,
+        dataCancelamento: nextStatus === 'CANCELADA' ? new Date() : solicitation.dataCancelamento,
+      },
+    })
+
+    await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId: id,
+        status: nextStatus,
+        message: [
+          `Status alterado manualmente por ${ctx.me.fullName ?? ctx.me.id}.`,
+          `Anterior: ${solicitation.status}.`,
+          `Novo: ${nextStatus}.`,
+          body.reason ? `Motivo: ${body.reason}.` : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      },
+    })
+
+    return NextResponse.json({ ok: true, updatedId: updated.id, from: solicitation.status, to: nextStatus })
+  }
+
+  return NextResponse.json({ error: 'Modo de atualização inválido.' }, { status: 400 })
+})

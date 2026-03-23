@@ -1,6 +1,10 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
+
+type StatusOption = { value: string; label: string }
+type SelectOption = { id: string; name: string }
+type ResponsibleOption = { id: string; fullName: string }
 
 type FluxoResponse = {
   solicitacao: {
@@ -9,6 +13,12 @@ type FluxoResponse = {
     tipo: string
     solicitante: string
     status: string
+    statusLabel: string
+    titulo: string
+    descricao: string | null
+    dataAbertura: string | null
+    dataPrevista: string | null
+    dataFechamento: string | null
   }
   etapaAtual: {
     id: string
@@ -18,6 +28,10 @@ type FluxoResponse = {
     responsavelAtual: string | null
     status: string
   }
+  dadosChamado: {
+    payload: Record<string, unknown>
+    secoes: Array<{ secao: string; campos: Array<{ chave: string; valor: unknown }> }>
+  }
   aprovacoes: Array<{ aprovador: string; status: 'PENDING' | 'APPROVED' | 'REJECTED' }>
   historico: Array<{
     etapa: string
@@ -26,15 +40,39 @@ type FluxoResponse = {
     dataInicio: string | null
     dataFim: string | null
   }>
+  movimentacoes: Array<{ id: string; status: string; mensagem: string | null; data: string | null }>
+  permissions: {
+    canEdit: boolean
+    canChangeStatus: boolean
+  }
+  statusOptions: StatusOption[]
+  statusAtual: string
+  departamentos: SelectOption[]
+  responsaveis: ResponsibleOption[]
+  valoresEdicao: {
+    titulo: string
+    descricao: string | null
+    campos: Record<string, unknown>
+  }
+  metadata: {
+    solicitanteEmail: string | null
+    solicitanteLogin: string | null
+    departamentoAtualId: string | null
+    responsavelAtualId: string | null
+  }
 }
+
+type TabId = 'fluxo' | 'dados' | 'editar' | 'status'
 
 const card = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function statusClass(status: string) {
-  if (status.includes('FINALIZADO') || status.includes('APPROVED')) return 'bg-green-100 text-green-700'
-  if (status.includes('ANDAMENTO') || status.includes('APPROV') || status.includes('EM ')) return 'bg-blue-100 text-blue-700'
-  if (status.includes('PENDENTE') || status.includes('PENDING')) return 'bg-amber-100 text-amber-700'
-  if (status.includes('REJECTED') || status.includes('REPROV')) return 'bg-red-100 text-red-700'
+  if (status.includes('FINALIZADO') || status.includes('APPROVED') || status.includes('CONCLUID')) return 'bg-green-100 text-green-700'
+  if (status.includes('ANDAMENTO') || status.includes('APROV') || status.includes('EM ') || status.includes('ATENDIMENTO')) {
+    return 'bg-blue-100 text-blue-700'
+  }
+  if (status.includes('PENDENTE') || status.includes('PENDING') || status.includes('AGUARDANDO')) return 'bg-amber-100 text-amber-700'
+  if (status.includes('REJECTED') || status.includes('REPROV') || status.includes('CANCEL')) return 'bg-red-100 text-red-700'
   return 'bg-slate-100 text-slate-700'
 }
 
@@ -44,11 +82,49 @@ function fmtDate(value: string | null) {
   return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleString('pt-BR')
 }
 
+function renderValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [result, setResult] = useState<FluxoResponse | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>('fluxo')
+
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editFields, setEditFields] = useState<Record<string, string>>({})
+  const [editReason, setEditReason] = useState('')
+
+  const [statusValue, setStatusValue] = useState('')
+  const [departmentId, setDepartmentId] = useState('')
+  const [responsavelId, setResponsavelId] = useState('')
+  const [statusReason, setStatusReason] = useState('')
+
+  const nextStep = useMemo(() => result?.historico.find((item) => item.status === 'PENDENTE') ?? null, [result])
+
+  function resetEditor(data: FluxoResponse) {
+    setEditTitle(data.valoresEdicao.titulo)
+    setEditDescription(data.valoresEdicao.descricao ?? '')
+    setEditFields(
+      Object.fromEntries(
+        Object.entries(data.valoresEdicao.campos ?? {}).map(([key, value]) => [key, value == null ? '' : String(value)]),
+      ),
+    )
+    setEditReason('')
+
+    setStatusValue(data.statusAtual)
+    setDepartmentId(data.metadata.departamentoAtualId ?? '')
+    setResponsavelId(data.metadata.responsavelAtualId ?? '')
+    setStatusReason('')
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -56,6 +132,7 @@ export default function FluxoSolicitacaoClient() {
 
     setLoading(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const response = await fetch(`/api/solicitacoes/fluxo/${encodeURIComponent(query.trim())}`, {
@@ -73,6 +150,8 @@ export default function FluxoSolicitacaoClient() {
 
       const data = (await response.json()) as FluxoResponse
       setResult(data)
+      setActiveTab('fluxo')
+      resetEditor(data)
     } catch (err: any) {
       setResult(null)
       setError(err?.message ?? 'Erro inesperado.')
@@ -81,12 +160,85 @@ export default function FluxoSolicitacaoClient() {
     }
   }
 
+  async function refreshCurrent() {
+    if (!result?.solicitacao.id) return
+    const response = await fetch(`/api/solicitacoes/fluxo/${encodeURIComponent(result.solicitacao.id)}`, { cache: 'no-store' })
+    if (!response.ok) return
+    const data = (await response.json()) as FluxoResponse
+    setResult(data)
+    resetEditor(data)
+  }
+
+  async function saveEditFields() {
+    if (!result) return
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/solicitacoes/fluxo/${result.solicitacao.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'EDIT_FIELDS',
+          titulo: editTitle,
+          descricao: editDescription || null,
+          campos: editFields,
+          reason: editReason || undefined,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error ?? 'Não foi possível salvar as alterações.')
+      setSuccess('Dados do chamado atualizados com sucesso.')
+      await refreshCurrent()
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao atualizar campos.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveStatus() {
+    if (!result) return
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch(`/api/solicitacoes/fluxo/${result.solicitacao.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'UPDATE_STATUS',
+          status: statusValue,
+          departmentId: departmentId || null,
+          responsavelId: responsavelId || null,
+          reason: statusReason || undefined,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error ?? 'Não foi possível alterar status/tramitação.')
+      setSuccess(`Status alterado com sucesso (${data?.from ?? 'anterior'} → ${data?.to ?? 'novo'}).`)
+      await refreshCurrent()
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro ao alterar status.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tabs: Array<{ id: TabId; label: string; disabled?: boolean }> = [
+    { id: 'fluxo', label: 'Fluxo do Chamado' },
+    { id: 'dados', label: 'Dados do Chamado' },
+    { id: 'editar', label: 'Editar Chamado', disabled: result ? !result.permissions.canEdit : true },
+    { id: 'status', label: 'Status / Tramitação', disabled: result ? !result.permissions.canChangeStatus : true },
+  ]
   return (
-    <div className="max-w-5xl space-y-4">
+    <div className="max-w-6xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Visualizador de Fluxo da Solicitação</h1>
+        <h1 className="text-xl font-semibold text-slate-800">Central do Chamado - Fluxo da Solicitação</h1>
         <p className="text-sm text-slate-500">
-          Busque por protocolo, id ou nome do solicitante para visualizar o andamento completo do fluxo.
+          Busque por protocolo, id, nome do solicitante, matrícula ou tipo da solicitação para acompanhar, consultar e manter o chamado.
         </p>
       </div>
 
@@ -94,7 +246,7 @@ export default function FluxoSolicitacaoClient() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Protocolo, ID ou solicitante"
+          placeholder="Protocolo, ID, solicitante, matrícula ou tipo"
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
         />
         <button
@@ -107,70 +259,222 @@ export default function FluxoSolicitacaoClient() {
       </form>
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {success && <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>}
 
       {result && (
         <div className="space-y-4">
-          <section className={card}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Dados da Solicitação</h2>
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <section className="rounded-xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4 shadow-sm">
+            <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <p><b>Protocolo:</b> {result.solicitacao.protocolo}</p>
               <p><b>Tipo:</b> {result.solicitacao.tipo}</p>
               <p><b>Solicitante:</b> {result.solicitacao.solicitante}</p>
-              <p><b>Status Geral:</b> {result.solicitacao.status}</p>
-            </div>
-          </section>
-
-          <section className={card}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Etapa Atual</h2>
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <p><b>Nome da etapa:</b> {result.etapaAtual.nome}</p>
-              <p><b>Tipo:</b> {result.etapaAtual.tipo}</p>
-              <p><b>Departamento atual:</b> {result.etapaAtual.departamento ?? '—'}</p>
-              <p><b>Responsável atual:</b> {result.etapaAtual.responsavelAtual ?? '—'}</p>
               <p>
-                <b>Status:</b>{' '}
-                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(result.etapaAtual.status)}`}>
-                  {result.etapaAtual.status}
+                <b>Status atual:</b>{' '}
+                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(result.solicitacao.status)}`}>
+                  {result.solicitacao.statusLabel}
                 </span>
               </p>
             </div>
           </section>
 
-          {result.etapaAtual.tipo === 'APPROVERS' && (
+          <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  disabled={tab.disabled}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    activeTab === tab.id
+                      ? 'bg-orange-500 text-white shadow'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {activeTab === 'fluxo' && (
+            <div className="space-y-4">
+              <section className={card}>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Fluxo / Andamento Completo</h2>
+                <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <p><b>Setor responsável atual:</b> {result.etapaAtual.departamento ?? '—'}</p>
+                  <p><b>Etapa atual:</b> {result.etapaAtual.nome}</p>
+                  <p><b>Responsável atual:</b> {result.etapaAtual.responsavelAtual ?? '—'}</p>
+                  <p><b>Data de abertura:</b> {fmtDate(result.solicitacao.dataAbertura)}</p>
+                  <p><b>Data prevista:</b> {fmtDate(result.solicitacao.dataPrevista)}</p>
+                  <p><b>Data de fechamento:</b> {fmtDate(result.solicitacao.dataFechamento)}</p>
+                </div>
+                {nextStep && <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">Próximo passo previsto: <b>{nextStep.etapa}</b></p>}
+              </section>
+
+              <section className={card}>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Linha do Tempo das Etapas</h2>
+                <div className="space-y-2">
+                  {result.historico.map((item, index) => (
+                    <div key={`${item.etapa}-${index}`} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-slate-800">{item.etapa}</p>
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+                      </div>
+                      <p className="text-slate-600">Tipo: {item.tipo}</p>
+                      <p className="text-slate-600">Início: {fmtDate(item.dataInicio)}</p>
+                      <p className="text-slate-600">Fim: {fmtDate(item.dataFim)}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className={card}>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Histórico de Movimentações / Tratativas</h2>
+                <div className="space-y-2">
+                  {result.movimentacoes.map((item) => (
+                    <div key={item.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+                        <span className="text-xs text-slate-500">{fmtDate(item.data)}</span>
+                      </div>
+                      <p className="mt-1 text-slate-700">{item.mensagem ?? 'Sem mensagem.'}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'dados' && (
             <section className={card}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Aprovação</h2>
-              <div className="space-y-2 text-sm">
-                {result.aprovacoes.length === 0 && <p className="text-slate-500">Sem aprovadores definidos.</p>}
-                {result.aprovacoes.map((item) => (
-                  <div key={item.aprovador} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
-                    <span>{item.aprovador}</span>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </div>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Dados preenchidos do chamado</h2>
+              <div className="space-y-4">
+                {result.dadosChamado.secoes.map((secao) => (
+                  <article key={secao.secao} className="rounded-md border border-slate-200 p-3">
+                    <h3 className="mb-2 text-sm font-semibold text-slate-700">{secao.secao}</h3>
+                    <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                      {secao.campos.map((campo) => (
+                        <p key={`${secao.secao}-${campo.chave}`}>
+                          <b>{campo.chave}:</b> {renderValue(campo.valor)}
+                        </p>
+                      ))}
+                    </div>
+                  </article>
                 ))}
               </div>
             </section>
           )}
 
-          <section className={card}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Histórico do Fluxo</h2>
-            <div className="space-y-2">
-              {result.historico.map((item, index) => (
-                <div key={`${item.etapa}-${index}`} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-slate-800">{item.etapa}</p>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>
-                      {item.status}
-                    </span>
+          {activeTab === 'editar' && (
+            <section className={card}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Editar chamado</h2>
+              {!result.permissions.canEdit ? (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">Seu perfil não possui permissão para editar os dados do chamado.</p>
+              ) : (
+                <div className="space-y-3">
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium text-slate-700">Título</span>
+                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </label>
+
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium text-slate-700">Descrição</span>
+                    <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </label>
+
+                  <div className="rounded-md border border-slate-200 p-3">
+                    <h3 className="mb-2 text-sm font-semibold text-slate-700">Campos do formulário</h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {Object.entries(editFields).map(([key, value]) => (
+                        <label key={key} className="block text-sm">
+                          <span className="mb-1 block text-slate-600">{key}</span>
+                          <input
+                            value={value}
+                            onChange={(e) => setEditFields((prev) => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full rounded-md border border-slate-300 px-3 py-2"
+                          />
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-slate-600">Tipo: {item.tipo}</p>
-                  <p className="text-slate-600">Início: {fmtDate(item.dataInicio)}</p>
-                  <p className="text-slate-600">Fim: {fmtDate(item.dataFim)}</p>
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium text-slate-700">Motivo da alteração (opcional)</span>
+                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={saveEditFields}
+                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar alterações'}
+                  </button>
                 </div>
-              ))}
-            </div>
-          </section>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'status' && (
+            <section className={card}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Status / Tramitação</h2>
+              {!result.permissions.canChangeStatus ? (
+                <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">Seu perfil não possui permissão para alterar status/tramitação.</p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    <b>Status anterior:</b> {result.solicitacao.status} | <b>Novo status:</b> {statusValue || '—'}
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-slate-700">Novo status</span>
+                      <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                        {result.statusOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-slate-700">Setor responsável</span>
+                      <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                        <option value="">Manter atual</option>
+                        {result.departamentos.map((dept) => (
+                          <option key={dept.id} value={dept.id}>{dept.name}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-slate-700">Responsável atual</span>
+                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                        <option value="">Sem responsável definido</option>
+                        {result.responsaveis.map((resp) => (
+                          <option key={resp.id} value={resp.id}>{resp.fullName}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label className="block text-sm">
+                    <span className="mb-1 block font-medium text-slate-700">Motivo / justificativa</span>
+                    <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={saving || !statusValue}
+                    onClick={saveStatus}
+                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    {saving ? 'Aplicando...' : 'Aplicar nova tramitação'}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
     </div>
