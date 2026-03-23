@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { DocumentVersionStatus } from '@prisma/client'
+import { DocumentApprovalStatus, DocumentFlowStepType, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -47,9 +47,23 @@ export async function POST(req: NextRequest) {
     }
 
 
+    const flow = await prisma.documentTypeApprovalFlow.findMany({
+      where: { documentTypeId: payload.documentTypeId, active: true },
+      orderBy: { order: 'asc' },
+      select: { id: true, stepType: true },
+    })
+
+    const firstStepType = flow[0]?.stepType ?? null
+    const initialStatus =
+      flow.length === 0
+        ? DocumentVersionStatus.PUBLICADO
+        : firstStepType === DocumentFlowStepType.QUALITY
+          ? DocumentVersionStatus.EM_ANALISE_QUALIDADE
+          : DocumentVersionStatus.AG_APROVACAO
+
     const created = await prisma.isoDocument.create({
       data: {
-       code: payload.code,
+        code: payload.code,
         title: payload.title,
         documentTypeId: payload.documentTypeId,
         ownerDepartmentId: payload.ownerDepartmentId,
@@ -62,19 +76,52 @@ export async function POST(req: NextRequest) {
         versions: {
           create: {
             revisionNumber: payload.revisionNumber ?? 1,
-            status: DocumentVersionStatus.EM_ELABORACAO,
+            status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
             nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
+            publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,
+            isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
           },
         },
       },
       include: { versions: true },
     })
 
-    return NextResponse.json(created, { status: 201 })
+    if (flow.length > 0 && created.versions[0]) {
+      await prisma.documentApproval.createMany({
+        data: flow.map((item) => ({
+          versionId: created.versions[0].id,
+          flowItemId: item.id,
+          status: DocumentApprovalStatus.PENDING,
+        })),
+      })
+    }
+
+    const routing =
+      initialStatus === DocumentVersionStatus.PUBLICADO
+        ? {
+            status: initialStatus,
+            targetTab: 'publicados',
+            targetPath: '/dashboard/controle-documentos/publicados',
+            message: 'Documento publicado com sucesso.',
+          }
+        : initialStatus === DocumentVersionStatus.EM_ANALISE_QUALIDADE
+          ? {
+              status: initialStatus,
+              targetTab: 'em-analise-qualidade',
+              targetPath: '/dashboard/controle-documentos/em-analise-qualidade',
+              message: 'Documento enviado com sucesso e encaminhado para revisão da qualidade.',
+            }
+          : {
+              status: initialStatus,
+              targetTab: 'para-aprovacao',
+              targetPath: '/dashboard/controle-documentos/para-aprovacao',
+              message: 'Documento enviado com sucesso e encaminhado para aprovação.',
+            }
+
+    return NextResponse.json({ ...created, routing }, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar documento ISO', error)
     return NextResponse.json({ error: 'Erro ao criar documento.' }, { status: 500 })
   }
-}

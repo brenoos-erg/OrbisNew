@@ -18,6 +18,7 @@ type GridRow = {
 }
 
 type Option = { id: string; name?: string; description?: string; fullName?: string }
+type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
@@ -37,6 +38,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
   const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
@@ -49,11 +51,15 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
 
-  const [meta, setMeta] = useState<{ documentTypes: Option[]; departments: Option[]; authors: Option[] }>({
+   const [meta, setMeta] = useState<{ documentTypes: Option[]; departments: Option[]; authors: Option[] }>({
     documentTypes: [],
     departments: [],
     authors: [],
   })
+  const hasActiveFilters = useMemo(
+    () => Boolean(appliedFilters.code || appliedFilters.title || appliedFilters.documentTypeId || appliedFilters.ownerDepartmentId || appliedFilters.authorUserId),
+    [appliedFilters],
+  )
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
 
@@ -67,7 +73,6 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return null
     }
   }
-
   const buildQuery = (format?: 'csv' | 'pdf') => {
     const params = new URLSearchParams()
     params.set('page', String(page))
@@ -188,8 +193,11 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
+    const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
     setShowCreate(false)
     setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null })
+    setCreateSuccess(data?.routing ?? { status: 'PUBLICADO', targetTab: 'publicados', targetPath: '/dashboard/controle-documentos/publicados', message: 'Documento cadastrado com sucesso.' })
+    clearFilters()
     await load()
   }
   const acceptTerm = async () => {
@@ -282,6 +290,18 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
       <div className="hidden md:block">{FiltersContent}</div>
       <button className="inline-flex items-center gap-2 rounded border px-3 py-2 md:hidden" onClick={() => setShowFiltersMobile(true)}><Filter size={16} />Filtros</button>
+      {createSuccess ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <p>{createSuccess.message}</p>
+          {endpoint.includes(createSuccess.targetTab) ? (
+            <p className="mt-1 text-emerald-800">O item já está disponível nesta aba. Se não localizar, limpe os filtros.</p>
+          ) : (
+            <p className="mt-1 text-emerald-800">
+              Localização: <a href={createSuccess.targetPath} className="underline">{createSuccess.targetPath}</a>.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
@@ -302,7 +322,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             {loading ? (
               [...Array(4)].map((_, idx) => <tr key={idx} className="border-t"><td colSpan={9} className="animate-pulse px-2 py-3 text-slate-400">Carregando...</td></tr>)
             ) : items.length === 0 ? (
-              <tr className="border-t"><td colSpan={9} className="px-2 py-3 text-slate-500">Nenhum resultado encontrado.</td></tr>
+              <tr className="border-t"><td colSpan={9} className="px-2 py-3 text-slate-500">{hasActiveFilters ? 'Nenhum resultado encontrado com os filtros aplicados. Clique em "Limpar filtros".' : 'Nenhum resultado encontrado.'}</td></tr>
             ) : (
               items.map((row) => (
                 <tr key={row.versionId} className="border-t">
@@ -333,8 +353,11 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
       <div className="space-y-3 md:hidden">
         {loading ? <div className="rounded border p-3 text-slate-400">Carregando...</div> : null}
-        {!loading && items.length === 0 ? <div className="rounded border p-3 text-slate-500">Nenhum resultado encontrado.</div> : null}
-        {items.map((row) => (
+        {!loading && items.length === 0 ? (
+          <div className="rounded border p-3 text-slate-500">
+            {hasActiveFilters ? 'Nenhum resultado encontrado com os filtros aplicados. Limpe os filtros para listar todos os itens.' : 'Nenhum resultado encontrado.'}
+          </div>
+        ) : null}        {items.map((row) => (
           <article key={row.versionId} className="space-y-2 rounded border p-3">
             <div className="flex items-center justify-between"><strong>{row.codigo}</strong><span className="rounded bg-slate-100 px-2 py-0.5 text-xs">Rev {row.nrRevisao} · {row.status}</span></div>
             <p className="text-sm font-medium">{row.titulo}</p>
