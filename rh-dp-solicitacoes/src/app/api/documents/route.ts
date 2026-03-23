@@ -26,7 +26,7 @@ async function savePdf(file: File) {
   return `/uploads/documents/${safeName}`
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest)   {
   try {
     const me = await requireActiveUser()
 
