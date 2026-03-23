@@ -373,7 +373,7 @@ export default function Sidebar({
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <span className={labelBase}>Documentos Para Aprovação</span>
+                    <span className={labelBase}>Documentos para Aprovação</span>
                   </Link>
                   <Link
                     href="/dashboard/controle-documentos/em-analise-qualidade"
@@ -384,51 +384,18 @@ export default function Sidebar({
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <span className={labelBase}>Docs. Em Análise Qualidade</span>
+                    <span className={labelBase}>Documentos em Revisão da Qualidade</span>
                   </Link>
                   <Link
-                    href="/dashboard/controle-documentos/em-revisao"
+                    href="/dashboard/controle-documentos/controle-aprovadores"
                     className={`${submenuItemBase}
                       ${
-                        pathname.startsWith('/dashboard/controle-documentos/em-revisao')
+                        pathname.startsWith('/dashboard/controle-documentos/controle-aprovadores')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <span className={labelBase}>Documentos Em Revisão</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/publicacao"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/publicacao')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Publicação de Documento</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/downloads"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/downloads')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Controle de Download</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/cadastros/tipos-documento"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/cadastros/tipos-documento')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Cadastros &gt; Tipos de Documento</span>
+                    <span className={labelBase}>Controle de Aprovadores</span>
                   </Link>
                 </div>
               )}

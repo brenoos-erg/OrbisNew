@@ -1,11 +1,11 @@
-import DocumentsGrid from '@/components/documents/DocumentsGrid'
 import DocumentControlTabs from '@/components/documents/DocumentControlTabs'
+import ApproversControlClient from './ApproversControlClient'
 
 export default function Page() {
   return (
     <div className="space-y-4">
       <DocumentControlTabs />
-      <DocumentsGrid endpoint="/api/documents/published" title="Documentos Publicados" fixedStatus="PUBLICADO" allowCreate />
+      <ApproversControlClient />
     </div>
   )
 }

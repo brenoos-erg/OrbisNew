@@ -1,9 +1,9 @@
 'use client'
 
-import { Download, Eye, Filter, Search, X } from 'lucide-react'
+import { Check, Download, Eye, Filter, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-type Props = { endpoint: string; title: string; fixedStatus?: string }
+type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
 type GridRow = {
   versionId: string
@@ -21,7 +21,7 @@ type Option = { id: string; name?: string; description?: string; fullName?: stri
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
-export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
+export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const [items, setItems] = useState<GridRow[]>([])
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
@@ -30,9 +30,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
   const [sortBy, setSortBy] = useState('publishedAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showFiltersMobile, setShowFiltersMobile] = useState(false)
+  const [canApprove, setCanApprove] = useState(false)
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
   const [pendingVersionId, setPendingVersionId] = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
     code: '',
@@ -102,14 +107,21 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
   }, [])
 
   useEffect(() => {
-    load()
+    if (!approvalStage) return
+    fetch(`/api/documents/approval-access?stage=${approvalStage}`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setCanApprove(Boolean(data.canApprove)))
+      .catch(() => setCanApprove(false))
+  }, [approvalStage])
+
+  useEffect(() => {
+    void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, page, pageSize, sortBy, sortOrder, appliedFilters])
 
   const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download') => {
     const res = await fetch(`/api/documents/versions/${versionId}/download`, { cache: 'no-store' })
     const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
-
     if (!data) return
 
     if (res.status === 403 && data.requiresTerm) {
@@ -118,7 +130,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
       return
     }
 
-    if (data.url) {
+   if (data.url) {
       if (intent === 'download') {
         const anchor = document.createElement('a')
         anchor.href = data.url
@@ -131,6 +143,55 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
     }
   }
 
+  const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
+    const res = await fetch(`/api/documents/versions/${versionId}/${action}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(action === 'reject' ? { comment: 'Reprovado na etapa.' } : {}),
+    })
+    if (res.ok) {
+      await load()
+      return
+    }
+
+    const data = await parseJsonSafely<{ error?: string }>(res)
+    alert(data?.error ?? 'Não foi possível processar a aprovação.')
+  }
+
+  const createDocument = async () => {
+    if (!createForm.code || !createForm.title || !createForm.documentTypeId || !createForm.ownerDepartmentId) {
+      setCreateError('Preencha os campos obrigatórios.')
+      return
+    }
+
+    if (!createForm.pdf) {
+      setCreateError('Anexe um arquivo PDF.')
+      return
+    }
+
+    setCreateError(null)
+    setCreating(true)
+    const formData = new FormData()
+    formData.set('code', createForm.code)
+    formData.set('title', createForm.title)
+    formData.set('documentTypeId', createForm.documentTypeId)
+    formData.set('ownerDepartmentId', createForm.ownerDepartmentId)
+    formData.set('authorUserId', createForm.authorUserId)
+    formData.set('pdf', createForm.pdf)
+
+    const res = await fetch('/api/documents', { method: 'POST', body: formData })
+    setCreating(false)
+
+    if (!res.ok) {
+      const data = await parseJsonSafely<{ error?: string }>(res)
+      setCreateError(data?.error ?? 'Erro ao cadastrar documento.')
+      return
+    }
+
+    setShowCreate(false)
+    setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null })
+    await load()
+  }
   const acceptTerm = async () => {
     if (!term || !pendingVersionId) return
     await fetch('/api/documents/term/accept', {
@@ -185,7 +246,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
         {meta.departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>
       <select className="rounded border px-3 py-2" value={draftFilters.authorUserId} onChange={(e) => setDraftFilters((v) => ({ ...v, authorUserId: e.target.value }))}>
-        <option value="">Elaborador / Responsável</option>
+        <option value="">Elaborador / Revisor</option>
         {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
       </select>
       {!fixedStatus ? (
@@ -201,7 +262,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
 
       <div className="col-span-full flex flex-wrap gap-2">
         <button className="inline-flex items-center gap-2 rounded bg-blue-700 px-3 py-2 text-white" onClick={onSearch}><Search size={16} />Pesquisar</button>
-        <button className="inline-flex items-center gap-2 rounded border px-3 py-2" onClick={clearFilters}><X size={16} />Limpar</button>
+        <button className="inline-flex items-center gap-2 rounded border px-3 py-2" onClick={clearFilters}><X size={16} />Limpar filtros</button>
       </div>
     </div>
   )
@@ -210,7 +271,10 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
     <div className="space-y-4 rounded-xl border bg-white p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <h1 className="text-xl font-semibold">{title}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {allowCreate ? (
+            <button className="inline-flex items-center gap-2 rounded bg-orange-500 px-3 py-2 text-white" onClick={() => setShowCreate(true)}><Plus size={16} />Novo documento</button>
+          ) : null}
           <a className="rounded bg-emerald-600 px-3 py-2 text-white" href={`/api/documents/export?${buildQuery('csv')}`}>Exportar CSV</a>
           <a className="rounded bg-slate-700 px-3 py-2 text-white" href={`/api/documents/export?${buildQuery('pdf')}`}>Exportar PDF</a>
         </div>
@@ -253,6 +317,12 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
                   <td className="space-x-2">
                     <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Visualizar</button>
                     <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Download</button>
+                    {approvalStage ? (
+                      <>
+                        <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
+                        <button className="inline-flex items-center gap-1 rounded border px-2 py-1" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
+                      </>
+                    ) : null}
                   </td>
                 </tr>
               ))
@@ -297,6 +367,35 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus }: Props) {
           <div className="ml-auto h-full w-[90%] max-w-sm overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Filtros</h2><button className="rounded border px-2 py-1" onClick={() => setShowFiltersMobile(false)}>Fechar</button></div>
             {FiltersContent}
+          </div>
+        </div>
+      ) : null}
+       {showCreate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowCreate(false)}>
+          <div className="w-full max-w-2xl space-y-3 rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold">Cadastrar documento</h2>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <input className="rounded border px-3 py-2" placeholder="Código" value={createForm.code} onChange={(e) => setCreateForm((v) => ({ ...v, code: e.target.value }))} />
+              <input className="rounded border px-3 py-2" placeholder="Título" value={createForm.title} onChange={(e) => setCreateForm((v) => ({ ...v, title: e.target.value }))} />
+              <select className="rounded border px-3 py-2" value={createForm.documentTypeId} onChange={(e) => setCreateForm((v) => ({ ...v, documentTypeId: e.target.value }))}>
+                <option value="">Tipo de documento</option>
+                {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
+              </select>
+              <select className="rounded border px-3 py-2" value={createForm.ownerDepartmentId} onChange={(e) => setCreateForm((v) => ({ ...v, ownerDepartmentId: e.target.value }))}>
+                <option value="">Centro responsável</option>
+                {meta.departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+              </select>
+              <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
+                <option value="">Elaborador/Revisor (auto)</option>
+                {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
+              </select>
+              <input type="file" accept="application/pdf" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, pdf: e.target.files?.[0] ?? null }))} />
+            </div>
+            {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
+            <div className="flex justify-end gap-2">
+              <button className="rounded border px-3 py-2" onClick={() => setShowCreate(false)}>Cancelar</button>
+              <button className="rounded bg-orange-500 px-3 py-2 text-white" disabled={creating} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
+            </div>
           </div>
         </div>
       ) : null}

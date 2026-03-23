@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentApprovalStatus, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
+import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
   const { comment } = await req.json().catch(() => ({ comment: null }))
+
+  const version = await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { status: true } })
+  if (!version) return NextResponse.json({ error: 'Versão não encontrada.' }, { status: 404 })
+
+  const stage = version.status === DocumentVersionStatus.AG_APROVACAO ? 2 : version.status === DocumentVersionStatus.EM_ANALISE_QUALIDADE ? 3 : null
+  if (!stage) return NextResponse.json({ error: 'Esta versão não está em etapa de aprovação.' }, { status: 400 })
+
+  const canApprove = await canApproveDocumentStage(me.id, stage)
+  if (!canApprove) return NextResponse.json({ error: 'Você não possui permissão para reprovar nesta etapa.' }, { status: 403 })
 
   const approval = await prisma.documentApproval.findFirst({
     where: { versionId, status: DocumentApprovalStatus.PENDING },
