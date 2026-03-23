@@ -2,9 +2,13 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { DocumentApprovalStatus, DocumentFlowStepType, DocumentVersionStatus } from '@prisma/client'
+import { DocumentApprovalStatus, DocumentFlowStepType, DocumentVersionStatus, Prisma } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+
+function normalizeCode(raw: unknown) {
+  return String(raw ?? '').trim()
+}
 
 async function savePdf(file: File) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
       const fileUrl = pdf instanceof File && pdf.size > 0 ? await savePdf(pdf) : null
 
       payload = {
-        code: String(form.get('code') ?? ''),
+        code: normalizeCode(form.get('code')),
         title: String(form.get('title') ?? ''),
         documentTypeId: String(form.get('documentTypeId') ?? ''),
         ownerDepartmentId: String(form.get('ownerDepartmentId') ?? ''),
@@ -40,10 +44,21 @@ export async function POST(req: NextRequest) {
       }
     } else {
       payload = await req.json()
+      payload.code = normalizeCode(payload.code)
     }
 
     if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerDepartmentId) {
       return NextResponse.json({ error: 'Preencha código, título, tipo de documento e centro responsável.' }, { status: 400 })
+    }
+
+
+    const duplicate = await prisma.isoDocument.findUnique({
+      where: { code: payload.code },
+      select: { id: true },
+    })
+
+    if (duplicate) {
+      return NextResponse.json({ error: `Já existe um documento com o código ${payload.code}.` }, { status: 409 })
     }
 
 
@@ -120,8 +135,12 @@ export async function POST(req: NextRequest) {
               message: 'Documento enviado com sucesso e encaminhado para aprovação.',
             }
 
-    return NextResponse.json({ ...created, routing }, { status: 201 })
+     return NextResponse.json({ ...created, routing }, { status: 201 })
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'O código informado já está em uso. Informe outro código.' }, { status: 409 })
+    }
+
     console.error('Erro ao criar documento ISO', error)
     return NextResponse.json({ error: 'Erro ao criar documento.' }, { status: 500 })
   }

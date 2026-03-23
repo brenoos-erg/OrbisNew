@@ -19,6 +19,7 @@ type GridRow = {
 
 type Option = { id: string; name?: string; description?: string; fullName?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
+type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 const STATUS_STYLES: Record<string, string> = {
@@ -52,6 +53,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
+  const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
   const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
@@ -176,9 +178,16 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     alert(data?.error ?? 'Não foi possível processar a aprovação.')
   }
 
-  const createDocument = async () => {
-    if (!createForm.code || !createForm.title || !createForm.documentTypeId || !createForm.ownerDepartmentId) {
+ const createDocument = async () => {
+    const normalizedCode = createForm.code.trim()
+
+    if (!normalizedCode || !createForm.title || !createForm.documentTypeId || !createForm.ownerDepartmentId) {
       setCreateError('Preencha os campos obrigatórios.')
+      return
+    }
+
+    if (codeValidation.status === 'duplicate') {
+      setCreateError(codeValidation.message ?? 'O código informado já está em uso. Informe outro código.')
       return
     }
 
@@ -190,7 +199,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     setCreateError(null)
     setCreating(true)
     const formData = new FormData()
-    formData.set('code', createForm.code)
+    formData.set('code', normalizedCode)
     formData.set('title', createForm.title)
     formData.set('documentTypeId', createForm.documentTypeId)
     formData.set('ownerDepartmentId', createForm.ownerDepartmentId)
@@ -206,13 +215,58 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-    const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
+     const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
     setShowCreate(false)
     setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', pdf: null })
+    setCodeValidation({ status: 'idle', message: null })
     setCreateSuccess(data?.routing ?? { status: 'PUBLICADO', targetTab: 'publicados', targetPath: '/dashboard/controle-documentos/publicados', message: 'Documento cadastrado com sucesso.' })
     clearFilters()
     await load()
   }
+
+  useEffect(() => {
+    if (!showCreate) return
+
+    const normalizedCode = createForm.code.trim()
+    if (!normalizedCode) {
+      setCodeValidation({ status: 'idle', message: null })
+      return
+    }
+
+    const controller = new AbortController()
+    setCodeValidation({ status: 'checking', message: 'Validando código...' })
+
+    const timeout = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ code: normalizedCode })
+        const res = await fetch(`/api/documents/code-availability?${params.toString()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        const data = await parseJsonSafely<{ available?: boolean; error?: string }>(res)
+
+        if (!res.ok) {
+          setCodeValidation({ status: 'error', message: data?.error ?? 'Não foi possível validar o código agora.' })
+          return
+        }
+
+        if (data?.available) {
+          setCodeValidation({ status: 'available', message: 'Código disponível.' })
+          return
+        }
+
+        setCodeValidation({ status: 'duplicate', message: `Já existe um documento com o código ${normalizedCode}.` })
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return
+        setCodeValidation({ status: 'error', message: 'Não foi possível validar o código agora.' })
+      }
+    }, 350)
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [createForm.code, showCreate])
   const acceptTerm = async () => {
     if (!term || !pendingVersionId) return
     await fetch('/api/documents/term/accept', {
@@ -299,7 +353,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap gap-2">
           {allowCreate ? (
-            <button className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600" onClick={() => setShowCreate(true)}><Plus size={16} />Novo documento</button>
+            <button
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+              onClick={() => {
+                setCreateError(null)
+                setCodeValidation({ status: 'idle', message: null })
+                setShowCreate(true)
+              }}
+            ><Plus size={16} />Novo documento</button>
           ) : null}
           <a className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700" href={`/api/documents/export?${buildQuery('csv')}`}><Download size={15} />Exportar CSV</a>
           <a className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800" href={`/api/documents/export?${buildQuery('pdf')}`}><Download size={15} />Exportar PDF</a>
@@ -426,7 +487,22 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
           <div className="w-full max-w-2xl space-y-3 rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Cadastrar documento</h2>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <input className="rounded border px-3 py-2" placeholder="Código" value={createForm.code} onChange={(e) => setCreateForm((v) => ({ ...v, code: e.target.value }))} />
+              <div>
+                <input
+                  className={`w-full rounded border px-3 py-2 ${codeValidation.status === 'duplicate' ? 'border-red-500' : 'border-slate-300'}`}
+                  placeholder="Código"
+                  value={createForm.code}
+                  onChange={(e) => {
+                    setCreateError(null)
+                    setCreateForm((v) => ({ ...v, code: e.target.value }))
+                  }}
+                />
+                {codeValidation.message ? (
+                  <p className={`mt-1 text-xs ${codeValidation.status === 'duplicate' || codeValidation.status === 'error' ? 'text-red-600' : codeValidation.status === 'available' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {codeValidation.message}
+                  </p>
+                ) : null}
+              </div>
               <input className="rounded border px-3 py-2" placeholder="Título" value={createForm.title} onChange={(e) => setCreateForm((v) => ({ ...v, title: e.target.value }))} />
               <select className="rounded border px-3 py-2" value={createForm.documentTypeId} onChange={(e) => setCreateForm((v) => ({ ...v, documentTypeId: e.target.value }))}>
                 <option value="">Tipo de documento</option>
@@ -445,7 +521,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
             <div className="flex justify-end gap-2">
               <button className="rounded border px-3 py-2" onClick={() => setShowCreate(false)}>Cancelar</button>
-              <button className="rounded bg-orange-500 px-3 py-2 text-white" disabled={creating} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
+              <button className="rounded bg-orange-500 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60" disabled={creating || codeValidation.status === 'duplicate' || codeValidation.status === 'checking'} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
         </div>
