@@ -130,6 +130,18 @@ export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: Soli
 }
 
 export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  const isExperienceFinalizationStage =
+    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
+    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
+
+  if (isExperienceFinalizationStage && ctx.role !== 'ADMIN') {
+    return (
+      canViewSolicitation(ctx, solicitation) &&
+      canUserActOnCurrentStage(ctx, solicitation) &&
+      solicitation.approverId !== ctx.userId
+    )
+  }
+
   return (
     canViewSolicitation(ctx, solicitation) &&
     (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))

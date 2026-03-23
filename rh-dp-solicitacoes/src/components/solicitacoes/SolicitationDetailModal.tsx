@@ -254,8 +254,10 @@ type SolicitationStatus =
   | 'AGUARDANDO_APROVACAO'
   | 'AGUARDANDO_TERMO'
   | 'AGUARDANDO_AVALIACAO_GESTOR'
+  | 'AGUARDANDO_FINALIZACAO_AVALIACAO'
   | 'CONCLUIDA'
   | 'CANCELADA'
+
 
 export type SolicitationDetail = {
   id: string
@@ -901,6 +903,7 @@ export function SolicitationDetailModal({
       detail?.department?.id === departamentoFinalFluxo)
   const canFinalizarUltimaEtapa =
     isUltimaEtapaFluxo &&
+    !isAvaliacaoExperiencia &&
     !followsRhFinalizationFlow &&
     !isNadaConsta &&
     !isSolicitacaoExames &&
@@ -1034,6 +1037,13 @@ export function SolicitationDetailModal({
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' &&
     !!detail?.department?.id &&
     currentUserDepartmentIds.has(detail.department.id)
+  const userIsCurrentDepartmentResponsible =
+    !!detail?.department?.id && currentUserDepartmentIds.has(detail.department.id)
+  const canFinalizeExperienceByRh =
+    isAvaliacaoExperiencia &&
+    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' &&
+    (userIsAdmin || userIsCurrentDepartmentResponsible)
+  const canDownloadExperiencePdf = canFinalizeExperienceByRh
   const canShowApprovalActions =
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
@@ -1618,12 +1628,44 @@ async function handleEncaminharAprovacaoComAnexo() {
         throw new Error(json?.error ?? 'Falha ao finalizar solicitação.')
       }
 
-      await refreshDetailFromServer()
+       await refreshDetailFromServer()
       setCloseSuccess('Chamado finalizado com sucesso.')
       onFinalized?.()
     } catch (err: any) {
       console.error('Erro ao finalizar última etapa', err)
       setCloseError(err?.message ?? 'Erro ao finalizar solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  async function handleBaixarPdfAvaliacaoExperiencia() {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/avaliacao-pdf`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao gerar PDF da avaliação.')
+      }
+
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `avaliacao-experiencia-${detail?.protocolo ?? row?.protocolo ?? solicitationId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+      setCloseSuccess('PDF da avaliação gerado com sucesso.')
+    } catch (err: any) {
+      console.error('Erro ao baixar PDF da avaliação', err)
+      setCloseError(err?.message ?? 'Erro ao gerar PDF da avaliação.')
     } finally {
       setClosing(false)
     }
@@ -2885,6 +2927,24 @@ async function handleEncaminharAprovacaoComAnexo() {
                       className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : 'Finalizar chamado'}
+                    </button>
+                  )}
+                  {canDownloadExperiencePdf && (
+                    <button
+                      onClick={handleBaixarPdfAvaliacaoExperiencia}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
+                    >
+                      {closing ? 'Gerando...' : 'Baixar PDF da avaliação'}
+                    </button>
+                  )}
+                  {canFinalizeExperienceByRh && (
+                    <button
+                      onClick={handleFinalizarUltimaEtapa}
+                      disabled={closing || isFinalizadaOuCancelada}
+                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                    >
+                      {closing ? 'Finalizando...' : 'Finalizar avaliação (RH)'}
                     </button>
                   )}
                    {isSolicitacaoExames && (

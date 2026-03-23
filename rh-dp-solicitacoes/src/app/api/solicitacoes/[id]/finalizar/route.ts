@@ -8,6 +8,10 @@ import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import {
+  EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from '@/lib/experienceEvaluation'
 
 export async function PATCH(
   _req: Request,
@@ -35,7 +39,7 @@ export async function PATCH(
       },
     })
 
-    if (!solicitation) {
+   if (!solicitation) {
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     }
 
@@ -43,11 +47,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Solicitação já encerrada.' }, { status: 400 })
     }
 
+    if (
+      solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
+      solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS
+    ) {
+      return NextResponse.json(
+        { error: 'A avaliação de experiência só pode ser finalizada após conclusão do gestor e retorno ao RH.' },
+        { status: 400 },
+      )
+    }
+
     const departamentos = Array.isArray((solicitation.tipo?.schemaJson as any)?.meta?.departamentos)
       ? ((solicitation.tipo?.schemaJson as any).meta.departamentos as unknown[])
           .filter((item): item is string => typeof item === 'string')
       : []
-
     const departamentoFinal = departamentos.length > 0 ? departamentos[departamentos.length - 1] : null
     const isUltimaEtapa =
       departamentos.length <= 1 ||

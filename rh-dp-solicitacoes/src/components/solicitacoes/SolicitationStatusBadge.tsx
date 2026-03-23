@@ -5,6 +5,7 @@ const statusClasses: Record<string, string> = {
   AGUARDANDO_APROVACAO: 'bg-amber-50 text-amber-700 border-amber-100',
   AGUARDANDO_TERMO: 'bg-purple-50 text-purple-700 border-purple-100',
   AGUARDANDO_AVALIACAO_GESTOR: 'bg-orange-50 text-orange-700 border-orange-100',
+  AGUARDANDO_FINALIZACAO_AVALIACAO: 'bg-amber-50 text-amber-700 border-amber-100',
   EM_ATENDIMENTO: 'bg-cyan-50 text-cyan-700 border-cyan-100',
   CONCLUIDA: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   CANCELADA: 'bg-rose-50 text-rose-700 border-rose-100',

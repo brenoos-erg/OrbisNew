@@ -7,6 +7,7 @@ import {
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
+  resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
 
 export async function POST(
@@ -91,7 +92,15 @@ export async function POST(
       )
     }
 
-    const payload = (solicitation.payload ?? {}) as Record<string, any>
+     const payload = (solicitation.payload ?? {}) as Record<string, any>
+    const rhRouting = await resolveRhDepartmentForExperienceEvaluation()
+    if (!rhRouting?.departmentId) {
+      return NextResponse.json(
+        { error: 'Não foi possível identificar o departamento do RH para concluir este fluxo.' },
+        { status: 400 },
+      )
+    }
+
     const updatedPayload = {
       ...payload,
       avaliacaoGestor: {
@@ -107,6 +116,11 @@ export async function POST(
         payload: updatedPayload,
         status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS as any,
         dataFechamento: null,
+        departmentId: rhRouting.departmentId,
+        ...(rhRouting.costCenterId ? { costCenterId: rhRouting.costCenterId } : {}),
+        assumidaPorId: null,
+        assumidaEm: null,
+        approverId: null,
       },
     })
 
@@ -114,7 +128,7 @@ export async function POST(
       data: {
         solicitationId: id,
         status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS as any,
-        message: 'Avaliação do gestor concluída. Aguardando finalização da área responsável.',
+        message: 'Avaliação do gestor concluída. Solicitação devolvida ao RH para emissão de PDF e finalização.',
       },
     })
 

@@ -33,6 +33,7 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
   listExperienceEvaluators,
+  resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 /**
@@ -748,12 +749,21 @@ export const POST = withModuleLevel(
           const gestorImediatoAvaliadorId = String(
             payload?.campos?.gestorImediatoAvaliadorId ?? '',
           )
+          const rhRouting = await resolveRhDepartmentForExperienceEvaluation()
+          if (!rhRouting?.departmentId) {
+            return NextResponse.json(
+              { error: 'Não foi possível identificar o departamento do RH para este fluxo.' },
+              { status: 400 },
+            )
+          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
               approverId: gestorImediatoAvaliadorId,
               status: EXPERIENCE_EVALUATION_STATUS as any,
+              departmentId: rhRouting.departmentId,
+              ...(rhRouting.costCenterId ? { costCenterId: rhRouting.costCenterId } : {}),
             },
           })
 
@@ -764,6 +774,7 @@ export const POST = withModuleLevel(
               message: 'Encaminhada para gestor imediato avaliador.',
             },
           })
+
 
           await prisma.event.create({
             data: {
