@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
+import { evaluateCodeAvailability } from '@/lib/iso-document-routing'
 import { prisma } from '@/lib/prisma'
 
 function normalizeCode(raw: string | null) {
@@ -18,10 +19,22 @@ export async function GET(req: NextRequest) {
   try {
     const document = await prisma.isoDocument.findUnique({
       where: { code },
-      select: { id: true },
+      select: {
+        id: true,
+        versions: {
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+          select: { id: true, status: true },
+        },
+      },
     })
 
-    return NextResponse.json({ available: !document })
+    if (!document) {
+      return NextResponse.json({ available: true, message: 'Código disponível.' })
+    }
+
+    const feedback = evaluateCodeAvailability(code, document.versions[0]?.status ?? null)
+    return NextResponse.json(feedback)
   } catch (error) {
     console.error('Erro ao validar código de documento ISO', error)
     return NextResponse.json({ error: 'Erro ao validar código do documento.' }, { status: 500 })

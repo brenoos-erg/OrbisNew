@@ -19,6 +19,7 @@ type GridRow = {
 
 type Option = { id: string; name?: string; description?: string; fullName?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
+type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
@@ -236,14 +237,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     const controller = new AbortController()
     setCodeValidation({ status: 'checking', message: 'Validando código...' })
 
-    const timeout = setTimeout(async () => {
+     const timeout = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ code: normalizedCode })
         const res = await fetch(`/api/documents/code-availability?${params.toString()}`, {
           cache: 'no-store',
           signal: controller.signal,
         })
-        const data = await parseJsonSafely<{ available?: boolean; error?: string }>(res)
+        const data = await parseJsonSafely<CodeAvailabilityResponse>(res)
 
         if (!res.ok) {
           setCodeValidation({ status: 'error', message: data?.error ?? 'Não foi possível validar o código agora.' })
@@ -251,11 +252,11 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         }
 
         if (data?.available) {
-          setCodeValidation({ status: 'available', message: 'Código disponível.' })
+          setCodeValidation({ status: 'available', message: data.message ?? 'Código disponível.' })
           return
         }
 
-        setCodeValidation({ status: 'duplicate', message: `Já existe um documento com o código ${normalizedCode}.` })
+        setCodeValidation({ status: 'duplicate', message: data?.message ?? `Já existe um documento com o código ${normalizedCode}.` })
       } catch (error) {
         if ((error as Error).name === 'AbortError') return
         setCodeValidation({ status: 'error', message: 'Não foi possível validar o código agora.' })

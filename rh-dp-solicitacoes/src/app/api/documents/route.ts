@@ -2,8 +2,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { DocumentApprovalStatus, DocumentFlowStepType, DocumentVersionStatus, Prisma } from '@prisma/client'
+import { DocumentApprovalStatus, DocumentVersionStatus, Prisma } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
+import {
+  createSuccessMessageByStatus,
+  duplicateCodeMessage,
+  resolveInitialVersionStatus,
+  routingForStatus,
+} from '@/lib/iso-document-routing'
 import { prisma } from '@/lib/prisma'
 
 function normalizeCode(raw: unknown) {
@@ -52,29 +58,79 @@ export async function POST(req: NextRequest) {
     }
 
 
-    const duplicate = await prisma.isoDocument.findUnique({
-      where: { code: payload.code },
-      select: { id: true },
-    })
-
-    if (duplicate) {
-      return NextResponse.json({ error: `Já existe um documento com o código ${payload.code}.` }, { status: 409 })
-    }
-
-
     const flow = await prisma.documentTypeApprovalFlow.findMany({
       where: { documentTypeId: payload.documentTypeId, active: true },
       orderBy: { order: 'asc' },
       select: { id: true, stepType: true },
     })
 
-    const firstStepType = flow[0]?.stepType ?? null
-    const initialStatus =
-      flow.length === 0
-        ? DocumentVersionStatus.PUBLICADO
-        : firstStepType === DocumentFlowStepType.QUALITY
-          ? DocumentVersionStatus.EM_ANALISE_QUALIDADE
-          : DocumentVersionStatus.AG_APROVACAO
+    const initialStatus = resolveInitialVersionStatus(flow)
+
+    const existing = await prisma.isoDocument.findUnique({
+      where: { code: payload.code },
+      select: {
+        id: true,
+        versions: {
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+          select: { id: true, status: true },
+        },
+      },
+    })
+
+    if (existing?.versions[0]) {
+      const status = existing.versions[0].status
+      return NextResponse.json(
+        {
+          error: duplicateCodeMessage(payload.code, status),
+          routing: routingForStatus(status),
+        },
+        { status: 409 },
+      )
+    }
+
+    if (existing && existing.versions.length === 0) {
+      const recoveredVersion = await prisma.$transaction(async (tx) => {
+        const version = await tx.documentVersion.create({
+          data: {
+            documentId: existing.id,
+            revisionNumber: payload.revisionNumber ?? 1,
+            status: initialStatus,
+            fileUrl: payload.fileUrl ?? null,
+            expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
+            nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
+            publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,
+            isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
+          },
+        })
+
+        if (flow.length > 0) {
+          await tx.documentApproval.createMany({
+            data: flow.map((item) => ({
+              versionId: version.id,
+              flowItemId: item.id,
+              status: DocumentApprovalStatus.PENDING,
+            })),
+          })
+        }
+
+        return version
+      })
+
+      const routing = routingForStatus(initialStatus)
+      return NextResponse.json(
+        {
+          id: existing.id,
+          recoveredOrphan: true,
+          versionId: recoveredVersion.id,
+          routing: {
+            ...routing,
+            message: 'Documento existente sem versão visível foi regularizado e retornou ao fluxo de publicação.',
+          },
+        },
+        { status: 201 },
+      )
+    }
 
     const created = await prisma.isoDocument.create({
       data: {
@@ -113,29 +169,18 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const routing =
-      initialStatus === DocumentVersionStatus.PUBLICADO
-        ? {
-            status: initialStatus,
-            targetTab: 'publicados',
-            targetPath: '/dashboard/controle-documentos/publicados',
-            message: 'Documento publicado com sucesso.',
-          }
-        : initialStatus === DocumentVersionStatus.EM_ANALISE_QUALIDADE
-          ? {
-              status: initialStatus,
-              targetTab: 'em-analise-qualidade',
-              targetPath: '/dashboard/controle-documentos/em-analise-qualidade',
-              message: 'Documento enviado com sucesso e encaminhado para revisão da qualidade.',
-            }
-          : {
-              status: initialStatus,
-              targetTab: 'para-aprovacao',
-              targetPath: '/dashboard/controle-documentos/para-aprovacao',
-              message: 'Documento enviado com sucesso e encaminhado para aprovação.',
-            }
+    const routing = routingForStatus(initialStatus)
 
-     return NextResponse.json({ ...created, routing }, { status: 201 })
+     return NextResponse.json(
+      {
+        ...created,
+        routing: {
+          ...routing,
+          message: createSuccessMessageByStatus(initialStatus),
+        },
+      },
+      { status: 201 },
+    )
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'O código informado já está em uso. Informe outro código.' }, { status: 409 })
