@@ -46,6 +46,33 @@ type UpdateBody =
       reason?: string
     }
 
+type CampoEdicaoSchema = {
+  name: string
+  label?: string
+  type?: string
+  required?: boolean
+  options?: string[]
+  defaultValue?: string
+  section?: string
+  stage?: string
+  placeholder?: string
+  readOnly?: boolean
+  disabled?: boolean
+  source?: string
+}
+
+function normalizeCampoType(campo: CampoEdicaoSchema): CampoEdicaoSchema {
+  const name = typeof campo.name === 'string' ? campo.name.toLowerCase() : ''
+  const looksLikeCostCenter =
+    campo.type === 'cost_center' || name.includes('centrocusto') || name.includes('costcenter')
+
+  return {
+    ...campo,
+    type: looksLikeCostCenter ? 'cost_center' : campo.type,
+  }
+}
+
+
 function summarizePayloadBlocks(payload: unknown) {
   if (!payload || typeof payload !== 'object') return []
   const root = payload as Record<string, unknown>
@@ -104,6 +131,14 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
     prisma.user.findMany({ where: { status: 'ATIVO' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' }, take: 200 }),
   ])
 
+  const [costCenters, positions] = await Promise.all([
+    prisma.costCenter.findMany({ select: { id: true, code: true, description: true }, orderBy: [{ code: 'asc' }, { description: 'asc' }] }),
+    prisma.position.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' }, take: 500 }),
+  ])
+
+  const schemaCampos = (((solicitation.tipo?.schemaJson as any)?.camposEspecificos ?? []) as CampoEdicaoSchema[])
+    .filter((campo) => campo && typeof campo.name === 'string')
+    .map(normalizeCampoType)
   const workflows = await readWorkflowRows()
   const workflow = workflows.find((row) => row.tipoId === solicitation.tipoId)
   const orderedSteps = workflow?.steps?.filter((step) => step.kind !== 'FIM') ?? []
@@ -179,13 +214,20 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
     movimentacoes: timelinePoints.map((item: any) => ({ id: item.id, status: item.status, mensagem: item.message, data: item.createdAt })),
     permissions: { canEdit, canChangeStatus },
     statusOptions: Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
-    statusAtual: solicitation.status,
+   statusAtual: solicitation.status,
     departamentos: departments,
     responsaveis: approverCandidates,
     valoresEdicao: {
       titulo: solicitation.titulo,
       descricao: solicitation.descricao,
       campos: ((solicitation.payload as Record<string, unknown>)?.campos ?? {}) as Record<string, unknown>,
+    },
+    formSchema: schemaCampos,
+    dataSources: {
+      costCenters,
+      users: approverCandidates,
+      departments,
+      positions,
     },
     metadata: {
       solicitanteEmail: solicitation.solicitante?.email ?? null,

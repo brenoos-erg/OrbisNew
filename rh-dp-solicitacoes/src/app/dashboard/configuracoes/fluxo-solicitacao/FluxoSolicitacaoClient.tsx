@@ -5,7 +5,22 @@ import { FormEvent, useMemo, useState } from 'react'
 type StatusOption = { value: string; label: string }
 type SelectOption = { id: string; name: string }
 type ResponsibleOption = { id: string; fullName: string }
-
+type CostCenterOption = { id: string; code: string | null; description: string }
+type PositionOption = { id: string; name: string }
+type CampoSchema = {
+  name: string
+  label?: string
+  type?: string
+  required?: boolean
+  options?: string[]
+  defaultValue?: string
+  section?: string
+  stage?: string
+  placeholder?: string
+  readOnly?: boolean
+  disabled?: boolean
+  source?: string
+}
 type FluxoResponse = {
   solicitacao: {
     id: string
@@ -54,6 +69,13 @@ type FluxoResponse = {
     descricao: string | null
     campos: Record<string, unknown>
   }
+  formSchema: CampoSchema[]
+  dataSources: {
+    costCenters: CostCenterOption[]
+    users: ResponsibleOption[]
+    departments: SelectOption[]
+    positions: PositionOption[]
+  }
   metadata: {
     solicitanteEmail: string | null
     solicitanteLogin: string | null
@@ -88,6 +110,24 @@ function renderValue(value: unknown) {
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
+function formatCostCenterOption(option: CostCenterOption) {
+  return [option.code, option.description].filter(Boolean).join(' - ')
+}
+
+function normalizeFieldType(field: CampoSchema) {
+  const byType = (field.type ?? '').toLowerCase()
+  if (byType) return byType
+  return 'text'
+}
+
+function parseDateForInput(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return ''
+  const onlyDate = value.match(/^\d{4}-\d{2}-\d{2}$/)
+  if (onlyDate) return value
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  return parsed.toISOString().slice(0, 10)
+}
 
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
@@ -98,9 +138,9 @@ export default function FluxoSolicitacaoClient() {
   const [result, setResult] = useState<FluxoResponse | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('fluxo')
 
-  const [editTitle, setEditTitle] = useState('')
+   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editFields, setEditFields] = useState<Record<string, string>>({})
+  const [editFields, setEditFields] = useState<Record<string, unknown>>({})
   const [editReason, setEditReason] = useState('')
 
   const [statusValue, setStatusValue] = useState('')
@@ -114,9 +154,7 @@ export default function FluxoSolicitacaoClient() {
     setEditTitle(data.valoresEdicao.titulo)
     setEditDescription(data.valoresEdicao.descricao ?? '')
     setEditFields(
-      Object.fromEntries(
-        Object.entries(data.valoresEdicao.campos ?? {}).map(([key, value]) => [key, value == null ? '' : String(value)]),
-      ),
+      Object.fromEntries(Object.entries(data.valoresEdicao.campos ?? {}).map(([key, value]) => [key, value ?? ''])),
     )
     setEditReason('')
 
@@ -187,7 +225,7 @@ export default function FluxoSolicitacaoClient() {
           reason: editReason || undefined,
         }),
       })
-      const data = await response.json().catch(() => ({}))
+           const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.error ?? 'Não foi possível salvar as alterações.')
       setSuccess('Dados do chamado atualizados com sucesso.')
       await refreshCurrent()
@@ -196,6 +234,171 @@ export default function FluxoSolicitacaoClient() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function inferFieldSourceOptions(field: CampoSchema) {
+    const normalizedName = field.name.toLowerCase()
+    if (field.type === 'cost_center' || normalizedName.includes('centrocusto') || normalizedName.includes('costcenter')) {
+      return result?.dataSources.costCenters.map((center) => ({
+        value: center.id,
+        label: formatCostCenterOption(center),
+      })) ?? []
+    }
+    if (field.source === 'users' || normalizedName.includes('usuario') || normalizedName.includes('gestor')) {
+      return result?.dataSources.users.map((user) => ({ value: user.id, label: user.fullName })) ?? []
+    }
+    if (field.source === 'departments' || normalizedName.includes('departamento')) {
+      return result?.dataSources.departments.map((department) => ({ value: department.id, label: department.name })) ?? []
+    }
+    if (field.source === 'positions' || normalizedName.includes('cargo')) {
+      return result?.dataSources.positions.map((position) => ({ value: position.id, label: position.name })) ?? []
+    }
+    return []
+  }
+
+  function renderEditField(field: CampoSchema) {
+    const fieldType = normalizeFieldType(field)
+    const fieldValue = editFields[field.name]
+    const label = field.label?.trim() || field.name
+    const dynamicOptions = inferFieldSourceOptions(field)
+    const options = (field.options ?? []).map((opt) => ({ value: opt, label: opt }))
+    const resolvedOptions = options.length > 0 ? options : dynamicOptions
+    const required = Boolean(field.required)
+    const disabled = Boolean(field.disabled)
+    const readOnly = Boolean(field.readOnly)
+    const placeholder = field.placeholder ?? ''
+
+    if (fieldType === 'checkbox' || fieldType === 'boolean') {
+      return (
+        <label key={field.name} className="flex items-start gap-2 rounded-md border border-slate-200 p-2 text-sm">
+          <input
+            type="checkbox"
+            checked={Boolean(fieldValue)}
+            disabled={disabled || readOnly}
+            onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.checked }))}
+          />
+          <span className="text-slate-700">
+            {label}
+            {required ? <span className="ml-1 text-red-500">*</span> : null}
+          </span>
+        </label>
+      )
+    }
+
+    if (fieldType === 'radio' && resolvedOptions.length > 0) {
+      const current = typeof fieldValue === 'string' ? fieldValue : ''
+      return (
+        <div key={field.name} className="block text-sm">
+          <span className="mb-1 block text-slate-700">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <div className="flex flex-wrap gap-3">
+            {resolvedOptions.map((option) => (
+              <label key={option.value} className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`edit-${field.name}`}
+                  value={option.value}
+                  checked={current === option.value}
+                  disabled={disabled || readOnly}
+                  onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )
+    }
+
+    if (fieldType === 'multiselect' || fieldType === 'multi_select') {
+      const values = Array.isArray(fieldValue) ? fieldValue.map(String) : []
+      return (
+        <label key={field.name} className="block text-sm">
+          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <select
+            multiple
+            value={values}
+            required={required}
+            disabled={disabled || readOnly}
+            onChange={(e) => {
+              const next = Array.from(e.target.selectedOptions).map((option) => option.value)
+              setEditFields((prev) => ({ ...prev, [field.name]: next }))
+            }}
+            className="w-full rounded-md border border-slate-300 px-3 py-2"
+          >
+            {resolvedOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+
+    if ((fieldType === 'select' || fieldType === 'cost_center' || fieldType === 'autocomplete') && resolvedOptions.length > 0) {
+      const selected = fieldValue == null ? '' : String(fieldValue)
+      return (
+        <label key={field.name} className="block text-sm">
+          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <select
+            value={selected}
+            required={required}
+            disabled={disabled || readOnly}
+            onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
+            className="w-full rounded-md border border-slate-300 px-3 py-2"
+          >
+            <option value="">Selecione...</option>
+            {resolvedOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+
+    if (fieldType === 'textarea') {
+      return (
+        <label key={field.name} className="block text-sm sm:col-span-2">
+          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <textarea
+            value={typeof fieldValue === 'string' ? fieldValue : String(fieldValue ?? '')}
+            placeholder={placeholder}
+            required={required}
+            disabled={disabled || readOnly}
+            onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
+            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            rows={4}
+          />
+        </label>
+      )
+    }
+
+    const inputType = fieldType === 'number' ? 'number' : fieldType === 'date' ? 'date' : 'text'
+    const normalizedValue =
+      inputType === 'date'
+        ? parseDateForInput(fieldValue)
+        : typeof fieldValue === 'number'
+          ? String(fieldValue)
+          : String(fieldValue ?? '')
+
+    return (
+      <label key={field.name} className="block text-sm">
+        <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+        <input
+          type={inputType}
+          value={normalizedValue}
+          placeholder={placeholder}
+          required={required}
+          readOnly={readOnly}
+          disabled={disabled}
+          onChange={(e) =>
+            setEditFields((prev) => ({
+              ...prev,
+              [field.name]: inputType === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value,
+            }))
+          }
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+        />
+      </label>
+    )
   }
 
   async function saveStatus() {
@@ -385,17 +588,19 @@ export default function FluxoSolicitacaoClient() {
 
                   <div className="rounded-md border border-slate-200 p-3">
                     <h3 className="mb-2 text-sm font-semibold text-slate-700">Campos do formulário</h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {Object.entries(editFields).map(([key, value]) => (
-                        <label key={key} className="block text-sm">
-                          <span className="mb-1 block text-slate-600">{key}</span>
-                          <input
-                            value={value}
-                            onChange={(e) => setEditFields((prev) => ({ ...prev, [key]: e.target.value }))}
-                            className="w-full rounded-md border border-slate-300 px-3 py-2"
-                          />
-                        </label>
-                      ))}
+                     <div className="grid gap-3 sm:grid-cols-2">
+                      {result.formSchema.length > 0
+                        ? result.formSchema.map(renderEditField)
+                        : Object.entries(editFields).map(([key, value]) => (
+                            <label key={key} className="block text-sm">
+                              <span className="mb-1 block text-slate-600">{key}</span>
+                              <input
+                                value={String(value ?? '')}
+                                onChange={(e) => setEditFields((prev) => ({ ...prev, [key]: e.target.value }))}
+                                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                              />
+                            </label>
+                          ))}
                     </div>
                   </div>
                   <label className="block text-sm">
