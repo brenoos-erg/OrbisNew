@@ -73,6 +73,7 @@ type FluxoResponse = {
   dataSources: {
     costCenters: CostCenterOption[]
     users: ResponsibleOption[]
+    experienceEvaluators?: ResponsibleOption[]
     departments: SelectOption[]
     positions: PositionOption[]
   }
@@ -129,6 +130,41 @@ function parseDateForInput(value: unknown) {
   return parsed.toISOString().slice(0, 10)
 }
 
+function normalizeText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function isExperienceEvaluatorField(field: CampoSchema) {
+  const normalizedName = field.name.trim().toLowerCase()
+  const normalizedLabel = (field.label ?? '').trim().toLowerCase()
+  return (
+    normalizedName === 'gestorimediatoavaliador' ||
+    normalizedName === 'gestorimediatoavaliadorid' ||
+    normalizedLabel.includes('gestor imediato avaliador')
+  )
+}
+
+function resolveExperienceEvaluatorId(
+  campos: Record<string, unknown>,
+  evaluators: ResponsibleOption[],
+) {
+  const byIdKey = normalizeText(campos.gestorImediatoAvaliadorId)
+  if (byIdKey && evaluators.some((user) => user.id === byIdKey)) return byIdKey
+
+  const rawGestor = campos.gestorImediatoAvaliador
+  if (rawGestor && typeof rawGestor === 'object' && !Array.isArray(rawGestor)) {
+    const byObjectId = normalizeText((rawGestor as Record<string, unknown>).id)
+    if (byObjectId && evaluators.some((user) => user.id === byObjectId)) return byObjectId
+  }
+
+  const byDirectId = normalizeText(rawGestor)
+  if (byDirectId && evaluators.some((user) => user.id === byDirectId)) return byDirectId
+
+  const byName = normalizeText(rawGestor).toLocaleLowerCase('pt-BR')
+  if (!byName) return ''
+  return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
+}
+
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -153,9 +189,19 @@ export default function FluxoSolicitacaoClient() {
   function resetEditor(data: FluxoResponse) {
     setEditTitle(data.valoresEdicao.titulo)
     setEditDescription(data.valoresEdicao.descricao ?? '')
-    setEditFields(
-      Object.fromEntries(Object.entries(data.valoresEdicao.campos ?? {}).map(([key, value]) => [key, value ?? ''])),
+    const normalizedFields = Object.fromEntries(
+      Object.entries(data.valoresEdicao.campos ?? {}).map(([key, value]) => [key, value ?? '']),
     )
+    const shouldNormalizeEvaluator = data.formSchema.some((field) => isExperienceEvaluatorField(field))
+    if (shouldNormalizeEvaluator) {
+      const evaluatorOptions = data.dataSources.experienceEvaluators ?? []
+      const evaluatorId = resolveExperienceEvaluatorId(normalizedFields, evaluatorOptions)
+      if (evaluatorId) {
+        normalizedFields.gestorImediatoAvaliadorId = evaluatorId
+        normalizedFields.gestorImediatoAvaliador = evaluatorId
+      }
+    }
+    setEditFields(normalizedFields)    
     setEditReason('')
 
     setStatusValue(data.statusAtual)
@@ -236,8 +282,11 @@ export default function FluxoSolicitacaoClient() {
     }
   }
 
-  function inferFieldSourceOptions(field: CampoSchema) {
+   function inferFieldSourceOptions(field: CampoSchema) {
     const normalizedName = field.name.toLowerCase()
+    if (isExperienceEvaluatorField(field)) {
+      return result?.dataSources.experienceEvaluators?.map((user) => ({ value: user.id, label: user.fullName })) ?? []
+    }
     if (field.type === 'cost_center' || normalizedName.includes('centrocusto') || normalizedName.includes('costcenter')) {
       return result?.dataSources.costCenters.map((center) => ({
         value: center.id,

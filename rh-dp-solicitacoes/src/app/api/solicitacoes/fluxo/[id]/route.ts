@@ -1,6 +1,7 @@
 import { ApprovalStatus, ModuleLevel, SolicitationStatus } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserModuleLevel, withModuleLevel } from '@/lib/access'
+import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
@@ -72,6 +73,33 @@ function normalizeCampoType(campo: CampoEdicaoSchema): CampoEdicaoSchema {
   }
 }
 
+function normalizeStringValue(value: unknown) {
+  if (typeof value !== 'string') return ''
+  return value.trim()
+}
+
+function resolveExperienceEvaluatorId(
+  campos: Record<string, unknown>,
+  evaluators: Array<{ id: string; fullName: string }>,
+) {
+  const byIdKey = normalizeStringValue(campos.gestorImediatoAvaliadorId)
+  if (byIdKey && evaluators.some((user) => user.id === byIdKey)) return byIdKey
+
+  const rawGestor = campos.gestorImediatoAvaliador
+  if (rawGestor && typeof rawGestor === 'object' && !Array.isArray(rawGestor)) {
+    const byObjectId = normalizeStringValue((rawGestor as Record<string, unknown>).id)
+    if (byObjectId && evaluators.some((user) => user.id === byObjectId)) return byObjectId
+  }
+
+  const byDirectId = normalizeStringValue(rawGestor)
+  if (byDirectId && evaluators.some((user) => user.id === byDirectId)) return byDirectId
+
+  const byName = normalizeStringValue(rawGestor).toLocaleLowerCase('pt-BR')
+  if (!byName) return ''
+
+  return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
+}
+
 
 function summarizePayloadBlocks(payload: unknown) {
   if (!payload || typeof payload !== 'object') return []
@@ -131,11 +159,20 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
     prisma.user.findMany({ where: { status: 'ATIVO' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' }, take: 200 }),
   ])
 
-  const [costCenters, positions] = await Promise.all([
+  const [costCenters, positions, experienceEvaluators] = await Promise.all([
     prisma.costCenter.findMany({ select: { id: true, code: true, description: true }, orderBy: [{ code: 'asc' }, { description: 'asc' }] }),
     prisma.position.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' }, take: 500 }),
+    listExperienceEvaluators(),
   ])
 
+  const payloadCampos = ((solicitation.payload as Record<string, unknown>)?.campos ?? {}) as Record<string, unknown>
+  const normalizedCampos = { ...payloadCampos }
+  const resolvedEvaluatorId = resolveExperienceEvaluatorId(payloadCampos, experienceEvaluators)
+  if (resolvedEvaluatorId) {
+    const evaluator = experienceEvaluators.find((item) => item.id === resolvedEvaluatorId)
+    normalizedCampos.gestorImediatoAvaliadorId = resolvedEvaluatorId
+    if (evaluator) normalizedCampos.gestorImediatoAvaliador = evaluator.fullName
+  }
   const schemaCampos = (((solicitation.tipo?.schemaJson as any)?.camposEspecificos ?? []) as CampoEdicaoSchema[])
     .filter((campo) => campo && typeof campo.name === 'string')
     .map(normalizeCampoType)
@@ -220,12 +257,13 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
     valoresEdicao: {
       titulo: solicitation.titulo,
       descricao: solicitation.descricao,
-      campos: ((solicitation.payload as Record<string, unknown>)?.campos ?? {}) as Record<string, unknown>,
+      campos: normalizedCampos,
     },
     formSchema: schemaCampos,
     dataSources: {
       costCenters,
       users: approverCandidates,
+      experienceEvaluators,
       departments,
       positions,
     },
@@ -255,7 +293,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
   if (body.mode === 'EDIT_FIELDS') {
     if (!canEdit) return NextResponse.json({ error: 'Sem permissão para editar os dados do chamado.' }, { status: 403 })
 
-    const currentPayload = (solicitation.payload as Record<string, unknown>) ?? {}
+     const currentPayload = (solicitation.payload as Record<string, unknown>) ?? {}
     const currentCampos = ((currentPayload.campos ?? {}) as Record<string, unknown>) ?? {}
     const incomingCampos = body.campos ?? {}
 
@@ -263,9 +301,32 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       Object.entries(incomingCampos).filter(([key]) => Object.prototype.hasOwnProperty.call(currentCampos, key)),
     )
 
+    const mergedCampos = { ...currentCampos, ...sanitizedCampos }
+    const hasExperienceEvaluatorField =
+      Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliador') ||
+      Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliadorId')
+
+    if (hasExperienceEvaluatorField) {
+      const experienceEvaluators = await listExperienceEvaluators()
+      const evaluatorId = resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
+
+      if (evaluatorId) {
+        const evaluator = experienceEvaluators.find((item) => item.id === evaluatorId)
+        mergedCampos.gestorImediatoAvaliadorId = evaluatorId
+        if (evaluator) mergedCampos.gestorImediatoAvaliador = evaluator.fullName
+      } else {
+        const incomingEvaluatorId = normalizeStringValue(incomingCampos.gestorImediatoAvaliadorId)
+        const incomingEvaluator = normalizeStringValue(incomingCampos.gestorImediatoAvaliador)
+        if (incomingEvaluatorId === '' || incomingEvaluator === '') {
+          mergedCampos.gestorImediatoAvaliadorId = ''
+          mergedCampos.gestorImediatoAvaliador = ''
+        }
+      }
+    }
+
     const updatedPayload = {
       ...currentPayload,
-      campos: { ...currentCampos, ...sanitizedCampos },
+      campos: mergedCampos,
     }
 
     const updated = await prisma.solicitation.update({
