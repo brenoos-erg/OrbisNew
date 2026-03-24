@@ -306,6 +306,9 @@ export type SolicitationDetail = {
   solicitacaoSetores?: SolicitacaoSetor[]
   timelines?: { id: string; status: string; message?: string | null; createdAt: string }[]
   nonConformity?: { id: string; numeroRnc: string; status?: string | null } | null
+  dataSources?: {
+    experienceEvaluators?: Array<{ id: string; fullName: string }>
+  }
 }
 
 
@@ -400,6 +403,56 @@ function normalizeConstaValue(value: unknown): ConstaFlag | '' {
     return 'NADA_CONSTA'
   return ''
 }
+
+function normalizeTextValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function isExperienceEvaluatorField(campo: CampoEspecifico) {
+  const normalizedName = campo.name.trim().toLowerCase()
+  const normalizedLabel = (campo.label ?? '').trim().toLowerCase()
+  return (
+    normalizedName === 'gestorimediatoavaliador' ||
+    normalizedName === 'gestorimediatoavaliadorid' ||
+    normalizedLabel.includes('gestor imediato avaliador')
+  )
+}
+
+function resolveExperienceEvaluatorDisplayValue(
+  payloadCampos: Record<string, unknown>,
+  evaluators: Array<{ id: string; fullName: string }>,
+) {
+  const byIdKey = normalizeTextValue(payloadCampos.gestorImediatoAvaliadorId)
+  if (byIdKey) {
+    const evaluator = evaluators.find((user) => user.id === byIdKey)
+    if (evaluator) return evaluator.fullName
+  }
+
+  const rawGestor = payloadCampos.gestorImediatoAvaliador
+  if (rawGestor && typeof rawGestor === 'object' && !Array.isArray(rawGestor)) {
+    const byObjectId = normalizeTextValue((rawGestor as Record<string, unknown>).id)
+    if (byObjectId) {
+      const evaluator = evaluators.find((user) => user.id === byObjectId)
+      if (evaluator) return evaluator.fullName
+    }
+  }
+
+  const byDirectId = normalizeTextValue(rawGestor)
+  if (byDirectId) {
+    const evaluator = evaluators.find((user) => user.id === byDirectId)
+    if (evaluator) return evaluator.fullName
+  }
+
+  const byName = normalizeTextValue(rawGestor)
+  if (!byName) return ''
+  const evaluatorByName = evaluators.find(
+    (user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName.toLocaleLowerCase('pt-BR'),
+  )
+  if (evaluatorByName) return evaluatorByName.fullName
+
+  return UUID_REGEX.test(byName) ? '' : byName
+}
+
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -1107,6 +1160,13 @@ export function SolicitationDetailModal({
   ])
 
   const getCampoDisplayValue = (campo: CampoEspecifico) => {
+    if (isExperienceEvaluatorField(campo)) {
+      return resolveExperienceEvaluatorDisplayValue(
+        payloadCampos,
+        detail?.dataSources?.experienceEvaluators ?? [],
+      )
+    }
+
     if (campo.name === 'centroCustoDestinoId') {
       return String(
         payloadCampos.centroCustoDestinoText ??

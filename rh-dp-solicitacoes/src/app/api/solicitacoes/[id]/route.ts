@@ -11,6 +11,34 @@ import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 import { canViewSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
+
+function normalizeStringValue(value: unknown) {
+  if (typeof value !== 'string') return ''
+  return value.trim()
+}
+
+function resolveExperienceEvaluatorId(
+  campos: Record<string, unknown>,
+  evaluators: Array<{ id: string; fullName: string }>,
+) {
+  const byIdKey = normalizeStringValue(campos.gestorImediatoAvaliadorId)
+  if (byIdKey && evaluators.some((user) => user.id === byIdKey)) return byIdKey
+
+  const rawGestor = campos.gestorImediatoAvaliador
+  if (rawGestor && typeof rawGestor === 'object' && !Array.isArray(rawGestor)) {
+    const byObjectId = normalizeStringValue((rawGestor as Record<string, unknown>).id)
+    if (byObjectId && evaluators.some((user) => user.id === byObjectId)) return byObjectId
+  }
+
+  const byDirectId = normalizeStringValue(rawGestor)
+  if (byDirectId && evaluators.some((user) => user.id === byDirectId)) return byDirectId
+
+  const byName = normalizeStringValue(rawGestor).toLocaleLowerCase('pt-BR')
+  if (!byName) return ''
+
+  return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
+}
 
 /**
  * GET /api/solicitacoes/[id]
@@ -170,6 +198,17 @@ export async function GET(
       return !already
     })
 
+    const payload = (item.payload ?? {}) as Record<string, unknown>
+    const payloadCampos = ((payload.campos as Record<string, unknown> | undefined) ?? {})
+    const experienceEvaluators = await listExperienceEvaluators()
+    const resolvedEvaluatorId = resolveExperienceEvaluatorId(payloadCampos, experienceEvaluators)
+    const normalizedCampos = { ...payloadCampos }
+    if (resolvedEvaluatorId) {
+      const evaluator = experienceEvaluators.find((value) => value.id === resolvedEvaluatorId)
+      normalizedCampos.gestorImediatoAvaliadorId = resolvedEvaluatorId
+      if (evaluator) normalizedCampos.gestorImediatoAvaliador = evaluator.fullName
+    }
+
     // Mapeia para o formato que o front espera
     const result = {
    id: item.id,
@@ -202,12 +241,18 @@ export async function GET(
         : null,
         department: item.department
         ? {
-            id: item.department.id,
+           id: item.department.id,
             name: item.department.name,
             code: item.department.code,
           }
          : null,
-      payload: item.payload as any,
+      payload: {
+        ...(payload as Record<string, unknown>),
+        campos: normalizedCampos,
+      } as any,
+      dataSources: {
+        experienceEvaluators,
+      },
       nonConformity: item.nonConformity
         ? { id: item.nonConformity.id, numeroRnc: item.nonConformity.numeroRnc, status: item.nonConformity.status }
         : null,
