@@ -91,14 +91,34 @@ function isUuidLike(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
+const payloadCostCenterObjectKeys = [
+  'centroCusto',
+  'centroCustoForm',
+  'centroCustoDestino',
+  'costCenter',
+]
+
+const payloadCostCenterFriendlyTextKeys = [
+  'centroCustoLabel',
+  'centroCustoIdLabel',
+  'centroCustoDestinoText',
+  'costCenterText',
+  'centroCusto',
+]
+
+const payloadCostCenterIdKeys = [
+  'centroCustoForm',
+  'centroCustoId',
+  'centroCustoDestinoId',
+  'costCenterId',
+  'centroCusto',
+  'centroCustoLabel',
+  'centroCustoIdLabel',
+  'centroCustoDestinoText',
+  'costCenterText',
+]
 function pickPayloadCostCenterId(campos: Record<string, unknown>) {
-  const candidate = pickFirstString(campos, [
-    'centroCustoForm',
-    'centroCustoId',
-    'centroCustoDestinoId',
-    'costCenterId',
-    'centroCusto',
-  ])
+  const candidate = pickFirstString(campos, payloadCostCenterIdKeys)
 
   if (!candidate || !isUuidLike(candidate)) return null
   return candidate
@@ -108,17 +128,14 @@ function resolvePayloadCostCenterLabel(
   campos: Record<string, unknown>,
   payloadCostCentersById?: Map<string, CostCenterLike>,
 ) {
-  const payloadCostCenter = asCostCenterLike(campos.centroCusto)
-  const payloadCostCenterFromObject = formatCostCenterLabel(payloadCostCenter, '')
-  if (payloadCostCenterFromObject) return payloadCostCenterFromObject
+  for (const key of payloadCostCenterObjectKeys) {
+    const payloadCostCenter = asCostCenterLike(campos[key])
+    const payloadCostCenterFromObject = formatCostCenterLabel(payloadCostCenter, '')
+    if (payloadCostCenterFromObject) return payloadCostCenterFromObject
+  }
 
-  const payloadFriendlyText = pickFirstString(campos, [
-    'centroCustoLabel',
-    'centroCustoIdLabel',
-    'centroCustoDestinoText',
-    'costCenterText',
-  ])
-  if (payloadFriendlyText) return payloadFriendlyText
+  const payloadFriendlyText = pickFirstString(campos, payloadCostCenterFriendlyTextKeys)
+  if (payloadFriendlyText && !isUuidLike(payloadFriendlyText)) return payloadFriendlyText
 
   const payloadCostCenterId = pickPayloadCostCenterId(campos)
   if (payloadCostCenterId) {
@@ -129,8 +146,7 @@ function resolvePayloadCostCenterLabel(
     return null
   }
 
-  const centroCustoText = pickFirstString(campos, ['centroCusto'])
-  return centroCustoText || null
+  return null
 }
 
 export function collectPayloadCostCenterIds(items: BiSolicitacaoPessoalItem[]) {
