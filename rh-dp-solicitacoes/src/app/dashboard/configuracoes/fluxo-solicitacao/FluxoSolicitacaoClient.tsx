@@ -309,6 +309,7 @@ export default function FluxoSolicitacaoClient() {
     const fieldType = normalizeFieldType(field)
     const fieldValue = editFields[field.name]
     const label = field.label?.trim() || field.name
+    const isEvaluatorField = isExperienceEvaluatorField(field)
     const dynamicOptions = inferFieldSourceOptions(field)
     const options = (field.options ?? []).map((opt) => ({ value: opt, label: opt }))
     const resolvedOptions = options.length > 0 ? options : dynamicOptions
@@ -382,8 +383,9 @@ export default function FluxoSolicitacaoClient() {
       )
     }
 
-    if ((fieldType === 'select' || fieldType === 'cost_center' || fieldType === 'autocomplete') && resolvedOptions.length > 0) {
-      const selected = fieldValue == null ? '' : String(fieldValue)
+     if ((isEvaluatorField || fieldType === 'select' || fieldType === 'cost_center' || fieldType === 'autocomplete') && resolvedOptions.length > 0) {
+      const selectedValue = fieldValue == null ? '' : String(fieldValue)
+      const selected = resolvedOptions.some((option) => option.value === selectedValue) ? selectedValue : ''
       return (
         <label key={field.name} className="block text-sm">
           <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
@@ -391,8 +393,18 @@ export default function FluxoSolicitacaoClient() {
             value={selected}
             required={required}
             disabled={disabled || readOnly}
-            onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            onChange={(e) => {
+              const selectedId = e.target.value
+              setEditFields((prev) => {
+                if (!isEvaluatorField) return { ...prev, [field.name]: selectedId }
+                return {
+                  ...prev,
+                  [field.name]: selectedId,
+                  gestorImediatoAvaliadorId: selectedId,
+                  gestorImediatoAvaliador: selectedId,
+                }
+              })
+            }}            className="w-full rounded-md border border-slate-300 px-3 py-2"
           >
             <option value="">Selecione...</option>
             {resolvedOptions.map((option) => (
