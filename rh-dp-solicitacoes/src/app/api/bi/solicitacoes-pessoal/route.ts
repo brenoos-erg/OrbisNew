@@ -4,6 +4,7 @@ import { isBiRequestAuthorized } from '@/lib/bi-auth'
 import {
   BI_SOLICITACAO_PESSOAL_COLUMNS,
   buildBiSolicitacaoPessoalWhere,
+  collectPayloadCostCenterIds,
   mapSolicitacaoPessoalBiRow,
   toBiSolicitacaoPessoalModelColumns,
 } from '@/lib/bi/solicitacoesPessoal'
@@ -46,7 +47,18 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    const rows = items.map((item) => mapSolicitacaoPessoalBiRow(item))
+    const payloadCostCenterIds = collectPayloadCostCenterIds(items)
+    const payloadCostCenters = payloadCostCenterIds.length
+      ? await prisma.costCenter.findMany({
+          where: { id: { in: payloadCostCenterIds } },
+          select: { id: true, description: true, externalCode: true, code: true },
+        })
+      : []
+    const payloadCostCentersById = new Map(
+      payloadCostCenters.map((costCenter) => [costCenter.id, costCenter] as const),
+    )
+
+    const rows = items.map((item) => mapSolicitacaoPessoalBiRow(item, payloadCostCentersById))
     const modelRows = rows.map(toBiSolicitacaoPessoalModelColumns)
 
     return NextResponse.json({

@@ -21,6 +21,21 @@ export type BiSolicitacaoPessoalRow = {
   motivoDaVaga: string
   ordem: string | null
 }
+type CostCenterLike = {
+  description: string | null
+  externalCode: string | null
+  code: string | null
+}
+
+type BiSolicitacaoPessoalItem = {
+  protocolo: string
+  dataAbertura: Date
+  status: SolicitationStatus
+  payload: unknown
+  solicitante: { fullName: string | null } | null
+  costCenter: CostCenterLike | null
+  department: { name: string | null } | null
+}
 
 export const BI_SOLICITACAO_PESSOAL_COLUMNS = [
   'protocolo',
@@ -72,6 +87,64 @@ function asCostCenterLike(value: unknown) {
     code: typeof maybe.code === 'string' ? maybe.code : null,
   }
 }
+function isUuidLike(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function pickPayloadCostCenterId(campos: Record<string, unknown>) {
+  const candidate = pickFirstString(campos, [
+    'centroCustoForm',
+    'centroCustoId',
+    'centroCustoDestinoId',
+    'costCenterId',
+    'centroCusto',
+  ])
+
+  if (!candidate || !isUuidLike(candidate)) return null
+  return candidate
+}
+
+function resolvePayloadCostCenterLabel(
+  campos: Record<string, unknown>,
+  payloadCostCentersById?: Map<string, CostCenterLike>,
+) {
+  const payloadCostCenter = asCostCenterLike(campos.centroCusto)
+  const payloadCostCenterFromObject = formatCostCenterLabel(payloadCostCenter, '')
+  if (payloadCostCenterFromObject) return payloadCostCenterFromObject
+
+  const payloadFriendlyText = pickFirstString(campos, [
+    'centroCustoLabel',
+    'centroCustoIdLabel',
+    'centroCustoDestinoText',
+    'costCenterText',
+  ])
+  if (payloadFriendlyText) return payloadFriendlyText
+
+  const payloadCostCenterId = pickPayloadCostCenterId(campos)
+  if (payloadCostCenterId) {
+    const payloadCostCenterResolved = payloadCostCentersById?.get(payloadCostCenterId)
+    if (payloadCostCenterResolved) {
+      return formatCostCenterLabel(payloadCostCenterResolved, '')
+    }
+    return null
+  }
+
+  const centroCustoText = pickFirstString(campos, ['centroCusto'])
+  return centroCustoText || null
+}
+
+export function collectPayloadCostCenterIds(items: BiSolicitacaoPessoalItem[]) {
+  const ids = new Set<string>()
+
+  for (const item of items) {
+    const campos = parsePayloadCampos(item.payload)
+    const payloadCostCenterId = pickPayloadCostCenterId(campos)
+    if (payloadCostCenterId) ids.add(payloadCostCenterId)
+  }
+
+  return [...ids]
+}
+
 
 function pickFirstString(obj: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
@@ -130,31 +203,16 @@ export function buildBiSolicitacaoPessoalWhere(filters: BiSolicitacaoPessoalFilt
   return where
 }
 
-export function mapSolicitacaoPessoalBiRow(item: {
-  protocolo: string
-  dataAbertura: Date
-  status: SolicitationStatus
-  payload: unknown
-  solicitante: { fullName: string | null } | null
-  costCenter: { description: string | null; externalCode: string | null; code: string | null } | null
-  department: { name: string | null } | null
-}): BiSolicitacaoPessoalRow {
+export function mapSolicitacaoPessoalBiRow(
+  item: BiSolicitacaoPessoalItem,
+  payloadCostCentersById?: Map<string, CostCenterLike>,
+): BiSolicitacaoPessoalRow {
   const campos = parsePayloadCampos(item.payload)
   const cargo = pickFirstString(campos, ['cargoNome', 'cargoFinal', 'cargo', 'cargoColaborador'])
   const motivoDaVagaRaw = pickFirstString(campos, ['motivoVaga', 'motivoDaVaga'])
   const motivoDaVaga = normalizeSolicitacaoPessoalMotivoVaga(motivoDaVagaRaw)
   const ordem = pickFirstString(campos, ['ordem', 'ordemVaga', 'ordemServico', 'numeroOrdem'])
-  const payloadCostCenter = asCostCenterLike(campos.centroCusto)
-  const centroCustoPayloadText = pickFirstString(campos, [
-    'centroCustoForm',
-    'centroCustoLabel',
-    'centroCustoIdLabel',
-    'centroCusto',
-  ])
-  const centroCustoPayload =
-    formatCostCenterLabel(payloadCostCenter, '') ||
-    centroCustoPayloadText ||
-    null
+  const centroCustoPayload = resolvePayloadCostCenterLabel(campos, payloadCostCentersById)
   const centroCustoAmigavel =
     centroCustoPayload ||
     formatCostCenterLabel(item.costCenter, '') ||

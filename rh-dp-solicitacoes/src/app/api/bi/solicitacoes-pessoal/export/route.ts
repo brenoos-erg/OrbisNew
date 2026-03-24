@@ -4,6 +4,7 @@ import { isBiRequestAuthorized } from '@/lib/bi-auth'
 import {
   BI_SOLICITACAO_PESSOAL_COLUMNS,
   buildBiSolicitacaoPessoalWhere,
+  collectPayloadCostCenterIds,
   mapSolicitacaoPessoalBiRow,
   toBiSolicitacaoPessoalModelColumns,
 } from '@/lib/bi/solicitacoesPessoal'
@@ -17,7 +18,6 @@ function escapeCsvValue(value: string) {
   }
   return value
 }
-
 export async function GET(req: NextRequest) {
   try {
     const auth = isBiRequestAuthorized(req)
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       solicitante: searchParams.get('solicitante'),
     })
 
-    const items = await prisma.solicitation.findMany({
+     const items = await prisma.solicitation.findMany({
       where,
       orderBy: [{ dataAbertura: 'desc' }],
       select: {
@@ -53,8 +53,19 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    const payloadCostCenterIds = collectPayloadCostCenterIds(items)
+    const payloadCostCenters = payloadCostCenterIds.length
+      ? await prisma.costCenter.findMany({
+          where: { id: { in: payloadCostCenterIds } },
+          select: { id: true, description: true, externalCode: true, code: true },
+        })
+      : []
+    const payloadCostCentersById = new Map(
+      payloadCostCenters.map((costCenter) => [costCenter.id, costCenter] as const),
+    )
+
     const modelRows = items
-      .map((item) => mapSolicitacaoPessoalBiRow(item))
+      .map((item) => mapSolicitacaoPessoalBiRow(item, payloadCostCentersById))
       .map((row) => toBiSolicitacaoPessoalModelColumns(row))
 
     const header = BI_SOLICITACAO_PESSOAL_COLUMNS.join(';')
