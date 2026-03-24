@@ -151,11 +151,14 @@ export function mapSolicitacaoPessoalBiRow(item: {
     'centroCustoIdLabel',
     'centroCusto',
   ])
-  const centroCustoAmigavel =
-    formatCostCenterLabel(item.costCenter, '') ||
-    item.department?.name?.trim() ||
+  const centroCustoPayload =
     formatCostCenterLabel(payloadCostCenter, '') ||
     centroCustoPayloadText ||
+    null
+  const centroCustoAmigavel =
+    centroCustoPayload ||
+    formatCostCenterLabel(item.costCenter, '') ||
+    item.department?.name?.trim() ||
     '-'
 
   return {
