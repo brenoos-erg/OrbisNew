@@ -50,6 +50,7 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const tipoId = searchParams.get('tipoId')
   const protocolo = searchParams.get('protocolo')
   const solicitante = searchParams.get('solicitante')
+  const solicitanteLogin = searchParams.get('solicitanteLogin')
   const status = searchParams.get('status')
   const text = searchParams.get('text')
   if (dateStart || dateEnd) {
@@ -69,11 +70,12 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const protocoloNormalizado = protocolo?.trim() ?? ''
   const hasProtocoloFilter = protocoloNormalizado.length > 0
 
-  if (status && !hasProtocoloFilter) where.status = status
+  if (status) where.status = status
 
-  if (hasProtocoloFilter) {
+   if (hasProtocoloFilter) {
     where.protocolo = {
       contains: protocoloNormalizado,
+      mode: 'insensitive',
     }
   }
 
@@ -81,34 +83,38 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     where.solicitante = {
       OR: [
         {
-          fullName: { contains: solicitante },
+          fullName: { contains: solicitante.trim(), mode: 'insensitive' },
         },
         {
-          email: { contains: solicitante },
+          email: { contains: solicitante.trim(), mode: 'insensitive' },
         },
       ],
     }
   }
+  if (solicitanteLogin?.trim()) {
+    where.solicitante = {
+      ...(where.solicitante ?? {}),
+      login: { contains: solicitanteLogin.trim(), mode: 'insensitive' },
+    }
+  }
 
-  if (text) {
-    const or: any[] = [
+  if (text?.trim()) {
+    const textValue = text.trim()
+    where.AND = [
+      ...(where.AND ?? []),
       {
-        titulo: { contains: text },
-      },
-      {
-        descricao: { contains: text },
+        OR: [
+          { titulo: { contains: textValue, mode: 'insensitive' } },
+          { descricao: { contains: textValue, mode: 'insensitive' } },
+          { payload: { path: ['campos'], string_contains: textValue } },
+          { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
+        ],
       },
     ]
-    if (where.OR) {
-      where.OR = [...where.OR, ...or]
-    } else {
-      where.OR = or
-    }
   }
 
   return where
 }
-
 function normalizeSimpleText(value: string) {
   return value
     .normalize('NFD')

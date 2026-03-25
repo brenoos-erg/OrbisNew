@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic'
 type ApiResponse = { rows: Row[]; total: number }
 type DepartmentOption = { id: string; label: string; description?: string | null }
 type CostCenterOption = { id: string; description: string; code?: string | null; externalCode?: string | null }
+type TipoOption = { id: string; nome: string }
 
 type FilterState = {
   departmentId: string
@@ -33,7 +34,6 @@ type FilterState = {
   status: string
   text: string
 }
-
 
 type SearchState = FilterState & { page: number; pageSize: number }
 
@@ -114,6 +114,7 @@ export default function SentRequestsPage() {
   const [total, setTotal] = useState(0)
   const [departments, setDepartments] = useState<DepartmentOption[]>([])
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
+  const [tipos, setTipos] = useState<TipoOption[]>([])
 
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -133,7 +134,7 @@ export default function SentRequestsPage() {
 
   const departmentsLabel = useMemo(() => [{ id: '', label: 'Todos os departamentos' }, ...departments], [departments])
   const costCentersLabel = useMemo(() => [{ id: '', description: 'Todos os centros de custo' }, ...costCenters], [costCenters])
-  const tipos = useMemo(() => [{ id: '', nome: 'Selecione uma opção' }, { id: 'tipo-docs-1', nome: 'Abertura de Chamado' }], [])
+  const tiposLabel = useMemo(() => [{ id: '', nome: 'Todos os tipos' }, ...tipos], [tipos])
   const categorias = useMemo(() => [{ id: '', nome: 'Selecione uma opção' }, { id: 'padrao', nome: 'Padrão' }], [])
   const statuses = useMemo(() => [
     { id: '', nome: 'Todos' },
@@ -170,23 +171,27 @@ export default function SentRequestsPage() {
 
     const loadFilters = async () => {
       try {
-        const [departmentsRes, costCentersRes] = await Promise.all([
+      const [departmentsRes, costCentersRes, tiposRes] = await Promise.all([
           fetch('/api/departments', { signal: controller.signal }),
           fetch('/api/cost-centers/select', { signal: controller.signal }),
+          fetch('/api/tipos-solicitacao', { signal: controller.signal }),
         ])
 
-        if (!departmentsRes.ok || !costCentersRes.ok) throw new Error('Erro ao carregar filtros.')
+        if (!departmentsRes.ok || !costCentersRes.ok || !tiposRes.ok) throw new Error('Erro ao carregar filtros.')
         const departmentsData = (await departmentsRes.json()) as DepartmentOption[]
         const costCentersData = (await costCentersRes.json()) as CostCenterOption[]
+        const tiposData = (await tiposRes.json()) as TipoOption[]
         if (active) {
           setDepartments(Array.isArray(departmentsData) ? departmentsData : [])
           setCostCenters(Array.isArray(costCentersData) ? costCentersData : [])
+          setTipos(Array.isArray(tiposData) ? tiposData : [])
         }
       } catch (err) {
         if (!controller.signal.aborted && active) {
           console.error('Erro ao carregar filtros de solicitações', err)
           setDepartments([])
           setCostCenters([])
+          setTipos([])
         }
       }
     }
@@ -444,7 +449,7 @@ export default function SentRequestsPage() {
           <div>
             <label className="block text-xs font-semibold text-black tracking-wide">Solicitação</label>
             <select value={formFilters.tipoId} onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
-              {tipos.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              {tiposLabel.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
             </select>
           </div>
           <div>

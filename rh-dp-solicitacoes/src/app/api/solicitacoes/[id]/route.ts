@@ -209,7 +209,7 @@ export async function GET(
       if (evaluator) normalizedCampos.gestorImediatoAvaliador = evaluator.fullName
     }
 
-    // Mapeia para o formato que o front espera
+   // Mapeia para o formato que o front espera
     const result = {
    id: item.id,
       protocolo: item.protocolo,
@@ -227,6 +227,7 @@ export async function GET(
       tipo: item.tipo
         ? {
             id: item.tipo.id,
+            codigo: (item.tipo as { codigo?: string | null }).codigo ?? null,
             nome: item.tipo.nome,
             descricao: item.tipo.descricao,
             schemaJson: item.tipo.schemaJson as any,

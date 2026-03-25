@@ -69,12 +69,12 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     }
   }
 
-  const protocoloNormalizado = protocolo?.trim() ?? ''
+ const protocoloNormalizado = protocolo?.trim() ?? ''
   const hasProtocoloFilter = protocoloNormalizado.length > 0
 
-  if (status && !hasProtocoloFilter) {
+  if (status) {
     where.status = status
-  } else if (situacao && !hasProtocoloFilter) {
+  } else if (situacao) {
     const statusBySituacao: Record<string, string[]> = {
       PENDENTE: ['ABERTA', 'AGUARDANDO_APROVACAO', 'AGUARDANDO_TERMO'],
       EM_ATENDIMENTO: ['EM_ATENDIMENTO', 'AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
@@ -90,15 +90,15 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 if (hasProtocoloFilter) {
     where.protocolo = {
       contains: protocoloNormalizado,
+      mode: 'insensitive',
     }
   }
-
   const solicitanteBusca = solicitanteNome ?? solicitante
   if (solicitanteBusca) {
     where.solicitante = {
       OR: [
-        { fullName: { contains: solicitanteBusca } },
-        { email: { contains: solicitanteBusca } },
+         { fullName: { contains: solicitanteBusca.trim(), mode: 'insensitive' } },
+        { email: { contains: solicitanteBusca.trim(), mode: 'insensitive' } },
       ],
     }
   }
@@ -107,13 +107,13 @@ if (hasProtocoloFilter) {
     where.solicitante = {
       ...(where.solicitante ?? {}),
       ...(where.solicitante?.OR ? {} : { OR: [] }),
-      login: { contains: solicitanteLogin },
+      login: { contains: solicitanteLogin.trim(), mode: 'insensitive' },
     }
   }
 
   if (responsavel) {
     where.assumidaPor = {
-      fullName: { contains: responsavel },
+      fullName: { contains: responsavel.trim(), mode: 'insensitive' },
     }
   }
 
@@ -138,16 +138,19 @@ if (hasProtocoloFilter) {
       },
     ]
   }
-  if (text) {
-    const or: any[] = [
-      { titulo: { contains: text } },
-      { descricao: { contains: text } },
+  if (text?.trim()) {
+    const textValue = text.trim()
+    where.AND = [
+      ...(where.AND ?? []),
+      {
+        OR: [
+          { titulo: { contains: textValue, mode: 'insensitive' } },
+          { descricao: { contains: textValue, mode: 'insensitive' } },
+          { payload: { path: ['campos'], string_contains: textValue } },
+          { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
+        ],
+      },
     ]
-    if (where.OR) {
-      where.OR = [...where.OR, ...or]
-    } else {
-      where.OR = or
-    }
   }
 
 

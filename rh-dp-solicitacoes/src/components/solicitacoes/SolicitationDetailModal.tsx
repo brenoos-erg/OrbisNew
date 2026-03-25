@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYYHHMM } from '@/lib/date'
 import {
-  isSolicitacaoDesligamento,
+   isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
@@ -20,6 +20,10 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
+import {
+  extractExperienceEvaluationData,
+  isExperienceEvaluationTipo,
+} from '@/lib/experienceEvaluationForm'
 
 
 
@@ -70,7 +74,7 @@ export type Row = {
   status: string
   protocolo?: string
   createdAt?: string | null
-  tipo?: { codigo?: string; nome: string } | null
+  tipo?: { id?: string; codigo?: string; nome: string } | null
   responsavel?: { fullName: string } | null
   responsavelId?: string | null
   finalizador?: { fullName: string } | null
@@ -206,7 +210,7 @@ type ChildSolicitation = {
   status: string
   dataAbertura: string
   approverId?: string | null
-  tipo?: { codigo?: string; nome: string } | null
+  tipo?: { id?: string; codigo?: string; nome: string } | null
   setorDestino?: string | null
 }
 type SolicitacaoSetor = {
@@ -218,6 +222,8 @@ type SolicitacaoSetor = {
   finalizadoEm?: string | null
   finalizadoPor?: string | null
 }
+
+type ExperienceEvaluationReadModel = ReturnType<typeof extractExperienceEvaluationData>
 
 type CurrentUser = {
   id: string
@@ -285,6 +291,7 @@ export type SolicitationDetail = {
   dataCancelamento?: string | null
   tipo?: {
     id: string
+    codigo?: string | null
     nome: string
     descricao?: string | null
     schemaJson?: SchemaJson
@@ -556,7 +563,7 @@ export function SolicitationDetailModal({
   canManage = true,
 }: Props) {
 
-  const isApprovalMode = mode === 'approval'
+ const isApprovalMode = mode === 'approval'
   const [detail, setDetail] = useState<SolicitationDetail | null>(detailProp)
   const [nadaConstaCampos, setNadaConstaCampos] = useState<
     Record<string, string>
@@ -573,6 +580,9 @@ export function SolicitationDetailModal({
     Partial<Record<keyof AvaliacaoGestorForm, string>>
   >({})
   const [gestorAvaliacaoError, setGestorAvaliacaoError] = useState<string | null>(null)
+  const [experienceData, setExperienceData] = useState<ExperienceEvaluationReadModel>(
+    extractExperienceEvaluationData({}),
+  )
   const [savingGestorAvaliacao, setSavingGestorAvaliacao] = useState(false)
 
   useEffect(() => {
@@ -790,18 +800,17 @@ export function SolicitationDetailModal({
     setDescricaoSolucaoSst((payloadSstResposta.descricaoSolucao as string) || '')
     setObservacaoSst1((payloadSstResposta.observacao1 as string) || '')
     setObservacaoSst2((payloadSstResposta.observacao2 as string) || '')
-    const payloadAvaliacaoGestor = (payload as any)?.avaliacaoGestor ?? {}
+    const payloadAvaliacaoGestor = extractExperienceEvaluationData(payload)
+    setExperienceData(payloadAvaliacaoGestor)
     setGestorAvaliacaoForm({
-      relacionamentoNota: (payloadAvaliacaoGestor.relacionamentoNota as string) || '',
-      comunicacaoNota: (payloadAvaliacaoGestor.comunicacaoNota as string) || '',
-      atitudeNota: (payloadAvaliacaoGestor.atitudeNota as string) || '',
-      saudeSegurancaNota: (payloadAvaliacaoGestor.saudeSegurancaNota as string) || '',
-      dominioTecnicoProcessosNota:
-        (payloadAvaliacaoGestor.dominioTecnicoProcessosNota as string) || '',
-      adaptacaoMudancaNota: (payloadAvaliacaoGestor.adaptacaoMudancaNota as string) || '',
-      autogestaoGestaoPessoasNota:
-        (payloadAvaliacaoGestor.autogestaoGestaoPessoasNota as string) || '',
-      comentarioFinal: (payloadAvaliacaoGestor.comentarioFinal as string) || '',
+      relacionamentoNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'relacionamentoNota')?.value ?? '',
+      comunicacaoNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'comunicacaoNota')?.value ?? '',
+      atitudeNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'atitudeNota')?.value ?? '',
+      saudeSegurancaNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'saudeSegurancaNota')?.value ?? '',
+      dominioTecnicoProcessosNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'dominioTecnicoProcessosNota')?.value ?? '',
+      adaptacaoMudancaNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'adaptacaoMudancaNota')?.value ?? '',
+      autogestaoGestaoPessoasNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'autogestaoGestaoPessoasNota')?.value ?? '',
+      comentarioFinal: payloadAvaliacaoGestor.comentarioFinal || '',
     })
     setGestorAvaliacaoFieldErrors({})
     setGestorAvaliacaoError(null)
@@ -822,12 +831,11 @@ export function SolicitationDetailModal({
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
-  const isAvaliacaoExperiencia = detail?.tipo?.id === 'RQ_RH_103'
+  const isAvaliacaoExperiencia = isExperienceEvaluationTipo(detail?.tipo)
   const canEditAvaliacaoGestor =
     Boolean(currentUser?.id) &&
     currentUser?.id === detail?.approverId &&
     effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
-
 
   const missingGestorAvaliacaoFields = useMemo(() => {
     return EXPERIENCE_EVALUATION_REQUIRED_FIELDS.filter((field) => {
@@ -2651,7 +2659,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                                 <span>{formatDisplayValue(payloadCampos[campo.name], campo.type)}</span>
                               </div>
                             ) : (
-                              <input className={INPUT_RO} readOnly value={value} />
+                                <input className={INPUT_RO} readOnly value={value} />
                             )}
                           </div>
                         )
@@ -2659,6 +2667,57 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   </div>
                 )
+              )}
+               
+              {isAvaliacaoExperiencia && (
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    Formulário estruturado — Avaliação do Período de Experiência
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                    <div>
+                      <label className={LABEL_RO}>Colaborador avaliado</label>
+                      <input className={INPUT_RO} readOnly value={experienceData.colaboradorAvaliado || '-'} />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Cargo</label>
+                      <input className={INPUT_RO} readOnly value={experienceData.cargoColaborador || '-'} />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Contrato / setor</label>
+                      <input className={INPUT_RO} readOnly value={experienceData.contratoSetor || '-'} />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Gestor imediato (avaliador)</label>
+                      <input className={INPUT_RO} readOnly value={experienceData.gestorImediatoAvaliador || '-'} />
+                    </div>
+                    <div>
+                      <label className={LABEL_RO}>Cargo do avaliador</label>
+                      <input className={INPUT_RO} readOnly value={experienceData.cargoAvaliador || '-'} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Competências / notas</label>
+                      <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                        {experienceData.notas.map((item) => (
+                          <div key={item.key} className="flex items-center justify-between border-b border-slate-200 py-2 text-xs last:border-b-0">
+                            <span className="font-medium text-slate-700">{item.label}</span>
+                            <span className="font-semibold text-slate-900">{item.value || '-'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>
+                        Deseja realizar algum comentário sobre o colaborador em questão?
+                      </label>
+                      <textarea
+                        className={`${INPUT_RO} min-h-[90px]`}
+                        readOnly
+                        value={experienceData.comentarioFinal || '-'}
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
                
                 {isAvaliacaoExperiencia && (
