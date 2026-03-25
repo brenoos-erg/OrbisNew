@@ -113,12 +113,12 @@ export default function Sidebar({
   const [pendingRefusalCount, setPendingRefusalCount] = useState<number | null>(null)
 
 
-    const pathname = usePathname()
+     const pathname = usePathname()
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
   const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
-  const inSst = pathname.startsWith('/dashboard/sst')
+  const inSst = pathname.startsWith('/dashboard/sgi/qualidade') || pathname.startsWith('/dashboard/sst')
   const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
   const inMyDocuments = pathname.startsWith('/dashboard/meus-documentos')
   const inDocs = pathname.startsWith('/dashboard/controle-documentos')
@@ -632,18 +632,18 @@ export default function Sidebar({
                 className={`${baseSection} ${inSst ? activeSection : inactiveSection}`}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
-                  <ShieldAlert className="h-5 w-5 shrink-0" />
+                 <ShieldAlert className="h-5 w-5 shrink-0" />
                 </span>
-                {!collapsed && <span className={labelBase}>SST</span>}
+                {!collapsed && <span className={labelBase}>SGI / Qualidade</span>}
               </button>
 
               {openSst && !collapsed && (
                 <div className="mt-1 ml-9 flex flex-col gap-1">
                   <Link
-                    href="/dashboard/sst/nao-conformidades"
+                    href="/dashboard/sgi/qualidade/nao-conformidades"
                     className={`${submenuItemBase}
                       ${
-                          pathname.startsWith('/dashboard/sst/nao-conformidades')
+                          pathname.startsWith('/dashboard/sgi/qualidade/nao-conformidades')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
@@ -651,10 +651,10 @@ export default function Sidebar({
                     <ClipboardCheck size={16} /> <span className={labelBase}>Não Conformidades</span>
                   </Link>
                   <Link
-                    href="/dashboard/sst/planos-de-acao"
+                    href="/dashboard/sgi/qualidade/planos-de-acao"
                     className={`${submenuItemBase}
                       ${
-                        pathname.startsWith('/dashboard/sst/planos-de-acao')
+                        pathname.startsWith('/dashboard/sgi/qualidade/planos-de-acao')
                           ? 'bg-orange-500/90 text-white'
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}

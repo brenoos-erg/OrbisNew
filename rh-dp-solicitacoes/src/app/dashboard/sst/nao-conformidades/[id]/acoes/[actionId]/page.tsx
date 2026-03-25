@@ -1,10 +1,6 @@
-import AcaoNaoConformidadeDetailClient from './AcaoNaoConformidadeDetailClient'
+import { redirect } from 'next/navigation'
 
-export default async function AcaoNaoConformidadeDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string; actionId: string }>
-}) {
+export default async function LegacyAcaoNaoConformidadeDetailPage({ params }: { params: Promise<{ id: string; actionId: string }> }) {
   const { id, actionId } = await params
-  return <AcaoNaoConformidadeDetailClient id={id} actionId={actionId} />
+  redirect(`/dashboard/sgi/qualidade/nao-conformidades/${id}/acoes/${actionId}`)
 }

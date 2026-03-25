@@ -1,0 +1,1 @@
+export { default } from '@/app/dashboard/sst/nao-conformidades/nova/NovaNaoConformidadeClientPage'

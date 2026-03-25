@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
         select: { id: true, numeroRnc: true },
       })
 
-      await appendNonConformityTimelineEvent(tx, {
+     await appendNonConformityTimelineEvent(tx, {
         nonConformityId: created.id,
         actorId: me.id,
         tipo: 'CRIACAO',
@@ -200,12 +200,17 @@ export async function POST(req: NextRequest) {
     })
 
 
-    void notifyNonConformityStakeholders({
+    const notificationResult = await notifyNonConformityStakeholders({
       nonConformityId: created.id,
       actorId: me.id,
       trigger: 'created',
     })
-
+    if (!notificationResult.sent) {
+      console.warn('NC notification not sent', {
+        nonConformityId: created.id,
+        reason: notificationResult.reason,
+      })
+    }
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
     console.error('POST /api/sst/nao-conformidades error', error)

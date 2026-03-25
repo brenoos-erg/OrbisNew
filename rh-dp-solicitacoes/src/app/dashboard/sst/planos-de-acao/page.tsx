@@ -1,5 +1,5 @@
-import PlanosDeAcaoClient from './PlanosDeAcaoClient'
+import { redirect } from 'next/navigation'
 
-export default function PlanosDeAcaoPage() {
-  return <PlanosDeAcaoClient />
+export default function LegacyPlanosDeAcaoPage() {
+  redirect('/dashboard/sgi/qualidade/planos-de-acao')
 }

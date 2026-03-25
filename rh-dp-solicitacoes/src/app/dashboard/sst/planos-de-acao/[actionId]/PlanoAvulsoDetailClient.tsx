@@ -153,7 +153,7 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
     if (!confirm('Deseja excluir este plano avulso?')) return
     const res = await fetch(`/api/sst/plano-de-acao/${actionId}`, { method: 'DELETE' })
     if (res.ok) {
-      router.push('/dashboard/sst/planos-de-acao')
+      router.push('/dashboard/sgi/qualidade/planos-de-acao')
       return
     }
     const data = await res.json().catch(() => ({}))
@@ -170,12 +170,12 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
           <h1 className="text-2xl font-bold text-slate-900">Ação #{actionId.slice(-6)}</h1>
           <p className="text-sm text-slate-600">Origem: Plano Avulso</p>
         </div>
-        <div className="ml-auto flex flex-wrap gap-2">
+         <div className="ml-auto flex flex-wrap gap-2">
           <button type="button" onClick={() => save({ status: NonConformityActionStatus.CANCELADA })} disabled={saving} className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 disabled:opacity-50">Cancelar</button>
           <button type="button" onClick={() => save({ status: NonConformityActionStatus.PENDENTE })} disabled={saving} className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 disabled:opacity-50">Reabrir</button>
           <button type="button" onClick={() => save({ status: NonConformityActionStatus.CONCLUIDA, dataConclusao: new Date().toISOString().slice(0, 10) })} disabled={saving} className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 disabled:opacity-50">Concluir ação</button>
           <button onClick={() => save()} disabled={saving} className="rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? 'Salvando...' : 'Salvar/Atualizar'}</button>
-          <Link href="/dashboard/sst/planos-de-acao" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">Voltar</Link>
+          <Link href="/dashboard/sgi/qualidade/planos-de-acao" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">Voltar</Link>
         </div>
       </header>
 

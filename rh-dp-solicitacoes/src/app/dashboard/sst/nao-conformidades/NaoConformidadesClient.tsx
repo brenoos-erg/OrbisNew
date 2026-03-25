@@ -133,7 +133,7 @@ export default function NaoConformidadesClient() {
                 <td className="px-3 py-2">{item.centroQueDetectou?.description || '-'}</td>
                 <td className="px-3 py-2">{item.centroQueOriginou?.description || '-'}</td>
                 <td className="px-3 py-2">{item.solicitanteNome}</td>
-                <td className="px-3 py-2 text-right"><Link href={`/dashboard/sst/nao-conformidades/${item.id}`} className="text-orange-600 hover:text-orange-700">Detalhes</Link></td>
+                <td className="px-3 py-2 text-right"><Link href={`/dashboard/sgi/qualidade/nao-conformidades/${item.id}`} className="text-orange-600 hover:text-orange-700">Detalhes</Link></td>
               </tr>
             ))}
           </tbody>

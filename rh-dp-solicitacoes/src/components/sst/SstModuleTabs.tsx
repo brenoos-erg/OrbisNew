@@ -14,7 +14,7 @@ export default function SstModuleTabs({ active }: SstModuleTabsProps) {
     >
       <div className="flex flex-wrap gap-2">
         <Link
-          href="/dashboard/sst/nao-conformidades"
+          href="/dashboard/sgi/qualidade/nao-conformidades"
           className={`rounded-md px-3 py-2 text-sm font-medium transition ${
             active === 'nao-conformidades'
               ? 'bg-orange-500 text-white'
@@ -24,7 +24,7 @@ export default function SstModuleTabs({ active }: SstModuleTabsProps) {
           Não conformidades
         </Link>
         <Link
-          href="/dashboard/sst/planos-de-acao"
+          href="/dashboard/sgi/qualidade/planos-de-acao"
           className={`rounded-md px-3 py-2 text-sm font-medium transition ${
             active === 'planos-de-acao'
               ? 'bg-orange-500 text-white'

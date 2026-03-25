@@ -1,6 +1,6 @@
-import PlanoAvulsoDetailClient from './PlanoAvulsoDetailClient'
+import { redirect } from 'next/navigation'
 
-export default async function PlanoAvulsoDetailPage({ params }: { params: Promise<{ actionId: string }> }) {
+export default async function LegacyPlanoAvulsoDetailPage({ params }: { params: Promise<{ actionId: string }> }) {
   const { actionId } = await params
-  return <PlanoAvulsoDetailClient actionId={actionId} />
+  redirect(`/dashboard/sgi/qualidade/planos-de-acao/${actionId}`)
 }

@@ -162,7 +162,7 @@ export default function PlanosDeAcaoClient() {
           <h1 className="text-3xl font-bold text-slate-900">Planos de ação</h1>
           <p className="max-w-3xl text-slate-600">Visualize planos vinculados à não conformidade e também planos avulsos.</p>
         </div>
-        <Link href="/dashboard/sst/nao-conformidades" className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <Link href="/dashboard/sgi/qualidade/nao-conformidades" className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
           Voltar para não conformidades
         </Link>
       </div>
@@ -229,8 +229,8 @@ export default function PlanosDeAcaoClient() {
             {items.map((item) => {
               const atrasada = isOverdue(item)
               const detailHref = item.nonConformityId
-                ? `/dashboard/sst/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`
-                : `/dashboard/sst/planos-de-acao/${item.id}`
+                ? `/dashboard/sgi/qualidade/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`
+                : `/dashboard/sgi/qualidade/planos-de-acao/${item.id}`
 
               return (
                 <tr key={item.id} className="border-t border-slate-100 hover:bg-orange-50/60">

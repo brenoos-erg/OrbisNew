@@ -56,8 +56,7 @@ type Detail = {
   planoDeAcao?: ActionItem[]
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
-   linkedSolicitations?: Array<{ id: string; protocolo: string; status: string }>
-  permissions?: { canManageAllNc?: boolean; canOpenChangeManagement?: boolean; canApproveQuality?: boolean }
+  permissions?: { canManageAllNc?: boolean; canApproveQuality?: boolean }
 }
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
@@ -256,21 +255,6 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     load()
   }
 
-  async function abrirGestaoMudancas() {
-    if (!item) return
-    const params = new URLSearchParams({
-      tipoCodigo: 'RQ.QUA.148',
-      origem: 'NAO_CONFORMIDADE',
-      nonConformityId: item.id,
-      nonConformityNumero: item.numeroRnc,
-      descricaoResumida: item.descricao ?? '',
-      justificativaInicial: item.evidenciaObjetiva ?? '',
-      areaImpactada:
-        item.centroQueOriginou?.description || item.centroQueDetectou?.description || '',
-    })
-    router.push(`/dashboard/solicitacoes/enviadas/nova?${params.toString()}`)
-  }
-
   async function aprovar(aprovadoValor: boolean) {
     await fetch(`/api/sst/nao-conformidades/${id}/aprovacao`, {
       method: 'POST',
@@ -425,12 +409,11 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       setActionSaving(false)
       return
     }
-
-    resetActionForm()
+ resetActionForm()
     setActionModalOpen(false)
     setActionSaving(false)
     if (!editingActionId && data?.id) {
-      router.push(`/dashboard/sst/nao-conformidades/${id}/acoes/${data.id}`)
+      router.push(`/dashboard/sgi/qualidade/nao-conformidades/${id}/acoes/${data.id}`)
       return
     }
     load()
@@ -514,16 +497,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
                 Reabrir não conformidade
             </button>
           ) : null}
-          {item.permissions?.canOpenChangeManagement ? (
-            <button
-              type="button"
-              onClick={abrirGestaoMudancas}
-              className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              Abrir Gestão de Mudanças
-            </button>
-          ) : null}
-          <Link href="/dashboard/sst/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
+          <Link href="/dashboard/sgi/qualidade/nao-conformidades" className="text-sm font-medium text-orange-600 hover:text-orange-700">Voltar</Link>
         </div>
       </div>
         {bloqueado ? <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">Aguardando aprovação da qualidade. Ações em modo somente leitura.</div> : null}
@@ -561,23 +535,6 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
             <Info label="Referência SIG" value={item.referenciaSig || '-'} />
              <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
            <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
-            <div className="mt-4 rounded-lg border border-slate-200 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gestão de Mudanças vinculada</p>
-              {item.linkedSolicitations?.length ? (
-                <ul className="mt-2 space-y-2">
-                  {item.linkedSolicitations.map((sol) => (
-                    <li key={sol.id} className="text-sm text-slate-700">
-                      <span className="font-medium">{sol.protocolo}</span> · {sol.status} ·{' '}
-                      <Link href={`/dashboard/solicitacoes/${sol.id}`} className="text-orange-700 hover:underline">
-                        Abrir
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-slate-500">Nenhuma solicitação de Gestão de Mudanças vinculada.</p>
-              )}
-            </div>
             {item.status === 'CANCELADA' ? <Info label="Justificativa do cancelamento" value={justificativaCancelamento || '-'} /> : null}
           </Card>
           <div className="space-y-4">
@@ -736,7 +693,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
                       <td className="px-3 py-2 text-slate-700">{formatActionDate(action.createdAt)}</td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-3">
-                          <Link href={`/dashboard/sst/nao-conformidades/${id}/acoes/${action.id}`} className="text-xs font-medium text-orange-700 hover:underline">Visualizar/Editar</Link>
+                          <Link href={`/dashboard/sgi/qualidade/nao-conformidades/${id}/acoes/${action.id}`} className="text-xs font-medium text-orange-700 hover:underline">Visualizar/Editar</Link>
                           <button type="button" disabled={bloqueado} onClick={() => removerActionItem(action.id)} className="text-xs font-medium text-rose-700 hover:underline disabled:opacity-50">Excluir</button>
                         </div>
                       </td>

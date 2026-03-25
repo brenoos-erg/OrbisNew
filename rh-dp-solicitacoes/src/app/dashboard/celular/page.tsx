@@ -33,10 +33,9 @@ const MODULE_CARDS: ModuleCard[] = [
    {
     key: MODULE_KEYS.SST,
     name: 'Não Conformidades',
-    href: '/dashboard/sst/nao-conformidades',
+    href: '/dashboard/sgi/qualidade/nao-conformidades',
   },
 ]
-
 export default async function CelularPage() {
   const { appUser } = await getCurrentAppUser()
   const levels = appUser?.moduleLevels ?? {}
