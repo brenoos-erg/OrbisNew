@@ -9,6 +9,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 async function saveFile(file: File, folder: string) {
   const bytes = Buffer.from(await file.arrayBuffer())
@@ -27,11 +28,15 @@ async function getContext(userId: string) {
   return { level }
 }
 
-async function canAccessNc(nonConformityId: string, userId: string, level: ModuleLevel | undefined) {
-  const nc = await prisma.nonConformity.findUnique({ where: { id: nonConformityId }, select: { solicitanteId: true } })
-  if (!nc) return false
-  if (hasMinLevel(level, ModuleLevel.NIVEL_2)) return true
-  return nc.solicitanteId === userId
+async function getNcAccessContext(nonConformityId: string) {
+  return prisma.nonConformity.findUnique({
+    where: { id: nonConformityId },
+    select: {
+      solicitanteId: true,
+      centroQueDetectouId: true,
+      centroQueOriginouId: true,
+    },
+  })
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -43,8 +48,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const nonConformityId = (await params).id
-    if (!(await canAccessNc(nonConformityId, me.id, level))) {
-      return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
+    const nc = await getNcAccessContext(nonConformityId)
+    if (!nc) {
+      return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+    }
+
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canAccess = canUserAccessNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canAccess) {      return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
     }
 
     const items = await prisma.nonConformityAttachment.findMany({
@@ -67,7 +85,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const nonConformityId = (await params).id
-    if (!(await canAccessNc(nonConformityId, me.id, level))) {
+    const nc = await getNcAccessContext(nonConformityId)
+    if (!nc) {
+      return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+    }
+
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canTreat = canUserTreatNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canTreat) {
       return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
     }
     const form = await req.formData()
@@ -111,7 +143,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     const nonConformityId = (await params).id
-    if (!(await canAccessNc(nonConformityId, me.id, level))) {
+    const nc = await getNcAccessContext(nonConformityId)
+    if (!nc) {
+      return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
+    }
+
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canTreat = canUserTreatNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canTreat) {
       return NextResponse.json({ error: 'Sem acesso à não conformidade.' }, { status: 403 })
     }
 

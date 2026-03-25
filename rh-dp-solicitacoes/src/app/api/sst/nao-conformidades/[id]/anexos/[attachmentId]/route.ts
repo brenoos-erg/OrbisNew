@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; attachmentId: string }> }) {
   try {
@@ -18,7 +19,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     const { id, attachmentId } = await params
     const [nc, attachment] = await Promise.all([
-      prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true } }),
+      prisma.nonConformity.findUnique({
+        where: { id },
+        select: {
+          solicitanteId: true,
+          centroQueDetectouId: true,
+          centroQueOriginouId: true,
+        },
+      }),
       prisma.nonConformityAttachment.findUnique({ where: { id: attachmentId } }),
     ])
 
@@ -26,7 +34,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Anexo não encontrado.' }, { status: 404 })
     }
 
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_2) && nc.solicitanteId !== me.id) {
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canAccess = canUserAccessNc({
+      userId: me.id,
+      level,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canAccess) {
       return NextResponse.json({ error: 'Sem acesso ao anexo.' }, { status: 403 })
     }
 
