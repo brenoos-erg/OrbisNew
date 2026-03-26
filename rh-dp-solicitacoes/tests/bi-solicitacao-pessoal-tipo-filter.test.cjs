@@ -9,16 +9,22 @@ assert.match(
   'Filtro BI deve conter somente códigos de Solicitação de Pessoal/Admissão',
 )
 
-assert.doesNotMatch(
-  source,
-  /codigo:\s*\{\s*in:\s*\[[^\]]*RQ\.RH\.002/,
-  'Filtro BI não deve incluir código da Avaliação do Período de Experiência',
-)
-
 assert.match(
   source,
   /id:\s*\{\s*in:\s*\['RQ_063',\s*'SOLICITACAO_ADMISSAO'\]\s*\}/,
   'Filtro BI deve manter IDs esperados de Solicitação de Pessoal/Admissão',
+)
+
+assert.doesNotMatch(
+  source,
+  /nome:\s*\{\s*contains:\s*'Solicitação de pessoal'\s*\}/,
+  'Filtro BI não deve depender de contains por nome para classificar Solicitação de Pessoal',
+)
+
+assert.match(
+  source,
+  /NOT:\s*\{\s*[\s\S]*RQ_RH_103[\s\S]*RQ\.RH\.002[\s\S]*\}/,
+  'Filtro BI deve excluir explicitamente o tipo de Avaliação do Período de Experiência',
 )
 
 console.info('bi-solicitacao-pessoal-tipo-filter.test.cjs: ok')

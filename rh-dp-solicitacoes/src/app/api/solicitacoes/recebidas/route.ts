@@ -80,15 +80,14 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 if (hasProtocoloFilter) {
     where.protocolo = {
       contains: protocolo,
-      mode: 'insensitive',
     }
   }
   const solicitanteBusca = solicitanteNome || solicitante
   if (solicitanteBusca) {
     where.solicitante = {
       OR: [
-         { fullName: { contains: solicitanteBusca, mode: 'insensitive' } },
-        { email: { contains: solicitanteBusca, mode: 'insensitive' } },
+         { fullName: { contains: solicitanteBusca } },
+        { email: { contains: solicitanteBusca } },
       ],
     }
   }
@@ -97,13 +96,13 @@ if (hasProtocoloFilter) {
     where.solicitante = {
       ...(where.solicitante ?? {}),
       ...(where.solicitante?.OR ? {} : { OR: [] }),
-      login: { contains: solicitanteLogin, mode: 'insensitive' },
+      login: { contains: solicitanteLogin },
     }
   }
 
   if (responsavel) {
     where.assumidaPor = {
-      fullName: { contains: responsavel, mode: 'insensitive' },
+      fullName: { contains: responsavel },
     }
   }
 
@@ -134,8 +133,8 @@ if (hasProtocoloFilter) {
       ...(where.AND ?? []),
       {
         OR: [
-          { titulo: { contains: textValue, mode: 'insensitive' } },
-          { descricao: { contains: textValue, mode: 'insensitive' } },
+          { titulo: { contains: textValue } },
+          { descricao: { contains: textValue } },
           { payload: { path: ['campos'], string_contains: textValue } },
           { payload: { path: ['formulario'], string_contains: textValue } },
           { payload: { path: ['form'], string_contains: textValue } },

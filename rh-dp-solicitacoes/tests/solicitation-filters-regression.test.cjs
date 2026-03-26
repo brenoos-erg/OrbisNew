@@ -12,4 +12,10 @@ for (const apiSource of [sentApi, receivedApi]) {
   assert.match(apiSource, /path:\s*\['answers'\]/)
 }
 
+assert.doesNotMatch(
+  receivedApi,
+  /mode:\s*['"]insensitive['"]/,
+  'API de recebidas não deve usar mode: insensitive (incompatível com provider mysql)',
+)
+
 console.log('solicitation-filters-regression ok')

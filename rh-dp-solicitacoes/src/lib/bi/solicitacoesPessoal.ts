@@ -49,11 +49,21 @@ export const BI_SOLICITACAO_PESSOAL_COLUMNS = [
 ] as const
 
 export const BI_SOLICITACAO_PESSOAL_TIPO_WHERE = {
-  OR: [
-    { id: { in: ['RQ_063', 'SOLICITACAO_ADMISSAO'] } },
-    { codigo: { in: ['RQ.RH.001', 'RQ.DP.001'] } },
-    { nome: { contains: 'Solicitação de pessoal' } },
-    { nome: { contains: 'Solicitação de admissão' } },
+  AND: [
+    {
+      OR: [
+        { id: { in: ['RQ_063', 'SOLICITACAO_ADMISSAO'] } },
+        { codigo: { in: ['RQ.RH.001', 'RQ.DP.001'] } },
+      ],
+    },
+    {
+      NOT: {
+        OR: [
+          { id: { in: ['RQ_RH_103'] } },
+          { codigo: { in: ['RQ.RH.002'] } },
+        ],
+      },
+    },
   ],
 } satisfies Prisma.TipoSolicitacaoWhereInput
 
