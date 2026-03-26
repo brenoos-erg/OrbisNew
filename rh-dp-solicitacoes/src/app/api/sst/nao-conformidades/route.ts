@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       const prazoAtendimento = new Date(createdAt)
       prazoAtendimento.setDate(prazoAtendimento.getDate() + 90)
 
-      const created = await tx.nonConformity.create({
+     const created = await tx.nonConformity.create({
         data: {
           numeroRnc,
           tipoNc,
@@ -176,6 +176,9 @@ export async function POST(req: NextRequest) {
           prazoAtendimento,
           referenciaSig: body?.referenciaSig ? String(body.referenciaSig).trim() : null,
           acoesImediatas: body?.acoesImediatas ? String(body.acoesImediatas).trim() : null,
+          planoAcaoCodigo: body?.planoAcaoCodigo ? String(body.planoAcaoCodigo).trim() : `PA-${numeroRnc.replace('RNC-', '')}`,
+          planoAcaoObjetivo: body?.planoAcaoObjetivo ? String(body.planoAcaoObjetivo).trim() : null,
+          planoAcaoEvidencias: body?.planoAcaoEvidencias ? String(body.planoAcaoEvidencias).trim() : null,
           gravidade,
           urgencia,
           tendencia,

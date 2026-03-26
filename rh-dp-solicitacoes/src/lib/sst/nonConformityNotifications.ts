@@ -1,4 +1,4 @@
-import { NonConformityStatus, Prisma, UserStatus } from '@prisma/client'
+import { ModuleLevel, NonConformityStatus, Prisma, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
 
@@ -57,6 +57,26 @@ export async function resolveNonConformityRecipientUsers(nonConformityId: string
     uniqueById.set(user.id, user)
   }
 
+  const qualityModuleUsers = await db.userModuleAccess.findMany({
+    where: {
+      level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
+      module: {
+        key: 'SST',
+      },
+      user: {
+        status: UserStatus.ATIVO,
+      },
+    },
+    select: {
+      user: { select: { id: true, fullName: true, email: true } },
+    },
+  })
+  for (const access of qualityModuleUsers) {
+    if (!access.user.email?.trim()) continue
+    if (access.user.id === nc.solicitanteId) continue
+    uniqueById.set(access.user.id, access.user)
+  }
+
   return {
     nc,
     recipients: Array.from(uniqueById.values()),
@@ -107,6 +127,14 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
   ].join('\n')
 
   const mailResult = await sendMail({ to, subject, text }, 'ALERTS')
+  if (!mailResult.sent) {
+    console.error('Falha no envio de alerta de NC', {
+      nonConformityId: input.nonConformityId,
+      trigger: input.trigger,
+      recipients: to.length,
+      error: mailResult.error,
+    })
+  }
 
   await db.nonConformityTimeline.create({
     data: {

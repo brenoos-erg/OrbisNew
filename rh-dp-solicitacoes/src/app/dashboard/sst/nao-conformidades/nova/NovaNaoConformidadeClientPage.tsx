@@ -26,7 +26,7 @@ export default function NovaNaoConformidadePage() {
     [centers],
   )
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+ async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const payload = {
@@ -37,11 +37,13 @@ export default function NovaNaoConformidadePage() {
       tipoNc: form.get('tipoNc'),
       referenciaSig: form.get('referenciaSig'),
       acoesImediatas: form.get('acoesImediatas'),
+      planoAcaoCodigo: form.get('planoAcaoCodigo'),
+      planoAcaoObjetivo: form.get('planoAcaoObjetivo'),
+      planoAcaoEvidencias: form.get('planoAcaoEvidencias'),
       gravidade,
       urgencia,
       tendencia,
     }
-
 
     try {
       setSaving(true)
@@ -80,9 +82,12 @@ export default function NovaNaoConformidadePage() {
             <FieldSelectNumeric label="Tendência" value={tendencia} options={GUT_OPTIONS.tendencia} onChange={setTendencia} />
           </div>
 
-           <FieldTextarea name="descricao" label="Descrição" />
+          <FieldTextarea name="descricao" label="Descrição" />
           <FieldTextarea name="evidenciaObjetiva" label="Evidência objetiva" />
           <FieldTextarea name="acoesImediatas" label="Ações imediatas" required={false} />
+          <FieldInput name="planoAcaoCodigo" label="Código do plano de ação" required={false} />
+          <FieldTextarea name="planoAcaoObjetivo" label="Objetivo do plano de ação" required={false} />
+          <FieldTextarea name="planoAcaoEvidencias" label="Evidências iniciais das tratativas" required={false} />
 
           {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
 

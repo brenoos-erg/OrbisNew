@@ -94,6 +94,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
      return NextResponse.json({
       item: {
         ...nc,
+        plano: {
+          codigo: nc.planoAcaoCodigo || `PA-${nc.numeroRnc.replace('RNC-', '')}`,
+          objetivo: nc.planoAcaoObjetivo || '',
+          evidenciasTratativas: nc.planoAcaoEvidencias || '',
+          nonConformityId: nc.id,
+          totalAcoes: nc.planoDeAcao.length,
+        },
         permissions: {
           canManageAllNc: canManageAllNc(level),
           canApproveQuality: canApproveNc(level),
@@ -176,12 +183,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const item = await tx.nonConformity.update({
         where: { id },
         data: {
-          status: nextStatus,
+           status: nextStatus,
           tipoNc: body?.tipoNc && Object.values(NonConformityType).includes(body.tipoNc) ? body.tipoNc : undefined,
           descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
           evidenciaObjetiva: body?.evidenciaObjetiva !== undefined ? String(body.evidenciaObjetiva).trim() : undefined,
           referenciaSig: body?.referenciaSig !== undefined ? (body.referenciaSig ? String(body.referenciaSig).trim() : null) : undefined,
           acoesImediatas: body?.acoesImediatas !== undefined ? (body.acoesImediatas ? String(body.acoesImediatas).trim() : null) : undefined,
+          planoAcaoCodigo: body?.planoAcaoCodigo !== undefined ? (body.planoAcaoCodigo ? String(body.planoAcaoCodigo).trim() : null) : undefined,
+          planoAcaoObjetivo: body?.planoAcaoObjetivo !== undefined ? (body.planoAcaoObjetivo ? String(body.planoAcaoObjetivo).trim() : null) : undefined,
+          planoAcaoEvidencias: body?.planoAcaoEvidencias !== undefined ? (body.planoAcaoEvidencias ? String(body.planoAcaoEvidencias).trim() : null) : undefined,
           causaRaiz: body?.causaRaiz !== undefined ? (body.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined,
           gravidade: parseGutValue(body?.gravidade),
           urgencia: parseGutValue(body?.urgencia),

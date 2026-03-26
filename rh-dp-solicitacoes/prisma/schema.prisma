@@ -977,7 +977,7 @@ model NonConformity {
   tipoNc                           NonConformityType
   evidenciaObjetiva                String                      @db.LongText
   empresa                          String                      @default("ERG ENGENHARIA")
-  centroQueDetectouId              String
+ centroQueDetectouId              String
   centroQueOriginouId              String
   prazoAtendimento                 DateTime
   fechamentoEm                     DateTime?
@@ -995,6 +995,9 @@ model NonConformity {
   solicitanteEmail                 String
   status                           NonConformityStatus         @default(ABERTA)
   acoesImediatas                   String?                     @db.LongText
+  planoAcaoCodigo                  String?                     @db.VarChar(80)
+  planoAcaoObjetivo                String?                     @db.LongText
+  planoAcaoEvidencias              String?                     @db.LongText
   causaRaiz                        String?                     @db.LongText
   verificacaoEficaciaTexto         String?                     @db.LongText
   verificacaoEficaciaData          DateTime?
