@@ -51,12 +51,20 @@ export function extractExperienceEvaluationData(payload: unknown) {
     ...avaliacaoGestor,
   }
 
+  const historyCandidates = [
+    readString(merged, 'historicoRelacionado'),
+    readString(merged, 'historico'),
+    readString(merged, 'historicoAvaliacao'),
+    readString(merged, 'relacionadoHistorico'),
+  ].filter((value) => value.trim().length > 0)
+
   const notas = EXPERIENCE_EVALUATION_COMPETENCIES.map((item) => ({
     ...item,
     value: readString(merged, item.key) || '-',
   }))
 
-  return {
+
+ return {
     colaboradorAvaliado: readString(merged, 'colaboradorAvaliado'),
     cargoColaborador: readString(merged, 'cargoColaborador'),
     contratoSetor: readString(merged, 'contratoSetor'),
@@ -66,6 +74,7 @@ export function extractExperienceEvaluationData(payload: unknown) {
       readString(merged, 'comentarioFinal') ||
       readString(merged, 'comentarios') ||
       readString(merged, 'observacoes'),
+    historicoRelacionado: historyCandidates[0] ?? '',
     notas,
   }
 }

@@ -2702,7 +2702,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <div key={item.key} className="flex items-center justify-between border-b border-slate-200 py-2 text-xs last:border-b-0">
                             <span className="font-medium text-slate-700">{item.label}</span>
                             <span className="font-semibold text-slate-900">{item.value || '-'}</span>
-                          </div>
+                           </div>
                         ))}
                       </div>
                     </div>
@@ -2714,6 +2714,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                         className={`${INPUT_RO} min-h-[90px]`}
                         readOnly
                         value={experienceData.comentarioFinal || '-'}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className={LABEL_RO}>Histórico relacionado</label>
+                      <textarea
+                        className={`${INPUT_RO} min-h-[90px]`}
+                        readOnly
+                        value={experienceData.historicoRelacionado || '-'}
                       />
                     </div>
                   </div>

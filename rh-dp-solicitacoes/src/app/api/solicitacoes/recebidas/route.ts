@@ -9,6 +9,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
 
 
 function buildWhereFromSearchParams(searchParams: URLSearchParams) {
@@ -24,30 +25,25 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const costCenterId = searchParams.get('costCenterId') ?? centerId
   const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
-  const protocolo = searchParams.get('protocolo')
-  const solicitante = searchParams.get('solicitante')
-  const solicitanteNome = searchParams.get('solicitanteNome')
-  const solicitanteLogin = searchParams.get('solicitanteLogin')
-  const matricula = searchParams.get('matricula')
-  const status = searchParams.get('status')
-  const situacao = searchParams.get('situacao')
-  const responsavel = searchParams.get('responsavel')
-  const text = searchParams.get('text')
+  const protocolo = normalizeFilterText(searchParams.get('protocolo'))
+  const solicitante = normalizeFilterText(searchParams.get('solicitante'))
+  const solicitanteNome = normalizeFilterText(searchParams.get('solicitanteNome'))
+  const solicitanteLogin = normalizeFilterText(searchParams.get('solicitanteLogin'))
+  const matricula = normalizeFilterText(searchParams.get('matricula'))
+  const status = normalizeFilterText(searchParams.get('status'))
+  const situacao = normalizeFilterText(searchParams.get('situacao'))
+  const responsavel = normalizeFilterText(searchParams.get('responsavel'))
+  const text = normalizeFilterText(searchParams.get('text'))
 
   if (openedDate) {
     where.dataAbertura = {
       gte: new Date(`${openedDate}T00:00:00`),
       lte: new Date(`${openedDate}T23:59:59`),
     }
-  } else if (dateStart || dateEnd) {
-   where.dataAbertura = {}
-    if (dateStart) {
-      where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
-    }
-    if (dateEnd) {
-      const end = new Date(dateEnd + 'T23:59:59')
-      where.dataAbertura.lte = end
-    }
+  } else {
+    const openedRange = buildUtcDateRangeFilter({ start: dateStart, end: dateEnd })
+    if (openedRange) where.dataAbertura = openedRange
+
   }
 
   if (departmentId) where.departmentId = departmentId
@@ -59,18 +55,12 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
       gte: new Date(`${closedDate}T00:00:00`),
       lte: new Date(`${closedDate}T23:59:59`),
     }
-  } else if (closedStart || closedEnd) {
-    where.dataFechamento = {}
-    if (closedStart) {
-      where.dataFechamento.gte = new Date(`${closedStart}T00:00:00`)
-    }
-    if (closedEnd) {
-      where.dataFechamento.lte = new Date(`${closedEnd}T23:59:59`)
-    }
+  } else {
+    const closedRange = buildUtcDateRangeFilter({ start: closedStart, end: closedEnd })
+    if (closedRange) where.dataFechamento = closedRange
   }
 
- const protocoloNormalizado = protocolo?.trim() ?? ''
-  const hasProtocoloFilter = protocoloNormalizado.length > 0
+  const hasProtocoloFilter = protocolo.length > 0
 
   if (status) {
     where.status = status
@@ -89,16 +79,16 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 
 if (hasProtocoloFilter) {
     where.protocolo = {
-      contains: protocoloNormalizado,
+      contains: protocolo,
       mode: 'insensitive',
     }
   }
-  const solicitanteBusca = solicitanteNome ?? solicitante
+  const solicitanteBusca = solicitanteNome || solicitante
   if (solicitanteBusca) {
     where.solicitante = {
       OR: [
-         { fullName: { contains: solicitanteBusca.trim(), mode: 'insensitive' } },
-        { email: { contains: solicitanteBusca.trim(), mode: 'insensitive' } },
+         { fullName: { contains: solicitanteBusca, mode: 'insensitive' } },
+        { email: { contains: solicitanteBusca, mode: 'insensitive' } },
       ],
     }
   }
@@ -107,13 +97,13 @@ if (hasProtocoloFilter) {
     where.solicitante = {
       ...(where.solicitante ?? {}),
       ...(where.solicitante?.OR ? {} : { OR: [] }),
-      login: { contains: solicitanteLogin.trim(), mode: 'insensitive' },
+      login: { contains: solicitanteLogin, mode: 'insensitive' },
     }
   }
 
   if (responsavel) {
     where.assumidaPor = {
-      fullName: { contains: responsavel.trim(), mode: 'insensitive' },
+      fullName: { contains: responsavel, mode: 'insensitive' },
     }
   }
 
@@ -138,8 +128,8 @@ if (hasProtocoloFilter) {
       },
     ]
   }
-  if (text?.trim()) {
-    const textValue = text.trim()
+  if (text) {
+    const textValue = text
     where.AND = [
       ...(where.AND ?? []),
       {
@@ -147,6 +137,13 @@ if (hasProtocoloFilter) {
           { titulo: { contains: textValue, mode: 'insensitive' } },
           { descricao: { contains: textValue, mode: 'insensitive' } },
           { payload: { path: ['campos'], string_contains: textValue } },
+          { payload: { path: ['formulario'], string_contains: textValue } },
+          { payload: { path: ['form'], string_contains: textValue } },
+          { payload: { path: ['metadata'], string_contains: textValue } },
+          { payload: { path: ['requestData'], string_contains: textValue } },
+          { payload: { path: ['dynamicForm'], string_contains: textValue } },
+          { payload: { path: ['answers'], string_contains: textValue } },
+          { payload: { path: ['fields'], string_contains: textValue } },
           { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
         ],
       },

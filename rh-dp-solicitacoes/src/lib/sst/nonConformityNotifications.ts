@@ -17,7 +17,7 @@ const RETROACTIVE_ELIGIBLE_STATUSES: NonConformityStatus[] = [
   NonConformityStatus.AGUARDANDO_VERIFICACAO,
   NonConformityStatus.APROVADA_QUALIDADE,
 ]
-
+const QUALITY_MODULE_KEYS = ['SST', 'sgi-qualidade', 'sgi_qualidade'] as const
 export async function resolveNonConformityRecipientUsers(nonConformityId: string, db: DbClient = prisma) {
   const nc = await db.nonConformity.findUnique({
     where: { id: nonConformityId },
@@ -61,7 +61,7 @@ export async function resolveNonConformityRecipientUsers(nonConformityId: string
     where: {
       level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
       module: {
-        key: 'SST',
+        key: { in: [...QUALITY_MODULE_KEYS] },
       },
       user: {
         status: UserStatus.ATIVO,
@@ -123,7 +123,7 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
     `Status: ${resolved.nc.status}`,
     `Descrição: ${resolved.nc.descricao.slice(0, 400)}`,
     '',
-    'Acesse o módulo SST para visualizar e tratar a NC.',
+    'Acesse SGI / Qualidade para visualizar e tratar a NC.',
   ].join('\n')
 
   const mailResult = await sendMail({ to, subject, text }, 'ALERTS')

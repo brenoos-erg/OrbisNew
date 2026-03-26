@@ -36,6 +36,7 @@ import {
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -48,58 +49,44 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const costCenterId = searchParams.get('costCenterId') ?? centerId
   const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
-  const protocolo = searchParams.get('protocolo')
-  const solicitante = searchParams.get('solicitante')
-  const solicitanteLogin = searchParams.get('solicitanteLogin')
-  const status = searchParams.get('status')
-  const text = searchParams.get('text')
-  if (dateStart || dateEnd) {
-    where.dataAbertura = {}
-    if (dateStart) {
-      where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
-    }
-    if (dateEnd) {
-      const end = new Date(dateEnd + 'T23:59:59')
-      where.dataAbertura.lte = end
-    }
-  }
+  const protocolo = normalizeFilterText(searchParams.get('protocolo'))
+  const solicitante = normalizeFilterText(searchParams.get('solicitante'))
+  const solicitanteLogin = normalizeFilterText(searchParams.get('solicitanteLogin'))
+  const status = normalizeFilterText(searchParams.get('status'))
+  const text = normalizeFilterText(searchParams.get('text'))
+  const openedRange = buildUtcDateRangeFilter({ start: dateStart, end: dateEnd })
+  if (openedRange) where.dataAbertura = openedRange
 
   if (departmentId) where.departmentId = departmentId
   if (costCenterId) where.costCenterId = costCenterId
   if (tipoId) where.tipoId = tipoId
-  const protocoloNormalizado = protocolo?.trim() ?? ''
-  const hasProtocoloFilter = protocoloNormalizado.length > 0
+  const hasProtocoloFilter = protocolo.length > 0
 
   if (status) where.status = status
 
    if (hasProtocoloFilter) {
     where.protocolo = {
-      contains: protocoloNormalizado,
+      contains: protocolo,
       mode: 'insensitive',
     }
   }
 
+  const solicitanteFilters: Record<string, unknown> = {}
   if (solicitante) {
-    where.solicitante = {
-      OR: [
-        {
-          fullName: { contains: solicitante.trim(), mode: 'insensitive' },
-        },
-        {
-          email: { contains: solicitante.trim(), mode: 'insensitive' },
-        },
-      ],
-    }
+    solicitanteFilters.OR = [
+      { fullName: { contains: solicitante, mode: 'insensitive' } },
+      { email: { contains: solicitante, mode: 'insensitive' } },
+    ]
   }
-  if (solicitanteLogin?.trim()) {
-    where.solicitante = {
-      ...(where.solicitante ?? {}),
-      login: { contains: solicitanteLogin.trim(), mode: 'insensitive' },
-    }
+  if (solicitanteLogin) {
+    solicitanteFilters.login = { contains: solicitanteLogin, mode: 'insensitive' }
+  }
+  if (Object.keys(solicitanteFilters).length > 0) {
+    where.solicitante = solicitanteFilters
   }
 
-  if (text?.trim()) {
-    const textValue = text.trim()
+  if (text) {
+    const textValue = text
     where.AND = [
       ...(where.AND ?? []),
       {
@@ -107,6 +94,13 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
           { titulo: { contains: textValue, mode: 'insensitive' } },
           { descricao: { contains: textValue, mode: 'insensitive' } },
           { payload: { path: ['campos'], string_contains: textValue } },
+          { payload: { path: ['formulario'], string_contains: textValue } },
+          { payload: { path: ['form'], string_contains: textValue } },
+          { payload: { path: ['metadata'], string_contains: textValue } },
+          { payload: { path: ['requestData'], string_contains: textValue } },
+          { payload: { path: ['dynamicForm'], string_contains: textValue } },
+          { payload: { path: ['answers'], string_contains: textValue } },
+          { payload: { path: ['fields'], string_contains: textValue } },
           { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
         ],
       },

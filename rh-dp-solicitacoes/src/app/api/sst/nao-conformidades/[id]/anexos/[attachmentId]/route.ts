@@ -17,22 +17,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
-    const { id, attachmentId } = await params
-    const [nc, attachment] = await Promise.all([
-      prisma.nonConformity.findUnique({
-        where: { id },
-        select: {
-          solicitanteId: true,
-          centroQueDetectouId: true,
-          centroQueOriginouId: true,
-        },
-      }),
-      prisma.nonConformityAttachment.findUnique({ where: { id: attachmentId } }),
-    ])
-
-    if (!nc || !attachment || attachment.nonConformityId !== id) {
+    const { attachmentId } = await params
+    const attachment = await prisma.nonConformityAttachment.findUnique({ where: { id: attachmentId } })
+    if (!attachment) {
       return NextResponse.json({ error: 'Anexo não encontrado.' }, { status: 404 })
     }
+    const nc = await prisma.nonConformity.findUnique({
+      where: { id: attachment.nonConformityId },
+      select: {
+        solicitanteId: true,
+        centroQueDetectouId: true,
+        centroQueOriginouId: true,
+      },
+    })
+    if (!nc) return NextResponse.json({ error: 'Anexo não encontrado.' }, { status: 404 })
 
     const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
     const canAccess = canUserAccessNc({
