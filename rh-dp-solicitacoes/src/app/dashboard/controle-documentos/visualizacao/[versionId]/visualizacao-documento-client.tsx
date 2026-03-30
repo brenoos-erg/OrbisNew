@@ -39,15 +39,12 @@ export default function VisualizacaoDocumentoClient({ versionId }: Props) {
           {data.document ? <p className="mt-1 text-amber-800">{data.document.code} · {data.document.title} · REV {data.document.revisionNumber}</p> : null}
         </div>
         {data.url ? (
-          <div className="relative">
+          <div>
             <iframe
               className="h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white"
               src={`${data.url}#toolbar=0&navpanes=0`}
               title="Visualização controlada do documento"
             />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-              <span className="-rotate-45 text-5xl font-bold tracking-widest text-slate-500/15">CÓPIA NÃO CONTROLADA</span>
-            </div>
           </div>
         ) : null}
       </div>
