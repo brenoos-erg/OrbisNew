@@ -4,9 +4,6 @@ export const NON_CONFORMITY_FIRST_SCREEN_FIELDS = [
   'evidenciaObjetiva',
   'referenciaSig',
   'acoesImediatas',
-  'planoAcaoCodigo',
-  'planoAcaoObjetivo',
-  'planoAcaoEvidencias',
 ] as const
 
 export function isEditingFirstScreen(touchedFields: string[]) {

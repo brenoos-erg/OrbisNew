@@ -359,6 +359,7 @@ model User {
   isoApprovalsDecided                        DocumentApproval[]           @relation("IsoApprovalDecidedBy")
   isoAttachmentsUploaded                     DocumentAttachment[]         @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
+  isoAuditLogs                               DocumentAuditLog[]
   isoTermAcceptances                         DocumentTermAcceptance[]
   isoDistributionsCreated                    Distribution[]               @relation("IsoDistributionCreatedBy")
   isoDistributionTargets                     DistributionTarget[]
@@ -437,6 +438,7 @@ model IsoDocument {
   author             User                  @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
   versions           DocumentVersion[]
   downloadLogs       DocumentDownloadLog[]
+  auditLogs          DocumentAuditLog[]
   distributions      Distribution[]
   printCopies        PrintCopy[]
 
@@ -459,6 +461,7 @@ model DocumentVersion {
   approvals          DocumentApproval[]
   attachments        DocumentAttachment[]
   downloadLogs       DocumentDownloadLog[]
+  auditLogs          DocumentAuditLog[]
   readReceipts       ReadReceipt[]
   printCopies        PrintCopy[]
   distributions      Distribution[]
@@ -493,17 +496,22 @@ model DocumentAttachment {
   uploadedBy   User            @relation("IsoAttachmentUploadedBy", fields: [uploadedById], references: [id])
 }
 
-model DocumentDownloadLog {
-  id           String          @id @default(uuid())
-  documentId   String
-  versionId    String
-  userId       String
-  downloadedAt DateTime        @default(now())
-  ip           String?
-  userAgent    String?
-  document     IsoDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+model DocumentAuditLog {
+  id         String              @id @default(uuid())
+  documentId String
+  versionId  String
+  userId     String
+  action     DocumentAuditAction
+  createdAt  DateTime            @default(now())
+  ip         String?
+  userAgent  String?
+  document   IsoDocument          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    DocumentVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+  @@index([versionId, createdAt])
+  @@index([action, createdAt])
 }
 
 model DocumentResponsibilityTerm {
@@ -1020,9 +1028,6 @@ model NonConformity {
   solicitanteEmail                 String
   status                           NonConformityStatus         @default(ABERTA)
   acoesImediatas                   String?                     @db.LongText
-  planoAcaoCodigo                  String?                     @db.VarChar(80)
-  planoAcaoObjetivo                String?                     @db.LongText
-  planoAcaoEvidencias              String?                     @db.LongText
   causaRaiz                        String?                     @db.LongText
   verificacaoEficaciaTexto         String?                     @db.LongText
   verificacaoEficaciaData          DateTime?
@@ -1305,6 +1310,12 @@ enum DocumentApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum DocumentAuditAction {
+  VIEW
+  DOWNLOAD
+  PRINT
 }
 
 enum ReadReceiptStatus {

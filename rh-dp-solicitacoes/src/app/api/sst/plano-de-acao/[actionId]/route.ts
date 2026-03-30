@@ -133,6 +133,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
       ? `${baseEvidence ? `${baseEvidence}\n\n` : ''}[${new Date().toLocaleString('pt-BR')}] ${me.fullName || me.email}: ${observacao}`
       : baseEvidence
 
+    if (desiredStatus === NonConformityActionStatus.CONCLUIDA && !evidenciasWithObs) {
+      return NextResponse.json({ error: 'Anexe evidência antes de concluir a ação.' }, { status: 400 })
+    }
+
     const updated = await prisma.nonConformityActionItem.update({
       where: { id: actionId },
       data: {
@@ -141,7 +145,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
         atividadeComo: toOptionalString(body?.atividadeComo),
         centroImpactadoId:
           body?.centroImpactadoId !== undefined ? (body?.centroImpactadoId ? String(body.centroImpactadoId) : null) : undefined,
-        centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
+
         centroResponsavelId:
           body?.centroResponsavelId !== undefined ? (body?.centroResponsavelId ? String(body.centroResponsavelId) : null) : undefined,
         dataInicioPrevista: toDate(body?.dataInicioPrevista),

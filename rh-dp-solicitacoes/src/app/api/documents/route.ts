@@ -48,6 +48,7 @@ export async function POST(req: NextRequest)   {
         summary: String(form.get('summary') ?? ''),
         affectedAreasNotes: String(form.get('affectedAreasNotes') ?? ''),
         fileUrl,
+        revisionNumber: form.get('revisionNumber'),
       }
     } else {
       payload = await req.json()
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest)   {
     if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerDepartmentId) {
       return NextResponse.json({ error: 'Preencha código, título, tipo de documento e centro responsável.' }, { status: 400 })
     }
+
 
 
     const flow = await prisma.documentTypeApprovalFlow.findMany({

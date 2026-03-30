@@ -54,10 +54,7 @@ type Detail = {
   comentarios?: CommentItem[]
   timeline?: any[]
   planoDeAcao?: ActionItem[]
-  plano?: {
-    codigo: string
-    objetivo: string
-    evidenciasTratativas: string
+   plano?: {
     nonConformityId: string
     totalAcoes: number
   }
@@ -148,10 +145,6 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [actionModalOpen, setActionModalOpen] = useState(false)
   const [actionFiltersDraft, setActionFiltersDraft] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
  const [actionFilters, setActionFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
-  const [planoMetaDraft, setPlanoMetaDraft] = useState({ codigo: '', objetivo: '', evidenciasTratativas: '' })
-  const [planoMetaSaving, setPlanoMetaSaving] = useState(false)
-  const [planoMetaError, setPlanoMetaError] = useState<string | null>(null)
-
   useEffect(() => {
     if (!initialSection) return
     const validSections: SectionKey[] = ['naoConformidade', 'evidencias', 'estudoCausa', 'planoDeAcao', 'verificacao', 'comentarios', 'timeline']
@@ -179,11 +172,6 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       })
       setAnaliseQualidade(data.item.verificacaoEficaciaTexto || '')
       setCausaRaiz(data.item.causaRaiz || '')
-      setPlanoMetaDraft({
-        codigo: data.item.plano?.codigo || '',
-        objetivo: data.item.plano?.objetivo || '',
-        evidenciasTratativas: data.item.plano?.evidenciasTratativas || '',
-      })
       if (Array.isArray(data.item.estudoCausa) && data.item.estudoCausa.length) {
         setPorques(data.item.estudoCausa.map((x: any) => ({ pergunta: x.pergunta, resposta: x.resposta || '' })))
       }
@@ -446,29 +434,6 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     load()
   }
 
-  async function salvarMetadadosPlano() {
-    if (bloqueado) return
-    setPlanoMetaSaving(true)
-    setPlanoMetaError(null)
-    const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        planoAcaoCodigo: planoMetaDraft.codigo,
-        planoAcaoObjetivo: planoMetaDraft.objetivo,
-        planoAcaoEvidencias: planoMetaDraft.evidenciasTratativas,
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setPlanoMetaError(data?.error || 'Erro ao salvar dados do plano de ação.')
-      setPlanoMetaSaving(false)
-      return
-    }
-    setPlanoMetaSaving(false)
-    load()
-  }
-
   function changeSection(section: SectionKey) {
     
     setActiveSection(section)
@@ -638,55 +603,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       ) : null}
        {activeSection === 'planoDeAcao' ? (
         <Card title="Plano de ação vinculado à não conformidade">
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Entidade principal do plano</p>
-            <div className="grid gap-2 md:grid-cols-2">
-              <label className="space-y-1 text-sm font-medium text-slate-700">
-                Código do plano
-                <input
-                  value={planoMetaDraft.codigo}
-                  onChange={(e) => setPlanoMetaDraft((prev) => ({ ...prev, codigo: e.target.value }))}
-                  disabled={bloqueado || planoMetaSaving}
-                  className="w-full rounded border px-2 py-1 text-sm font-normal"
-                />
-              </label>
-              <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                Ações vinculadas: <b>{item.plano?.totalAcoes ?? filteredActions.length}</b>
-              </div>
+           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+              Ações vinculadas: <b>{item.plano?.totalAcoes ?? filteredActions.length}</b>
             </div>
-            <label className="space-y-1 text-sm font-medium text-slate-700">
-              Objetivo do plano
-              <textarea
-                value={planoMetaDraft.objetivo}
-                onChange={(e) => setPlanoMetaDraft((prev) => ({ ...prev, objetivo: e.target.value }))}
-                disabled={bloqueado || planoMetaSaving}
-                className="w-full rounded border px-2 py-1 text-sm font-normal"
-                rows={2}
-              />
-            </label>
-            <label className="space-y-1 text-sm font-medium text-slate-700">
-              Evidências das tratativas (resumo do plano)
-              <textarea
-                value={planoMetaDraft.evidenciasTratativas}
-                onChange={(e) => setPlanoMetaDraft((prev) => ({ ...prev, evidenciasTratativas: e.target.value }))}
-                disabled={bloqueado || planoMetaSaving}
-                className="w-full rounded border px-2 py-1 text-sm font-normal"
-                rows={3}
-              />
-            </label>
-            {planoMetaError ? <p className="text-sm text-rose-700">{planoMetaError}</p> : null}
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={salvarMetadadosPlano}
-                disabled={bloqueado || planoMetaSaving}
-                className="rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {planoMetaSaving ? 'Salvando plano...' : 'Salvar dados do plano'}
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
               <label className="space-y-1 text-xs font-medium uppercase tracking-wide text-slate-600">
                 Status

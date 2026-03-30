@@ -3,6 +3,7 @@ import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { resolveTermChallenge } from '@/lib/documentTermAccess'
+import { registerDocumentAuditLog } from '@/lib/documentAudit'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -10,7 +11,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
 
   const version = await prisma.documentVersion.findUnique({
     where: { id: versionId },
-    include: { document: true },
+    include: {
+      document: true,
+      distributions: { orderBy: { createdAt: 'desc' }, take: 1, select: { versionId: true } },
+    },
   })
 
   if (!version) {
@@ -57,11 +61,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
       where: { termId_userId: { termId: term.id, userId: me.id } },
     })
     if (!acceptance) {
-      return NextResponse.json(
+       return NextResponse.json(
         { requiresTerm: true, term: { id: term.id, title: term.title, content: term.content } },
         { status: 403 },
       )
     }
+  }
+
+  const resolvedFileUrl = version.fileUrl
+    ? version.fileUrl
+    : (
+      await prisma.documentVersion.findFirst({
+        where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } },
+        orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }],
+        select: { fileUrl: true },
+      })
+    )?.fileUrl ?? null
+
+  if (!resolvedFileUrl) {
+    return NextResponse.json({ error: 'Arquivo da versão publicada não encontrado.' }, { status: 404 })
   }
 
   await prisma.documentDownloadLog.create({
@@ -74,5 +92,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     },
   })
 
-  return NextResponse.json({ url: version.fileUrl })
+  await registerDocumentAuditLog({
+    action: 'DOWNLOAD',
+    documentId: version.documentId,
+    versionId,
+    userId: me.id,
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+    userAgent: req.headers.get('user-agent'),
+  })
+
+  return NextResponse.json({ url: resolvedFileUrl })
 }

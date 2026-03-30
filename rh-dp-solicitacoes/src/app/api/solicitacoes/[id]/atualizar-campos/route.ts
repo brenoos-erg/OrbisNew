@@ -31,7 +31,7 @@ const normalizeSetorKey = (value: string) =>
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
 
-const normalizeSaudeStatusValue = (value: unknown): 'ASO Válido' | 'Agendamento' | null => {
+const normalizeSaudeStatusValue = (value: unknown): 'Ciente' | null => {
   if (typeof value !== 'string') return null
   const normalized = value
     .trim()
@@ -39,8 +39,7 @@ const normalizeSaudeStatusValue = (value: unknown): 'ASO Válido' | 'Agendamento
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
 
-  if (normalized === 'ASO VALIDO') return 'ASO Válido'
-  if (normalized === 'AGENDAMENTO') return 'Agendamento'
+  if (normalized === 'CIENTE') return 'Ciente'
   return null
 }
 
@@ -170,29 +169,26 @@ export async function POST(
     }
 
     const statusValue = camposAtualizados[setorMeta.constaField]
-    const saudeStatus =
-      normalizedSetor === 'SAUDE' ? normalizeSaudeStatusValue(statusValue) : null
+    const saudeOuSstStatus =
+      normalizedSetor === 'SAUDE' || normalizedSetor === 'SST' ? normalizeSaudeStatusValue(statusValue) : null
     const constaFlag =
-      normalizedSetor === 'SAUDE'
-        ? // Para manter compatibilidade com os badges existentes, mapeamos o status de Saúde em constaFlag.
-          saudeStatus === 'Agendamento'
-          ? 'CONSTA'
-          : saudeStatus === 'ASO Válido'
-            ? 'NADA_CONSTA'
-            : null
+      normalizedSetor === 'SAUDE' || normalizedSetor === 'SST'
+        ? saudeOuSstStatus === 'Ciente'
+          ? 'NADA_CONSTA'
+          : null
         : normalizeConstaValue(statusValue)
 
     const shouldFinalize =
       action === 'FINALIZAR' || Boolean(finalizarSetor ?? finalizar)
     const canFinalizeSetor =
-      normalizedSetor === 'SAUDE' ? Boolean(saudeStatus) : Boolean(constaFlag)
+      normalizedSetor === 'SAUDE' || normalizedSetor === 'SST' ? Boolean(saudeOuSstStatus) : Boolean(constaFlag)
 
     if (shouldFinalize && !canFinalizeSetor) {
       return NextResponse.json(
         {
           error:
-            normalizedSetor === 'SAUDE'
-              ? 'Informe o status (ASO Válido ou Agendamento) antes de finalizar.'
+            normalizedSetor === 'SAUDE' || normalizedSetor === 'SST'
+              ? 'Informe o status Ciente antes de finalizar.'
               : 'Informe o status (Consta ou Nada Consta) antes de finalizar.',
         },
         { status: 400 },

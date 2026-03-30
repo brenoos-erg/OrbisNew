@@ -163,6 +163,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
     }
 
+    const desiredStatus = Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
+      ? (body.status as NonConformityActionStatus)
+      : NonConformityActionStatus.PENDENTE
+    const evidencias = body?.evidencias ? String(body.evidencias).trim() : null
+    if (desiredStatus === NonConformityActionStatus.CONCLUIDA && !evidencias) {
+      return NextResponse.json({ error: 'Anexe evidência antes de concluir a ação.' }, { status: 400 })
+    }
+
     const created = await prisma.nonConformityActionItem.create({
       data: {
         nonConformityId: null,
@@ -172,7 +180,7 @@ export async function POST(req: NextRequest) {
        motivoBeneficio: toOptionalString(body?.motivoBeneficio),
         atividadeComo: toOptionalString(body?.atividadeComo),
         centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
-        centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
+
         centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
         dataInicioPrevista: toDate(body?.dataInicioPrevista),
         dataFimPrevista: toDate(body?.dataFimPrevista),
@@ -189,10 +197,8 @@ export async function POST(req: NextRequest) {
         responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
         responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
         prazo: body?.prazo ? new Date(String(body.prazo)) : toDate(body?.dataFimPrevista),
-        status: Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
-          ? (body.status as NonConformityActionStatus)
-          : NonConformityActionStatus.PENDENTE,
-        evidencias: body?.evidencias ? String(body.evidencias).trim() : null,
+        status: desiredStatus,
+        evidencias,
       },
     })
 

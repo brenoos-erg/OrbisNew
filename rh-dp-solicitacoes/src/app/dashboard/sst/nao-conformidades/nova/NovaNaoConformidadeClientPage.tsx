@@ -37,9 +37,6 @@ export default function NovaNaoConformidadePage() {
       tipoNc: form.get('tipoNc'),
       referenciaSig: form.get('referenciaSig'),
       acoesImediatas: form.get('acoesImediatas'),
-      planoAcaoCodigo: form.get('planoAcaoCodigo'),
-      planoAcaoObjetivo: form.get('planoAcaoObjetivo'),
-      planoAcaoEvidencias: form.get('planoAcaoEvidencias'),
       gravidade,
       urgencia,
       tendencia,
@@ -85,9 +82,7 @@ export default function NovaNaoConformidadePage() {
           <FieldTextarea name="descricao" label="Descrição" />
           <FieldTextarea name="evidenciaObjetiva" label="Evidência objetiva" />
           <FieldTextarea name="acoesImediatas" label="Ações imediatas" required={false} />
-          <FieldInput name="planoAcaoCodigo" label="Código do plano de ação" required={false} />
-          <FieldTextarea name="planoAcaoObjetivo" label="Objetivo do plano de ação" required={false} />
-          <FieldTextarea name="planoAcaoEvidencias" label="Evidências iniciais das tratativas" required={false} />
+
 
           {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
 

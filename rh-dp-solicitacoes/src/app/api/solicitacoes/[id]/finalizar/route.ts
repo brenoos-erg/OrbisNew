@@ -12,6 +12,7 @@ import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
+import { isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
 export async function PATCH(
   _req: Request,
@@ -26,20 +27,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
     }
 
-
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
       include: {
+        department: { select: { id: true, code: true } },
         tipo: {
           select: {
+            id: true,
+            nome: true,
             schemaJson: true,
           },
         },
-        solicitacaoSetores: { select: { setor: true } },
+        solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
       },
     })
 
-   if (!solicitation) {
+    if (!solicitation) {
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     }
 
@@ -66,14 +69,23 @@ export async function PATCH(
       departamentos.length <= 1 ||
       (departamentoFinal !== null && solicitation.departmentId === departamentoFinal)
 
-    if (!isUltimaEtapa) {
+   const isNadaConsta = isSolicitacaoNadaConsta({ id: solicitation.tipo?.id, nome: solicitation.tipo?.nome })
+    const todosSetoresVerdes =
+      solicitation.solicitacaoSetores.length > 0 &&
+      solicitation.solicitacaoSetores.every((setor) => setor.status === 'CONCLUIDO' && Boolean(setor.constaFlag))
+
+    const dpPodeFinalizarExcecao =
+      me.role === 'DP' &&
+      (solicitation.department?.code === '08' || solicitation.assumidaPorId === me.id)
+
+    if (!isUltimaEtapa && !(isNadaConsta && todosSetoresVerdes) && !dpPodeFinalizarExcecao) {
       return NextResponse.json(
         { error: 'Só é possível finalizar chamados na última etapa do fluxo.' },
         { status: 400 },
       )
     }
 
-     const userAccess = await resolveUserAccessContext({
+    const userAccess = await resolveUserAccessContext({
       userId: me.id,
       role: me.role,
       primaryDepartmentId: me.departmentId,
@@ -90,7 +102,7 @@ export async function PATCH(
       solicitacaoSetores: solicitation.solicitacaoSetores,
     })
 
-    if (!canFinalize) {
+    if (!canFinalize && !dpPodeFinalizarExcecao) {
       return NextResponse.json(
         { error: 'Você não pode finalizar solicitações desta etapa/departamento.' },
         { status: 403 },
@@ -114,7 +126,7 @@ export async function PATCH(
       },
     })
 
-     await prisma.event.create({
+    await prisma.event.create({
       data: {
         id: randomUUID(),
         solicitationId: id,
@@ -127,7 +139,7 @@ export async function PATCH(
       solicitationId: id,
       event: 'FINALIZED',
       actorName: me.fullName ?? me.id,
-      dedupeKey: `FINALIZED:${id}` ,
+      dedupeKey: `FINALIZED:${id}`,
     })
 
     return NextResponse.json(updated)

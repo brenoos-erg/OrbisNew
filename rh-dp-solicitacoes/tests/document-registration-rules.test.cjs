@@ -22,12 +22,13 @@ test('novo documento sem fluxo inicia como PUBLICADO', () => {
   assert.equal(status, DocumentVersionStatus.PUBLICADO)
 })
 
-test('documento em fluxo de qualidade aponta para aba correta', () => {
+test('documento com fluxo configurado sempre inicia em aprovação de gestão', () => {
   const status = resolveInitialVersionStatus([{ stepType: DocumentFlowStepType.QUALITY }])
   const routing = routingForStatus(status)
-  assert.equal(status, DocumentVersionStatus.EM_ANALISE_QUALIDADE)
-  assert.equal(routing.targetPath, '/dashboard/controle-documentos/em-analise-qualidade')
+  assert.equal(status, DocumentVersionStatus.AG_APROVACAO)
+  assert.equal(routing.targetPath, '/dashboard/controle-documentos/para-aprovacao')
 })
+
 
 test('documento existente em aprovação informa aba de aprovação', () => {
   const duplicate = evaluateCodeAvailability('DOC-001', DocumentVersionStatus.AG_APROVACAO)

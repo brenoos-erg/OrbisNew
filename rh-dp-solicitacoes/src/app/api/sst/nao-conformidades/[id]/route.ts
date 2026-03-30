@@ -14,6 +14,21 @@ import { canEditFirstScreen } from '@/lib/sst/nonConformityPermissions'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function toHttpError(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  if (message === 'Usuário não autenticado') {
+    return { status: 401, error: message }
+  }
+  if (message === 'Usuário inativo') {
+    return { status: 403, error: message }
+  }
+  if (message === 'Serviço indisponível. Não foi possível conectar ao banco de dados.') {
+    return { status: 503, error: message }
+  }
+
+  return null
+}
+
 function parseGutValue(value: unknown) {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
@@ -23,8 +38,10 @@ function parseGutValue(value: unknown) {
 }
 
 
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const id = (await params).id
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
@@ -33,18 +50,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const nc = await prisma.nonConformity.findUnique({
-      where: { id: (await params).id },
+      where: { id },
       include: {
          planoDeAcao: {
           select: {
             id: true,
             descricao: true,
-            responsavelNome: true,
             prazo: true,
             status: true,
-            evidencias: true,
             createdAt: true,
             updatedAt: true,
+            responsavelNome: true,
+            responsavel: { select: { fullName: true } },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -77,9 +94,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       item: {
         ...nc,
         plano: {
-          codigo: nc.planoAcaoCodigo || `PA-${nc.numeroRnc.replace('RNC-', '')}`,
-          objetivo: nc.planoAcaoObjetivo || '',
-          evidenciasTratativas: nc.planoAcaoEvidencias || '',
           nonConformityId: nc.id,
           totalAcoes: nc.planoDeAcao.length,
         },
@@ -90,6 +104,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
   } catch (error) {
+    const httpError = toHttpError(error)
+    if (httpError) {
+      return NextResponse.json({ error: httpError.error }, { status: httpError.status })
+    }
     console.error('GET /api/sst/nao-conformidades/[id] error', error)
     return NextResponse.json({ error: 'Erro ao carregar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }
@@ -176,9 +194,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           evidenciaObjetiva: body?.evidenciaObjetiva !== undefined ? String(body.evidenciaObjetiva).trim() : undefined,
           referenciaSig: body?.referenciaSig !== undefined ? (body.referenciaSig ? String(body.referenciaSig).trim() : null) : undefined,
           acoesImediatas: body?.acoesImediatas !== undefined ? (body.acoesImediatas ? String(body.acoesImediatas).trim() : null) : undefined,
-          planoAcaoCodigo: body?.planoAcaoCodigo !== undefined ? (body.planoAcaoCodigo ? String(body.planoAcaoCodigo).trim() : null) : undefined,
-          planoAcaoObjetivo: body?.planoAcaoObjetivo !== undefined ? (body.planoAcaoObjetivo ? String(body.planoAcaoObjetivo).trim() : null) : undefined,
-          planoAcaoEvidencias: body?.planoAcaoEvidencias !== undefined ? (body.planoAcaoEvidencias ? String(body.planoAcaoEvidencias).trim() : null) : undefined,
           causaRaiz: body?.causaRaiz !== undefined ? (body.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined,
           gravidade: parseGutValue(body?.gravidade),
           urgencia: parseGutValue(body?.urgencia),
@@ -220,8 +235,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    return NextResponse.json(updated)
+     return NextResponse.json(updated)
   } catch (error) {
+    const httpError = toHttpError(error)
+    if (httpError) {
+      return NextResponse.json({ error: httpError.error }, { status: httpError.status })
+    }
     console.error('PATCH /api/sst/nao-conformidades/[id] error', error)
     return NextResponse.json({ error: 'Erro ao atualizar não conformidade.', detail: devErrorDetail(error) }, { status: 500 })
   }

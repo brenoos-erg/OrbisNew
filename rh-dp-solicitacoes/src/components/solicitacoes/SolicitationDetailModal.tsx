@@ -328,7 +328,7 @@ function formatDateTime(dateStr?: string | null) {
   return formatDateTimeDDMMYYYYHHMM(dateStr)
 }
 
-const SAUDE_STATUS_OPTIONS = ['ASO Válido', 'Agendamento'] as const
+const SAUDE_STATUS_OPTIONS = ['Ciente'] as const
 
 type SaudeStatus = (typeof SAUDE_STATUS_OPTIONS)[number]
 
@@ -340,10 +340,10 @@ function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
 
-   if (normalized === 'ASO VALIDO') return 'ASO Válido'
-  if (normalized === 'AGENDAMENTO') return 'Agendamento'
+   if (normalized === 'CIENTE') return 'Ciente'
   return ''
 }
+
 
 
 const UUID_REGEX =
@@ -1364,13 +1364,13 @@ export function SolicitationDetailModal({
     }
   }
 
-  const renderNadaConstaCampo = (campo: CampoEspecifico) => {
+ const renderNadaConstaCampo = (campo: CampoEspecifico) => {
     const value = nadaConstaCampos[campo.name] ?? ''
     const baseClass =
       'w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-base lg:text-sm'
       const isDisabled = !canEditNadaConstaSetor
     const isConstaField = campo.name === constaFieldName
-    const isSaudeConstaField = activeSector === 'SAUDE' && isConstaField
+    const isSaudeConstaField = (activeSector === 'SAUDE' || activeSector === 'SST') && isConstaField
 
     if (isConstaField) {
       if (isSaudeConstaField) {
@@ -2529,17 +2529,15 @@ async function handleEncaminharAprovacaoComAnexo() {
                                 normalizeSetorKey(registro.setor) === setor.key,
                             )
                             const constaFlag = (setorRegistro?.constaFlag ?? '').toString().toUpperCase()
-                           const saudeStatus = normalizeSaudeStatusValue(setorRegistro?.campos?.saudeStatus)
-                            const isSaudeSetor = setor.key === 'SAUDE'
+                            const saudeStatus = normalizeSaudeStatusValue((setorRegistro?.campos?.saudeStatus ?? setorRegistro?.campos?.sstStatus))
+                            const isSaudeSetor = setor.key === 'SAUDE' || setor.key === 'SST'
                             let badgeClass = 'border-yellow-200 bg-yellow-50 text-yellow-700'
                             if (isConcluida) {
                               if (isSaudeSetor) {
                                 badgeClass =
-                                  saudeStatus === 'Agendamento'
-                                    ? 'border-red-200 bg-red-50 text-red-700'
-                                    : saudeStatus === 'ASO Válido'
-                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                                  saudeStatus === 'Ciente'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700'
                               } else {
                                 badgeClass =
                                   constaFlag === 'CONSTA'

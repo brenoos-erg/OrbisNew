@@ -124,11 +124,22 @@ export const NADA_CONSTA_TI_FIELDS: NadaConstaCampoDef[] = [
 export const NADA_CONSTA_SAUDE_FIELDS: NadaConstaCampoDef[] = [
   {
     name: 'saudeStatus',
-    label: 'Status do ASO',
+    label: 'Acompanhamento',
     type: 'select',
-    options: ['ASO Válido', 'Agendamento'],
+    options: ['Ciente'],
     stage: 'saude',
     section: 'Saúde',
+  },
+]
+
+export const NADA_CONSTA_SST_FIELDS: NadaConstaCampoDef[] = [
+  {
+    name: 'sstStatus',
+    label: 'Acompanhamento',
+    type: 'select',
+    options: ['Ciente'],
+    stage: 'sst',
+    section: 'SST',
   },
 ]
 export const NADA_CONSTA_FINANCEIRO_FIELDS: NadaConstaCampoDef[] = [
@@ -186,6 +197,7 @@ export function getNadaConstaDefaultFieldsForSetor(
 ): NadaConstaCampoDef[] {
   if (setor === 'TI') return NADA_CONSTA_TI_FIELDS
   if (setor === 'SAUDE') return NADA_CONSTA_SAUDE_FIELDS
+  if (setor === 'SST') return NADA_CONSTA_SST_FIELDS
   if (setor === 'FINANCEIRO') return NADA_CONSTA_FINANCEIRO_FIELDS
   if (setor === 'FISCAL') return NADA_CONSTA_FISCAL_FIELDS
   return []

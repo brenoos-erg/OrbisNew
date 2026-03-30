@@ -26,15 +26,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
 
   if (!approval) return NextResponse.json({ error: 'Não há etapa pendente.' }, { status: 400 })
 
-  const pendingAfterCurrent = await prisma.documentApproval.count({
-    where: {
-      versionId,
-      status: DocumentApprovalStatus.PENDING,
-      flowItem: { order: { gt: approval.flowItem.order } },
-    },
-  })
-
-  const nextStatus = pendingAfterCurrent > 0
+  const nextStatus = stage === 2
     ? DocumentVersionStatus.EM_ANALISE_QUALIDADE
     : DocumentVersionStatus.PUBLICADO
 
