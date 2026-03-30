@@ -3,18 +3,20 @@ import { PrintCopyType } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
+import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
 
-  const version = await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { id: true, documentId: true } })
-  if (!version) return NextResponse.json({ error: 'Versão não encontrada.' }, { status: 404 })
+  const access = await resolveDocumentVersionAccess(versionId, me.id)
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
+  if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 
   await prisma.printCopy.create({
     data: {
-      documentId: version.documentId,
-      versionId: version.id,
+      documentId: access.documentId,
+      versionId: access.versionId,
       type: PrintCopyType.UNCONTROLLED,
       issuedById: me.id,
     },
@@ -22,12 +24,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
 
   await registerDocumentAuditLog({
     action: 'PRINT',
-    documentId: version.documentId,
-    versionId: version.id,
+    documentId: access.documentId,
+    versionId: access.versionId,
     userId: me.id,
     ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
     userAgent: req.headers.get('user-agent'),
   })
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    url: `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT`,
+  })
 }

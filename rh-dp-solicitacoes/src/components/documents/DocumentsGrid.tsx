@@ -50,7 +50,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
-  const [pendingVersionId, setPendingVersionId] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ versionId: string; intent: 'view' | 'download' | 'print' } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -142,28 +142,28 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }, [endpoint, page, pageSize, sortBy, sortOrder, appliedFilters])
 
   const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download') => {
-    const res = await fetch(`/api/documents/versions/${versionId}/download`, { cache: 'no-store' })
+    const endpoint = intent === 'view'
+      ? `/api/documents/versions/${versionId}/view`
+      : `/api/documents/versions/${versionId}/download`
+    const res = await fetch(endpoint, { method: intent === 'view' ? 'POST' : 'GET', cache: 'no-store' })
     const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
     if (!data) return
 
     if (res.status === 403 && data.requiresTerm) {
       if (data.term) setTerm(data.term)
-      setPendingVersionId(versionId)
+      setPendingAction({ versionId, intent })
       return
     }
 
    if (data.url) {
-      if (intent === 'view') {
-        await fetch(`/api/documents/versions/${versionId}/view`, { method: 'POST' }).catch(() => null)
-      }
       if (intent === 'download') {
         const anchor = document.createElement('a')
         anchor.href = data.url
-        anchor.target = '_blank'
+        anchor.target = '_self'
         anchor.rel = 'noreferrer'
         anchor.click()
       } else {
-        window.open(data.url, '_blank', 'noopener,noreferrer')
+        window.open(`/dashboard/controle-documentos/visualizacao/${versionId}`, '_blank', 'noopener,noreferrer')
       }
     }
   }
@@ -171,10 +171,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
 
   const printDocument = async (versionId: string) => {
-    const res = await fetch(`/api/documents/versions/${versionId}/download`, { cache: 'no-store' })
-    const data = await parseJsonSafely<{ url?: string }>(res)
+    const res = await fetch(`/api/documents/versions/${versionId}/print`, { method: 'POST', cache: 'no-store' })
+    const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
+    if (res.status === 403 && data?.requiresTerm) {
+      if (data.term) setTerm(data.term)
+      setPendingAction({ versionId, intent: 'print' })
+      return
+    }
     if (!data?.url) return
-    await fetch(`/api/documents/versions/${versionId}/print`, { method: 'POST' }).catch(() => null)
     const win = window.open(data.url, '_blank', 'noopener,noreferrer')
     win?.addEventListener('load', () => win.print())
   }
@@ -284,16 +288,20 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       controller.abort()
     }
   }, [createForm.code, showCreate])
-  const acceptTerm = async () => {
-    if (!term || !pendingVersionId) return
+   const acceptTerm = async () => {
+    if (!term || !pendingAction) return
     await fetch('/api/documents/term/accept', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ termId: term.id }),
     })
     setTerm(null)
-    await requestDocumentAccess(pendingVersionId, 'download')
-    setPendingVersionId(null)
+    if (pendingAction.intent === 'print') {
+      await printDocument(pendingAction.versionId)
+    } else {
+      await requestDocumentAccess(pendingAction.versionId, pendingAction.intent)
+    }
+    setPendingAction(null)
   }
 
   const onSearch = () => {
@@ -359,12 +367,13 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     </div>
   )
 
-  return (
+ return (
     <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-orange-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Gestão de Documentos</p>
         <h1 className="mt-1 text-2xl font-semibold text-slate-900">{title}</h1>
         <p className="mt-1 text-sm text-slate-600">{PAGE_DESCRIPTIONS[title] ?? 'Consulte documentos, aplique filtros e acompanhe o fluxo da documentação.'}</p>
+        <p className="mt-2 text-xs font-medium text-amber-700">Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
