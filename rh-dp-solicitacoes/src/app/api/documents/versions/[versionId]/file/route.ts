@@ -1,20 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { NextResponse, type NextRequest } from 'next/server'
 import { ModuleLevel } from '@prisma/client'
+
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { resolveTermChallenge } from '@/lib/documentTermAccess'
-import { registerDocumentAuditLog } from '@/lib/documentAudit'
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
+function normalizeStoredUrl(url: string) {
+  return url.startsWith('/') ? url : `/${url}`
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ versionId: string }> },
+) {
   const me = await requireActiveUser()
   const { versionId } = await params
 
   const version = await prisma.documentVersion.findUnique({
     where: { id: versionId },
-    include: {
-      document: true,
-      distributions: { orderBy: { createdAt: 'desc' }, take: 1, select: { versionId: true } },
-    },
+    include: { document: true },
   })
 
   if (!version) {
@@ -39,33 +44,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     }),
   ])
 
-  const canDownload =
+  const canRead =
     me.role === 'ADMIN' ||
     version.document.authorUserId === me.id ||
     version.document.ownerDepartmentId === me.departmentId ||
     Boolean(departmentLink) ||
     Boolean(moduleAccess)
 
-  if (!canDownload) {
+  if (!canRead) {
     return NextResponse.json({ error: 'Sem acesso ao documento.' }, { status: 403 })
-  }
-
-  const termChallenge = await resolveTermChallenge(prisma, me.id)
-  if (termChallenge) {
-    return NextResponse.json(termChallenge, { status: 403 })
-  }
-
-  const term = await prisma.documentResponsibilityTerm.findFirst({ where: { active: true }, orderBy: { updatedAt: 'desc' } })
-  if (term) {
-    const acceptance = await prisma.documentTermAcceptance.findUnique({
-      where: { termId_userId: { termId: term.id, userId: me.id } },
-    })
-    if (!acceptance) {
-       return NextResponse.json(
-        { requiresTerm: true, term: { id: term.id, title: term.title, content: term.content } },
-        { status: 403 },
-      )
-    }
   }
 
   const resolvedFileUrl = version.fileUrl
@@ -82,24 +69,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     return NextResponse.json({ error: 'Arquivo da versão publicada não encontrado.' }, { status: 404 })
   }
 
-  await prisma.documentDownloadLog.create({
-    data: {
-      documentId: version.documentId,
-      versionId,
-      userId: me.id,
-      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-      userAgent: req.headers.get('user-agent'),
-    },
-  })
+  const normalized = normalizeStoredUrl(resolvedFileUrl)
+  const absolutePath = path.join(process.cwd(), 'public', normalized)
 
-  await registerDocumentAuditLog({
-    action: 'DOWNLOAD',
-    documentId: version.documentId,
-    versionId,
-    userId: me.id,
-    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-    userAgent: req.headers.get('user-agent'),
-  })
+  try {
+    const fileBuffer = await readFile(absolutePath)
+    const filename = path.basename(normalized)
+    const encodedName = encodeURIComponent(filename)
 
-  return NextResponse.json({ url: `/api/documents/versions/${versionId}/file` })
+    return new NextResponse(fileBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename*=UTF-8''${encodedName}`,
+        'Cache-Control': 'private, max-age=0, no-cache',
+      },
+    })
+  } catch {
+    return NextResponse.json({ error: 'Arquivo do documento não encontrado.' }, { status: 404 })
+  }
 }

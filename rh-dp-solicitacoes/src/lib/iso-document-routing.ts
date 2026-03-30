@@ -14,18 +14,14 @@ export type CodeAvailabilityFeedback = {
 }
 
 export function resolveInitialVersionStatus(flow: Array<{ stepType: DocumentFlowStepType }>) {
-  const firstStepType = flow[0]?.stepType ?? null
-
   if (flow.length === 0) {
     return DocumentVersionStatus.PUBLICADO
   }
 
-  if (firstStepType === DocumentFlowStepType.QUALITY) {
-    return DocumentVersionStatus.EM_ANALISE_QUALIDADE
-  }
-
+  // Regra padrão: toda nova versão inicia em aprovação de gestão.
   return DocumentVersionStatus.AG_APROVACAO
 }
+
 
 export function routingForStatus(status: DocumentVersionStatus): Omit<DocumentRouting, 'message'> {
   if (status === DocumentVersionStatus.PUBLICADO) {

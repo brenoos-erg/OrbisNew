@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     return NextResponse.json(termChallenge, { status: 403 })
   }
 
-  const resolvedFileUrl = version.fileUrl || (await prisma.documentVersion.findFirst({ where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }], select: { fileUrl: true } }))?.fileUrl
+   const resolvedFileUrl = version.fileUrl || (await prisma.documentVersion.findFirst({ where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }], select: { fileUrl: true } }))?.fileUrl
   if (!resolvedFileUrl) return NextResponse.json({ error: 'Arquivo publicado não encontrado.' }, { status: 404 })
 
   await prisma.documentDownloadLog.create({
@@ -35,5 +35,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     },
   })
 
-  return NextResponse.json({ url: resolvedFileUrl })
+  return NextResponse.json({ url: `/api/documents/versions/${versionId}/file` })
 }

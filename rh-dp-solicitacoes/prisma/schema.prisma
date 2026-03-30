@@ -495,6 +495,21 @@ model DocumentAttachment {
   version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   uploadedBy   User            @relation("IsoAttachmentUploadedBy", fields: [uploadedById], references: [id])
 }
+model DocumentDownloadLog {
+  id           String          @id @default(uuid())
+  documentId   String
+  versionId    String
+  userId       String
+  downloadedAt DateTime        @default(now())
+  ip           String?
+  userAgent    String?
+  document     IsoDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, downloadedAt])
+  @@index([versionId, downloadedAt])
+}
 
 model DocumentAuditLog {
   id         String              @id @default(uuid())
