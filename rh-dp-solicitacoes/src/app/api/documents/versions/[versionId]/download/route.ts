@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { resolveTermChallenge } from '@/lib/documentTermAccess'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -43,6 +44,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
 
   if (!canDownload) {
     return NextResponse.json({ error: 'Sem acesso ao documento.' }, { status: 403 })
+  }
+
+  const termChallenge = await resolveTermChallenge(prisma, me.id)
+  if (termChallenge) {
+    return NextResponse.json(termChallenge, { status: 403 })
+  }
+
+  const term = await prisma.documentResponsibilityTerm.findFirst({ where: { active: true }, orderBy: { updatedAt: 'desc' } })
+  if (term) {
+    const acceptance = await prisma.documentTermAcceptance.findUnique({
+      where: { termId_userId: { termId: term.id, userId: me.id } },
+    })
+    if (!acceptance) {
+      return NextResponse.json(
+        { requiresTerm: true, term: { id: term.id, title: term.title, content: term.content } },
+        { status: 403 },
+      )
+    }
   }
 
   await prisma.documentDownloadLog.create({

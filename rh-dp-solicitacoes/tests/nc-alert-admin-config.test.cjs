@@ -1,12 +1,14 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
 
-const api = fs.readFileSync('src/app/api/sst/nao-conformidades/alertas-config/route.ts', 'utf8')
-assert.match(api, /me\.role !== 'ADMIN'/)
-assert.match(api, /subjectTemplate/)
-assert.match(api, /bodyTemplate/)
+const { isNonConformityAlertEventEnabled } = require('../src/lib/sst/nonConformityAlertRules')
 
-const ui = fs.readFileSync('src/app/dashboard/sst/nao-conformidades/NaoConformidadesClient.tsx', 'utf8')
-assert.match(ui, /Alertas de NC \(Admin\)/)
+const config = { eventCreatedEnabled: true, eventUpdatedEnabled: false }
+assert.equal(isNonConformityAlertEventEnabled('created', config), true)
+assert.equal(isNonConformityAlertEventEnabled('updated', config), false)
+assert.equal(isNonConformityAlertEventEnabled('retroactive', config), false)
 
-console.log('nc-alert-admin-config ok')
+const configWithUpdates = { eventCreatedEnabled: false, eventUpdatedEnabled: true }
+assert.equal(isNonConformityAlertEventEnabled('updated', configWithUpdates), true)
+assert.equal(isNonConformityAlertEventEnabled('migrated', configWithUpdates), true)
+
+console.log('nc-alert-admin-config behavior ok')

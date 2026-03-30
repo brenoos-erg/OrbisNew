@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { renderNcAlertTemplate } from '@/lib/sst/nonConformityAlertTemplate'
 
 const DEFAULT_SUBJECT = 'NC {{numeroRnc}}: ação necessária'
 const DEFAULT_BODY = [
@@ -28,6 +29,4 @@ export async function ensureNonConformityAlertConfig() {
   })
 }
 
-export function renderNcAlertTemplate(template: string, values: Record<string, string>) {
-  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => values[key] ?? '')
-}
+export { renderNcAlertTemplate }

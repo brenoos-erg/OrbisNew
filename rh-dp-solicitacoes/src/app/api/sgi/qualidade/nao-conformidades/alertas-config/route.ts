@@ -1,0 +1,1 @@
+export { GET, PUT } from '@/app/api/sst/nao-conformidades/alertas-config/route'

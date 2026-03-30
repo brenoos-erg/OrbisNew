@@ -23,3 +23,24 @@ export const OFFICIAL_DEPARTMENTS = [
 ] as const
 
 export const OFFICIAL_DEPARTMENT_CODES = OFFICIAL_DEPARTMENTS.map((item) => item.code)
+
+export function validateOfficialDepartments(departments: ReadonlyArray<{ code: string; name: string; sigla: string }>) {
+  const duplicateCodes = new Set<string>()
+  const duplicateSiglas = new Set<string>()
+  const codeSet = new Set<string>()
+  const siglaSet = new Set<string>()
+
+  for (const item of departments) {
+    if (codeSet.has(item.code)) duplicateCodes.add(item.code)
+    codeSet.add(item.code)
+
+    if (siglaSet.has(item.sigla)) duplicateSiglas.add(item.sigla)
+    siglaSet.add(item.sigla)
+  }
+
+  return {
+    valid: duplicateCodes.size === 0 && duplicateSiglas.size === 0,
+    duplicateCodes: Array.from(duplicateCodes.values()),
+    duplicateSiglas: Array.from(duplicateSiglas.values()),
+  }
+}

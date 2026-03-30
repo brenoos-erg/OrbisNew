@@ -1,7 +1,13 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
 
-const route = fs.readFileSync('src/app/api/documents/route.ts', 'utf8')
-assert.match(route, /revisionNumber:\s*payload\.revisionNumber \?\? 0/)
+const { resolveInitialRevisionNumber } = require('../src/lib/isoDocumentCreation')
 
-console.log('document-revision-start-zero ok')
+assert.equal(resolveInitialRevisionNumber(undefined), 0)
+assert.equal(resolveInitialRevisionNumber(null), 0)
+assert.equal(resolveInitialRevisionNumber(0), 0)
+assert.equal(resolveInitialRevisionNumber(3), 3)
+assert.equal(resolveInitialRevisionNumber(-1), 0)
+assert.equal(resolveInitialRevisionNumber(2.5), 0)
+assert.equal(resolveInitialRevisionNumber('1'), 0)
+
+console.log('document-revision-start-zero behavior ok')

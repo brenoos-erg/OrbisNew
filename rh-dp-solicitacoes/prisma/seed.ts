@@ -2,7 +2,7 @@
 
 import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES } from '@/lib/officialDepartment'
+import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES, validateOfficialDepartments } from '@/lib/officialDepartment'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 
@@ -33,6 +33,13 @@ async function main() {
 
   const databaseHost = hostOf(process.env.DATABASE_URL)
   console.log('🔎 Host DATABASE_URL:', databaseHost)
+
+  const officialDepartmentsValidation = validateOfficialDepartments(OFFICIAL_DEPARTMENTS)
+  if (!officialDepartmentsValidation.valid) {
+    throw new Error(
+      `Lista de departamentos oficiais inválida. Códigos duplicados: ${officialDepartmentsValidation.duplicateCodes.join(', ') || '-'}; siglas duplicadas: ${officialDepartmentsValidation.duplicateSiglas.join(', ') || '-'}.`,
+    )
+  }
 
   // PrismaClient usa apenas DATABASE_URL
   const prisma = new PrismaClient()
@@ -3047,7 +3054,7 @@ async function main() {
     create: { departmentId: tiDepartment.id, moduleId: meusDocumentosModule.id },
   })
 
-  const qualityDepartment = await prisma.department.findUnique({ where: { code: '16' } })
+  const qualityDepartment = await prisma.department.findUnique({ where: { code: '22' } })
   const sigDepartment = await prisma.department.findUnique({ where: { code: '18' } })
 
   for (const dept of [qualityDepartment, sigDepartment]) {

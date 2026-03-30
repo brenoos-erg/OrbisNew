@@ -10,6 +10,7 @@ import {
   resolveInitialVersionStatus,
   routingForStatus,
 } from '@/lib/iso-document-routing'
+import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
 
 function normalizeCode(raw: unknown) {
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest)   {
     })
 
     const initialStatus = resolveInitialVersionStatus(flow)
+    const revisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
 
     const existing = await prisma.isoDocument.findUnique({
       where: { code: payload.code },
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest)   {
         const version = await tx.documentVersion.create({
           data: {
             documentId: existing.id,
-            revisionNumber: payload.revisionNumber ?? 0,
+            revisionNumber,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
@@ -146,7 +148,7 @@ export async function POST(req: NextRequest)   {
         affectedAreasNotes: payload.affectedAreasNotes,
         versions: {
           create: {
-           revisionNumber: payload.revisionNumber ?? 0,
+           revisionNumber,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,

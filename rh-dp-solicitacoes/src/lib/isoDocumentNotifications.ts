@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
+import { buildDocumentPublicationRecipientWhere } from '@/lib/isoDocumentNotificationRules'
 
 export async function notifyDocumentPublished(versionId: string) {
   const version = await prisma.documentVersion.findUnique({
@@ -7,15 +8,10 @@ export async function notifyDocumentPublished(versionId: string) {
     include: { document: { include: { ownerDepartment: true, author: true } } },
   })
   if (!version || !version.document) return { sent: false, reason: 'not-found' as const }
+  if (!version.publishedAt || !version.isCurrentPublished) return { sent: false, reason: 'not-published' as const }
 
   const users = await prisma.user.findMany({
-    where: {
-      status: 'ATIVO',
-      OR: [
-        { departmentId: version.document.ownerDepartmentId },
-        { costCenters: { some: {} } },
-      ],
-    },
+    where: buildDocumentPublicationRecipientWhere(version.document.ownerDepartmentId),
     select: { email: true },
     take: 300,
   })

@@ -1,8 +1,15 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
 
-const routeFile = fs.readFileSync('src/app/api/sst/nao-conformidades/route.ts', 'utf8')
-assert.match(routeFile, /const notificationResult = await notifyNonConformityStakeholders\(/)
-assert.match(routeFile, /console\.warn\('NC notification not sent'/)
+const { renderNcAlertTemplate } = require('../src/lib/sst/nonConformityAlertTemplate')
 
-console.log('non-conformity-alert-pipeline ok')
+const template = 'NC {{numeroRnc}} - {{status}} - {{responsavel}}'
+const rendered = renderNcAlertTemplate(template, {
+  numeroRnc: 'RNC-2026-0001',
+  status: 'ABERTA',
+  responsavel: 'João Silva',
+})
+
+assert.equal(rendered, 'NC RNC-2026-0001 - ABERTA - João Silva')
+assert.equal(renderNcAlertTemplate('Campo ausente {{naoExiste}}', {}), 'Campo ausente ')
+
+console.log('non-conformity-alert-pipeline behavior ok')

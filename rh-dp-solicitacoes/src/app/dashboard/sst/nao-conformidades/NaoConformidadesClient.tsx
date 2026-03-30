@@ -118,7 +118,7 @@ export default function NaoConformidadesClient() {
         <button type="button" onClick={clearFilters} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Limpar filtros</button>
         <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><RefreshCcw size={14} />Atualizar</button>
         {isAdmin ? (
-          <Link href="/dashboard/sst/nao-conformidades/alertas" className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+         <Link href="/dashboard/sgi/qualidade/nao-conformidades/alertas" className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
             Alertas de NC (Admin)
           </Link>
         ) : null}

@@ -8,10 +8,11 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
+import { canEditFirstScreen } from '@/lib/sst/nonConformityPermissions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
 
 function parseGutValue(value: unknown) {
   if (value === undefined) return undefined
@@ -146,19 +147,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    const firstScreenFields = [
-      'tipoNc',
-      'descricao',
-      'evidenciaObjetiva',
-      'referenciaSig',
-      'acoesImediatas',
-      'planoAcaoCodigo',
-      'planoAcaoObjetivo',
-      'planoAcaoEvidencias',
-    ]
     const touchedFields = Object.keys(body).filter((key) => body[key] !== undefined)
-    const editingFirstScreen = touchedFields.some((key) => firstScreenFields.includes(key))
-    if (editingFirstScreen && !canManageAllNc(level)) {
+    if (!canEditFirstScreen(canManageAllNc(level), touchedFields)) {
+
       return NextResponse.json({ error: 'Somente usuários com nível 3 podem editar os dados da 1ª tela da NC.' }, { status: 403 })
     }
     if (nextStatus === NonConformityStatus.ENCERRADA && !canManageAllNc(level)) {
@@ -214,8 +205,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             : 'Não conformidade atualizada',
       })
 
-      return item
+        return item
     })
+
+    if (touchedFields.length > 0) {
+      const notificationResult = await notifyNonConformityStakeholders({
+        nonConformityId: id,
+        actorId: me.id,
+        trigger: 'updated',
+      })
+      if (!notificationResult.sent) {
+        console.warn('NC update notification not sent', {
+          nonConformityId: id,
+          reason: notificationResult.reason,
+        })
+      }
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

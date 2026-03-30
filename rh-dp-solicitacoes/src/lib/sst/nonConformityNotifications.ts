@@ -2,13 +2,14 @@ import { ModuleLevel, NonConformityStatus, Prisma, UserStatus } from '@prisma/cl
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
 import { ensureNonConformityAlertConfig, renderNcAlertTemplate } from '@/lib/sst/nonConformityAlertConfig'
+import { isNonConformityAlertEventEnabled, type NonConformityAlertTrigger } from '@/lib/sst/nonConformityAlertRules'
 
 type DbClient = Prisma.TransactionClient | typeof prisma
 
 type NotifyInput = {
   nonConformityId: string
   actorId?: string | null
-  trigger: 'created' | 'migrated' | 'retroactive'
+  trigger: NonConformityAlertTrigger
   db?: DbClient
 }
 
@@ -105,10 +106,11 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
   if (existing) return { sent: false, reason: 'already-notified' as const }
 
   const config = await ensureNonConformityAlertConfig()
-  const eventEnabled = input.trigger === 'created' ? config.eventCreatedEnabled : config.eventUpdatedEnabled
+  const eventEnabled = isNonConformityAlertEventEnabled(input.trigger, config)
   if (!eventEnabled) {
     return { sent: false, reason: 'event-disabled' as const }
   }
+
 
   const configRecipients = (config.recipients ?? []).map((recipient: { email: string }) => recipient.email).filter(Boolean)
   const mergedRecipients = new Set([...resolved.recipients.map((x) => x.email), ...configRecipients])
