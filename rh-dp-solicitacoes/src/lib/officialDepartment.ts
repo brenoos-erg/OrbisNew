@@ -1,14 +1,25 @@
 export const OFFICIAL_DEPARTMENTS = [
   { code: '06', name: 'Fiscal', sigla: 'FISCAL' },
+  { code: '07', name: 'Comunicação', sigla: 'COM' },
+  { code: '08', name: 'Departamento Pessoal', sigla: 'DP' },
+  { code: '09', name: 'Diretoria', sigla: 'DIR' },
   { code: '10', name: 'Financeiro', sigla: 'FIN' },
   { code: '11', name: 'Logística', sigla: 'LOG' },
   { code: '12', name: 'Almoxarifado', sigla: 'ALMOX' },
+  { code: '13', name: 'Controladoria', sigla: 'CTRL' },
+  { code: '14', name: 'Jurídico', sigla: 'JUR' },
+  { code: '15', name: 'Meio Ambiente', sigla: 'MA' },
+  { code: '16', name: 'Comercial', sigla: 'COML' },
   { code: '17', name: 'Recursos Humanos', sigla: 'RH' },
-  { code: '08', name: 'Departamento Pessoal', sigla: 'DP' },
-  { code: '20', name: 'Tecnologia da Informação', sigla: 'TI' },
+  { code: '18', name: 'Responsabilidade Social', sigla: 'RS' },
   { code: '19', name: 'Segurança do Trabalho', sigla: 'SST' },
+  { code: '20', name: 'Tecnologia da Informação', sigla: 'TI' },
   { code: '21', name: 'Saúde Ocupacional', sigla: 'SAUDE' },
   { code: '22', name: 'Qualidade', sigla: 'QUA' },
+  { code: '23', name: 'Engenharia e Projetos', sigla: 'ENG' },
+  { code: '24', name: 'Administrativo', sigla: 'ADM' },
+  { code: '25', name: 'Contabilidade', sigla: 'CONT' },
+  { code: '26', name: 'Escritório Mariana', sigla: 'MARIANA' },
 ] as const
 
 export const OFFICIAL_DEPARTMENT_CODES = OFFICIAL_DEPARTMENTS.map((item) => item.code)

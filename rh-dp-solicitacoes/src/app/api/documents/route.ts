@@ -89,12 +89,12 @@ export async function POST(req: NextRequest)   {
       )
     }
 
-    if (existing && existing.versions.length === 0) {
+   if (existing && existing.versions.length === 0) {
       const recoveredVersion = await prisma.$transaction(async (tx) => {
         const version = await tx.documentVersion.create({
           data: {
             documentId: existing.id,
-            revisionNumber: payload.revisionNumber ?? 1,
+            revisionNumber: payload.revisionNumber ?? 0,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest)   {
         affectedAreasNotes: payload.affectedAreasNotes,
         versions: {
           create: {
-            revisionNumber: payload.revisionNumber ?? 1,
+           revisionNumber: payload.revisionNumber ?? 0,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,

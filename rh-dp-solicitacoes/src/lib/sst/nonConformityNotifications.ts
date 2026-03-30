@@ -1,6 +1,7 @@
 import { ModuleLevel, NonConformityStatus, Prisma, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
+import { ensureNonConformityAlertConfig, renderNcAlertTemplate } from '@/lib/sst/nonConformityAlertConfig'
 
 type DbClient = Prisma.TransactionClient | typeof prisma
 
@@ -103,7 +104,16 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
   })
   if (existing) return { sent: false, reason: 'already-notified' as const }
 
-  if (resolved.recipients.length === 0) {
+  const config = await ensureNonConformityAlertConfig()
+  const eventEnabled = input.trigger === 'created' ? config.eventCreatedEnabled : config.eventUpdatedEnabled
+  if (!eventEnabled) {
+    return { sent: false, reason: 'event-disabled' as const }
+  }
+
+  const configRecipients = (config.recipients ?? []).map((recipient: { email: string }) => recipient.email).filter(Boolean)
+  const mergedRecipients = new Set([...resolved.recipients.map((x) => x.email), ...configRecipients])
+  const to = Array.from(mergedRecipients)
+  if (to.length === 0) {
     await db.nonConformityTimeline.create({
       data: {
         nonConformityId: input.nonConformityId,
@@ -114,17 +124,15 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
     })
     return { sent: false, reason: 'no-recipients' as const }
   }
-
-  const to = resolved.recipients.map((x) => x.email)
-  const subject = `NC ${resolved.nc.numeroRnc}: ação necessária para centro envolvido`
-  const text = [
-    `A não conformidade ${resolved.nc.numeroRnc} envolve um centro de custo vinculado a você.`,
-    '',
-    `Status: ${resolved.nc.status}`,
-    `Descrição: ${resolved.nc.descricao.slice(0, 400)}`,
-    '',
-    'Acesse SGI / Qualidade para visualizar e tratar a NC.',
-  ].join('\n')
+  const templateValues = {
+    numeroRnc: resolved.nc.numeroRnc,
+    descricao: resolved.nc.descricao.slice(0, 1000),
+    status: resolved.nc.status,
+    responsavel: resolved.recipients[0]?.fullName || '-',
+    data: new Date().toLocaleString('pt-BR'),
+  }
+  const subject = renderNcAlertTemplate(config.subjectTemplate, templateValues)
+  const text = renderNcAlertTemplate(config.bodyTemplate, templateValues)
 
   const mailResult = await sendMail({ to, subject, text }, 'ALERTS')
   if (!mailResult.sent) {
@@ -141,7 +149,7 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
       nonConformityId: input.nonConformityId,
       actorId: input.actorId ?? null,
       tipo: 'ALERTA',
-      message: `${marker} (${resolved.recipients.length} destinatário(s); envio=${mailResult.sent ? 'ok' : 'falha'})`,
+      message: `${marker} (${to.length} destinatário(s); envio=${mailResult.sent ? 'ok' : 'falha'})`,
     },
   })
 

@@ -971,6 +971,31 @@ model NonConformitySequence {
   updatedAt DateTime @updatedAt
 }
 
+
+model NonConformityAlertConfig {
+  id                    String                       @id @default(cuid())
+  eventCreatedEnabled   Boolean                      @default(true)
+  eventUpdatedEnabled   Boolean                      @default(false)
+  subjectTemplate       String
+  bodyTemplate          String                       @db.LongText
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  recipients            NonConformityAlertRecipient[]
+}
+
+model NonConformityAlertRecipient {
+  id            String                   @id @default(cuid())
+  configId      String
+  email         String
+  fullName      String?
+  active        Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  config        NonConformityAlertConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, email])
+}
+
 model NonConformity {
   id                               String                      @id @default(cuid())
   numeroRnc                        String                      @unique

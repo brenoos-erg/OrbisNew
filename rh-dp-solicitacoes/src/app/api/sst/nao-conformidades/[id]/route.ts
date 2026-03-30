@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Sem permissão para editar esta NC.' }, { status: 403 })
     }
 
-    const approved = isApproved(current.aprovadoQualidadeStatus)
+     const approved = isApproved(current.aprovadoQualidadeStatus)
     const nextStatus = body?.status as NonConformityStatus | undefined
     if (nextStatus && !Object.values(NonConformityStatus).includes(nextStatus)) {
       return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
@@ -146,6 +146,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    const firstScreenFields = [
+      'tipoNc',
+      'descricao',
+      'evidenciaObjetiva',
+      'referenciaSig',
+      'acoesImediatas',
+      'planoAcaoCodigo',
+      'planoAcaoObjetivo',
+      'planoAcaoEvidencias',
+    ]
+    const touchedFields = Object.keys(body).filter((key) => body[key] !== undefined)
+    const editingFirstScreen = touchedFields.some((key) => firstScreenFields.includes(key))
+    if (editingFirstScreen && !canManageAllNc(level)) {
+      return NextResponse.json({ error: 'Somente usuários com nível 3 podem editar os dados da 1ª tela da NC.' }, { status: 403 })
+    }
     if (nextStatus === NonConformityStatus.ENCERRADA && !canManageAllNc(level)) {
       return NextResponse.json({ error: 'Somente nível 3 pode encerrar.' }, { status: 403 })
     }

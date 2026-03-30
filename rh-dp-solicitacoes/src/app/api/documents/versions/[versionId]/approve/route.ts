@@ -3,6 +3,7 @@ import { DocumentApprovalStatus, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
+import { notifyDocumentPublished } from '@/lib/isoDocumentNotifications'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -33,6 +34,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     },
   })
 
+  const nextStatus = pendingAfterCurrent > 0
+    ? DocumentVersionStatus.EM_ANALISE_QUALIDADE
+    : DocumentVersionStatus.PUBLICADO
+
   await prisma.$transaction([
     prisma.documentApproval.update({
       where: { id: approval.id },
@@ -41,14 +46,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     prisma.documentVersion.update({
       where: { id: versionId },
       data: {
-        status: pendingAfterCurrent > 0
-          ? DocumentVersionStatus.EM_ANALISE_QUALIDADE
-          : DocumentVersionStatus.PUBLICADO,
-        publishedAt: pendingAfterCurrent > 0 ? undefined : new Date(),
-        isCurrentPublished: pendingAfterCurrent > 0 ? undefined : true,
+        status: nextStatus,
+        publishedAt: nextStatus === DocumentVersionStatus.PUBLICADO ? new Date() : undefined,
+        isCurrentPublished: nextStatus === DocumentVersionStatus.PUBLICADO ? true : undefined,
       },
     }),
   ])
+
+  if (nextStatus === DocumentVersionStatus.PUBLICADO) {
+    const mailResult = await notifyDocumentPublished(versionId)
+    if (!mailResult.sent) {
+      console.warn('Document publication alert not sent', { versionId, reason: mailResult.reason })
+    }
+  }
 
   return NextResponse.json({ ok: true })
 }

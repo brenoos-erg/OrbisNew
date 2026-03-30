@@ -40,6 +40,7 @@ export default function NaoConformidadesClient() {
   const [centroQueDetectouId, setCentroQueDetectouId] = useState('')
   const [centroQueOriginouId, setCentroQueOriginouId] = useState('')
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const qs = useMemo(() => {
     const query = new URLSearchParams()
@@ -89,6 +90,10 @@ export default function NaoConformidadesClient() {
 
   useEffect(() => {
     loadCostCenters()
+    fetch('/api/me', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setIsAdmin(data?.user?.role === 'ADMIN'))
+      .catch(() => setIsAdmin(false))
   }, [])
 
   useEffect(() => {
@@ -112,6 +117,11 @@ export default function NaoConformidadesClient() {
         </select>
         <button type="button" onClick={clearFilters} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Limpar filtros</button>
         <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><RefreshCcw size={14} />Atualizar</button>
+        {isAdmin ? (
+          <Link href="/dashboard/sst/nao-conformidades/alertas" className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+            Alertas de NC (Admin)
+          </Link>
+        ) : null}
       </div>
 
       {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</div> : null}
