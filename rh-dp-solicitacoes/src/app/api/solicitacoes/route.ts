@@ -90,18 +90,18 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     where.AND = [
       ...(where.AND ?? []),
       {
-        OR: [
+         OR: [
           { titulo: { contains: textValue, mode: 'insensitive' } },
           { descricao: { contains: textValue, mode: 'insensitive' } },
-          { payload: { path: ['campos'], string_contains: textValue } },
-          { payload: { path: ['formulario'], string_contains: textValue } },
-          { payload: { path: ['form'], string_contains: textValue } },
-          { payload: { path: ['metadata'], string_contains: textValue } },
-          { payload: { path: ['requestData'], string_contains: textValue } },
-          { payload: { path: ['dynamicForm'], string_contains: textValue } },
-          { payload: { path: ['answers'], string_contains: textValue } },
-          { payload: { path: ['fields'], string_contains: textValue } },
-          { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
+          { payload: { path: '$.campos', string_contains: textValue } },
+          { payload: { path: '$.formulario', string_contains: textValue } },
+          { payload: { path: '$.form', string_contains: textValue } },
+          { payload: { path: '$.metadata', string_contains: textValue } },
+          { payload: { path: '$.requestData', string_contains: textValue } },
+          { payload: { path: '$.dynamicForm', string_contains: textValue } },
+          { payload: { path: '$.answers', string_contains: textValue } },
+          { payload: { path: '$.fields', string_contains: textValue } },
+          { payload: { path: '$.avaliacaoGestor', string_contains: textValue } },
         ],
       },
     ]

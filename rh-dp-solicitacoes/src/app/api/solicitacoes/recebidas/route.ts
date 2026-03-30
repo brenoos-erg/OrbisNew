@@ -113,13 +113,7 @@ if (hasProtocoloFilter) {
         OR: [
           {
             payload: {
-              path: ['campos', 'matricula'],
-              string_contains: matricula,
-            },
-          },
-          {
-            payload: {
-              path: ['solicitante', 'matricula'],
+              path: '$.solicitante.matricula',
               string_contains: matricula,
             },
           },
@@ -135,15 +129,15 @@ if (hasProtocoloFilter) {
         OR: [
           { titulo: { contains: textValue } },
           { descricao: { contains: textValue } },
-          { payload: { path: ['campos'], string_contains: textValue } },
-          { payload: { path: ['formulario'], string_contains: textValue } },
-          { payload: { path: ['form'], string_contains: textValue } },
-          { payload: { path: ['metadata'], string_contains: textValue } },
-          { payload: { path: ['requestData'], string_contains: textValue } },
-          { payload: { path: ['dynamicForm'], string_contains: textValue } },
-          { payload: { path: ['answers'], string_contains: textValue } },
-          { payload: { path: ['fields'], string_contains: textValue } },
-          { payload: { path: ['avaliacaoGestor'], string_contains: textValue } },
+          { payload: { path: '$.campos', string_contains: textValue } },
+          { payload: { path: '$.formulario', string_contains: textValue } },
+          { payload: { path: '$.form', string_contains: textValue } },
+          { payload: { path: '$.metadata', string_contains: textValue } },
+          { payload: { path: '$.requestData', string_contains: textValue } },
+          { payload: { path: '$.dynamicForm', string_contains: textValue } },
+          { payload: { path: '$.answers', string_contains: textValue } },
+          { payload: { path: '$.fields', string_contains: textValue } },
+          { payload: { path: '$.avaliacaoGestor', string_contains: textValue } },
         ],
       },
     ]
