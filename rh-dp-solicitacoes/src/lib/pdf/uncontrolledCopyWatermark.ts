@@ -1,6 +1,6 @@
 const WATERMARK_TEXT = 'CÓPIA NÃO CONTROLADA'
 
-const TEXT_COLOR = '0.45 0.45 0.45'
+const TEXT_COLOR = '0.62 0.62 0.62'
 const DEFAULT_PAGE_WIDTH = 595
 const DEFAULT_PAGE_HEIGHT = 842
 const WATERMARK_MARGIN = 28
@@ -23,7 +23,7 @@ const parseMediaBox = (objectBody: string) => {
 }
 
 const buildWatermarkStream = (width: number, height: number) => {
-  const fontSize = Math.max(28, Math.min(42, Math.round(Math.min(width, height) * 0.06)))
+  const fontSize = Math.max(24, Math.min(38, Math.round(Math.min(width, height) * 0.052)))
   const radians = (-32 * Math.PI) / 180
   const cos = Math.cos(radians).toFixed(5)
   const sin = Math.sin(radians).toFixed(5)
@@ -108,7 +108,7 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
 
   const singleRefMatch = pageBody.match(/\/Contents\s+(\d+)\s+0\s+R/)
   if (singleRefMatch) {
-    return pageBody.replace(/\/Contents\s+\d+\s+0\s+R/, `/Contents [${singleRefMatch[1]} 0 R ${streamObjectId} 0 R]`)
+     return pageBody.replace(/\/Contents\s+\d+\s+0\s+R/, `/Contents [${streamObjectId} 0 R ${singleRefMatch[1]} 0 R]`)
   }
 
   return pageBody.replace('>>', `\n/Contents [${streamObjectId} 0 R]\n>>`)
@@ -139,7 +139,7 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
 
    const appendedObjects: string[] = [
     `${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`,
-    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.08 /ca 0.08 >>\nendobj\n`,
+    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.045 /ca 0.045 >>\nendobj\n`,
   ]
 
   let updatedSource = source
