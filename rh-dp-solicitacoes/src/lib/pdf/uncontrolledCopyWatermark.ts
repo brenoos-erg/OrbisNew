@@ -3,6 +3,7 @@ const WATERMARK_TEXT = 'CÓPIA NÃO CONTROLADA'
 const TEXT_COLOR = '0.45 0.45 0.45'
 const DEFAULT_PAGE_WIDTH = 595
 const DEFAULT_PAGE_HEIGHT = 842
+const WATERMARK_MARGIN = 28
 
 const escapePdfText = (value: string) => value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
 
@@ -22,12 +23,40 @@ const parseMediaBox = (objectBody: string) => {
 }
 
 const buildWatermarkStream = (width: number, height: number) => {
-  const fontSize = Math.max(34, Math.min(58, Math.round(Math.min(width, height) * 0.08)))
-  const radians = (-35 * Math.PI) / 180
+  const fontSize = Math.max(28, Math.min(42, Math.round(Math.min(width, height) * 0.06)))
+  const radians = (-32 * Math.PI) / 180
   const cos = Math.cos(radians).toFixed(5)
   const sin = Math.sin(radians).toFixed(5)
-  const tx = (width * 0.16).toFixed(2)
-  const ty = (height * 0.52).toFixed(2)
+  const textWidth = WATERMARK_TEXT.length * fontSize * 0.56
+  const textHeight = fontSize
+
+  const centerX = width * 0.5
+  const centerY = height * 0.5
+  let tx = centerX - textWidth / 2
+  let ty = centerY - textHeight / 2
+
+  const project = (x: number, y: number) => {
+    const px = Math.cos(radians) * x + -Math.sin(radians) * y + tx
+    const py = Math.sin(radians) * x + Math.cos(radians) * y + ty
+    return { x: px, y: py }
+  }
+
+  const corners = [
+    project(0, 0),
+    project(textWidth, 0),
+    project(0, textHeight),
+    project(textWidth, textHeight),
+  ]
+
+  const minX = Math.min(...corners.map((corner) => corner.x))
+  const maxX = Math.max(...corners.map((corner) => corner.x))
+  const minY = Math.min(...corners.map((corner) => corner.y))
+  const maxY = Math.max(...corners.map((corner) => corner.y))
+
+  if (minX < WATERMARK_MARGIN) tx += WATERMARK_MARGIN - minX
+  if (maxX > width - WATERMARK_MARGIN) tx -= maxX - (width - WATERMARK_MARGIN)
+  if (minY < WATERMARK_MARGIN) ty += WATERMARK_MARGIN - minY
+  if (maxY > height - WATERMARK_MARGIN) ty -= maxY - (height - WATERMARK_MARGIN)
 
   const commands = [
     'q',
@@ -35,7 +64,7 @@ const buildWatermarkStream = (width: number, height: number) => {
     'BT',
     `${TEXT_COLOR} rg`,
     `/Fwm ${fontSize} Tf`,
-    `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${tx} ${ty} Tm`,
+    `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${tx.toFixed(2)} ${ty.toFixed(2)} Tm`,
     `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
     'ET',
     'Q',
@@ -74,7 +103,7 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
   if (contentsArrayMatch) {
     const current = contentsArrayMatch[1]
     if (current.includes(`${streamObjectId} 0 R`)) return pageBody
-    return pageBody.replace(/\/Contents\s*\[([\s\S]*?)\]/, `/Contents [${current} ${streamObjectId} 0 R]`)
+    return pageBody.replace(/\/Contents\s*\[([\s\S]*?)\]/, `/Contents [${streamObjectId} 0 R ${current}]`)
   }
 
   const singleRefMatch = pageBody.match(/\/Contents\s+(\d+)\s+0\s+R/)
@@ -108,9 +137,9 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
   const fontObjectId = nextObjectId++
   const gsObjectId = nextObjectId++
 
-  const appendedObjects: string[] = [
+   const appendedObjects: string[] = [
     `${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`,
-    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.15 /ca 0.15 >>\nendobj\n`,
+    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.08 /ca 0.08 >>\nendobj\n`,
   ]
 
   let updatedSource = source
