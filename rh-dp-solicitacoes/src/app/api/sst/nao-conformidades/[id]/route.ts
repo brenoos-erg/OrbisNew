@@ -45,7 +45,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             evidencias: true,
             createdAt: true,
             updatedAt: true,
-            responsavel: { select: { id: true, fullName: true } },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -55,10 +54,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         timeline: { include: { actor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },
         centroQueDetectou: { select: { id: true, description: true } },
         centroQueOriginou: { select: { id: true, description: true } },
-        aprovadoQualidadePor: { select: { id: true, fullName: true, email: true } },
-        verificacaoEficaciaAprovadoPor: { select: { id: true, fullName: true, email: true } },
           },
     })
+
 
    if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
