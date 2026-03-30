@@ -21,3 +21,4 @@ export function buildDocumentPublicationRecipientWhere(ownerDepartmentId: string
       },
     ],
   }
+}
