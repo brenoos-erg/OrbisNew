@@ -9,6 +9,7 @@ type ViewPayload = {
   term?: { id: string; title: string; content: string }
   isPdf?: boolean
   fileExtension?: string
+  conversionError?: string | null
   url?: string
   downloadUrl?: string
   document?: { code: string; title: string; revisionNumber: number }
@@ -75,9 +76,9 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
             />
           </div>
         ) : (
-          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
+            <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">Este documento está em formato {extensionLabel}.</p>
-            <p className="mt-2">A visualização interna suporta apenas arquivos PDF. Faça o download do arquivo original para abrir no aplicativo correspondente.</p>
+            <p className="mt-2">{data.conversionError ?? 'A visualização interna suporta apenas arquivos PDF. Faça o download do arquivo original para abrir no aplicativo correspondente.'}</p>
             {data.downloadUrl ? (
               <a
                 className="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"

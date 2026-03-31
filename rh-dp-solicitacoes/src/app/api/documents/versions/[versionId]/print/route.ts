@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import path from 'node:path'
 import { PrintCopyType } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { resolveDocumentFileType } from '@/lib/documents/fileType'
+import { convertWordToPdf } from '@/lib/documents/wordToPdf'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -32,7 +34,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     userAgent: req.headers.get('user-agent'),
   })
   const fileType = resolveDocumentFileType(access.fileUrl)
-  const canRenderPdf = fileType.isPdf || fileType.isWord
+  let canRenderPdf = fileType.isPdf
+  let conversionError: string | null = null
+
+  if (fileType.isWord) {
+    try {
+      await convertWordToPdf({
+        fileUrl: access.fileUrl,
+        sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
+      })
+      canRenderPdf = true
+    } catch (error) {
+      conversionError = 'Não foi possível converter este arquivo Word para impressão agora. Você pode baixar o original.'
+      console.error('Falha ao preparar conversão Word para impressão.', {
+        versionId,
+        fileUrl: access.fileUrl,
+        error,
+      })
+    }
+  }
   const renderUrl = canRenderPdf
     ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT${fileType.isWord ? '&format=pdf' : ''}`
     : undefined
@@ -41,6 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     ok: true,
     isPdf: canRenderPdf,
     fileExtension: fileType.extension,
+    conversionError,
     url: renderUrl,
     downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=PRINT`,
     document: {

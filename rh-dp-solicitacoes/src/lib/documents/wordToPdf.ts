@@ -18,10 +18,12 @@ type ConversionOptions = {
 }
 
 function getSofficeCandidates() {
-  const envCandidate = process.env.SOFFICE_PATH?.trim()
+  const libreOfficeEnvCandidate = process.env.LIBREOFFICE_PATH?.trim()
+  const legacyEnvCandidate = process.env.SOFFICE_PATH?.trim()
 
   return [
-    envCandidate,
+    libreOfficeEnvCandidate,
+    legacyEnvCandidate,
     'soffice',
     '/usr/bin/soffice',
     '/usr/local/bin/soffice',
@@ -90,7 +92,7 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
     const tempInputPath = path.join(tempDir, tempInputName)
     await fs.copyFile(sourceAbsolutePath, tempInputPath)
 
-   await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
+    await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
 
     const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
     const convertedPdf = await fs.readFile(convertedTempPdfPath)
