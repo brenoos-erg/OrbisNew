@@ -2,6 +2,7 @@
 
 import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -39,6 +40,7 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
 }
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
+  const router = useRouter()
   const [items, setItems] = useState<GridRow[]>([])
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
@@ -153,29 +155,58 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }, [endpoint, page, pageSize, sortBy, sortOrder, appliedFilters])
 
   const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download') => {
-    const endpoint = intent === 'view'
-      ? `/api/documents/versions/${versionId}/view`
-      : `/api/documents/versions/${versionId}/download`
-    const res = await fetch(endpoint, { method: intent === 'view' ? 'POST' : 'GET', cache: 'no-store' })
-    const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
-    if (!data) return
-
-    if (res.status === 403 && data.requiresTerm) {
-      if (data.term) setTerm(data.term)
-      setPendingAction({ versionId, intent })
+    if (!versionId) {
+      alert('Não foi possível localizar a versão do documento para abrir.')
       return
     }
 
-   if (data.url) {
-      if (intent === 'download') {
-        const anchor = document.createElement('a')
-        anchor.href = data.url
-        anchor.target = '_self'
-        anchor.rel = 'noreferrer'
-        anchor.click()
-      } else {
-        window.open(`/dashboard/controle-documentos/visualizacao/${versionId}`, '_blank', 'noopener,noreferrer')
+    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
+    const previewWindow = intent === 'view' ? window.open('about:blank', '_blank', 'noopener,noreferrer') : null
+    const endpoint = intent === 'view'
+      ? `/api/documents/versions/${versionId}/view`
+      : `/api/documents/versions/${versionId}/download`
+    try {
+      const res = await fetch(endpoint, { method: intent === 'view' ? 'POST' : 'GET', cache: 'no-store' })
+      const data = await parseJsonSafely<{ error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
+      if (!data) {
+        previewWindow?.close()
+        alert('Não foi possível processar a resposta para o documento.')
+        return
       }
+
+    if (!res.ok && data.error) {
+        previewWindow?.close()
+        alert(data.error)
+        return
+      }
+
+      if (res.status === 403 && data.requiresTerm) {
+        previewWindow?.close()
+        if (data.term) setTerm(data.term)
+        setPendingAction({ versionId, intent })
+        return
+      }
+
+      if (data.url) {
+        if (intent === 'download') {
+          const anchor = document.createElement('a')
+          anchor.href = data.url
+          anchor.target = '_self'
+          anchor.rel = 'noreferrer'
+          anchor.click()
+        } else if (previewWindow) {
+          previewWindow.location.href = viewerPath
+        } else {
+          router.push(viewerPath)
+        }
+        return
+      }
+
+      previewWindow?.close()
+      alert('Documento sem URL de visualização disponível no momento.')
+    } catch {
+      previewWindow?.close()
+      alert('Falha ao carregar o documento. Tente novamente.')
     }
   }
 
