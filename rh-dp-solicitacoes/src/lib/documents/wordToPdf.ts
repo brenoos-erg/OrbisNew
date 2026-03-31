@@ -38,8 +38,11 @@ async function runSofficeConvert(args: string[]) {
 
   for (const binary of getSofficeCandidates()) {
     attemptedBinaries.push(binary)
+    const candidateBinary = path.extname(binary).toLowerCase() === '.exe' || path.basename(binary).toLowerCase().includes('soffice')
+      ? binary
+      : path.join(binary, process.platform === 'win32' ? 'soffice.exe' : 'soffice')
     try {
-      await execFileAsync(binary, args, {
+      await execFileAsync(candidateBinary, args, {
         timeout: 60_000,
         maxBuffer: 10 * 1024 * 1024,
       })
@@ -50,6 +53,7 @@ async function runSofficeConvert(args: string[]) {
         lastError = error
         continue
       }
+
 
       throw error
     }
@@ -67,6 +71,7 @@ function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeo
 }
 
 export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: ConversionOptions): Promise<ConversionResult> {
+  await fs.access(sourceAbsolutePath)
   const sourceStat = await fs.stat(sourceAbsolutePath)
   const sourceBaseName = path.basename(sourceAbsolutePath, path.extname(sourceAbsolutePath))
 
@@ -84,7 +89,6 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
       outputFileName: `${sourceBaseName}.pdf`,
     }
   }
-
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'word-to-pdf-'))
 
   try {
@@ -95,7 +99,10 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
     await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
 
     const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
-    const convertedPdf = await fs.readFile(convertedTempPdfPath)
+    const convertedPdf = await fs.readFile(convertedTempPdfPath).catch(() => null)
+    if (!convertedPdf?.length) {
+      throw new Error('Arquivo PDF convertido não foi gerado pelo LibreOffice.')
+    }
 
     await fs.writeFile(derivedAbsolutePath, convertedPdf)
 

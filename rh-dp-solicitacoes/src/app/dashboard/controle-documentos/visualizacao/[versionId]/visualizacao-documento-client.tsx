@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Props = { versionId: string; initialIntent: 'view' | 'print' }
 type ViewPayload = {
@@ -19,6 +19,7 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   const [loading, setLoading] = useState(true)
   const [requestError, setRequestError] = useState<string | null>(null)
   const [frameReady, setFrameReady] = useState(false)
+  const frameRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -47,7 +48,13 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
 
   useEffect(() => {
     if (!frameReady || initialIntent !== 'print') return
-    const timer = window.setTimeout(() => window.print(), 250)
+    const timer = window.setTimeout(() => {
+      const frameWindow = frameRef.current?.contentWindow
+      if (frameWindow) {
+        frameWindow.focus()
+        frameWindow.print()
+      }
+    }, 350)
     return () => window.clearTimeout(timer)
   }, [frameReady, initialIntent])
 
@@ -58,37 +65,44 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
 
   const extensionLabel = data?.fileExtension ? data.fileExtension.replace('.', '').toUpperCase() : 'não-PDF'
 
+  if (data.isPdf && data.url) {
+    return (
+      <div className={initialIntent === 'print' ? 'h-screen bg-white p-0' : 'min-h-screen bg-slate-100 p-3'}>
+        <div className={initialIntent === 'print' ? 'h-full' : 'mx-auto max-w-6xl space-y-2'}>
+          {initialIntent !== 'print' ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <p className="font-semibold">CÓPIA NÃO CONTROLADA</p>
+              <p>Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
+              {data.document ? <p className="mt-1 text-amber-800">{data.document.code} · {data.document.title} · REV {data.document.revisionNumber}</p> : null}
+            </div>
+          ) : null}
+          <iframe
+            ref={frameRef}
+            className={initialIntent === 'print' ? 'h-full w-full border-0 bg-white' : 'h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white'}
+            src={`${data.url}#toolbar=0&navpanes=0`}
+            title="Visualização controlada do documento"
+            onLoad={() => setFrameReady(true)}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 p-3">
       <div className="mx-auto max-w-6xl space-y-2">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          <p className="font-semibold">CÓPIA NÃO CONTROLADA</p>
-          <p>Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
-          {data.document ? <p className="mt-1 text-amber-800">{data.document.code} · {data.document.title} · REV {data.document.revisionNumber}</p> : null}
+        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">Este documento está em formato {extensionLabel}.</p>
+          <p className="mt-2">{data.conversionError ?? 'A visualização interna suporta apenas arquivos PDF no momento.'}</p>
+          {data.downloadUrl ? (
+            <a
+              className="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              href={data.downloadUrl}
+            >
+              Baixar arquivo
+            </a>
+          ) : null}
         </div>
-        {data.isPdf && data.url ? (
-          <div>
-            <iframe
-              className="h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white"
-              src={`${data.url}#toolbar=0&navpanes=0`}
-              title="Visualização controlada do documento"
-              onLoad={() => setFrameReady(true)}
-            />
-          </div>
-        ) : (
-            <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
-            <p className="font-semibold text-slate-900">Este documento está em formato {extensionLabel}.</p>
-            <p className="mt-2">{data.conversionError ?? 'A visualização interna suporta apenas arquivos PDF. Faça o download do arquivo original para abrir no aplicativo correspondente.'}</p>
-            {data.downloadUrl ? (
-              <a
-                className="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                href={data.downloadUrl}
-              >
-                Baixar arquivo original
-              </a>
-            ) : null}
-          </div>
-        )}
       </div>
     </div>
   )

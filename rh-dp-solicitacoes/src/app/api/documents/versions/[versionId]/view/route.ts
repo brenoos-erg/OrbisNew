@@ -23,7 +23,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
   })
 
   const fileType = resolveDocumentFileType(access.fileUrl)
-  let canRenderPdf = fileType.isPdf
   let conversionError: string | null = null
 
   if (fileType.isWord) {
@@ -32,16 +31,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
         fileUrl: access.fileUrl,
         sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
       })
-      canRenderPdf = true
     } catch (error) {
-      conversionError = 'Não foi possível converter este arquivo Word para visualização agora. Você pode baixar o original.'
+      conversionError = 'Não foi possível converter este arquivo Word para visualização agora.'
       console.error('Falha ao preparar conversão Word para visualização.', {
         versionId,
         fileUrl: access.fileUrl,
         error,
       })
+      return NextResponse.json({ error: conversionError }, { status: 422 })
     }
   }
+  const canRenderPdf = fileType.isPdf || fileType.isWord
   const renderUrl = canRenderPdf
     ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW${fileType.isWord ? '&format=pdf' : ''}`
     : undefined

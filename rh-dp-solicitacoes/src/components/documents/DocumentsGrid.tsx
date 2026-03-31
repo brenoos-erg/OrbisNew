@@ -340,11 +340,15 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }, [createForm.code, showCreate])
   const acceptTerm = async () => {
     if (!term || !pendingAction) return
-    await fetch('/api/documents/term/accept', {
+    const response = await fetch('/api/documents/term/accept', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ termId: term.id }),
     })
+    if (!response.ok) {
+      alert('Não foi possível registrar o aceite do termo de responsabilidade.')
+      return
+    }
     const action = pendingAction
     setTerm(null)
     setPendingAction(null)

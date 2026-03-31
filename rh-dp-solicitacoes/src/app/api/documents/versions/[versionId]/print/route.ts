@@ -16,6 +16,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 
+  const fileType = resolveDocumentFileType(access.fileUrl)
+  let conversionError: string | null = null
+
+  if (fileType.isWord) {
+    try {
+      await convertWordToPdf({
+        fileUrl: access.fileUrl,
+        sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
+      })
+    } catch (error) {
+      conversionError = 'Não foi possível converter este arquivo Word para impressão agora.'
+      console.error('Falha ao preparar conversão Word para impressão.', {
+        versionId,
+        fileUrl: access.fileUrl,
+        error,
+      })
+      return NextResponse.json({ error: conversionError }, { status: 422 })
+    }
+  }
+  const canRenderPdf = fileType.isPdf || fileType.isWord
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const userAgent = req.headers.get('user-agent')
+
   await prisma.printCopy.create({
     data: {
       documentId: access.documentId,
@@ -30,29 +53,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     documentId: access.documentId,
     versionId: access.versionId,
     userId: me.id,
-    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-    userAgent: req.headers.get('user-agent'),
+    ip,
+    userAgent,
   })
-  const fileType = resolveDocumentFileType(access.fileUrl)
-  let canRenderPdf = fileType.isPdf
-  let conversionError: string | null = null
-
-  if (fileType.isWord) {
-    try {
-      await convertWordToPdf({
-        fileUrl: access.fileUrl,
-        sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
-      })
-      canRenderPdf = true
-    } catch (error) {
-      conversionError = 'Não foi possível converter este arquivo Word para impressão agora. Você pode baixar o original.'
-      console.error('Falha ao preparar conversão Word para impressão.', {
-        versionId,
-        fileUrl: access.fileUrl,
-        error,
-      })
-    }
-  }
   const renderUrl = canRenderPdf
     ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT${fileType.isWord ? '&format=pdf' : ''}`
     : undefined

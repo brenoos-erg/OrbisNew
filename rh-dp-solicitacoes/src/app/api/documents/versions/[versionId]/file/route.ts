@@ -12,6 +12,13 @@ function normalizeStoredUrl(url: string) {
   return url.startsWith('/') ? url : `/${url}`
 }
 
+function toPublicAbsolutePath(fileUrl: string) {
+  const normalized = normalizeStoredUrl(fileUrl)
+  const relativeToPublic = normalized.replace(/^\/+/, '')
+  return path.join(process.cwd(), 'public', relativeToPublic)
+}
+
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ versionId: string }> },
@@ -23,8 +30,8 @@ export async function GET(
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 
-  const normalized = normalizeStoredUrl(access.fileUrl)
-  const absolutePath = path.join(process.cwd(), 'public', normalized)
+   const normalized = normalizeStoredUrl(access.fileUrl)
+  const absolutePath = toPublicAbsolutePath(access.fileUrl)
 
   try {
     const fileBuffer = await readFile(absolutePath)
