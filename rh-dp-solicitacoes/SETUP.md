@@ -3,6 +3,7 @@
 ## Requisitos
 - Node.js 20+
 - Docker
+- LibreOffice (binário `soffice`) para conversão de `.doc/.docx` em PDF no módulo de Controle de Documentos
 
 ## 1) Subir MySQL
 ```bash
@@ -25,6 +26,18 @@ SUPERADMIN_PASSWORD="SuperAdmin@123"
 ## 3) Instalar dependências
 ```bash
 npm install
+```
+
+### Dependência do servidor para conversão Word → PDF
+Linux (Debian/Ubuntu):
+```bash
+sudo apt-get update
+sudo apt-get install -y libreoffice
+```
+
+Após instalar, valide:
+```bash
+soffice --version
 ```
 
 ### Dependências para geração de termo/PDF

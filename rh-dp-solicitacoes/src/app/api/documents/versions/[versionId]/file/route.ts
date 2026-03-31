@@ -6,6 +6,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { applyUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
+import { convertWordToPdf } from '@/lib/documents/wordToPdf'
 
 function normalizeStoredUrl(url: string) {
   return url.startsWith('/') ? url : `/${url}`
@@ -18,6 +19,7 @@ export async function GET(
   const me = await requireActiveUser()
   const { versionId } = await params
   const disposition = _req.nextUrl.searchParams.get('disposition') === 'attachment' ? 'attachment' : 'inline'
+  const forcePdfFormat = _req.nextUrl.searchParams.get('format') === 'pdf'
 
   const access = await resolveDocumentVersionAccess(versionId, me.id)
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
@@ -28,15 +30,41 @@ export async function GET(
 
   try {
     const fileBuffer = await readFile(absolutePath)
-    const filename = path.basename(normalized)
-    const encodedName = encodeURIComponent(filename)
+    const originalFileName = path.basename(normalized)
+    const encodedOriginalName = encodeURIComponent(originalFileName)
     const fileType = resolveDocumentFileType(access.fileUrl)
+    let pdfSource: Buffer | null = null
+    let downloadName = originalFileName
 
-    if (!fileType.isPdf || !isPdfBuffer(fileBuffer)) {
+    if (fileType.isPdf && isPdfBuffer(fileBuffer)) {
+      pdfSource = Buffer.from(fileBuffer)
+      downloadName = originalFileName
+    } else if (fileType.isWord && forcePdfFormat) {
+      try {
+        const converted = await convertWordToPdf({
+          fileUrl: access.fileUrl,
+          sourceAbsolutePath: absolutePath,
+        })
+        pdfSource = converted.pdfBuffer
+        downloadName = converted.outputFileName
+      } catch (conversionError) {
+        console.error('Falha ao converter documento Word para PDF.', {
+          versionId,
+          fileUrl: access.fileUrl,
+          error: conversionError,
+        })
+        return NextResponse.json(
+          { error: 'Não foi possível converter o documento Word para PDF no momento.' },
+          { status: 422 },
+        )
+      }
+    }
+
+    if (!pdfSource) {
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           'Content-Type': fileType.mimeType,
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodedName}`,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodedOriginalName}`,
           'Cache-Control': 'private, max-age=0, no-cache',
           'X-Document-File-Type': fileType.extension || 'unknown',
           'X-Document-Copy-Type': 'ORIGINAL',
@@ -44,7 +72,9 @@ export async function GET(
         },
       })
     }
-    const sourceValidation = validatePdfBuffer(fileBuffer)
+
+    const encodedOutputName = encodeURIComponent(downloadName)
+    const sourceValidation = validatePdfBuffer(pdfSource)
     if (!sourceValidation.valid) {
       console.error('Arquivo de documento inválido para visualização em PDF.', {
         versionId,
@@ -60,11 +90,11 @@ export async function GET(
       )
     }
 
-    let outputBuffer: Buffer = Buffer.from(fileBuffer)
+    let outputBuffer: Buffer = Buffer.from(pdfSource)
     let watermarkApplied = false
 
     try {
-      outputBuffer = applyUncontrolledCopyWatermark(fileBuffer)
+      outputBuffer = applyUncontrolledCopyWatermark(pdfSource)
       watermarkApplied = true
     } catch (watermarkError) {
       console.warn("Falha ao aplicar marca d'água. Retornando PDF original.", {
@@ -72,7 +102,7 @@ export async function GET(
         fileUrl: access.fileUrl,
         error: watermarkError,
       })
-      outputBuffer = Buffer.from(fileBuffer)
+      outputBuffer = Buffer.from(pdfSource)
     }
 
     const outputValidation = validatePdfBuffer(outputBuffer)
@@ -82,14 +112,14 @@ export async function GET(
         fileUrl: access.fileUrl,
         reason: outputValidation.reason,
       })
-      outputBuffer = Buffer.from(fileBuffer)
+      outputBuffer = Buffer.from(pdfSource)
       watermarkApplied = false
     }
 
     return new NextResponse(new Uint8Array(outputBuffer), {
       headers: {
         'Content-Type': DOCUMENT_PDF_MIME,
-        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedName}`,
+        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedOutputName}`,
         'Cache-Control': 'private, max-age=0, no-cache',
         'X-Document-Copy-Type': 'UNCONTROLLED',
         'X-Document-Watermark': watermarkApplied ? 'CÓPIA NÃO CONTROLADA' : 'UNAVAILABLE',

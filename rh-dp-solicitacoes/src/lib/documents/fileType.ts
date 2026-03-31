@@ -17,6 +17,7 @@ export type DocumentFileType = {
   extension: string
   mimeType: string
   isPdf: boolean
+  isWord: boolean
 }
 
 export function resolveDocumentFileType(fileUrl: string): DocumentFileType {
@@ -27,6 +28,7 @@ export function resolveDocumentFileType(fileUrl: string): DocumentFileType {
     extension,
     mimeType,
     isPdf: extension === '.pdf',
+    isWord: extension === '.doc' || extension === '.docx',
   }
 }
 

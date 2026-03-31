@@ -32,12 +32,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     userAgent: req.headers.get('user-agent'),
   })
   const fileType = resolveDocumentFileType(access.fileUrl)
+  const canRenderPdf = fileType.isPdf || fileType.isWord
+  const renderUrl = canRenderPdf
+    ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT${fileType.isWord ? '&format=pdf' : ''}`
+    : undefined
 
   return NextResponse.json({
     ok: true,
-    isPdf: fileType.isPdf,
+    isPdf: canRenderPdf,
     fileExtension: fileType.extension,
-    url: fileType.isPdf ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT` : undefined,
+    url: renderUrl,
     downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=PRINT`,
     document: {
       code: access.documentCode,
