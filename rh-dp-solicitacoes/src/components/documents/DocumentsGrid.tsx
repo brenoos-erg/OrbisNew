@@ -1,12 +1,13 @@
 'use client'
 
-import { Check, Download, Eye, Filter, Plus, Printer, Search, X } from 'lucide-react'
+import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
 type GridRow = {
   versionId: string
+  documentId: string
   dataPublicacao: string | null
   codigo: string
   nrRevisao: number
@@ -47,6 +48,9 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [showFiltersMobile, setShowFiltersMobile] = useState(false)
   const [canApprove, setCanApprove] = useState(false)
+  const [canManageDocuments, setCanManageDocuments] = useState(false)
+  const [actionInFlight, setActionInFlight] = useState<'cancel' | 'delete' | null>(null)
+  const [targetRow, setTargetRow] = useState<GridRow | null>(null)
 
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
@@ -128,13 +132,20 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       .catch(() => null)
   }, [])
 
-  useEffect(() => {
+    useEffect(() => {
     if (!approvalStage) return
     fetch(`/api/documents/approval-access?stage=${approvalStage}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => setCanApprove(Boolean(data.canApprove)))
       .catch(() => setCanApprove(false))
   }, [approvalStage])
+
+  useEffect(() => {
+    fetch('/api/documents/management-access', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setCanManageDocuments(Boolean(data.canManage)))
+      .catch(() => setCanManageDocuments(false))
+  }, [])
 
   useEffect(() => {
     void load()
@@ -198,6 +209,35 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     alert(data?.error ?? 'Não foi possível processar a aprovação.')
   }
 
+  const cancelDocument = async (row: GridRow) => {
+    setActionInFlight('cancel')
+    const res = await fetch(`/api/documents/versions/${row.versionId}/cancel`, { method: 'PATCH' })
+    setActionInFlight(null)
+
+    if (!res.ok) {
+      const data = await parseJsonSafely<{ error?: string }>(res)
+      alert(data?.error ?? 'Não foi possível cancelar o documento.')
+      return
+    }
+
+    setTargetRow(null)
+    await load()
+  }
+
+  const deleteDocument = async (row: GridRow) => {
+    setActionInFlight('delete')
+    const res = await fetch(`/api/documents/${row.documentId}`, { method: 'DELETE' })
+    setActionInFlight(null)
+
+    if (!res.ok) {
+      const data = await parseJsonSafely<{ error?: string }>(res)
+      alert(data?.error ?? 'Não foi possível excluir o documento.')
+      return
+    }
+
+    setTargetRow(null)
+    await load()
+  }
  const createDocument = async () => {
     const normalizedCode = createForm.code.trim()
 
@@ -454,8 +494,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                     <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => printDocument(row.versionId)}><Printer size={14} />Imprimir</button>
                     {approvalStage ? (
                       <>
-                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
+                         <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
                         <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
+                      </>
+                    ) : null}
+                    {canManageDocuments ? (
+                      <>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100" onClick={() => setTargetRow(row)}><X size={14} />Cancelar</button>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => setTargetRow(row)}><Trash2 size={14} />Excluir</button>
                       </>
                     ) : null}
                   </td>
@@ -484,6 +530,12 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
               <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar</button>
               <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => printDocument(row.versionId)}><Printer size={14} />Imprimir</button>
             </div>
+            {canManageDocuments ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700" onClick={() => setTargetRow(row)}><X size={14} />Cancelar</button>
+                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700" onClick={() => setTargetRow(row)}><Trash2 size={14} />Excluir</button>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -502,11 +554,44 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         </div>
       </div>
 
-      {showFiltersMobile ? (
+     {showFiltersMobile ? (
         <div className="fixed inset-0 z-50 bg-black/40 md:hidden" onClick={() => setShowFiltersMobile(false)}>
           <div className="ml-auto h-full w-[90%] max-w-sm overflow-auto bg-white p-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Filtros</h2><button className="rounded-lg border border-slate-300 px-2 py-1 text-sm" onClick={() => setShowFiltersMobile(false)}>Fechar</button></div>
             {FiltersContent}
+          </div>
+        </div>
+      ) : null}
+
+      {targetRow ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setTargetRow(null)}>
+          <div className="w-full max-w-xl space-y-4 rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-slate-900">Gerenciar documento {targetRow.codigo}</h2>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-medium">Cancelar documento</p>
+              <p>O documento permanece no sistema, com status <strong>CANCELADO</strong>, preservando rastreabilidade e histórico.</p>
+              <button
+                className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2 font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => cancelDocument(targetRow)}
+                disabled={actionInFlight !== null}
+              >
+                {actionInFlight === 'cancel' ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </div>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+              <p className="font-medium">Excluir documento</p>
+              <p>Exclusão definitiva do documento e de suas versões relacionadas. Use apenas quando realmente necessário.</p>
+              <button
+                className="mt-3 rounded-lg border border-rose-300 bg-rose-100 px-3 py-2 font-medium text-rose-900 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => deleteDocument(targetRow)}
+                disabled={actionInFlight !== null}
+              >
+                {actionInFlight === 'delete' ? 'Excluindo...' : 'Confirmar exclusão'}
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <button className="rounded border px-3 py-2" onClick={() => setTargetRow(null)} disabled={actionInFlight !== null}>Fechar</button>
+            </div>
           </div>
         </div>
       ) : null}
