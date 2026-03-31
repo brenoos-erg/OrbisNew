@@ -160,8 +160,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
-    const previewWindow = intent === 'download' ? null : window.open('about:blank', '_blank', 'noopener,noreferrer')
+   const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
     const endpoint = intent === 'view'
       ? `/api/documents/versions/${versionId}/view`
       : intent === 'print'
@@ -171,19 +170,16 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       const res = await fetch(endpoint, { method: intent === 'download' ? 'GET' : 'POST', cache: 'no-store' })
       const data = await parseJsonSafely<{ error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
       if (!data) {
-        previewWindow?.close()
         alert('Não foi possível processar a resposta para o documento.')
         return
       }
 
     if (!res.ok && data.error) {
-        previewWindow?.close()
         alert(data.error)
         return
       }
 
       if (res.status === 403 && data.requiresTerm) {
-        previewWindow?.close()
         if (data.term) setTerm(data.term)
         setPendingAction({ versionId, intent })
         return
@@ -203,13 +199,11 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         return
       }
 
-      if (previewWindow) {
-        previewWindow.location.href = viewerPath
-      } else {
+      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
+      if (!previewWindow) {
         router.push(viewerPath)
       }
     } catch {
-      previewWindow?.close()
       alert('Falha ao carregar o documento. Tente novamente.')
     }
   }
@@ -666,7 +660,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             <p className="max-h-60 overflow-auto whitespace-pre-wrap text-sm">{term.content}</p>
             <p className="text-sm text-slate-600">Ao aceitar, você confirma ciência das responsabilidades para acesso ao documento.</p>
             <div className="flex justify-end gap-2">
-              <button className="rounded border px-3 py-2" onClick={() => setTerm(null)}>Não aceito</button>
+              <button className="rounded border px-3 py-2" onClick={() => {
+                setTerm(null)
+                setPendingAction(null)
+                alert('Sem aceitar o termo de responsabilidade não é possível executar ações no documento.')
+              }}
+              >
+                Não aceito
+              </button>
               <button className="rounded bg-emerald-700 px-3 py-2 text-white" onClick={acceptTerm}>Aceito</button>
             </div>
           </div>

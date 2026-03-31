@@ -17,6 +17,46 @@ type ConversionOptions = {
   sourceAbsolutePath: string
 }
 
+function getSofficeCandidates() {
+  const envCandidate = process.env.SOFFICE_PATH?.trim()
+
+  return [
+    envCandidate,
+    'soffice',
+    '/usr/bin/soffice',
+    '/usr/local/bin/soffice',
+    'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+    'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+  ].filter((candidate): candidate is string => Boolean(candidate))
+}
+
+async function runSofficeConvert(args: string[]) {
+  const attemptedBinaries: string[] = []
+  let lastError: unknown = null
+
+  for (const binary of getSofficeCandidates()) {
+    attemptedBinaries.push(binary)
+    try {
+      await execFileAsync(binary, args, {
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+      return
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException & { code?: string }
+      if (err?.code === 'ENOENT') {
+        lastError = error
+        continue
+      }
+
+      throw error
+    }
+  }
+
+  const message = lastError instanceof Error ? lastError.message : String(lastError)
+  throw new Error(`LibreOffice (soffice) não encontrado. Caminhos tentados: ${attemptedBinaries.join(', ')}. Último erro: ${message}`)
+}
+
 function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeof fs.stat>>) {
   return createHash('sha1')
     .update(`${fileUrl}:${sourceStat.mtimeMs}:${sourceStat.size}`)
@@ -50,10 +90,7 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
     const tempInputPath = path.join(tempDir, tempInputName)
     await fs.copyFile(sourceAbsolutePath, tempInputPath)
 
-    await execFileAsync('soffice', ['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath], {
-      timeout: 60_000,
-      maxBuffer: 10 * 1024 * 1024,
-    })
+   await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
 
     const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
     const convertedPdf = await fs.readFile(convertedTempPdfPath)
