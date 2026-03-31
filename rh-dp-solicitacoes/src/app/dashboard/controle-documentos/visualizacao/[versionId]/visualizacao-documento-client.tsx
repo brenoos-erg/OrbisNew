@@ -7,10 +7,12 @@ type ViewPayload = {
   error?: string
   requiresTerm?: boolean
   term?: { id: string; title: string; content: string }
+  isPdf?: boolean
+  fileExtension?: string
   url?: string
+  downloadUrl?: string
   document?: { code: string; title: string; revisionNumber: number }
 }
-
 export default function VisualizacaoDocumentoClient({ versionId }: Props) {
   const [data, setData] = useState<ViewPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,6 +32,8 @@ export default function VisualizacaoDocumentoClient({ versionId }: Props) {
   if (!data || data.error) return <div className="p-6 text-sm text-rose-700">{data?.error ?? 'Não foi possível abrir o documento.'}</div>
   if (data.requiresTerm) return <div className="p-6 text-sm text-amber-800">Aceite o termo de responsabilidade na listagem de documentos antes de visualizar.</div>
 
+  const extensionLabel = data?.fileExtension ? data.fileExtension.replace('.', '').toUpperCase() : 'não-PDF'
+
   return (
     <div className="min-h-screen bg-slate-100 p-3">
       <div className="mx-auto max-w-6xl space-y-2">
@@ -38,7 +42,7 @@ export default function VisualizacaoDocumentoClient({ versionId }: Props) {
           <p>Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
           {data.document ? <p className="mt-1 text-amber-800">{data.document.code} · {data.document.title} · REV {data.document.revisionNumber}</p> : null}
         </div>
-        {data.url ? (
+        {data.isPdf && data.url ? (
           <div>
             <iframe
               className="h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white"
@@ -46,7 +50,20 @@ export default function VisualizacaoDocumentoClient({ versionId }: Props) {
               title="Visualização controlada do documento"
             />
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">Este documento está em formato {extensionLabel}.</p>
+            <p className="mt-2">A visualização interna suporta apenas arquivos PDF. Faça o download do arquivo original para abrir no aplicativo correspondente.</p>
+            {data.downloadUrl ? (
+              <a
+                className="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                href={data.downloadUrl}
+              >
+                Baixar arquivo original
+              </a>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   )

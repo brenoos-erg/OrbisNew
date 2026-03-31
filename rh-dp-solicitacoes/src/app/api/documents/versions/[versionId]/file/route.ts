@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { applyUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
+import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 
 function normalizeStoredUrl(url: string) {
   return url.startsWith('/') ? url : `/${url}`
@@ -27,6 +28,22 @@ export async function GET(
 
   try {
     const fileBuffer = await readFile(absolutePath)
+    const filename = path.basename(normalized)
+    const encodedName = encodeURIComponent(filename)
+    const fileType = resolveDocumentFileType(access.fileUrl)
+
+    if (!fileType.isPdf || !isPdfBuffer(fileBuffer)) {
+      return new NextResponse(new Uint8Array(fileBuffer), {
+        headers: {
+          'Content-Type': fileType.mimeType,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodedName}`,
+          'Cache-Control': 'private, max-age=0, no-cache',
+          'X-Document-File-Type': fileType.extension || 'unknown',
+          'X-Document-Copy-Type': 'ORIGINAL',
+          'X-Document-Watermark': 'NOT_APPLICABLE',
+        },
+      })
+    }
     const sourceValidation = validatePdfBuffer(fileBuffer)
     if (!sourceValidation.valid) {
       console.error('Arquivo de documento inválido para visualização em PDF.', {
@@ -37,8 +54,7 @@ export async function GET(
 
       return NextResponse.json(
         {
-          error: 'O arquivo armazenado não é um PDF válido para visualização.',
-          reason: sourceValidation.reason,
+          error: 'O PDF armazenado está inválido para visualização no momento.',
         },
         { status: 422 },
       )
@@ -70,12 +86,9 @@ export async function GET(
       watermarkApplied = false
     }
 
-    const filename = path.basename(normalized)
-    const encodedName = encodeURIComponent(filename)
-
     return new NextResponse(new Uint8Array(outputBuffer), {
       headers: {
-        'Content-Type': 'application/pdf',
+        'Content-Type': DOCUMENT_PDF_MIME,
         'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedName}`,
         'Cache-Control': 'private, max-age=0, no-cache',
         'X-Document-Copy-Type': 'UNCONTROLLED',

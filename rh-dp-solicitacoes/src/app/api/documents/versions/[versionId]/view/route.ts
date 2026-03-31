@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
+import { resolveDocumentFileType } from '@/lib/documents/fileType'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -19,10 +20,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     userAgent: req.headers.get('user-agent'),
   })
 
+  const fileType = resolveDocumentFileType(access.fileUrl)
+
   return NextResponse.json({
     ok: true,
-    url: `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`,
-    document: {
+    isPdf: fileType.isPdf,
+    fileExtension: fileType.extension,
+    url: fileType.isPdf ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW` : undefined,
+    downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=VIEW`,
+     document: {
       code: access.documentCode,
       title: access.documentTitle,
       revisionNumber: access.revisionNumber,
