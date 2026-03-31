@@ -7,6 +7,35 @@ const WATERMARK_MARGIN = 28
 
 const escapePdfText = (value: string) => value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
 
+type PdfValidation = { valid: true } | { valid: false; reason: string }
+
+export function validatePdfBuffer(pdfBuffer: Buffer): PdfValidation {
+  if (!pdfBuffer?.length) return { valid: false, reason: 'arquivo vazio' }
+
+  const headerProbe = pdfBuffer.subarray(0, Math.min(1024, pdfBuffer.length)).toString('latin1')
+  if (!headerProbe.includes('%PDF-')) {
+    return { valid: false, reason: 'assinatura %PDF- ausente no cabeçalho' }
+  }
+
+  const tailProbe = pdfBuffer.subarray(Math.max(0, pdfBuffer.length - 2048)).toString('latin1')
+  if (!tailProbe.includes('%%EOF')) {
+    return { valid: false, reason: 'marcador %%EOF ausente no final do arquivo' }
+  }
+
+  return { valid: true }
+}
+
+function validatePdfCompatibilityForMutation(source: string): PdfValidation {
+  if (/\/Type\s*\/XRef/.test(source)) {
+    return { valid: false, reason: 'PDF usa stream de xref (não suportado pela estratégia atual de marca d\'água)' }
+  }
+
+  if (/\/Type\s*\/ObjStm/.test(source)) {
+    return { valid: false, reason: 'PDF usa object streams (não suportado pela estratégia atual de marca d\'água)' }
+  }
+
+  return { valid: true }
+}
 const parseMediaBox = (objectBody: string) => {
   const match = objectBody.match(/\/MediaBox\s*\[\s*([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s*\]/)
   if (!match) return { width: DEFAULT_PAGE_WIDTH, height: DEFAULT_PAGE_HEIGHT }
@@ -106,22 +135,37 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
     return pageBody.replace(/\/Contents\s*\[([\s\S]*?)\]/, `/Contents [${streamObjectId} 0 R ${current}]`)
   }
 
-  const singleRefMatch = pageBody.match(/\/Contents\s+(\d+)\s+0\s+R/)
+  const singleRefMatch = pageBody.match(/\/Contents\s+(\d+)\s+\d+\s+R/)
   if (singleRefMatch) {
-     return pageBody.replace(/\/Contents\s+\d+\s+0\s+R/, `/Contents [${streamObjectId} 0 R ${singleRefMatch[1]} 0 R]`)
+    return pageBody.replace(/\/Contents\s+\d+\s+\d+\s+R/, `/Contents [${streamObjectId} 0 R ${singleRefMatch[1]} 0 R]`)
   }
 
   return pageBody.replace('>>', `\n/Contents [${streamObjectId} 0 R]\n>>`)
 }
 
 export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
+  const inputValidation = validatePdfBuffer(pdfBuffer)
+  if (!inputValidation.valid) {
+    throw new Error(`PDF inválido para marca d'água: ${inputValidation.reason}.`)
+  }
+
   const source = pdfBuffer.toString('latin1')
-  const objectRegex = /(\d+)\s+0\s+obj([\s\S]*?)endobj/g
-  const objects: Array<{ id: number; full: string; body: string }> = []
+  const compatibilityValidation = validatePdfCompatibilityForMutation(source)
+  if (!compatibilityValidation.valid) {
+    throw new Error(`PDF incompatível com marca d'água: ${compatibilityValidation.reason}.`)
+  }
+
+  const objectRegex = /(\d+)\s+(\d+)\s+obj([\s\S]*?)endobj/g
+  const objects: Array<{ id: number; generation: number; full: string; body: string }> = []
 
   let objectMatch: RegExpExecArray | null
   while ((objectMatch = objectRegex.exec(source)) !== null) {
-    objects.push({ id: Number(objectMatch[1]), full: objectMatch[0], body: objectMatch[2] })
+    objects.push({
+      id: Number(objectMatch[1]),
+      generation: Number(objectMatch[2]),
+      full: objectMatch[0],
+      body: objectMatch[3],
+    })
   }
 
   if (!objects.length) {
@@ -153,16 +197,21 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
       `${streamObjectId} 0 obj\n<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}endstream\nendobj\n`,
     )
 
-    let updatedPageBody = pageObject.body
+     let updatedPageBody = pageObject.body
     updatedPageBody = ensureResources(updatedPageBody, fontObjectId, gsObjectId)
     updatedPageBody = ensureContentsArray(updatedPageBody, streamObjectId)
 
-    const updatedObject = `${pageObject.id} 0 obj${updatedPageBody}endobj`
+    const updatedObject = `${pageObject.id} ${pageObject.generation} obj${updatedPageBody}endobj`
     updatedSource = updatedSource.replace(pageObject.full, updatedObject)
   }
 
-  const watermarkHeader = `% UNCONTROLLED_COPY_WATERMARK_APPLIED\n`
-  const merged = `${watermarkHeader}${updatedSource}\n${appendedObjects.join('')}\n`
+  const merged = `${updatedSource}\n${appendedObjects.join('')}\n`
+  const outputBuffer = Buffer.from(merged, 'latin1')
 
-  return Buffer.from(merged, 'latin1')
+  const outputValidation = validatePdfBuffer(outputBuffer)
+  if (!outputValidation.valid) {
+    throw new Error(`Falha ao validar PDF após aplicar marca d'água: ${outputValidation.reason}.`)
+  }
+
+  return outputBuffer
 }

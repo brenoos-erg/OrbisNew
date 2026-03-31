@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { requireActiveUser } from '@/lib/auth'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
-import { applyUncontrolledCopyWatermark } from '@/lib/pdf/uncontrolledCopyWatermark'
+import { applyUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
 
 function normalizeStoredUrl(url: string) {
   return url.startsWith('/') ? url : `/${url}`
@@ -27,6 +27,23 @@ export async function GET(
 
   try {
     const fileBuffer = await readFile(absolutePath)
+    const sourceValidation = validatePdfBuffer(fileBuffer)
+    if (!sourceValidation.valid) {
+      console.error('Arquivo de documento inválido para visualização em PDF.', {
+        versionId,
+        fileUrl: access.fileUrl,
+        reason: sourceValidation.reason,
+      })
+
+      return NextResponse.json(
+        {
+          error: 'O arquivo armazenado não é um PDF válido para visualização.',
+          reason: sourceValidation.reason,
+        },
+        { status: 422 },
+      )
+    }
+
     let outputBuffer: Buffer = Buffer.from(fileBuffer)
     let watermarkApplied = false
 
@@ -34,7 +51,23 @@ export async function GET(
       outputBuffer = applyUncontrolledCopyWatermark(fileBuffer)
       watermarkApplied = true
     } catch (watermarkError) {
-      console.warn("Falha ao aplicar marca d'água. Retornando PDF original.", watermarkError)
+      console.warn("Falha ao aplicar marca d'água. Retornando PDF original.", {
+        versionId,
+        fileUrl: access.fileUrl,
+        error: watermarkError,
+      })
+      outputBuffer = Buffer.from(fileBuffer)
+    }
+
+    const outputValidation = validatePdfBuffer(outputBuffer)
+    if (!outputValidation.valid) {
+      console.error('PDF final inválido para resposta. Revertendo para PDF original.', {
+        versionId,
+        fileUrl: access.fileUrl,
+        reason: outputValidation.reason,
+      })
+      outputBuffer = Buffer.from(fileBuffer)
+      watermarkApplied = false
     }
 
     const filename = path.basename(normalized)
