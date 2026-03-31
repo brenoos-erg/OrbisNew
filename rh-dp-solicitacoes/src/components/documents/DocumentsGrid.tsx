@@ -160,52 +160,47 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-   const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
-    const endpoint = intent === 'view'
-      ? `/api/documents/versions/${versionId}/view`
-      : intent === 'print'
-        ? `/api/documents/versions/${versionId}/print`
-        : `/api/documents/versions/${versionId}/download`
-    try {
-      const res = await fetch(endpoint, { method: intent === 'download' ? 'GET' : 'POST', cache: 'no-store' })
-      const data = await parseJsonSafely<{ error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
-      if (!data) {
-        alert('Não foi possível processar a resposta para o documento.')
+   try {
+      const res = await fetch('/api/documents/term/active', { cache: 'no-store' })
+      const data = await parseJsonSafely<{ id: string; title: string; content: string }>(res)
+      if (!res.ok || !data?.id) {
+        alert('Não foi possível carregar o termo de responsabilidade.')
         return
       }
+      setTerm(data)
+      setPendingAction({ versionId, intent })
+    } catch {
+      alert('Falha ao carregar o termo de responsabilidade. Tente novamente.')
+    }
+  }
 
-    if (!res.ok && data.error) {
-        alert(data.error)
-        return
-      }
-
-      if (res.status === 403 && data.requiresTerm) {
-        if (data.term) setTerm(data.term)
-        setPendingAction({ versionId, intent })
-        return
-      }
-
-     if (intent === 'download' && data.url) {
-        const anchor = document.createElement('a')
-        anchor.href = data.url
-        anchor.target = '_self'
-        anchor.rel = 'noreferrer'
-        anchor.click()
-        return
-      }
-
-      if (intent === 'download') {
-        alert('Documento sem URL de visualização disponível no momento.')
-        return
-      }
-
+  const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
+    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
+    if (intent === 'view' || intent === 'print') {
       const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
       if (!previewWindow) {
         router.push(viewerPath)
       }
-    } catch {
-      alert('Falha ao carregar o documento. Tente novamente.')
+      return
     }
+
+    const endpoint = `/api/documents/versions/${versionId}/download`
+    const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' })
+    const data = await parseJsonSafely<{ error?: string; url?: string }>(res)
+    if (!res.ok) {
+      alert(data?.error ?? 'Falha ao baixar o documento.')
+      return
+    }
+    if (!data?.url) {
+      alert('Documento sem URL de download disponível no momento.')
+      return
+    }
+
+    const anchor = document.createElement('a')
+    anchor.href = data.url
+    anchor.target = '_self'
+    anchor.rel = 'noreferrer'
+    anchor.click()
   }
 
 
@@ -343,18 +338,18 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       controller.abort()
     }
   }, [createForm.code, showCreate])
-   const acceptTerm = async () => {
+  const acceptTerm = async () => {
     if (!term || !pendingAction) return
     await fetch('/api/documents/term/accept', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ termId: term.id }),
     })
+    const action = pendingAction
     setTerm(null)
-    await requestDocumentAccess(pendingAction.versionId, pendingAction.intent)
     setPendingAction(null)
+    await executeDocumentAction(action.versionId, action.intent)
   }
-
 
   const onSearch = () => {
     setPage(1)

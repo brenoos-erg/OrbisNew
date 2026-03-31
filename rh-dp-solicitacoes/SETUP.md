@@ -21,6 +21,8 @@ docker run --name orbis-mysql \
 DATABASE_URL="mysql://orbis:orbis123@localhost:3306/orbis"
 JWT_SECRET="troque-por-um-segredo-forte"
 SUPERADMIN_PASSWORD="SuperAdmin@123"
+# Opcional (recomendado no Windows): caminho absoluto do LibreOffice
+LIBREOFFICE_PATH="C:\\Program Files\\LibreOffice\\program\\soffice.exe"
 ```
 
 ## 3) Instalar dependências
@@ -38,6 +40,11 @@ sudo apt-get install -y libreoffice
 Após instalar, valide:
 ```bash
 soffice --version
+```
+
+No Windows, configure `LIBREOFFICE_PATH` para evitar falhas de resolução automática do binário:
+```env
+LIBREOFFICE_PATH="C:\\Program Files\\LibreOffice\\program\\soffice.exe"
 ```
 
 ### Dependências para geração de termo/PDF

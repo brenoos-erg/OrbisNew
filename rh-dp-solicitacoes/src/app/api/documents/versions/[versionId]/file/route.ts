@@ -19,8 +19,6 @@ export async function GET(
   const me = await requireActiveUser()
   const { versionId } = await params
   const disposition = _req.nextUrl.searchParams.get('disposition') === 'attachment' ? 'attachment' : 'inline'
-  const forcePdfFormat = _req.nextUrl.searchParams.get('format') === 'pdf'
-
   const access = await resolveDocumentVersionAccess(versionId, me.id)
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
@@ -31,7 +29,6 @@ export async function GET(
   try {
     const fileBuffer = await readFile(absolutePath)
     const originalFileName = path.basename(normalized)
-    const encodedOriginalName = encodeURIComponent(originalFileName)
     const fileType = resolveDocumentFileType(access.fileUrl)
     let pdfSource: Buffer | null = null
     let downloadName = originalFileName
@@ -39,7 +36,7 @@ export async function GET(
     if (fileType.isPdf && isPdfBuffer(fileBuffer)) {
       pdfSource = Buffer.from(fileBuffer)
       downloadName = originalFileName
-    } else if (fileType.isWord && forcePdfFormat) {
+    } else if (fileType.isWord) {
       try {
         const converted = await convertWordToPdf({
           fileUrl: access.fileUrl,
@@ -61,16 +58,12 @@ export async function GET(
     }
 
     if (!pdfSource) {
-      return new NextResponse(new Uint8Array(fileBuffer), {
-        headers: {
-          'Content-Type': fileType.mimeType,
-          'Content-Disposition': `attachment; filename*=UTF-8''${encodedOriginalName}`,
-          'Cache-Control': 'private, max-age=0, no-cache',
-          'X-Document-File-Type': fileType.extension || 'unknown',
-          'X-Document-Copy-Type': 'ORIGINAL',
-          'X-Document-Watermark': 'NOT_APPLICABLE',
+      return NextResponse.json(
+        {
+          error: `Formato ${fileType.extension || 'desconhecido'} não suportado para emissão como cópia não controlada.`,
         },
-      })
+        { status: 422 },
+      )
     }
 
     const encodedOutputName = encodeURIComponent(downloadName)
@@ -97,23 +90,32 @@ export async function GET(
       outputBuffer = applyUncontrolledCopyWatermark(pdfSource)
       watermarkApplied = true
     } catch (watermarkError) {
-      console.warn("Falha ao aplicar marca d'água. Retornando PDF original.", {
+      console.error("Falha ao aplicar marca d'água obrigatória no documento.", {
         versionId,
         fileUrl: access.fileUrl,
         error: watermarkError,
       })
-      outputBuffer = Buffer.from(pdfSource)
+      return NextResponse.json(
+        {
+          error: "Não foi possível aplicar a marca d'água obrigatória no documento.",
+        },
+        { status: 422 },
+      )
     }
 
     const outputValidation = validatePdfBuffer(outputBuffer)
     if (!outputValidation.valid) {
-      console.error('PDF final inválido para resposta. Revertendo para PDF original.', {
+      console.error('PDF final inválido após marca d\'água obrigatória.', {
         versionId,
         fileUrl: access.fileUrl,
         reason: outputValidation.reason,
       })
-      outputBuffer = Buffer.from(pdfSource)
-      watermarkApplied = false
+      return NextResponse.json(
+        {
+          error: 'Não foi possível gerar o PDF com marca d\'água obrigatória.',
+        },
+        { status: 422 },
+      )
     }
 
     return new NextResponse(new Uint8Array(outputBuffer), {
