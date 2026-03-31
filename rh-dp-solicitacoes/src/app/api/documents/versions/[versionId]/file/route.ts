@@ -27,17 +27,26 @@ export async function GET(
 
   try {
     const fileBuffer = await readFile(absolutePath)
-    const watermarkedBuffer = applyUncontrolledCopyWatermark(fileBuffer)
+    let outputBuffer: Buffer = Buffer.from(fileBuffer)
+    let watermarkApplied = false
+
+    try {
+      outputBuffer = applyUncontrolledCopyWatermark(fileBuffer)
+      watermarkApplied = true
+    } catch (watermarkError) {
+      console.warn("Falha ao aplicar marca d'água. Retornando PDF original.", watermarkError)
+    }
+
     const filename = path.basename(normalized)
     const encodedName = encodeURIComponent(filename)
 
-    return new NextResponse(new Uint8Array(watermarkedBuffer), {
+    return new NextResponse(new Uint8Array(outputBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedName}`,
         'Cache-Control': 'private, max-age=0, no-cache',
         'X-Document-Copy-Type': 'UNCONTROLLED',
-        'X-Document-Watermark': 'CÓPIA NÃO CONTROLADA',
+        'X-Document-Watermark': watermarkApplied ? 'CÓPIA NÃO CONTROLADA' : 'UNAVAILABLE',
       },
     })
   } catch (error) {
