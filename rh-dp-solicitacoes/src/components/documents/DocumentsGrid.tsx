@@ -154,19 +154,21 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, page, pageSize, sortBy, sortOrder, appliedFilters])
 
-  const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download') => {
+  const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download' | 'print') => {
     if (!versionId) {
       alert('Não foi possível localizar a versão do documento para abrir.')
       return
     }
 
-    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
-    const previewWindow = intent === 'view' ? window.open('about:blank', '_blank', 'noopener,noreferrer') : null
+    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
+    const previewWindow = intent === 'download' ? null : window.open('about:blank', '_blank', 'noopener,noreferrer')
     const endpoint = intent === 'view'
       ? `/api/documents/versions/${versionId}/view`
-      : `/api/documents/versions/${versionId}/download`
+      : intent === 'print'
+        ? `/api/documents/versions/${versionId}/print`
+        : `/api/documents/versions/${versionId}/download`
     try {
-      const res = await fetch(endpoint, { method: intent === 'view' ? 'POST' : 'GET', cache: 'no-store' })
+      const res = await fetch(endpoint, { method: intent === 'download' ? 'GET' : 'POST', cache: 'no-store' })
       const data = await parseJsonSafely<{ error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
       if (!data) {
         previewWindow?.close()
@@ -187,43 +189,31 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         return
       }
 
-      if (data.url) {
-        if (intent === 'download') {
-          const anchor = document.createElement('a')
-          anchor.href = data.url
-          anchor.target = '_self'
-          anchor.rel = 'noreferrer'
-          anchor.click()
-        } else if (previewWindow) {
-          previewWindow.location.href = viewerPath
-        } else {
-          router.push(viewerPath)
-        }
+     if (intent === 'download' && data.url) {
+        const anchor = document.createElement('a')
+        anchor.href = data.url
+        anchor.target = '_self'
+        anchor.rel = 'noreferrer'
+        anchor.click()
         return
       }
 
-      previewWindow?.close()
-      alert('Documento sem URL de visualização disponível no momento.')
+      if (intent === 'download') {
+        alert('Documento sem URL de visualização disponível no momento.')
+        return
+      }
+
+      if (previewWindow) {
+        previewWindow.location.href = viewerPath
+      } else {
+        router.push(viewerPath)
+      }
     } catch {
       previewWindow?.close()
       alert('Falha ao carregar o documento. Tente novamente.')
     }
   }
 
-
-
-  const printDocument = async (versionId: string) => {
-    const res = await fetch(`/api/documents/versions/${versionId}/print`, { method: 'POST', cache: 'no-store' })
-    const data = await parseJsonSafely<{ requiresTerm?: boolean; term?: { id: string; title: string; content: string }; url?: string }>(res)
-    if (res.status === 403 && data?.requiresTerm) {
-      if (data.term) setTerm(data.term)
-      setPendingAction({ versionId, intent: 'print' })
-      return
-    }
-    if (!data?.url) return
-    const win = window.open(data.url, '_blank', 'noopener,noreferrer')
-    win?.addEventListener('load', () => win.print())
-  }
 
   const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
     const res = await fetch(`/api/documents/versions/${versionId}/${action}`, {
@@ -367,13 +357,10 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       body: JSON.stringify({ termId: term.id }),
     })
     setTerm(null)
-    if (pendingAction.intent === 'print') {
-      await printDocument(pendingAction.versionId)
-    } else {
-      await requestDocumentAccess(pendingAction.versionId, pendingAction.intent)
-    }
+    await requestDocumentAccess(pendingAction.versionId, pendingAction.intent)
     setPendingAction(null)
   }
+
 
   const onSearch = () => {
     setPage(1)
@@ -522,7 +509,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                     <td className="space-x-2 px-3 py-3">
                     <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Visualizar</button>
                     <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Download</button>
-                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => printDocument(row.versionId)}><Printer size={14} />Imprimir</button>
+                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'print')}><Printer size={14} />Imprimir</button>
                     {approvalStage ? (
                       <>
                          <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
@@ -559,7 +546,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             <div className="flex gap-2">
                 <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Ver</button>
               <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar</button>
-              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => printDocument(row.versionId)}><Printer size={14} />Imprimir</button>
+               <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => requestDocumentAccess(row.versionId, 'print')}><Printer size={14} />Imprimir</button>
             </div>
             {canManageDocuments ? (
               <div className="grid grid-cols-2 gap-2">
