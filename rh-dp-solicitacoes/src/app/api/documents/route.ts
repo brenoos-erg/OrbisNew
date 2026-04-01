@@ -12,6 +12,7 @@ import {
 } from '@/lib/iso-document-routing'
 import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
+import { finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -24,8 +25,10 @@ async function saveUploadedDocument(file: File) {
   const absolute = path.join(uploadDir, safeName)
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(absolute, buffer)
-  return `/uploads/documents/${safeName}`
+
+  return finalizeToPublishedPdf({ sourceFileUrl: `/uploads/documents/${safeName}` })
 }
+
 
 export async function POST(req: NextRequest)   {
   try {

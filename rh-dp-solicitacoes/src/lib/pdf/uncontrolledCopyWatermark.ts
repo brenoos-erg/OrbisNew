@@ -111,7 +111,7 @@ const ensureResources = (pageBody: string, fontObjectId: number, gsObjectId: num
   })
 }
 
-const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
+onst ensureContentsArray = (pageBody: string, streamObjectId: number) => {
   const contentsArrayMatch = pageBody.match(/\/Contents\s*\[([\s\S]*?)\]/)
   if (contentsArrayMatch) {
     const current = contentsArrayMatch[1]
@@ -127,6 +127,11 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
   return pageBody.replace('>>', `\n/Contents [${streamObjectId} 0 R]\n>>`)
 }
 
+
+export function hasUncontrolledCopyWatermark(pdfBuffer: Buffer): boolean {
+  if (!pdfBuffer?.length) return false
+  return pdfBuffer.toString('latin1').includes(WATERMARK_TEXT)
+}
 export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
   const inputValidation = validatePdfBuffer(pdfBuffer)
   if (!inputValidation.valid) {
@@ -181,7 +186,7 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
       `${streamObjectId} 0 obj\n<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}endstream\nendobj\n`,
     )
 
-     let updatedPageBody = pageObject.body
+      let updatedPageBody = pageObject.body
     updatedPageBody = ensureResources(updatedPageBody, fontObjectId, gsObjectId)
     updatedPageBody = ensureContentsArray(updatedPageBody, streamObjectId)
 
@@ -189,7 +194,7 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
     updatedSource = updatedSource.replace(pageObject.full, updatedObject)
   }
 
-  const merged = `${updatedSource}\n${appendedObjects.join('')}\n`
+  const merged = `${updatedSource}\n${appendedObjects.join('')}\n%%EOF\n`
   const outputBuffer = Buffer.from(merged, 'latin1')
 
   const outputValidation = validatePdfBuffer(outputBuffer)

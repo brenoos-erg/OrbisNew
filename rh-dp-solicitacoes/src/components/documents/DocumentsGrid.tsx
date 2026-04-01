@@ -175,11 +175,26 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    const viewerPath = intent === 'print'
-      ? `/documentos/impressao/${encodeURIComponent(versionId)}`
-      : `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
-    if (intent === 'view' || intent === 'print') {
-      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
+    if (intent === 'print') {
+      const printRes = await fetch(`/api/documents/versions/${versionId}/print`, { method: 'POST', cache: 'no-store' })
+      const printData = await parseJsonSafely<{ error?: string; url?: string }>(printRes)
+      if (!printRes.ok) {
+        alert(printData?.error ?? 'Falha ao preparar impressão do documento.')
+        return
+      }
+      if (!printData?.url) {
+        alert('Documento sem URL de impressão disponível no momento.')
+        return
+      }
+      const printWindow = window.open(printData.url, '_blank', 'noopener,noreferrer')
+      if (!printWindow) {
+        router.push(printData.url)
+      }
+      return
+    }
+
+    if (intent === 'view') {
+      const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
       if (!previewWindow) {
         router.push(viewerPath)
       }

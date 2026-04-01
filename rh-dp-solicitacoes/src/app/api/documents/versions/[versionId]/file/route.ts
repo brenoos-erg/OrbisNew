@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { requireActiveUser } from '@/lib/auth'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
-import { applyUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
+import { applyUncontrolledCopyWatermark, hasUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 
@@ -99,23 +99,25 @@ export async function GET(
     }
 
     let outputBuffer: Buffer = Buffer.from(pdfSource)
-    let watermarkApplied = false
+    let watermarkApplied = hasUncontrolledCopyWatermark(pdfSource)
 
-    try {
-      outputBuffer = applyUncontrolledCopyWatermark(pdfSource)
-      watermarkApplied = true
-    } catch (watermarkError) {
+    if (!watermarkApplied) {
+      try {
+        outputBuffer = applyUncontrolledCopyWatermark(pdfSource)
+        watermarkApplied = true
+      } catch (watermarkError) {
       console.error("Falha ao aplicar marca d'água obrigatória no documento.", {
         versionId,
         fileUrl: access.fileUrl,
         error: watermarkError,
       })
       return NextResponse.json(
-        {
-          error: "Não foi possível aplicar a marca d'água obrigatória no documento.",
-        },
-        { status: 422 },
-      )
+          {
+            error: "Não foi possível aplicar a marca d'água obrigatória no documento.",
+          },
+          { status: 422 },
+        )
+      }
     }
 
     const outputValidation = validatePdfBuffer(outputBuffer)
