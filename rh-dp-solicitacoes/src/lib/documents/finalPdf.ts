@@ -47,21 +47,39 @@ export async function resolveDocumentFinalPdf(
   if ('error' in access) return { error: access.error, status: access.status } as FinalPdfError
   if ('termChallenge' in access) return { termChallenge: access.termChallenge, status: access.status } as FinalPdfTermChallenge
 
-  const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
+ const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
   const absolutePath = toPublicAbsolutePath(access.fileUrl)
   const fileBuffer = await readFile(absolutePath)
   const originalFileName = path.basename(normalizedFileUrl)
   const fileType = resolveDocumentFileType(access.fileUrl)
+  console.info('[documents.final-pdf] source-loaded', {
+    versionId,
+    intent,
+    documentId: access.documentId,
+    fileUrl: normalizedFileUrl,
+    extension: fileType.extension,
+    mimeType: fileType.mimeType,
+    isPdf: fileType.isPdf,
+    isConvertibleToPdf: fileType.isConvertibleToPdf,
+  })
 
   let pdfSource: Buffer | null = null
   let outputFileName = originalFileName
 
   if (fileType.isPdf && isPdfBuffer(fileBuffer)) {
     pdfSource = Buffer.from(fileBuffer)
+    console.info('[documents.final-pdf] source-is-pdf', { versionId, intent, validatedByHeader: true })
   } else if (fileType.isConvertibleToPdf) {
     const converted = await convertDocumentToPdf({ fileUrl: access.fileUrl, sourceAbsolutePath: absolutePath })
     pdfSource = converted.pdfBuffer
     outputFileName = converted.outputFileName
+    console.info('[documents.final-pdf] source-converted-to-pdf', {
+      versionId,
+      intent,
+      sourceExtension: fileType.extension,
+      outputFileName,
+      size: converted.pdfBuffer.length,
+    })
   }
 
   if (!pdfSource) {
@@ -72,6 +90,7 @@ export async function resolveDocumentFinalPdf(
   if (!sourceValidation.valid) {
     throw new Error(`O PDF intermediário está inválido: ${sourceValidation.reason}`)
   }
+  console.info('[documents.final-pdf] intermediate-pdf-validated', { versionId, intent })
 
   let outputBuffer: Buffer = Buffer.from(pdfSource)
   let watermarkApplied = hasUncontrolledCopyWatermark(pdfSource)
@@ -79,11 +98,13 @@ export async function resolveDocumentFinalPdf(
     outputBuffer = applyUncontrolledCopyWatermark(pdfSource)
     watermarkApplied = true
   }
+  console.info('[documents.final-pdf] watermark-step-complete', { versionId, intent, watermarkApplied })
 
   const outputValidation = validatePdfBuffer(outputBuffer)
   if (!outputValidation.valid) {
     throw new Error(`O PDF final com marca d'água ficou inválido: ${outputValidation.reason}`)
   }
+  console.info('[documents.final-pdf] final-pdf-validated', { versionId, intent, size: outputBuffer.length })
 
   return {
     outputBuffer,

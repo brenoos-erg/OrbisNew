@@ -69,6 +69,7 @@ async function resolveSofficeBinary() {
 
 async function runSofficeConvert(args: string[]) {
   const binary = await resolveSofficeBinary()
+  console.info('[documents.word-to-pdf] converting-with-soffice', { binary, args })
 
   try {
     await execFileAsync(binary, args, {
@@ -103,6 +104,7 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
 
   const cachedPdf = await fs.readFile(derivedAbsolutePath).catch(() => null)
   if (cachedPdf) {
+    console.info('[documents.word-to-pdf] using-derived-cache', { fileUrl, derivedAbsolutePath })
     return {
       pdfBuffer: cachedPdf,
       outputFileName: `${sourceBaseName}.pdf`,
@@ -117,13 +119,19 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
 
     await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
 
-    const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
+     const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
     const convertedPdf = await fs.readFile(convertedTempPdfPath).catch(() => null)
     if (!convertedPdf?.length) {
       throw new Error('Arquivo PDF convertido não foi gerado pelo LibreOffice.')
     }
 
     await fs.writeFile(derivedAbsolutePath, convertedPdf)
+    console.info('[documents.word-to-pdf] conversion-finished', {
+      fileUrl,
+      sourceAbsolutePath,
+      derivedAbsolutePath,
+      outputBytes: convertedPdf.length,
+    })
 
     return {
       pdfBuffer: convertedPdf,
@@ -131,6 +139,11 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
     }
    } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
+    console.error('[documents.word-to-pdf] conversion-failed', {
+      fileUrl,
+      sourceAbsolutePath,
+      detail,
+    })
     throw new Error(`Falha ao converter documento Word para PDF: ${detail}. Verifique se o LibreOffice (soffice) está instalado e acessível.`)
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true })

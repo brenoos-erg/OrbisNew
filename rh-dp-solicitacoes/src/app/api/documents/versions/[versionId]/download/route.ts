@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { registerDocumentAuditLog } from '@/lib/documentAudit'
-import { resolveDocumentFinalPdf } from '@/lib/documents/finalPdf'
+import { executeControlledDocumentAction } from '@/lib/documents/controlledAction'
 
 // Mantido por retrocompatibilidade de testes de regressão estáticos:
 // Sem acesso ao documento.
@@ -15,38 +13,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
   const { versionId } = await params
 
   try {
-    const resolved = await resolveDocumentFinalPdf(versionId, me.id, 'download')
-    if ('error' in resolved) {
-      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
-    }
-
-    if ('termChallenge' in resolved) {
-      return NextResponse.json(resolved.termChallenge, { status: resolved.status })
-    }
-
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
-    const userAgent = req.headers.get('user-agent')
-
-    await prisma.documentDownloadLog.create({
-      data: {
-        documentId: resolved.access.documentId,
-        versionId,
-        userId: me.id,
-        ip,
-        userAgent,
-      },
-    })
-
-    await registerDocumentAuditLog({
-      action: 'DOWNLOAD',
-      documentId: resolved.access.documentId,
-      versionId,
-      userId: me.id,
-      ip,
-      userAgent,
-    })
-
-    return NextResponse.json({ url: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=DOWNLOAD` })
+    const result = await executeControlledDocumentAction({ req, versionId, userId: me.id, intent: 'download' })
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status })
+    if ('termChallenge' in result) return NextResponse.json(result.termChallenge, { status: result.status })
+    return NextResponse.json({ url: result.downloadUrl })
   } catch (error) {
     console.error('Falha ao preparar download via pipeline único.', { versionId, error })
     return NextResponse.json({ error: 'Não foi possível preparar o PDF final para download.' }, { status: 422 })

@@ -174,53 +174,41 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     }
   }
 
-  const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    if (intent === 'print') {
-      const printRes = await fetch(`/api/documents/versions/${versionId}/print`, { method: 'POST', cache: 'no-store' })
-      const printData = await parseJsonSafely<{ error?: string; url?: string }>(printRes)
-      if (!printRes.ok) {
-        alert(printData?.error ?? 'Falha ao preparar impressão do documento.')
-        return
-      }
-      if (!printData?.url) {
-        alert('Documento sem URL de impressão disponível no momento.')
-        return
-      }
-      const printWindow = window.open(printData.url, '_blank', 'noopener,noreferrer')
-      if (!printWindow) {
-        router.push(printData.url)
-      }
-      return
-    }
-
-    if (intent === 'view') {
-      const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
-      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
-      if (!previewWindow) {
-        router.push(viewerPath)
-      }
-      return
-    }
-
-    const endpoint = `/api/documents/versions/${versionId}/download`
-    const res = await fetch(endpoint, { method: 'GET', cache: 'no-store' })
-    const data = await parseJsonSafely<{ error?: string; url?: string }>(res)
+   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
+    const method = intent === 'download' ? 'GET' : 'POST'
+    const endpoint = intent === 'download'
+      ? `/api/documents/versions/${versionId}/download`
+      : '/api/documents/versions/' + encodeURIComponent(versionId) + '/controlled'
+    const res = await fetch(endpoint, {
+      method,
+      cache: 'no-store',
+      headers: intent === 'download' ? undefined : { 'content-type': 'application/json' },
+      body: intent === 'download' ? undefined : JSON.stringify({ intent }),
+    })
+    const data = await parseJsonSafely<{ error?: string; url?: string; downloadUrl?: string }>(res)
     if (!res.ok) {
-      alert(data?.error ?? 'Falha ao baixar o documento.')
-      return
-    }
-    if (!data?.url) {
-      alert('Documento sem URL de download disponível no momento.')
+      alert(data?.error ?? 'Falha ao processar ação do documento.')
       return
     }
 
-    const anchor = document.createElement('a')
-    anchor.href = data.url
-    anchor.target = '_self'
-    anchor.rel = 'noreferrer'
-    anchor.click()
+    const targetUrl = intent === 'download' ? data?.url : data?.url
+    if (!targetUrl) {
+      alert('Documento sem URL final disponível no momento.')
+      return
+    }
+
+    if (intent === 'download') {
+      const anchor = document.createElement('a')
+      anchor.href = targetUrl
+      anchor.target = '_self'
+      anchor.rel = 'noreferrer'
+      anchor.click()
+      return
+    }
+
+    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer')
+    if (!opened) router.push(targetUrl)
   }
-
 
   const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
     const res = await fetch(`/api/documents/versions/${versionId}/${action}`, {

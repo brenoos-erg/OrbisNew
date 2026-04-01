@@ -27,7 +27,7 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
           ? `/api/documents/versions/${versionId}/print`
           : `/api/documents/versions/${versionId}/view`
         const res = await fetch(endpoint, { method: 'POST', cache: 'no-store' })
-        const payload = (await res.json().catch(() => null)) as ViewPayload | null
+       const payload = (await res.json().catch(() => null)) as ViewPayload | null
         if (!payload) {
           setRequestError('Não foi possível interpretar a resposta do servidor.')
           setData(null)
@@ -52,14 +52,7 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   if (data.isPdf && data.url) {
     return (
       <div className={initialIntent === 'print' ? 'h-screen bg-white p-0' : 'min-h-screen bg-slate-100 p-3'}>
-        <div className={initialIntent === 'print' ? 'h-full' : 'mx-auto max-w-6xl space-y-2'}>
-          {initialIntent !== 'print' ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              <p className="font-semibold">CÓPIA NÃO CONTROLADA</p>
-              <p>Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
-              {data.document ? <p className="mt-1 text-amber-800">{data.document.code} · {data.document.title} · REV {data.document.revisionNumber}</p> : null}
-            </div>
-          ) : null}
+        <div className={initialIntent === 'print' ? 'h-full' : 'mx-auto max-w-6xl'}>
           <iframe
             className={initialIntent === 'print' ? 'h-full w-full border-0 bg-white' : 'h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white'}
             src={`${data.url}#toolbar=0&navpanes=0`}
