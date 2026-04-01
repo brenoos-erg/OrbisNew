@@ -4,7 +4,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { resolveDocumentFileType } from '@/lib/documents/fileType'
-import { convertWordToPdf } from '@/lib/documents/wordToPdf'
+import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -25,15 +25,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
   const fileType = resolveDocumentFileType(access.fileUrl)
   let conversionError: string | null = null
 
-  if (fileType.isWord) {
+  if (!fileType.isPdf && fileType.isConvertibleToPdf) {
     try {
-      await convertWordToPdf({
+      await convertDocumentToPdf({
         fileUrl: access.fileUrl,
         sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
       })
     } catch (error) {
-      conversionError = 'Não foi possível converter este arquivo Word para visualização agora.'
-      console.error('Falha ao preparar conversão Word para visualização.', {
+      conversionError = 'Não foi possível converter este arquivo para PDF para visualização agora.'
+      console.error('Falha ao preparar conversão para visualização em PDF.', {
         versionId,
         fileUrl: access.fileUrl,
         error,
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
       return NextResponse.json({ error: conversionError }, { status: 422 })
     }
   }
-  const canRenderPdf = fileType.isPdf || fileType.isWord
+  const canRenderPdf = fileType.isPdf || fileType.isConvertibleToPdf
   const renderUrl = canRenderPdf
-    ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW${fileType.isWord ? '&format=pdf' : ''}`
+    ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`
     : undefined
 
   return NextResponse.json({
@@ -60,3 +60,4 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     },
   })
 }
+

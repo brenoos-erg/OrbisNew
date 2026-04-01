@@ -18,8 +18,18 @@ export type DocumentFileType = {
   mimeType: string
   isPdf: boolean
   isWord: boolean
+  isConvertibleToPdf: boolean
 }
 
+const PDF_CONVERTIBLE_EXTENSIONS = new Set([
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.txt',
+])
 export function resolveDocumentFileType(fileUrl: string): DocumentFileType {
   const extension = path.extname(fileUrl).toLowerCase()
   const mimeType = EXTENSION_MIME_MAP[extension] ?? 'application/octet-stream'
@@ -29,6 +39,7 @@ export function resolveDocumentFileType(fileUrl: string): DocumentFileType {
     mimeType,
     isPdf: extension === '.pdf',
     isWord: extension === '.doc' || extension === '.docx',
+    isConvertibleToPdf: PDF_CONVERTIBLE_EXTENSIONS.has(extension),
   }
 }
 

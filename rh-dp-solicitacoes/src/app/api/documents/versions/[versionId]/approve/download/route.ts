@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
+import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { prisma } from '@/lib/prisma'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 
@@ -25,14 +26,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     return NextResponse.json(access.termChallenge, { status: access.status })
   }
 
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+  const userAgent = req.headers.get('user-agent')
+
   await prisma.documentDownloadLog.create({
     data: {
       documentId: version.documentId,
       versionId: access.versionId,
       userId: me.id,
-      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-      userAgent: req.headers.get('user-agent'),
+      ip,
+      userAgent,
     },
+  })
+
+  await registerDocumentAuditLog({
+    action: 'DOWNLOAD',
+    documentId: access.documentId,
+    versionId: access.versionId,
+    userId: me.id,
+    ip,
+    userAgent,
   })
 
   return NextResponse.json({ url: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=DOWNLOAD` })

@@ -6,12 +6,11 @@ import { requireActiveUser } from '@/lib/auth'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { applyUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
-import { convertWordToPdf } from '@/lib/documents/wordToPdf'
+import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 
 function normalizeStoredUrl(url: string) {
   return url.startsWith('/') ? url : `/${url}`
 }
-
 function toPublicAbsolutePath(fileUrl: string) {
   const normalized = normalizeStoredUrl(fileUrl)
   const relativeToPublic = normalized.replace(/^\/+/, '')
@@ -51,26 +50,27 @@ export async function GET(
     if (fileType.isPdf && isPdfBuffer(fileBuffer)) {
       pdfSource = Buffer.from(fileBuffer)
       downloadName = originalFileName
-    } else if (fileType.isWord) {
+    } else if (fileType.isConvertibleToPdf) {
       try {
-        const converted = await convertWordToPdf({
+        const converted = await convertDocumentToPdf({
           fileUrl: access.fileUrl,
           sourceAbsolutePath: absolutePath,
         })
         pdfSource = converted.pdfBuffer
         downloadName = converted.outputFileName
       } catch (conversionError) {
-        console.error('Falha ao converter documento Word para PDF.', {
+        console.error('Falha ao converter documento para PDF.', {
           versionId,
           fileUrl: access.fileUrl,
           error: conversionError,
         })
         return NextResponse.json(
-          { error: 'Não foi possível converter o documento Word para PDF no momento.' },
+          { error: 'Não foi possível converter o documento para PDF no momento.' },
           { status: 422 },
         )
       }
     }
+
 
     if (!pdfSource) {
       return NextResponse.json(

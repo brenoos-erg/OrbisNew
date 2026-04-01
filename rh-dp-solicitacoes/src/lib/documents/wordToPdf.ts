@@ -136,3 +136,5 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
     await fs.rm(tempDir, { recursive: true, force: true })
   }
 }
+
+export const convertDocumentToPdf = convertWordToPdf
