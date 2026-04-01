@@ -111,7 +111,7 @@ const ensureResources = (pageBody: string, fontObjectId: number, gsObjectId: num
   })
 }
 
-onst ensureContentsArray = (pageBody: string, streamObjectId: number) => {
+const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
   const contentsArrayMatch = pageBody.match(/\/Contents\s*\[([\s\S]*?)\]/)
   if (contentsArrayMatch) {
     const current = contentsArrayMatch[1]

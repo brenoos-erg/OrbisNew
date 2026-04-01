@@ -194,7 +194,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     }
 
     if (intent === 'view') {
-      const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
+      const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
+      const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
       if (!previewWindow) {
         router.push(viewerPath)
       }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Props = { versionId: string; initialIntent: 'view' | 'print' }
 type ViewPayload = {
@@ -17,8 +17,6 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   const [data, setData] = useState<ViewPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [requestError, setRequestError] = useState<string | null>(null)
-  const [frameReady, setFrameReady] = useState(false)
-  const frameRef = useRef<HTMLIFrameElement | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -45,17 +43,6 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
      void load()
   }, [versionId, initialIntent])
 
-  useEffect(() => {
-    if (!frameReady || initialIntent !== 'print') return
-    const timer = window.setTimeout(() => {
-      const frameWindow = frameRef.current?.contentWindow
-      if (frameWindow) {
-        frameWindow.focus()
-        frameWindow.print()
-      }
-    }, 350)
-    return () => window.clearTimeout(timer)
-  }, [frameReady, initialIntent])
 
   if (loading) return <div className="p-6 text-sm text-slate-600">Carregando visualização…</div>
   if (requestError) return <div className="p-6 text-sm text-rose-700">{requestError}</div>
@@ -74,11 +61,9 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
             </div>
           ) : null}
           <iframe
-            ref={frameRef}
             className={initialIntent === 'print' ? 'h-full w-full border-0 bg-white' : 'h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white'}
             src={`${data.url}#toolbar=0&navpanes=0`}
             title="Visualização controlada do documento"
-            onLoad={() => setFrameReady(true)}
           />
         </div>
       </div>

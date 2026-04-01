@@ -1,82 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'node:path'
 import { PrintCopyType } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
-import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
-import { resolveDocumentFileType } from '@/lib/documents/fileType'
-import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
+import { resolveDocumentFinalPdf } from '@/lib/documents/finalPdf'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
 
-  const access = await resolveDocumentVersionAccess(versionId, me.id, 'print')
-  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
-  if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
+  try {
+    const resolved = await resolveDocumentFinalPdf(versionId, me.id, 'print')
+    if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if ('termChallenge' in resolved) return NextResponse.json(resolved.termChallenge, { status: resolved.status })
 
-  const fileType = resolveDocumentFileType(access.fileUrl)
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+    const userAgent = req.headers.get('user-agent')
 
-  if (!fileType.isPdf && !fileType.isConvertibleToPdf) {
-    return NextResponse.json(
-      {
-        error: `Formato ${fileType.extension || 'desconhecido'} não suportado para impressão final em PDF.`,
+    await prisma.printCopy.create({
+      data: {
+        documentId: resolved.access.documentId,
+        versionId: resolved.access.versionId,
+        type: PrintCopyType.UNCONTROLLED,
+        issuedById: me.id,
       },
-      { status: 422 },
-    )
+    })
+
+    await registerDocumentAuditLog({
+      action: 'PRINT',
+      documentId: resolved.access.documentId,
+      versionId: resolved.access.versionId,
+      userId: me.id,
+      ip,
+      userAgent,
+    })
+
+    return NextResponse.json({
+      ok: true,
+      isPdf: true,
+      fileExtension: resolved.sourceExtension,
+      url: `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT`,
+      downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=PRINT`,
+      document: {
+        code: resolved.access.documentCode,
+        title: resolved.access.documentTitle,
+        revisionNumber: resolved.access.revisionNumber,
+      },
+    })
+  } catch (error) {
+    console.error('Falha ao preparar impressão via pipeline único.', { versionId, error })
+    return NextResponse.json({ error: 'Não foi possível preparar o PDF final para impressão.' }, { status: 422 })
   }
-
-  if (!fileType.isPdf) {
-    try {
-      await convertDocumentToPdf({
-        fileUrl: access.fileUrl,
-        sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
-      })
-    } catch (error) {
-      console.error('Falha ao preparar conversão para impressão em PDF.', {
-        versionId,
-        fileUrl: access.fileUrl,
-        error,
-      })
-      return NextResponse.json(
-        { error: 'Não foi possível converter este arquivo para PDF para impressão agora.' },
-        { status: 422 },
-      )
-    }
-  }
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
-  const userAgent = req.headers.get('user-agent')
-
-  await prisma.printCopy.create({
-    data: {
-      documentId: access.documentId,
-      versionId: access.versionId,
-      type: PrintCopyType.UNCONTROLLED,
-      issuedById: me.id,
-    },
-  })
-
-  await registerDocumentAuditLog({
-    action: 'PRINT',
-    documentId: access.documentId,
-    versionId: access.versionId,
-    userId: me.id,
-    ip,
-    userAgent,
-  })
-  const renderUrl = `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=PRINT`
-
-  return NextResponse.json({
-    ok: true,
-    isPdf: true,
-    fileExtension: fileType.extension,
-    url: renderUrl,
-    downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=PRINT`,
-    document: {
-      code: access.documentCode,
-      title: access.documentTitle,
-      revisionNumber: access.revisionNumber,
-    },
-  })
 }

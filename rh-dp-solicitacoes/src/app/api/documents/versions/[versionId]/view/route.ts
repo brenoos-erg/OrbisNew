@@ -1,69 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'node:path'
 import { requireActiveUser } from '@/lib/auth'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
-import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
-import { resolveDocumentFileType } from '@/lib/documents/fileType'
-import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
+import { resolveDocumentFinalPdf } from '@/lib/documents/finalPdf'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
-  const access = await resolveDocumentVersionAccess(versionId, me.id, 'view')
-  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
-  if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 
-  await registerDocumentAuditLog({
-    action: 'VIEW',
-    documentId: access.documentId,
-    versionId: access.versionId,
-    userId: me.id,
-    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-    userAgent: req.headers.get('user-agent'),
-  })
+  try {
+    const resolved = await resolveDocumentFinalPdf(versionId, me.id, 'view')
+    if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if ('termChallenge' in resolved) return NextResponse.json(resolved.termChallenge, { status: resolved.status })
 
-   const fileType = resolveDocumentFileType(access.fileUrl)
+    await registerDocumentAuditLog({
+      action: 'VIEW',
+      documentId: resolved.access.documentId,
+      versionId: resolved.access.versionId,
+      userId: me.id,
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      userAgent: req.headers.get('user-agent'),
+    })
 
-  if (!fileType.isPdf && !fileType.isConvertibleToPdf) {
-    return NextResponse.json(
-      {
-        error: `Formato ${fileType.extension || 'desconhecido'} não suportado para visualização final em PDF.`,
+    const renderUrl = `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`
+
+    return NextResponse.json({
+      ok: true,
+      isPdf: true,
+      fileExtension: resolved.sourceExtension,
+      url: renderUrl,
+      downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=VIEW`,
+      document: {
+        code: resolved.access.documentCode,
+        title: resolved.access.documentTitle,
+        revisionNumber: resolved.access.revisionNumber,
       },
+    })
+  } catch (error) {
+    console.error('Falha ao preparar visualização via pipeline único.', { versionId, error })
+    return NextResponse.json(
+      { error: 'Não foi possível preparar o PDF final para visualização.' },
       { status: 422 },
     )
   }
-
-  if (!fileType.isPdf) {
-    try {
-      await convertDocumentToPdf({
-        fileUrl: access.fileUrl,
-        sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
-      })
-    } catch (error) {
-      console.error('Falha ao preparar conversão para visualização em PDF.', {
-        versionId,
-        fileUrl: access.fileUrl,
-        error,
-      })
-      return NextResponse.json(
-        { error: 'Não foi possível converter este arquivo para PDF para visualização agora.' },
-        { status: 422 },
-      )
-    }
-  }
-   const renderUrl = `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`
-
-  return NextResponse.json({
-    ok: true,
-    isPdf: true,
-    fileExtension: fileType.extension,
-    url: renderUrl,
-    downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=VIEW`,
-     document: {
-      code: access.documentCode,
-      title: access.documentTitle,
-      revisionNumber: access.revisionNumber,
-    },
-  })
 }
 
