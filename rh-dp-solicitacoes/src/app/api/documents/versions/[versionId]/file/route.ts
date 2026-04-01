@@ -18,6 +18,13 @@ function toPublicAbsolutePath(fileUrl: string) {
   return path.join(process.cwd(), 'public', relativeToPublic)
 }
 
+function resolveIntentFromAuditAction(value: string | null): 'view' | 'download' | 'print' {
+  const normalized = String(value ?? '').trim().toUpperCase()
+  if (normalized === 'DOWNLOAD') return 'download'
+  if (normalized === 'PRINT') return 'print'
+  return 'view'
+}
+
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +33,8 @@ export async function GET(
   const me = await requireActiveUser()
   const { versionId } = await params
   const disposition = _req.nextUrl.searchParams.get('disposition') === 'attachment' ? 'attachment' : 'inline'
-  const access = await resolveDocumentVersionAccess(versionId, me.id)
+  const intent = resolveIntentFromAuditAction(_req.nextUrl.searchParams.get('auditAction'))
+  const access = await resolveDocumentVersionAccess(versionId, me.id, intent)
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 

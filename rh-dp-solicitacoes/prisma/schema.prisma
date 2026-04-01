@@ -360,7 +360,9 @@ model User {
   isoAttachmentsUploaded                     DocumentAttachment[]         @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
-  isoTermAcceptances                         DocumentTermAcceptance[]
+  isoTermActionAcceptances                   DocumentTermActionAcceptance[]
+  isoTermActionAcceptances                   DocumentTermActionAcceptance[]  downloadLogs       DocumentDownloadLog[]
+  auditLogs          DocumentAuditLog[]
   isoDistributionsCreated                    Distribution[]               @relation("IsoDistributionCreatedBy")
   isoDistributionTargets                     DistributionTarget[]
   isoReadReceipts                            ReadReceipt[]
@@ -462,6 +464,7 @@ model DocumentVersion {
   attachments        DocumentAttachment[]
   downloadLogs       DocumentDownloadLog[]
   auditLogs          DocumentAuditLog[]
+  termActionAcceptances DocumentTermActionAcceptance[]
   readReceipts       ReadReceipt[]
   printCopies        PrintCopy[]
   distributions      Distribution[]
@@ -537,7 +540,9 @@ model DocumentResponsibilityTerm {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
   acceptances DocumentTermAcceptance[]
+  actionAcceptances DocumentTermActionAcceptance[]
 }
+
 
 model DocumentTermAcceptance {
   id         String                     @id @default(uuid())
@@ -550,6 +555,24 @@ model DocumentTermAcceptance {
   user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
  @@unique([termId, userId])
+}
+
+model DocumentTermActionAcceptance {
+  id         String                     @id @default(uuid())
+  termId     String
+  userId     String
+  versionId  String
+  intent     String                     @db.VarChar(16)
+  acceptedAt DateTime                   @default(now())
+  ip         String?
+  userAgent  String?
+  term       DocumentResponsibilityTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version    DocumentVersion            @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([termId, userId, versionId, intent], map: "DocumentTermActionAcceptance_unique")
+  @@index([userId, intent, acceptedAt])
+  @@index([versionId, intent, acceptedAt])
 }
 
 model DocumentApprovalControl {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { resolveTermChallenge } from '@/lib/documentTermAccess'
+import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -17,23 +17,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
     return NextResponse.json({ error: 'Documento publicado não encontrado.' }, { status: 404 })
   }
 
-  const termChallenge = await resolveTermChallenge(prisma, me.id)
-  if (termChallenge) {
-    return NextResponse.json(termChallenge, { status: 403 })
+  const access = await resolveDocumentVersionAccess(versionId, me.id, 'download')
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status })
   }
-
-   const resolvedFileUrl = version.fileUrl || (await prisma.documentVersion.findFirst({ where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } }, orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }], select: { fileUrl: true } }))?.fileUrl
-  if (!resolvedFileUrl) return NextResponse.json({ error: 'Arquivo publicado não encontrado.' }, { status: 404 })
+  if ('termChallenge' in access) {
+    return NextResponse.json(access.termChallenge, { status: access.status })
+  }
 
   await prisma.documentDownloadLog.create({
     data: {
       documentId: version.documentId,
-      versionId,
+      versionId: access.versionId,
       userId: me.id,
       ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
       userAgent: req.headers.get('user-agent'),
     },
   })
 
-  return NextResponse.json({ url: `/api/documents/versions/${versionId}/file` })
+  return NextResponse.json({ url: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=DOWNLOAD` })
 }

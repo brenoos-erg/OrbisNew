@@ -6,6 +6,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
+let cachedSofficeBinary: string | null = null
 
 type ConversionResult = {
   pdfBuffer: Buffer
@@ -32,7 +33,9 @@ function getSofficeCandidates() {
   ].filter((candidate): candidate is string => Boolean(candidate))
 }
 
-async function runSofficeConvert(args: string[]) {
+async function resolveSofficeBinary() {
+  if (cachedSofficeBinary) return cachedSofficeBinary
+
   const attemptedBinaries: string[] = []
   let lastError: unknown = null
 
@@ -42,11 +45,12 @@ async function runSofficeConvert(args: string[]) {
       ? binary
       : path.join(binary, process.platform === 'win32' ? 'soffice.exe' : 'soffice')
     try {
-      await execFileAsync(candidateBinary, args, {
-        timeout: 60_000,
-        maxBuffer: 10 * 1024 * 1024,
+      await execFileAsync(candidateBinary, ['--version'], {
+        timeout: 20_000,
+        maxBuffer: 2 * 1024 * 1024,
       })
-      return
+      cachedSofficeBinary = candidateBinary
+      return candidateBinary
     } catch (error) {
       const err = error as NodeJS.ErrnoException & { code?: string }
       if (err?.code === 'ENOENT') {
@@ -54,13 +58,27 @@ async function runSofficeConvert(args: string[]) {
         continue
       }
 
-
-      throw error
+      lastError = error
+      continue
     }
   }
 
   const message = lastError instanceof Error ? lastError.message : String(lastError)
   throw new Error(`LibreOffice (soffice) não encontrado. Caminhos tentados: ${attemptedBinaries.join(', ')}. Último erro: ${message}`)
+}
+
+async function runSofficeConvert(args: string[]) {
+  const binary = await resolveSofficeBinary()
+
+  try {
+    await execFileAsync(binary, args, {
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Falha ao executar LibreOffice (${binary}) para conversão: ${detail}`)
+  }
 }
 
 function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeof fs.stat>>) {
@@ -69,6 +87,7 @@ function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeo
     .digest('hex')
     .slice(0, 12)
 }
+
 
 export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: ConversionOptions): Promise<ConversionResult> {
   await fs.access(sourceAbsolutePath)
@@ -110,9 +129,9 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
       pdfBuffer: convertedPdf,
       outputFileName: `${sourceBaseName}.pdf`,
     }
-  } catch (error) {
+   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Falha ao converter documento Word para PDF: ${detail}`)
+    throw new Error(`Falha ao converter documento Word para PDF: ${detail}. Verifique se o LibreOffice (soffice) está instalado e acessível.`)
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true })
   }

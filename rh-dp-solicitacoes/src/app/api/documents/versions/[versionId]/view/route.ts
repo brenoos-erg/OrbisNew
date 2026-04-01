@@ -9,7 +9,7 @@ import { convertWordToPdf } from '@/lib/documents/wordToPdf'
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
-  const access = await resolveDocumentVersionAccess(versionId, me.id)
+  const access = await resolveDocumentVersionAccess(versionId, me.id, 'view')
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 

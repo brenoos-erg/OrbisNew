@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
   const me = await requireActiveUser()
   const { versionId } = await params
 
-  const access = await resolveDocumentVersionAccess(versionId, me.id)
+  const access = await resolveDocumentVersionAccess(versionId, me.id, 'print')
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
   if ('termChallenge' in access) return NextResponse.json(access.termChallenge, { status: access.status })
 

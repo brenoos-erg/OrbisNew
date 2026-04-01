@@ -62,7 +62,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
   const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
-  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', pdf: null as File | null })
+  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', file: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
     code: '',
@@ -261,8 +261,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-    if (!createForm.pdf) {
-      setCreateError('Anexe um arquivo PDF.')
+     if (!createForm.file) {
+      setCreateError('Anexe um arquivo PDF, DOC ou DOCX.')
       return
     }
 
@@ -275,7 +275,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     formData.set('ownerDepartmentId', createForm.ownerDepartmentId)
     formData.set('authorUserId', createForm.authorUserId)
     if (createForm.revisionNumber) formData.set('revisionNumber', createForm.revisionNumber)
-    formData.set('pdf', createForm.pdf)
+    formData.set('file', createForm.file)
 
     const res = await fetch('/api/documents', { method: 'POST', body: formData })
     setCreating(false)
@@ -288,7 +288,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
      const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
     setShowCreate(false)
-    setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', pdf: null })
+    setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', file: null })
     setCodeValidation({ status: 'idle', message: null })
     setCreateSuccess(data?.routing ?? { status: 'PUBLICADO', targetTab: 'publicados', targetPath: '/dashboard/controle-documentos/publicados', message: 'Documento cadastrado com sucesso.' })
     clearFilters()
@@ -343,7 +343,11 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     const response = await fetch('/api/documents/term/accept', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ termId: term.id }),
+      body: JSON.stringify({
+        termId: term.id,
+        versionId: pendingAction.versionId,
+        intent: pendingAction.intent.toUpperCase(),
+      }),
     })
     if (!response.ok) {
       alert('Não foi possível registrar o aceite do termo de responsabilidade.')
@@ -640,8 +644,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                 <option value="">Elaborador/Revisor (auto)</option>
                 {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
               </select>
-              <input className="rounded border px-3 py-2" placeholder="Revisão inicial (opcional)" value={createForm.revisionNumber} onChange={(e) => setCreateForm((v) => ({ ...v, revisionNumber: e.target.value.replace(/[^0-9]/g, '') }))} />
-              <input type="file" accept="application/pdf" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, pdf: e.target.files?.[0] ?? null }))} />
+                <input className="rounded border px-3 py-2" placeholder="Revisão inicial (opcional)" value={createForm.revisionNumber} onChange={(e) => setCreateForm((v) => ({ ...v, revisionNumber: e.target.value.replace(/[^0-9]/g, '') }))} />
+              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, file: e.target.files?.[0] ?? null }))} />
             </div>
             {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
             <div className="flex justify-end gap-2">

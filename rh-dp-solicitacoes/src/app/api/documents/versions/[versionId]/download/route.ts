@@ -13,7 +13,7 @@ import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
- const access = await resolveDocumentVersionAccess(versionId, me.id)
+ const access = await resolveDocumentVersionAccess(versionId, me.id, 'download')
   if ('error' in access) {
     return NextResponse.json({ error: access.error }, { status: access.status })
   }

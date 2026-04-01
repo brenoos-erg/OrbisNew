@@ -17,7 +17,7 @@ function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
 }
 
-async function savePdf(file: File) {
+async function saveUploadedDocument(file: File) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
   const safeName = `${Date.now()}-${randomUUID()}-${file.name.replace(/\s+/g, '-')}`
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest)   {
 
     if (contentType.includes('multipart/form-data')) {
       const form = await req.formData()
-      const pdf = form.get('pdf')
-      const fileUrl = pdf instanceof File && pdf.size > 0 ? await savePdf(pdf) : null
+      const uploadedFile = form.get('file') ?? form.get('pdf')
+      const fileUrl = uploadedFile instanceof File && uploadedFile.size > 0 ? await saveUploadedDocument(uploadedFile) : null
 
       payload = {
         code: normalizeCode(form.get('code')),

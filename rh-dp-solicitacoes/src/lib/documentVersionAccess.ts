@@ -6,7 +6,13 @@ export type DocumentTermChallenge = {
   term: { id: string; title: string; content: string }
 }
 
-export async function resolveDocumentVersionAccess(versionId: string, userId: string) {
+export type DocumentAccessIntent = 'view' | 'download' | 'print'
+
+export async function resolveDocumentVersionAccess(
+  versionId: string,
+  userId: string,
+  intent?: DocumentAccessIntent,
+) {
   const version = await prisma.documentVersion.findUnique({
     where: { id: versionId },
     include: {
@@ -61,10 +67,21 @@ export async function resolveDocumentVersionAccess(versionId: string, userId: st
     orderBy: { updatedAt: 'desc' },
   })
   if (term) {
-    const acceptance = await prisma.documentTermAcceptance.findUnique({
-      where: { termId_userId: { termId: term.id, userId } },
-      select: { id: true },
-    })
+    const acceptance = intent
+      ? await prisma.documentTermActionAcceptance.findFirst({
+        where: {
+          termId: term.id,
+          userId,
+          versionId,
+          intent: intent.toUpperCase(),
+        },
+        select: { id: true },
+      })
+      : await prisma.documentTermAcceptance.findUnique({
+        where: { termId_userId: { termId: term.id, userId } },
+        select: { id: true },
+      })
+
     if (!acceptance) {
       return {
         termChallenge: {
@@ -75,7 +92,6 @@ export async function resolveDocumentVersionAccess(versionId: string, userId: st
       }
     }
   }
-
   const resolvedFileUrl = version.fileUrl
     ? version.fileUrl
     : (
