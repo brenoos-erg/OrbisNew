@@ -22,35 +22,41 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     userAgent: req.headers.get('user-agent'),
   })
 
-  const fileType = resolveDocumentFileType(access.fileUrl)
-  let conversionError: string | null = null
+   const fileType = resolveDocumentFileType(access.fileUrl)
 
-  if (!fileType.isPdf && fileType.isConvertibleToPdf) {
+  if (!fileType.isPdf && !fileType.isConvertibleToPdf) {
+    return NextResponse.json(
+      {
+        error: `Formato ${fileType.extension || 'desconhecido'} não suportado para visualização final em PDF.`,
+      },
+      { status: 422 },
+    )
+  }
+
+  if (!fileType.isPdf) {
     try {
       await convertDocumentToPdf({
         fileUrl: access.fileUrl,
         sourceAbsolutePath: path.join(process.cwd(), 'public', access.fileUrl.startsWith('/') ? access.fileUrl.slice(1) : access.fileUrl),
       })
     } catch (error) {
-      conversionError = 'Não foi possível converter este arquivo para PDF para visualização agora.'
       console.error('Falha ao preparar conversão para visualização em PDF.', {
         versionId,
         fileUrl: access.fileUrl,
         error,
       })
-      return NextResponse.json({ error: conversionError }, { status: 422 })
+      return NextResponse.json(
+        { error: 'Não foi possível converter este arquivo para PDF para visualização agora.' },
+        { status: 422 },
+      )
     }
   }
-  const canRenderPdf = fileType.isPdf || fileType.isConvertibleToPdf
-  const renderUrl = canRenderPdf
-    ? `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`
-    : undefined
+   const renderUrl = `/api/documents/versions/${versionId}/file?disposition=inline&auditAction=VIEW`
 
   return NextResponse.json({
     ok: true,
-    isPdf: canRenderPdf,
+    isPdf: true,
     fileExtension: fileType.extension,
-    conversionError,
     url: renderUrl,
     downloadUrl: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=VIEW`,
      document: {

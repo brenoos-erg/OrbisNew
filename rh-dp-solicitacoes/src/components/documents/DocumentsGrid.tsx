@@ -175,7 +175,9 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    const viewerPath = `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}${intent === 'print' ? '?intent=print' : ''}`
+    const viewerPath = intent === 'print'
+      ? `/documentos/impressao/${encodeURIComponent(versionId)}`
+      : `/dashboard/controle-documentos/visualizacao/${encodeURIComponent(versionId)}`
     if (intent === 'view' || intent === 'print') {
       const previewWindow = window.open(viewerPath, '_blank', 'noopener,noreferrer')
       if (!previewWindow) {

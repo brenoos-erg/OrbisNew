@@ -9,7 +9,6 @@ type ViewPayload = {
   term?: { id: string; title: string; content: string }
   isPdf?: boolean
   fileExtension?: string
-  conversionError?: string | null
   url?: string
   downloadUrl?: string
   document?: { code: string; title: string; revisionNumber: number }
@@ -63,8 +62,6 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   if (!data || data.error) return <div className="p-6 text-sm text-rose-700">{data?.error ?? 'Não foi possível abrir o documento.'}</div>
   if (data.requiresTerm) return <div className="p-6 text-sm text-amber-800">Aceite o termo de responsabilidade na listagem de documentos antes de visualizar.</div>
 
-  const extensionLabel = data?.fileExtension ? data.fileExtension.replace('.', '').toUpperCase() : 'não-PDF'
-
   if (data.isPdf && data.url) {
     return (
       <div className={initialIntent === 'print' ? 'h-screen bg-white p-0' : 'min-h-screen bg-slate-100 p-3'}>
@@ -89,20 +86,15 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-3">
-      <div className="mx-auto max-w-6xl space-y-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-700">
-          <p className="font-semibold text-slate-900">Este documento está em formato {extensionLabel}.</p>
-          <p className="mt-2">{data.conversionError ?? 'A visualização interna suporta apenas arquivos PDF no momento.'}</p>
-          {data.downloadUrl ? (
-            <a
-              className="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-              href={data.downloadUrl}
-            >
-              Baixar arquivo
-            </a>
-          ) : null}
-        </div>
+     <div className="p-6 text-sm text-rose-700">
+      Não foi possível abrir o PDF final com marca d’água deste documento.
+      {data.fileExtension ? (
+        <span className="block text-xs text-rose-600">Formato informado: {data.fileExtension.replace('.', '').toUpperCase()}.</span>
+      ) : null}
+      <div className="mt-3">
+        <a className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" href="/dashboard/controle-documentos/publicados">
+          Voltar para a listagem
+        </a>
       </div>
     </div>
   )
