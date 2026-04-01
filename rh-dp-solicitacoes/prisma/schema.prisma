@@ -30,9 +30,9 @@ model RefusalAttachment {
 }
 
 model RefusalReport {
-  id                     String              @id @default(uuid())
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  id                     String         @id @default(uuid())
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
   employeeId             String
   employeeName           String
   sectorOrContract       String
@@ -43,17 +43,17 @@ model RefusalReport {
   generalCoordinatorName String?
   contractManagerId      String?
   generalCoordinatorId   String?
-  status                 RefusalStatus       @default(PENDENTE)
+  status                 RefusalStatus  @default(PENDENTE)
   decision               Boolean?
   decisionComment        String?
   decidedAt              DateTime?
   decidedById            String?
   decisionLevel          ModuleLevel?
   attachments            RefusalAttachment[]
-  contractManager        User?               @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
-  decidedBy              User?               @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
-  employee               User                @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
-  generalCoordinator     User?               @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
+  contractManager        User?          @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
+  decidedBy              User?          @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
+  employee               User           @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
+  generalCoordinator     User?          @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
 }
 
 model Comment {
@@ -103,7 +103,6 @@ model CostCenter {
   ncActionsImpactCenter      NonConformityActionItem[]    @relation("NcActionImpactCenter")
   ncActionsResponsibleCenter NonConformityActionItem[]    @relation("NcActionResponsibleCenter")
 
-
   @@map("CostCenter")
 }
 
@@ -151,26 +150,26 @@ model Leader {
 }
 
 model TipoSolicitacao {
-  id           String         @id
-  codigo       String         @unique
-  nome         String         @unique
+  id           String                    @id
+  codigo       String                    @unique
+  nome         String                    @unique
   descricao    String?
   schemaJson   Json
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
   solicitacoes Solicitation[]
   approvers    TipoSolicitacaoApprover[]
 }
 
 model TipoSolicitacaoApprover {
-  id        String          @id @default(uuid())
+  id        String            @id @default(uuid())
   tipoId    String
   userId    String
-  role      TipoApproverRole @default(APPROVER)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  tipo      TipoSolicitacao @relation(fields: [tipoId], references: [id], onDelete: Cascade)
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TipoApproverRole  @default(APPROVER)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  tipo      TipoSolicitacao   @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tipoId, userId])
 }
@@ -193,49 +192,49 @@ model Department {
 }
 
 model Solicitation {
-  id                 String                 @id @default(uuid())
+  id                 String               @id @default(uuid())
   titulo             String
   descricao          String?
   tipoId             String
   payload            Json
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   approvalAt         DateTime?
   approvalComment    String?
-  approvalStatus     ApprovalStatus         @default(NAO_PRECISA)
+  approvalStatus     ApprovalStatus       @default(NAO_PRECISA)
   approverId         String?
   costCenterId       String?
-  dataAbertura       DateTime               @default(now())
+  dataAbertura       DateTime             @default(now())
   dataCancelamento   DateTime?
   dataFechamento     DateTime?
   dataPrevista       DateTime?
   departmentId       String
   prioridade         SolicitationPriority?
-  protocolo          String                 @unique
-  idempotencyKey     String?                @unique
-  requiresApproval   Boolean                @default(false)
+  protocolo          String               @unique
+  idempotencyKey     String?              @unique
+  requiresApproval   Boolean              @default(false)
   solicitanteId      String
-  status             SolicitationStatus     @default(ABERTA)
+  status             SolicitationStatus   @default(ABERTA)
   parentId           String?
-  vagaPrevista       Boolean                @default(false)
+  vagaPrevista       Boolean              @default(false)
   assumidaPorId      String?
   assumidaEm         DateTime?
   nonConformityId    String?
   anexos             Attachment[]
   comentarios        Comment[]
   eventos            Event[]
-  approver           User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
-  assumidaPor        User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
-  costCenter         CostCenter?            @relation(fields: [costCenterId], references: [id])
-  department         Department             @relation(fields: [departmentId], references: [id])
-  parent             Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
-  children           Solicitation[]         @relation("SolicitationParent")
-  solicitante        User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
-  tipo               TipoSolicitacao        @relation(fields: [tipoId], references: [id])
+  approver           User?                @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  assumidaPor        User?                @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
+  costCenter         CostCenter?          @relation(fields: [costCenterId], references: [id])
+  department         Department           @relation(fields: [departmentId], references: [id])
+  parent             Solicitation?        @relation("SolicitationParent", fields: [parentId], references: [id])
+  children           Solicitation[]       @relation("SolicitationParent")
+  solicitante        User                 @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
+  tipo               TipoSolicitacao      @relation(fields: [tipoId], references: [id])
   timelines          SolicitationTimeline[]
   solicitacaoSetores SolicitacaoSetor[]
   documents          Document[]
-  nonConformity      NonConformity?          @relation(fields: [nonConformityId], references: [id])
+  nonConformity      NonConformity?       @relation(fields: [nonConformityId], references: [id])
 
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
@@ -262,7 +261,7 @@ model Document {
 }
 
 model DocumentAssignment {
-   id                  String                   @id @default(uuid())
+  id                  String                   @id @default(uuid())
   documentId          String
   userId              String
   status              DocumentAssignmentStatus @default(PENDENTE)
@@ -318,6 +317,7 @@ model User {
   positionId                                 String?
   avatarUrl                                  String?
   departmentId                               String?
+
   comments                                   Comment[]                    @relation("CommentAutor")
   events                                     Event[]                      @relation("EventActor")
   membersOfGroups                            GroupMember[]
@@ -329,10 +329,12 @@ model User {
   solicitacoesAssumidas                      Solicitation[]               @relation("SolicitationAssumidaPor")
   solicitacoesCriadas                        Solicitation[]               @relation("SolicitationSolicitante")
   tipoSolicitacaoApprovers                   TipoSolicitacaoApprover[]
+
   costCenter                                 CostCenter?                  @relation(fields: [costCenterId], references: [id])
   department                                 Department?                  @relation(fields: [departmentId], references: [id])
   leader                                     Leader?                      @relation(fields: [leaderId], references: [id])
   position                                   Position?                    @relation(fields: [positionId], references: [id])
+
   costCenters                                UserCostCenter[]
   userDepartments                            UserDepartment[]
   moduleAccesses                             UserModuleAccess[]
@@ -350,7 +352,7 @@ model User {
   nonConformitiesAsQualityApprover           NonConformity[]              @relation("NonConformityQualityApprover")
   nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
-  nonConformityActionItemsCreated            NonConformityActionItem[]      @relation("NonConformityActionItemCreatedBy")
+  nonConformityActionItemsCreated            NonConformityActionItem[]    @relation("NonConformityActionItemCreatedBy")
   nonConformityAttachments                   NonConformityAttachment[]
   nonConformityComments                      NonConformityComment[]
   nonConformityTimelineEvents                NonConformityTimeline[]
@@ -360,18 +362,17 @@ model User {
   isoAttachmentsUploaded                     DocumentAttachment[]         @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
+  isoTermAcceptances                         DocumentTermAcceptance[]
   isoTermActionAcceptances                   DocumentTermActionAcceptance[]
-  isoTermActionAcceptances                   DocumentTermActionAcceptance[]  downloadLogs       DocumentDownloadLog[]
-  auditLogs          DocumentAuditLog[]
   isoDistributionsCreated                    Distribution[]               @relation("IsoDistributionCreatedBy")
   isoDistributionTargets                     DistributionTarget[]
   isoReadReceipts                            ReadReceipt[]
   isoPrintCopiesIssued                       PrintCopy[]                  @relation("IsoPrintCopyIssuedBy")
-  documentApprovalControls                    DocumentApprovalControl[]
-
+  documentApprovalControls                   DocumentApprovalControl[]
 
   @@map("User")
 }
+
 model DocumentTypeCatalog {
   id                 String                     @id @default(uuid())
   code               String                     @unique
@@ -385,12 +386,12 @@ model DocumentTypeCatalog {
 }
 
 model ApproverGroup {
-  id           String                     @id @default(uuid())
+  id           String                    @id @default(uuid())
   name         String
   departmentId String?
-  createdAt    DateTime                   @default(now())
-  updatedAt    DateTime                   @updatedAt
-  department   Department?                @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  department   Department?               @relation(fields: [departmentId], references: [id])
   members      ApproverGroupMember[]
   flowItems    DocumentTypeApprovalFlow[]
 
@@ -422,8 +423,8 @@ model DocumentTypeApprovalFlow {
 }
 
 model IsoDocument {
-  id                 String                @id @default(uuid())
-  code               String                @unique
+  id                 String               @id @default(uuid())
+  code               String               @unique
   title              String
   documentTypeId     String
   ownerDepartmentId  String
@@ -431,13 +432,13 @@ model IsoDocument {
   physicalLocation   String?
   accessType         String
   validityAt         DateTime?
-  summary            String?               @db.LongText
-  affectedAreasNotes String?               @db.LongText
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  documentType       DocumentTypeCatalog   @relation(fields: [documentTypeId], references: [id])
-  ownerDepartment    Department            @relation(fields: [ownerDepartmentId], references: [id])
-  author             User                  @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
+  summary            String?              @db.LongText
+  affectedAreasNotes String?              @db.LongText
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  documentType       DocumentTypeCatalog  @relation(fields: [documentTypeId], references: [id])
+  ownerDepartment    Department           @relation(fields: [ownerDepartmentId], references: [id])
+  author             User                 @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
   versions           DocumentVersion[]
   downloadLogs       DocumentDownloadLog[]
   auditLogs          DocumentAuditLog[]
@@ -449,25 +450,25 @@ model IsoDocument {
 }
 
 model DocumentVersion {
-  id                 String                @id @default(uuid())
-  documentId         String
-  revisionNumber     Int
-  status             DocumentVersionStatus
-  fileUrl            String?               @db.Text
-  createdAt          DateTime              @default(now())
-  publishedAt        DateTime?
-  expiresAt          DateTime?
-  nextReviewAt       DateTime?
-  isCurrentPublished Boolean               @default(false)
-  document           IsoDocument           @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  approvals          DocumentApproval[]
-  attachments        DocumentAttachment[]
-  downloadLogs       DocumentDownloadLog[]
-  auditLogs          DocumentAuditLog[]
+  id                    String                         @id @default(uuid())
+  documentId            String
+  revisionNumber        Int
+  status                DocumentVersionStatus
+  fileUrl               String?                        @db.Text
+  createdAt             DateTime                       @default(now())
+  publishedAt           DateTime?
+  expiresAt             DateTime?
+  nextReviewAt          DateTime?
+  isCurrentPublished    Boolean                        @default(false)
+  document              IsoDocument                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  approvals             DocumentApproval[]
+  attachments           DocumentAttachment[]
+  downloadLogs          DocumentDownloadLog[]
+  auditLogs             DocumentAuditLog[]
   termActionAcceptances DocumentTermActionAcceptance[]
-  readReceipts       ReadReceipt[]
-  printCopies        PrintCopy[]
-  distributions      Distribution[]
+  readReceipts          ReadReceipt[]
+  printCopies           PrintCopy[]
+  distributions         Distribution[]
 
   @@unique([documentId, revisionNumber])
   @@index([status, publishedAt])
@@ -498,6 +499,7 @@ model DocumentAttachment {
   version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   uploadedBy   User            @relation("IsoAttachmentUploadedBy", fields: [uploadedById], references: [id])
 }
+
 model DocumentDownloadLog {
   id           String          @id @default(uuid())
   documentId   String
@@ -523,9 +525,9 @@ model DocumentAuditLog {
   createdAt  DateTime            @default(now())
   ip         String?
   userAgent  String?
-  document   IsoDocument          @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version    DocumentVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   IsoDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([documentId, createdAt])
   @@index([versionId, createdAt])
@@ -533,16 +535,15 @@ model DocumentAuditLog {
 }
 
 model DocumentResponsibilityTerm {
-  id          String                   @id @default(uuid())
-  title       String
-  content     String                   @db.LongText
-  active      Boolean                  @default(true)
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
-  acceptances DocumentTermAcceptance[]
+  id                String                         @id @default(uuid())
+  title             String
+  content           String                         @db.LongText
+  active            Boolean                        @default(true)
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  acceptances       DocumentTermAcceptance[]
   actionAcceptances DocumentTermActionAcceptance[]
 }
-
 
 model DocumentTermAcceptance {
   id         String                     @id @default(uuid())
@@ -554,7 +555,7 @@ model DocumentTermAcceptance {
   term       DocumentResponsibilityTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
   user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
- @@unique([termId, userId])
+  @@unique([termId, userId])
 }
 
 model DocumentTermActionAcceptance {
@@ -576,25 +577,25 @@ model DocumentTermActionAcceptance {
 }
 
 model DocumentApprovalControl {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  canApproveTab2   Boolean  @default(false)
-  canApproveTab3   Boolean  @default(false)
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  canApproveTab2 Boolean  @default(false)
+  canApproveTab3 Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Distribution {
-  id          String               @id @default(uuid())
+  id          String              @id @default(uuid())
   documentId  String
   versionId   String
   createdById String
-  createdAt   DateTime             @default(now())
-  document    IsoDocument          @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version     DocumentVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  createdBy   User                 @relation("IsoDistributionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime            @default(now())
+  document    IsoDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  createdBy   User                @relation("IsoDistributionCreatedBy", fields: [createdById], references: [id])
   targets     DistributionTarget[]
 }
 
@@ -797,6 +798,7 @@ model SolicitationTimeline {
   createdAt      DateTime     @default(now())
   solicitation   Solicitation @relation(fields: [solicitationId], references: [id])
 }
+
 model ProtocolSequence {
   year       Int      @id
   lastNumber Int      @default(0)
@@ -836,24 +838,6 @@ model UserDepartment {
 
   @@unique([userId, departmentId])
   @@map("UserDepartment")
-}
-
-enum TiEquipmentCategory {
-  LINHA_TELEFONICA
-  SMARTPHONE
-  NOTEBOOK
-  DESKTOP
-  MONITOR
-  IMPRESSORA
-  TPLINK
-  OUTROS
-}
-
-enum TiEquipmentStatus {
-  IN_STOCK
-  ASSIGNED
-  MAINTENANCE
-  RETIRED
 }
 
 model TiEquipment {
@@ -1017,27 +1001,26 @@ model NonConformitySequence {
   updatedAt DateTime @updatedAt
 }
 
-
 model NonConformityAlertConfig {
-  id                    String                       @id @default(cuid())
-  eventCreatedEnabled   Boolean                      @default(true)
-  eventUpdatedEnabled   Boolean                      @default(false)
-  subjectTemplate       String
-  bodyTemplate          String                       @db.LongText
-  createdAt             DateTime                     @default(now())
-  updatedAt             DateTime                     @updatedAt
-  recipients            NonConformityAlertRecipient[]
+  id                  String                       @id @default(cuid())
+  eventCreatedEnabled Boolean                      @default(true)
+  eventUpdatedEnabled Boolean                      @default(false)
+  subjectTemplate     String
+  bodyTemplate        String                       @db.LongText
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  recipients          NonConformityAlertRecipient[]
 }
 
 model NonConformityAlertRecipient {
-  id            String                   @id @default(cuid())
-  configId      String
-  email         String
-  fullName      String?
-  active        Boolean                  @default(true)
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  config        NonConformityAlertConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  id        String                   @id @default(cuid())
+  configId  String
+  email     String
+  fullName  String?
+  active    Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  config    NonConformityAlertConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 
   @@unique([configId, email])
 }
@@ -1048,7 +1031,7 @@ model NonConformity {
   tipoNc                           NonConformityType
   evidenciaObjetiva                String                      @db.LongText
   empresa                          String                      @default("ERG ENGENHARIA")
- centroQueDetectouId              String
+  centroQueDetectouId              String
   centroQueOriginouId              String
   prazoAtendimento                 DateTime
   fechamentoEm                     DateTime?
@@ -1089,38 +1072,38 @@ model NonConformity {
 }
 
 model NonConformityActionItem {
-  id                       String                    @id @default(cuid())
+  id                       String                         @id @default(cuid())
   nonConformityId          String?
   origemPlano              NonConformityActionPlanOrigin @default(NAO_CONFORMIDADE)
   createdById              String?
   descricao                String
-  motivoBeneficio          String?                   @db.LongText
-  atividadeComo            String?                   @db.LongText
+  motivoBeneficio          String?                       @db.LongText
+  atividadeComo            String?                       @db.LongText
   centroImpactadoId        String?
   centroImpactadoDescricao String?
   centroResponsavelId      String?
   dataInicioPrevista       DateTime?
   dataFimPrevista          DateTime?
-  custo                    Decimal?                  @db.Decimal(12, 2)
+  custo                    Decimal?                      @db.Decimal(12, 2)
   dataConclusao            DateTime?
-  tipo                     NonConformityActionType   @default(ACAO_CORRETIVA)
-  origem                   String?                   @db.VarChar(80)
-  referencia               String?                   @db.VarChar(120)
+  tipo                     NonConformityActionType       @default(ACAO_CORRETIVA)
+  origem                   String?                       @db.VarChar(80)
+  referencia               String?                       @db.VarChar(120)
   rapidez                  Int?
   autonomia                Int?
   beneficio                Int?
   responsavelId            String?
   responsavelNome          String?
   prazo                    DateTime?
-  status                   NonConformityActionStatus @default(PENDENTE)
-  evidencias               String?                   @db.LongText
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  nonConformity            NonConformity?            @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
-  responsavel              User?                     @relation(fields: [responsavelId], references: [id])
-  createdBy                User?                     @relation("NonConformityActionItemCreatedBy", fields: [createdById], references: [id])
-  centroImpactado          CostCenter?               @relation("NcActionImpactCenter", fields: [centroImpactadoId], references: [id])
-  centroResponsavel        CostCenter?               @relation("NcActionResponsibleCenter", fields: [centroResponsavelId], references: [id])
+  status                   NonConformityActionStatus     @default(PENDENTE)
+  evidencias               String?                       @db.LongText
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  nonConformity            NonConformity?                @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  responsavel              User?                         @relation(fields: [responsavelId], references: [id])
+  createdBy                User?                         @relation("NonConformityActionItemCreatedBy", fields: [createdById], references: [id])
+  centroImpactado          CostCenter?                   @relation("NcActionImpactCenter", fields: [centroImpactadoId], references: [id])
+  centroResponsavel        CostCenter?                   @relation("NcActionResponsibleCenter", fields: [centroResponsavelId], references: [id])
 
   @@index([nonConformityId, status])
 }
@@ -1241,6 +1224,7 @@ enum SolicitationStatus {
   CONCLUIDA
   CANCELADA
 }
+
 enum TipoApproverRole {
   APPROVER
   VIEWER
@@ -1310,6 +1294,7 @@ enum NonConformityActionStatus {
   CONCLUIDA
   CANCELADA
 }
+
 enum NonConformityActionPlanOrigin {
   NAO_CONFORMIDADE
   PLANO_AVULSO
@@ -1327,6 +1312,7 @@ enum NonConformityApprovalStatus {
   APROVADO
   REPROVADO
 }
+
 enum DocumentFlowStepType {
   REVIEW
   QUALITY
@@ -1364,4 +1350,22 @@ enum ReadReceiptStatus {
 enum PrintCopyType {
   CONTROLLED
   UNCONTROLLED
+}
+
+enum TiEquipmentCategory {
+  LINHA_TELEFONICA
+  SMARTPHONE
+  NOTEBOOK
+  DESKTOP
+  MONITOR
+  IMPRESSORA
+  TPLINK
+  OUTROS
+}
+
+enum TiEquipmentStatus {
+  IN_STOCK
+  ASSIGNED
+  MAINTENANCE
+  RETIRED
 }
