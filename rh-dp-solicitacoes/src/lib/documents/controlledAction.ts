@@ -10,18 +10,18 @@ export type ControlledIntent = 'view' | 'download' | 'print'
 type ControlledActionSuccess = {
   ok: true
   intent: ControlledIntent
-  isPdf: true
+  isPdf: boolean
   fileExtension: string
   url: string
   downloadUrl: string
   printUrl: string
+  controlledFlowApplied: boolean
   document: {
     code: string
     title: string
     revisionNumber: number
   }
 }
-
 type ControlledActionFailure =
   | { error: string; status: 401 | 403 | 404 | 422 }
   | { termChallenge: unknown; status: 403 }
@@ -121,14 +121,15 @@ async function executeControlledDocumentActionWithDeps(
     convertedToPdf: resolved.convertedToPdf,
   })
 
-  return {
+ return {
     ok: true,
     intent: input.intent,
-    isPdf: true,
+    isPdf: resolved.isPdf,
     fileExtension: resolved.sourceExtension,
     url: `/api/documents/versions/${input.versionId}/file?disposition=inline&auditAction=${intentUpper}`,
     downloadUrl: `/api/documents/versions/${input.versionId}/file?disposition=attachment&auditAction=${intentUpper}`,
-    printUrl: `/documents/view/${input.versionId}?intent=print`,
+    printUrl: `/documentos/impressao/${input.versionId}`,
+    controlledFlowApplied: resolved.controlledFlowApplied,
     document: {
       code: resolved.access.documentCode,
       title: resolved.access.documentTitle,

@@ -20,6 +20,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null)
+  const [nativeMode, setNativeMode] = useState(false)
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const initialIntentRef = useRef<'view' | 'print'>(initialIntent)
 
@@ -28,7 +29,6 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
   const loadPdf = async () => {
     setLoading(true)
     setError(null)
-
     try {
       const intent = initialIntentRef.current
       initialIntentRef.current = 'view'
@@ -44,6 +44,19 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
       }
 
       const buffer = await response.arrayBuffer()
+      const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+      if (!contentType.includes('application/pdf')) {
+        setNativeMode(true)
+        setPdf((current) => {
+          current?.destroy().catch(() => null)
+          return null
+        })
+        setPageCount(0)
+        setSourceBytes(null)
+        return
+      }
+
+      setNativeMode(false)
       const bytes = new Uint8Array(buffer)
       setSourceBytes(bytes)
 
@@ -60,6 +73,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
         return null
       })
       setPageCount(0)
+      setNativeMode(false)
     } finally {
       setLoading(false)
     }
@@ -111,6 +125,10 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
   }
 
   const printFile = async () => {
+    if (nativeMode) {
+      window.open(`${endpointBase}?action=print`, '_blank', 'noopener,noreferrer')
+      return
+    }
     try {
       const response = await fetch(`${endpointBase}?action=print`, { cache: 'no-store', credentials: 'include' })
       if (!response.ok) throw new Error('Não foi possível preparar o PDF para impressão.')
@@ -157,13 +175,23 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
           className="mt-4 inline-flex items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100"
           onClick={() => void loadPdf()}
         >
-          <RefreshCcw size={14} /> Tentar novamente
+        <RefreshCcw size={14} /> Tentar novamente
         </button>
       </div>
     )
   }
 
   if (!sourceBytes || pageCount < 1) {
+    if (nativeMode) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            Este documento está no modo nativo (sem conversão para PDF controlado).
+          </div>
+          <iframe className="h-[calc(100vh-180px)] w-full rounded-lg border border-slate-200 bg-white" src={`${endpointBase}?action=view`} title="Visualização nativa do documento" />
+        </div>
+      )
+    }
     return <div className="p-5 text-sm text-slate-700">PDF indisponível para esta versão.</div>
   }
 

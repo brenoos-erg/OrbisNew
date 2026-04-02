@@ -5,6 +5,8 @@ import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 import { normalizeStoredDocumentUrl, resolvePublicDocumentPath } from '@/lib/documents/documentStorage'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
+import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
+import { applyDocumentHeaderStamp } from '@/lib/pdf/documentHeaderStamp'
 import {
   applyUncontrolledCopyWatermark,
   hasUncontrolledCopyWatermark,
@@ -21,15 +23,22 @@ type DocumentAccessResolved = {
   revisionNumber: number
   documentCode: string
   documentTitle: string
+  publicationDate?: Date | null
+  elaboratorName?: string | null
+  approverName?: string | null
 }
+
 
 export type BuildControlledPdfResult = {
   outputBuffer: Buffer
   outputFileName: string
-  mimeType: typeof DOCUMENT_PDF_MIME
+  mimeType: string
   sourceExtension: string
   watermarkApplied: boolean
   convertedToPdf: boolean
+  headerApplied: boolean
+  controlledFlowApplied: boolean
+  isPdf: boolean
   access: DocumentAccessResolved
 }
 
@@ -42,8 +51,8 @@ type BuildControlledPdfDeps = {
   validatePdf: typeof validatePdfBuffer
   hasWatermark: typeof hasUncontrolledCopyWatermark
   applyWatermark: typeof applyUncontrolledCopyWatermark
+  applyHeader: typeof applyDocumentHeaderStamp
 }
-
 const defaultDeps: BuildControlledPdfDeps = {
   resolveAccess: resolveDocumentVersionAccess,
   readSourceFile: readFile,
@@ -53,8 +62,17 @@ const defaultDeps: BuildControlledPdfDeps = {
   validatePdf: validatePdfBuffer,
   hasWatermark: hasUncontrolledCopyWatermark,
   applyWatermark: applyUncontrolledCopyWatermark,
+  applyHeader: applyDocumentHeaderStamp,
 }
 
+function formatPublicationDate(value?: Date | null): string {
+  if (!value) return '-'
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(value)
+}
+
+function buildHeaderLine(access: DocumentAccessResolved): string {
+  return `Código: ${access.documentCode} | Nº Revisão: ${access.revisionNumber} | Data Publicação: ${formatPublicationDate(access.publicationDate)} | Elaborador: ${access.elaboratorName ?? '-'} | Aprovador: ${access.approverName ?? '-'}`
+}
 
 export async function buildControlledPdfWithDeps(
   versionId: string,
@@ -101,6 +119,7 @@ export async function buildControlledPdfWithDeps(
   const originalFileName = path.basename(normalizedFileUrl)
   const sourceType = deps.detectFileType(access.fileUrl)
   const bufferLooksLikePdf = deps.detectPdfBuffer(sourceBuffer)
+  const familyRule = resolveDocumentFamilyRule(access.documentCode)
 
   console.info('[documents.controlled-pdf] source-loaded', {
     versionId,
@@ -112,7 +131,23 @@ export async function buildControlledPdfWithDeps(
     isPdfByExtension: sourceType.isPdf,
     isPdfByBuffer: bufferLooksLikePdf,
     isConvertibleToPdf: sourceType.isConvertibleToPdf,
+    family: familyRule.family,
   })
+
+  if (familyRule.family === 'non-controlled-native') {
+    return {
+      outputBuffer: sourceBuffer,
+      outputFileName: originalFileName,
+      mimeType: sourceType.mimeType || 'application/octet-stream',
+      sourceExtension: sourceType.extension,
+      watermarkApplied: false,
+      convertedToPdf: false,
+      headerApplied: false,
+      controlledFlowApplied: false,
+      isPdf: bufferLooksLikePdf,
+      access,
+    }
+  }
 
   let pdfSourceBuffer: Buffer | null = null
   let outputFileName = originalFileName
@@ -172,11 +207,14 @@ export async function buildControlledPdfWithDeps(
 
   let finalPdfBuffer: Buffer = Buffer.from(pdfSourceBuffer)
   let watermarkApplied = deps.hasWatermark(pdfSourceBuffer)
+  const headerLine = buildHeaderLine(access)
 
   if (!watermarkApplied) {
     finalPdfBuffer = deps.applyWatermark(pdfSourceBuffer)
     watermarkApplied = true
   }
+
+  finalPdfBuffer = deps.applyHeader(finalPdfBuffer, headerLine)
 
   console.info('[documents.controlled-pdf] watermark-step-complete', {
     versionId,
@@ -201,13 +239,16 @@ export async function buildControlledPdfWithDeps(
     size: finalPdfBuffer.length,
   })
 
-  return {
+ return {
     outputBuffer: finalPdfBuffer,
     outputFileName,
     mimeType: DOCUMENT_PDF_MIME,
     sourceExtension: sourceType.extension,
     watermarkApplied,
     convertedToPdf,
+    headerApplied: true,
+    controlledFlowApplied: true,
+    isPdf: true,
     access,
   }
 }

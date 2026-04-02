@@ -67,17 +67,19 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
     )
   }
 
-  return (
-    <div className="p-6 text-sm text-rose-700">
-      Não foi possível abrir o PDF final com marca d’água deste documento.
-      {data.fileExtension ? (
-        <span className="block text-xs text-rose-600">Formato informado: {data.fileExtension.replace('.', '').toUpperCase()}.</span>
-      ) : null}
-      <div className="mt-3">
-        <a className="inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" href="/dashboard/controle-documentos/publicados">
-          Voltar para a listagem
-        </a>
+  if (data.url) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-3">
+        <div className="mx-auto max-w-6xl">
+          <iframe
+            className="h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white"
+            src={data.url}
+            title="Visualização do documento no formato original"
+          />
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <div className="p-6 text-sm text-rose-700">Não foi possível abrir o documento no formato original.</div>
 }

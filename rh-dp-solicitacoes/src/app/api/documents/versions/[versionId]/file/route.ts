@@ -31,7 +31,7 @@ export async function GET(
         'Content-Type': resolved.mimeType,
         'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedOutputName}`,
         'Cache-Control': 'private, max-age=0, no-cache',
-        'X-Document-Copy-Type': 'UNCONTROLLED',
+        'X-Document-Copy-Type': resolved.controlledFlowApplied ? 'UNCONTROLLED' : 'ORIGINAL',
         'X-Document-Watermark': resolved.watermarkApplied ? 'CÓPIA NÃO CONTROLADA' : 'UNAVAILABLE',
       },
     })

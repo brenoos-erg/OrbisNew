@@ -1,4 +1,4 @@
-import { ModuleLevel } from '@prisma/client'
+import { DocumentApprovalStatus, ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { resolvePublicDocumentPath } from '@/lib/documents/documentStorage'
 
@@ -17,7 +17,23 @@ export async function resolveDocumentVersionAccess(
   const version = await prisma.documentVersion.findUnique({
     where: { id: versionId },
     include: {
-      document: true,
+      document: {
+        include: {
+          author: {
+            select: { fullName: true },
+          },
+        },
+      },
+      approvals: {
+        where: { status: DocumentApprovalStatus.APPROVED, decidedById: { not: null } },
+        orderBy: { flowItem: { order: 'desc' } },
+        include: {
+          decidedBy: {
+            select: { fullName: true },
+          },
+        },
+        take: 1,
+      },
     },
   })
 
@@ -131,12 +147,15 @@ export async function resolveDocumentVersionAccess(
     return { error: 'Arquivo da versão publicada não encontrado no armazenamento físico.', status: 404 as const }
   }
 
-  return {
+   return {
     versionId: version.id,
     documentId: version.documentId,
     fileUrl: resolvedFileUrl,
     revisionNumber: version.revisionNumber,
     documentCode: version.document.code,
     documentTitle: version.document.title,
+    publicationDate: version.publishedAt ?? null,
+    elaboratorName: version.document.author.fullName,
+    approverName: version.approvals[0]?.decidedBy?.fullName ?? '-',
   }
 }
