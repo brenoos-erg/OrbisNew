@@ -174,37 +174,24 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     }
   }
 
-   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    const endpoint = '/api/documents/versions/' + encodeURIComponent(versionId) + '/controlled'
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      cache: 'no-store',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ intent }),
-    })
-    const data = await parseJsonSafely<{ error?: string; url?: string; downloadUrl?: string; printUrl?: string }>(res)
-    if (!res.ok) {
-      alert(data?.error ?? 'Falha ao processar ação do documento.')
+  const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
+    if (intent === 'view') {
+      router.push(`/documents/view/${encodeURIComponent(versionId)}`)
       return
     }
 
-    const targetUrl = intent === 'download' ? data?.downloadUrl ?? data?.url : intent === 'print' ? data?.printUrl ?? data?.url : data?.url
-    if (!targetUrl) {
-      alert('Documento sem URL final disponível no momento.')
-      return
-    }
+    const endpoint = `/api/documents/versions/${encodeURIComponent(versionId)}/controlled?action=${intent}`
 
-
-     if (intent === 'download') {
+    if (intent === 'download') {
       const anchor = document.createElement('a')
-      anchor.href = targetUrl
+      anchor.href = endpoint
       anchor.target = '_self'
       anchor.rel = 'noreferrer'
       anchor.click()
       return
     }
 
-    router.push(targetUrl)
+    window.open(endpoint, '_blank', 'noopener,noreferrer')
   }
 
   const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
