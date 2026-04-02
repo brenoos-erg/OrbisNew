@@ -1,5 +1,6 @@
-import VisualizacaoDocumentoClient from '@/app/dashboard/controle-documentos/visualizacao/[versionId]/visualizacao-documento-client'
 import { requireActiveUser } from '@/lib/auth'
+
+import ImpressaoDocumentoClient from './impressao-documento-client'
 
 type Props = {
   params: Promise<{ versionId: string }>
@@ -8,5 +9,6 @@ type Props = {
 export default async function ImpressaoDocumentoPage({ params }: Props) {
   await requireActiveUser()
   const { versionId } = await params
-  return <VisualizacaoDocumentoClient versionId={versionId} initialIntent="print" />
+
+  return <ImpressaoDocumentoClient versionId={versionId} />
 }
