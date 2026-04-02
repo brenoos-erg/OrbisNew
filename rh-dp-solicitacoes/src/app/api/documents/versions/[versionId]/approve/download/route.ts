@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentVersionStatus } from '@prisma/client'
+
 import { requireActiveUser } from '@/lib/auth'
-import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { prisma } from '@/lib/prisma'
-import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
+import { executeControlledDocumentAction } from '@/lib/documents/controlledAction'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -11,42 +11,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
 
   const version = await prisma.documentVersion.findUnique({
     where: { id: versionId },
-    include: { document: true },
+    select: { id: true, status: true },
   })
 
   if (!version || version.status !== DocumentVersionStatus.PUBLICADO) {
     return NextResponse.json({ error: 'Documento publicado não encontrado.' }, { status: 404 })
   }
 
-  const access = await resolveDocumentVersionAccess(versionId, me.id, 'download')
-  if ('error' in access) {
-    return NextResponse.json({ error: access.error }, { status: access.status })
-  }
-  if ('termChallenge' in access) {
-    return NextResponse.json(access.termChallenge, { status: access.status })
-  }
-
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
-  const userAgent = req.headers.get('user-agent')
-
-  await prisma.documentDownloadLog.create({
-    data: {
-      documentId: version.documentId,
-      versionId: access.versionId,
+  try {
+    const result = await executeControlledDocumentAction({
+      req,
+      versionId,
       userId: me.id,
-      ip,
-      userAgent,
-    },
-  })
+      intent: 'download',
+    })
 
-  await registerDocumentAuditLog({
-    action: 'DOWNLOAD',
-    documentId: access.documentId,
-    versionId: access.versionId,
-    userId: me.id,
-    ip,
-    userAgent,
-  })
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status })
+    if ('termChallenge' in result) return NextResponse.json(result.termChallenge, { status: result.status })
 
-  return NextResponse.json({ url: `/api/documents/versions/${versionId}/file?disposition=attachment&auditAction=DOWNLOAD` })
+    return NextResponse.json({ url: result.downloadUrl })
+  } catch (error) {
+    console.error('Falha ao preparar download de aprovação via pipeline central.', { versionId, error })
+    return NextResponse.json({ error: 'Não foi possível preparar o PDF final para download.' }, { status: 422 })
+  }
 }

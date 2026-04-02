@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Props = { versionId: string; initialIntent: 'view' | 'print' }
 type ViewPayload = {
@@ -11,23 +11,28 @@ type ViewPayload = {
   fileExtension?: string
   url?: string
   downloadUrl?: string
+  printUrl?: string
   document?: { code: string; title: string; revisionNumber: number }
 }
+
 export default function VisualizacaoDocumentoClient({ versionId, initialIntent }: Props) {
   const [data, setData] = useState<ViewPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [requestError, setRequestError] = useState<string | null>(null)
+  const printTriggeredRef = useRef(false)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       setRequestError(null)
       try {
-        const endpoint = initialIntent === 'print'
-          ? `/api/documents/versions/${versionId}/print`
-          : `/api/documents/versions/${versionId}/view`
-        const res = await fetch(endpoint, { method: 'POST', cache: 'no-store' })
-       const payload = (await res.json().catch(() => null)) as ViewPayload | null
+        const res = await fetch(`/api/documents/versions/${versionId}/controlled`, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ intent: initialIntent }),
+        })
+        const payload = (await res.json().catch(() => null)) as ViewPayload | null
         if (!payload) {
           setRequestError('Não foi possível interpretar a resposta do servidor.')
           setData(null)
@@ -40,9 +45,25 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
       }
       setLoading(false)
     }
-     void load()
+
+    void load()
   }, [versionId, initialIntent])
 
+  useEffect(() => {
+    if (initialIntent !== 'print' || !data?.url || printTriggeredRef.current) return
+    printTriggeredRef.current = true
+
+    const iframe = document.getElementById('controlled-print-frame') as HTMLIFrameElement | null
+    if (!iframe) return
+
+    const triggerPrint = () => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+    }
+
+    iframe.addEventListener('load', triggerPrint, { once: true })
+    return () => iframe.removeEventListener('load', triggerPrint)
+  }, [data?.url, initialIntent])
 
   if (loading) return <div className="p-6 text-sm text-slate-600">Carregando visualização…</div>
   if (requestError) return <div className="p-6 text-sm text-rose-700">{requestError}</div>
@@ -54,6 +75,7 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
       <div className={initialIntent === 'print' ? 'h-screen bg-white p-0' : 'min-h-screen bg-slate-100 p-3'}>
         <div className={initialIntent === 'print' ? 'h-full' : 'mx-auto max-w-6xl'}>
           <iframe
+            id={initialIntent === 'print' ? 'controlled-print-frame' : undefined}
             className={initialIntent === 'print' ? 'h-full w-full border-0 bg-white' : 'h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white'}
             src={`${data.url}#toolbar=0&navpanes=0`}
             title="Visualização controlada do documento"
@@ -64,7 +86,7 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   }
 
   return (
-     <div className="p-6 text-sm text-rose-700">
+    <div className="p-6 text-sm text-rose-700">
       Não foi possível abrir o PDF final com marca d’água deste documento.
       {data.fileExtension ? (
         <span className="block text-xs text-rose-600">Formato informado: {data.fileExtension.replace('.', '').toUpperCase()}.</span>

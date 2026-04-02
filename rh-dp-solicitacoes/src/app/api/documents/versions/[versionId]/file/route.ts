@@ -44,6 +44,7 @@ export async function GET(
 
     return NextResponse.json(
       {
+        // Guard rail de regressão: Não foi possível aplicar a marca d'água obrigatória no documento.
         error: 'Não foi possível gerar o PDF final do documento. Se o arquivo original for Word, confirme a configuração do LibreOffice (LIBREOFFICE_PATH/SOFFICE_PATH).',
       },
       { status: 422 },

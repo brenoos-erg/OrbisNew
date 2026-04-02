@@ -5,6 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
+import { validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
+
 const execFileAsync = promisify(execFile)
 let cachedSofficeBinary: string | null = null
 
@@ -12,7 +14,6 @@ type ConversionResult = {
   pdfBuffer: Buffer
   outputFileName: string
 }
-
 type ConversionOptions = {
   fileUrl: string
   sourceAbsolutePath: string
@@ -52,13 +53,7 @@ async function resolveSofficeBinary() {
       cachedSofficeBinary = candidateBinary
       return candidateBinary
     } catch (error) {
-      const err = error as NodeJS.ErrnoException & { code?: string }
-      if (err?.code === 'ENOENT') {
-        lastError = error
-        continue
-      }
-
-      lastError = error
+     lastError = error
       continue
     }
   }
@@ -73,9 +68,9 @@ async function runSofficeConvert(args: string[]) {
 
   try {
     await execFileAsync(binary, args, {
-        timeout: 60_000,
-        maxBuffer: 10 * 1024 * 1024,
-      })
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(`Falha ao executar LibreOffice (${binary}) para conversão: ${detail}`)
@@ -89,6 +84,12 @@ function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeo
     .slice(0, 12)
 }
 
+function assertValidPdf(buffer: Buffer, context: { fileUrl: string; stage: 'cache' | 'conversion' }) {
+  const validation = validatePdfBuffer(buffer)
+  if (validation.valid) return
+
+  throw new Error(`PDF inválido após ${context.stage}: ${validation.reason} (${context.fileUrl}).`)
+}
 
 export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: ConversionOptions): Promise<ConversionResult> {
   await fs.access(sourceAbsolutePath)
@@ -104,12 +105,23 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
 
   const cachedPdf = await fs.readFile(derivedAbsolutePath).catch(() => null)
   if (cachedPdf) {
-    console.info('[documents.word-to-pdf] using-derived-cache', { fileUrl, derivedAbsolutePath })
-    return {
-      pdfBuffer: cachedPdf,
-      outputFileName: `${sourceBaseName}.pdf`,
+    try {
+      assertValidPdf(cachedPdf, { fileUrl, stage: 'cache' })
+      console.info('[documents.word-to-pdf] using-derived-cache', { fileUrl, derivedAbsolutePath, bytes: cachedPdf.length })
+      return {
+        pdfBuffer: cachedPdf,
+        outputFileName: `${sourceBaseName}.pdf`,
+      }
+    } catch (error) {
+      console.warn('[documents.word-to-pdf] cache-invalid-reconvert', {
+        fileUrl,
+        derivedAbsolutePath,
+        detail: error instanceof Error ? error.message : String(error),
+      })
+      await fs.rm(derivedAbsolutePath, { force: true })
     }
   }
+
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'word-to-pdf-'))
 
   try {
@@ -119,11 +131,13 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
 
     await runSofficeConvert(['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath])
 
-     const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
+    const convertedTempPdfPath = path.join(tempDir, `${path.basename(tempInputName, path.extname(tempInputName))}.pdf`)
     const convertedPdf = await fs.readFile(convertedTempPdfPath).catch(() => null)
     if (!convertedPdf?.length) {
       throw new Error('Arquivo PDF convertido não foi gerado pelo LibreOffice.')
     }
+
+    assertValidPdf(convertedPdf, { fileUrl, stage: 'conversion' })
 
     await fs.writeFile(derivedAbsolutePath, convertedPdf)
     console.info('[documents.word-to-pdf] conversion-finished', {
@@ -137,14 +151,14 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
       pdfBuffer: convertedPdf,
       outputFileName: `${sourceBaseName}.pdf`,
     }
-   } catch (error) {
+  } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     console.error('[documents.word-to-pdf] conversion-failed', {
       fileUrl,
       sourceAbsolutePath,
       detail,
     })
-    throw new Error(`Falha ao converter documento Word para PDF: ${detail}. Verifique se o LibreOffice (soffice) está instalado e acessível.`)
+   throw new Error(`Falha ao converter documento Word para PDF: ${detail}. Verifique se o LibreOffice (soffice) está instalado e acessível.`)
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true })
   }

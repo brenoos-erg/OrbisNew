@@ -175,27 +175,25 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
    const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    const method = intent === 'download' ? 'GET' : 'POST'
-    const endpoint = intent === 'download'
-      ? `/api/documents/versions/${versionId}/download`
-      : '/api/documents/versions/' + encodeURIComponent(versionId) + '/controlled'
+    const endpoint = '/api/documents/versions/' + encodeURIComponent(versionId) + '/controlled'
     const res = await fetch(endpoint, {
-      method,
+      method: 'POST',
       cache: 'no-store',
-      headers: intent === 'download' ? undefined : { 'content-type': 'application/json' },
-      body: intent === 'download' ? undefined : JSON.stringify({ intent }),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ intent }),
     })
-    const data = await parseJsonSafely<{ error?: string; url?: string; downloadUrl?: string }>(res)
+    const data = await parseJsonSafely<{ error?: string; url?: string; downloadUrl?: string; printUrl?: string }>(res)
     if (!res.ok) {
       alert(data?.error ?? 'Falha ao processar ação do documento.')
       return
     }
 
-    const targetUrl = intent === 'download' ? data?.url : data?.url
+    const targetUrl = intent === 'download' ? data?.downloadUrl ?? data?.url : intent === 'print' ? data?.printUrl ?? data?.url : data?.url
     if (!targetUrl) {
       alert('Documento sem URL final disponível no momento.')
       return
     }
+
 
     if (intent === 'download') {
       const anchor = document.createElement('a')
@@ -434,7 +432,6 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Gestão de Documentos</p>
         <h1 className="mt-1 text-2xl font-semibold text-slate-900">{title}</h1>
         <p className="mt-1 text-sm text-slate-600">{PAGE_DESCRIPTIONS[title] ?? 'Consulte documentos, aplique filtros e acompanhe o fluxo da documentação.'}</p>
-        <p className="mt-2 text-xs font-medium text-amber-700">Documento emitido como cópia não controlada. Verifique a versão vigente no sistema.</p>
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

@@ -47,11 +47,12 @@ export async function resolveDocumentFinalPdf(
   if ('error' in access) return { error: access.error, status: access.status } as FinalPdfError
   if ('termChallenge' in access) return { termChallenge: access.termChallenge, status: access.status } as FinalPdfTermChallenge
 
- const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
+const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
   const absolutePath = toPublicAbsolutePath(access.fileUrl)
   const fileBuffer = await readFile(absolutePath)
   const originalFileName = path.basename(normalizedFileUrl)
   const fileType = resolveDocumentFileType(access.fileUrl)
+  const bufferLooksLikePdf = isPdfBuffer(fileBuffer)
   console.info('[documents.final-pdf] source-loaded', {
     versionId,
     intent,
@@ -59,16 +60,17 @@ export async function resolveDocumentFinalPdf(
     fileUrl: normalizedFileUrl,
     extension: fileType.extension,
     mimeType: fileType.mimeType,
-    isPdf: fileType.isPdf,
+    isPdfByExtension: fileType.isPdf,
+    isPdfByBuffer: bufferLooksLikePdf,
     isConvertibleToPdf: fileType.isConvertibleToPdf,
   })
 
   let pdfSource: Buffer | null = null
   let outputFileName = originalFileName
 
-  if (fileType.isPdf && isPdfBuffer(fileBuffer)) {
+  if (bufferLooksLikePdf) {
     pdfSource = Buffer.from(fileBuffer)
-    console.info('[documents.final-pdf] source-is-pdf', { versionId, intent, validatedByHeader: true })
+    console.info('[documents.final-pdf] source-is-pdf', { versionId, intent, detectedBy: fileType.isPdf ? 'extension+header' : 'header-only' })
   } else if (fileType.isConvertibleToPdf) {
     const converted = await convertDocumentToPdf({ fileUrl: access.fileUrl, sourceAbsolutePath: absolutePath })
     pdfSource = converted.pdfBuffer
@@ -83,6 +85,7 @@ export async function resolveDocumentFinalPdf(
   }
 
   if (!pdfSource) {
+    console.error('[documents.final-pdf] unsupported-source', { versionId, intent, extension: fileType.extension, mimeType: fileType.mimeType })
     throw new Error(`Formato ${fileType.extension || 'desconhecido'} não suportado para saída final em PDF.`)
   }
 
@@ -91,6 +94,7 @@ export async function resolveDocumentFinalPdf(
     throw new Error(`O PDF intermediário está inválido: ${sourceValidation.reason}`)
   }
   console.info('[documents.final-pdf] intermediate-pdf-validated', { versionId, intent })
+
 
   let outputBuffer: Buffer = Buffer.from(pdfSource)
   let watermarkApplied = hasUncontrolledCopyWatermark(pdfSource)

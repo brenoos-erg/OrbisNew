@@ -14,6 +14,7 @@ type ControlledActionSuccess = {
   fileExtension: string
   url: string
   downloadUrl: string
+  printUrl: string
   document: {
     code: string
     title: string
@@ -87,6 +88,7 @@ export async function executeControlledDocumentAction(input: {
     fileExtension: resolved.sourceExtension,
     url: `/api/documents/versions/${input.versionId}/file?disposition=inline&auditAction=${intentUpper}`,
     downloadUrl: `/api/documents/versions/${input.versionId}/file?disposition=attachment&auditAction=${intentUpper}`,
+    printUrl: `/documentos/impressao/${input.versionId}`,
     document: {
       code: resolved.access.documentCode,
       title: resolved.access.documentTitle,

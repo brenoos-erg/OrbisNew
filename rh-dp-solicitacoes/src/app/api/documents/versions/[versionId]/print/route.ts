@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 import { executeControlledDocumentAction } from '@/lib/documents/controlledAction'
 
+// Guard rail de regressão: não suportado para impressão final em PDF.
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
