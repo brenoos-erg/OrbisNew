@@ -52,28 +52,29 @@ const parseMediaBox = (objectBody: string) => {
 }
 
 const buildWatermarkStream = (width: number, height: number) => {
-  const fontSize = Math.max(22, Math.min(40, Math.round(Math.min(width, height) * 0.05)))
+  const fontSize = Math.max(16, Math.min(26, Math.round(Math.min(width, height) * 0.034)))
   const radians = (-32 * Math.PI) / 180
   const cos = Math.cos(radians).toFixed(5)
   const sin = Math.sin(radians).toFixed(5)
-  const tileStepX = Math.max(220, width * 0.42)
-  const tileStepY = Math.max(180, height * 0.3)
-  const startX = -width * 0.15
-  const startY = WATERMARK_MARGIN * 2
+  const centerX = width * 0.19
+  const centerY = height * 0.54
+  const secondaryX = width * 0.08
+  const secondaryY = Math.max(WATERMARK_MARGIN * 2.2, height * 0.28)
 
-  const watermarks: string[] = []
-  for (let y = startY; y <= height + tileStepY; y += tileStepY) {
-    for (let x = startX; x <= width + tileStepX; x += tileStepX) {
-      watermarks.push(
-        'BT',
-        `${TEXT_COLOR} rg`,
-        `/Fwm ${fontSize} Tf`,
-        `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${x.toFixed(2)} ${y.toFixed(2)} Tm`,
-        `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
-        'ET',
-      )
-    }
-  }
+  const watermarks: string[] = [
+    'BT',
+    `${TEXT_COLOR} rg`,
+    `/Fwm ${fontSize} Tf`,
+    `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${centerX.toFixed(2)} ${centerY.toFixed(2)} Tm`,
+    `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
+    'ET',
+    'BT',
+    `${TEXT_COLOR} rg`,
+    `/Fwm ${Math.max(14, Math.round(fontSize * 0.86))} Tf`,
+    `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${secondaryX.toFixed(2)} ${secondaryY.toFixed(2)} Tm`,
+    `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
+    'ET',
+  ]
 
   const commands = [
     'q',
@@ -172,7 +173,7 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
 
    const appendedObjects: string[] = [
     `${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`,
-    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.12 /ca 0.12 >>\nendobj\n`,
+    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.07 /ca 0.07 >>\nendobj\n`,
   ]
 
   let updatedSource = source

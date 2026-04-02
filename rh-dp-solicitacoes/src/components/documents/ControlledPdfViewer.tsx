@@ -25,7 +25,23 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
   const initialIntentRef = useRef<'view' | 'print'>(initialIntent)
 
   const endpointBase = useMemo(() => `/api/documents/versions/${encodeURIComponent(versionId)}/controlled`, [versionId])
+  const acceptTermForIntent = async (term: { id: string; title: string; content: string }, intent: 'VIEW' | 'DOWNLOAD' | 'PRINT') => {
+    const accepted = window.confirm(`Para continuar, é necessário aceitar o termo "${term.title}" para a ação ${intent}. Deseja aceitar agora?`)
+    if (!accepted) return false
 
+    const response = await fetch('/api/documents/term/accept', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        termId: term.id,
+        versionId,
+        intent,
+      }),
+    })
+
+    return response.ok
+  }
   const loadPdf = async () => {
     setLoading(true)
     setError(null)
@@ -124,16 +140,34 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
     window.location.href = `${endpointBase}?action=download`
   }
 
-  const printFile = async () => {
+ const printFile = async (retryAfterTermAcceptance = true) => {
     if (nativeMode) {
       window.open(`${endpointBase}?action=print`, '_blank', 'noopener,noreferrer')
       return
     }
     try {
       const response = await fetch(`${endpointBase}?action=print`, { cache: 'no-store', credentials: 'include' })
-      if (!response.ok) throw new Error('Não foi possível preparar o PDF para impressão.')
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string } }
+          | null
 
-      const blob = await response.blob()
+        if (retryAfterTermAcceptance && response.status === 403 && payload?.requiresTerm && payload.term?.id) {
+          const accepted = await acceptTermForIntent(payload.term, 'PRINT')
+          if (accepted) {
+            await printFile(false)
+            return
+          }
+          throw new Error('O termo de responsabilidade para impressão não foi aceito.')
+        }
+        throw new Error(payload?.error ?? 'Não foi possível preparar o PDF para impressão.')
+      }
+
+     const blob = await response.blob()
+      if (!blob.type.toLowerCase().includes('pdf')) {
+        window.open(`${endpointBase}?action=print`, '_blank', 'noopener,noreferrer')
+        return
+      }
       const objectUrl = URL.createObjectURL(blob)
       const frame = document.createElement('iframe')
       frame.style.position = 'fixed'
@@ -152,6 +186,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
           frame.remove()
         }, 30_000)
       }
+
 
       document.body.appendChild(frame)
     } catch (reason) {
