@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { requireActiveUser } from '@/lib/auth'
-import { resolveDocumentFinalPdf } from '@/lib/documents/finalPdf'
+import { buildControlledPdf } from '@/lib/documents/controlledPdfPipeline'
 
 function resolveIntentFromAuditAction(value: string | null): 'view' | 'download' | 'print' {
   const normalized = String(value ?? '').trim().toUpperCase()
@@ -20,7 +20,7 @@ export async function GET(
   const intent = resolveIntentFromAuditAction(req.nextUrl.searchParams.get('auditAction'))
 
   try {
-    const resolved = await resolveDocumentFinalPdf(versionId, me.id, intent)
+    const resolved = await buildControlledPdf(versionId, me.id, intent)
     if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     if ('termChallenge' in resolved) return NextResponse.json(resolved.termChallenge, { status: resolved.status })
 
@@ -40,7 +40,7 @@ export async function GET(
       return NextResponse.json({ error: 'Arquivo do documento não encontrado.' }, { status: 404 })
     }
 
-    console.error('Erro ao resolver PDF final único do documento.', { versionId, intent, error })
+    console.error('Erro ao resolver PDF final do pipeline central do documento.', { versionId, intent, error })
 
     return NextResponse.json(
       {

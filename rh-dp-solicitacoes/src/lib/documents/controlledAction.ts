@@ -3,7 +3,7 @@ import { PrintCopyType } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
-import { resolveDocumentFinalPdf } from '@/lib/documents/finalPdf'
+import { buildControlledPdf } from '@/lib/documents/controlledPdfPipeline'
 
 export type ControlledIntent = 'view' | 'download' | 'print'
 
@@ -32,7 +32,7 @@ export async function executeControlledDocumentAction(input: {
   userId: string
   intent: ControlledIntent
 }): Promise<ControlledActionSuccess | ControlledActionFailure> {
-  const resolved = await resolveDocumentFinalPdf(input.versionId, input.userId, input.intent)
+  const resolved = await buildControlledPdf(input.versionId, input.userId, input.intent)
   if ('error' in resolved) return { error: resolved.error, status: resolved.status }
   if ('termChallenge' in resolved) return { termChallenge: resolved.termChallenge, status: resolved.status }
 
@@ -79,6 +79,7 @@ export async function executeControlledDocumentAction(input: {
     intent: input.intent,
     sourceExtension: resolved.sourceExtension,
     watermarkApplied: resolved.watermarkApplied,
+    convertedToPdf: resolved.convertedToPdf,
   })
 
   return {
