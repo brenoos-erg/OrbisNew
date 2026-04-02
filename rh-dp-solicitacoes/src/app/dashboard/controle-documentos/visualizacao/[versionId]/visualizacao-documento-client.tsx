@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Props = { versionId: string; initialIntent: 'view' | 'print' }
 type ViewPayload = {
@@ -19,7 +19,6 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   const [data, setData] = useState<ViewPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [requestError, setRequestError] = useState<string | null>(null)
-  const printTriggeredRef = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -49,20 +48,9 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
     void load()
   }, [versionId, initialIntent])
 
-  useEffect(() => {
-    if (initialIntent !== 'print' || !data?.url || printTriggeredRef.current) return
-    printTriggeredRef.current = true
-
-    const iframe = document.getElementById('controlled-print-frame') as HTMLIFrameElement | null
-    if (!iframe) return
-
-    const triggerPrint = () => {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-    }
-
-    iframe.addEventListener('load', triggerPrint, { once: true })
-    return () => iframe.removeEventListener('load', triggerPrint)
+   useEffect(() => {
+    if (initialIntent !== 'print' || !data?.url) return
+    window.location.replace(`${data.url}#toolbar=0&navpanes=0`)
   }, [data?.url, initialIntent])
 
   if (loading) return <div className="p-6 text-sm text-slate-600">Carregando visualização…</div>
@@ -71,12 +59,15 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
   if (data.requiresTerm) return <div className="p-6 text-sm text-amber-800">Aceite o termo de responsabilidade na listagem de documentos antes de visualizar.</div>
 
   if (data.isPdf && data.url) {
+    if (initialIntent === 'print') {
+      return <div className="p-6 text-sm text-slate-600">Preparando PDF final para impressão…</div>
+    }
+
     return (
-      <div className={initialIntent === 'print' ? 'h-screen bg-white p-0' : 'min-h-screen bg-slate-100 p-3'}>
-        <div className={initialIntent === 'print' ? 'h-full' : 'mx-auto max-w-6xl'}>
+      <div className="min-h-screen bg-slate-100 p-3">
+        <div className="mx-auto max-w-6xl">
           <iframe
-            id={initialIntent === 'print' ? 'controlled-print-frame' : undefined}
-            className={initialIntent === 'print' ? 'h-full w-full border-0 bg-white' : 'h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white'}
+            className="h-[calc(100vh-120px)] w-full rounded-lg border border-slate-200 bg-white"
             src={`${data.url}#toolbar=0&navpanes=0`}
             title="Visualização controlada do documento"
           />

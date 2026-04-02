@@ -47,7 +47,7 @@ export async function resolveDocumentFinalPdf(
   if ('error' in access) return { error: access.error, status: access.status } as FinalPdfError
   if ('termChallenge' in access) return { termChallenge: access.termChallenge, status: access.status } as FinalPdfTermChallenge
 
-const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
+  const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
   const absolutePath = toPublicAbsolutePath(access.fileUrl)
   const fileBuffer = await readFile(absolutePath)
   const originalFileName = path.basename(normalizedFileUrl)
@@ -65,13 +65,14 @@ const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
     isConvertibleToPdf: fileType.isConvertibleToPdf,
   })
 
-  let pdfSource: Buffer | null = null
+ let pdfSource: Buffer | null = null
   let outputFileName = originalFileName
 
   if (bufferLooksLikePdf) {
     pdfSource = Buffer.from(fileBuffer)
     console.info('[documents.final-pdf] source-is-pdf', { versionId, intent, detectedBy: fileType.isPdf ? 'extension+header' : 'header-only' })
   } else if (fileType.isConvertibleToPdf) {
+    console.info('[documents.final-pdf] conversion-start', { versionId, intent, sourceExtension: fileType.extension })
     const converted = await convertDocumentToPdf({ fileUrl: access.fileUrl, sourceAbsolutePath: absolutePath })
     pdfSource = converted.pdfBuffer
     outputFileName = converted.outputFileName
@@ -91,9 +92,11 @@ const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
 
   const sourceValidation = validatePdfBuffer(pdfSource)
   if (!sourceValidation.valid) {
+    console.error('[documents.final-pdf] intermediate-pdf-invalid', { versionId, intent, reason: sourceValidation.reason })
     throw new Error(`O PDF intermediário está inválido: ${sourceValidation.reason}`)
   }
   console.info('[documents.final-pdf] intermediate-pdf-validated', { versionId, intent })
+
 
 
   let outputBuffer: Buffer = Buffer.from(pdfSource)

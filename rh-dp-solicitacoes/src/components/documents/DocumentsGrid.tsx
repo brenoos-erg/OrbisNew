@@ -195,7 +195,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     }
 
 
-    if (intent === 'download') {
+     if (intent === 'download') {
       const anchor = document.createElement('a')
       anchor.href = targetUrl
       anchor.target = '_self'
@@ -204,8 +204,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-    const opened = window.open(targetUrl, '_blank', 'noopener,noreferrer')
-    if (!opened) router.push(targetUrl)
+    router.push(targetUrl)
   }
 
   const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
@@ -218,6 +217,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       await load()
       return
     }
+
 
     const data = await parseJsonSafely<{ error?: string }>(res)
     alert(data?.error ?? 'Não foi possível processar a aprovação.')
