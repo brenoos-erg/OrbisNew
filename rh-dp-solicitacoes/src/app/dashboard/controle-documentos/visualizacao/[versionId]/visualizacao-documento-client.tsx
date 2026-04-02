@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type Props = { versionId: string; initialIntent: 'view' | 'print' }
+type Props = { versionId: string; initialIntent: 'view' }
 type ViewPayload = {
   error?: string
   requiresTerm?: boolean
@@ -48,21 +48,12 @@ export default function VisualizacaoDocumentoClient({ versionId, initialIntent }
     void load()
   }, [versionId, initialIntent])
 
-   useEffect(() => {
-    if (initialIntent !== 'print' || !data?.url) return
-    window.location.replace(`${data.url}#toolbar=0&navpanes=0`)
-  }, [data?.url, initialIntent])
-
   if (loading) return <div className="p-6 text-sm text-slate-600">Carregando visualização…</div>
   if (requestError) return <div className="p-6 text-sm text-rose-700">{requestError}</div>
   if (!data || data.error) return <div className="p-6 text-sm text-rose-700">{data?.error ?? 'Não foi possível abrir o documento.'}</div>
   if (data.requiresTerm) return <div className="p-6 text-sm text-amber-800">Aceite o termo de responsabilidade na listagem de documentos antes de visualizar.</div>
 
   if (data.isPdf && data.url) {
-    if (initialIntent === 'print') {
-      return <div className="p-6 text-sm text-slate-600">Preparando PDF final para impressão…</div>
-    }
-
     return (
       <div className="min-h-screen bg-slate-100 p-3">
         <div className="mx-auto max-w-6xl">
