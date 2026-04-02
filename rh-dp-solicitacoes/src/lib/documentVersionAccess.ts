@@ -1,5 +1,6 @@
 import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { resolvePublicDocumentPath } from '@/lib/documents/documentStorage'
 
 export type DocumentTermChallenge = {
   requiresTerm: true
@@ -92,18 +93,42 @@ export async function resolveDocumentVersionAccess(
       }
     }
   }
-  const resolvedFileUrl = version.fileUrl
-    ? version.fileUrl
-    : (
-      await prisma.documentVersion.findFirst({
-        where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } },
-        orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }],
-        select: { fileUrl: true },
-      })
-    )?.fileUrl ?? null
+  const versionCandidates = [version.fileUrl]
+
+  const publishedCandidates = await prisma.documentVersion.findMany({
+    where: { documentId: version.documentId, isCurrentPublished: true, fileUrl: { not: null } },
+    orderBy: [{ publishedAt: 'desc' }, { revisionNumber: 'desc' }],
+    select: { id: true, fileUrl: true },
+    take: 5,
+  })
+
+  for (const published of publishedCandidates) {
+    versionCandidates.push(published.fileUrl)
+  }
+
+  const uniqueCandidates = Array.from(new Set(versionCandidates.filter((item): item is string => Boolean(item?.trim()))))
+
+  let resolvedFileUrl: string | null = null
+
+  for (const candidateFileUrl of uniqueCandidates) {
+    const pathResolution = await resolvePublicDocumentPath(candidateFileUrl)
+    console.info('[documents.version-access] file-url-candidate-check', {
+      versionId,
+      candidateFileUrl,
+      resolvedFileUrl: pathResolution.resolvedFileUrl,
+      absolutePath: pathResolution.absolutePath,
+      exists: pathResolution.exists,
+      attemptedAbsolutePaths: pathResolution.attemptedAbsolutePaths,
+    })
+
+    if (!pathResolution.exists) continue
+
+    resolvedFileUrl = pathResolution.resolvedFileUrl
+    break
+  }
 
   if (!resolvedFileUrl) {
-    return { error: 'Arquivo da versão publicada não encontrado.', status: 404 as const }
+    return { error: 'Arquivo da versão publicada não encontrado no armazenamento físico.', status: 404 as const }
   }
 
   return {

@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentApprovalStatus, DocumentVersionStatus, Prisma } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
@@ -13,6 +12,7 @@ import {
 import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
 import { finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
+import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -21,12 +21,25 @@ function normalizeCode(raw: unknown) {
 async function saveUploadedDocument(file: File) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
-  const safeName = `${Date.now()}-${randomUUID()}-${file.name.replace(/\s+/g, '-')}`
+  const extension = path.extname(file.name || '').toLowerCase() || '.bin'
+  const safeName = buildStoredDocumentFileName(extension, 'doc')
   const absolute = path.join(uploadDir, safeName)
+  const originalFileUrl = `/uploads/documents/${safeName}`
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(absolute, buffer)
 
-  return finalizeToPublishedPdf({ sourceFileUrl: `/uploads/documents/${safeName}` })
+  const publishedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl })
+
+  console.info('[documents.create] upload-persisted', {
+    originalName: file.name,
+    safeName,
+    originalFileUrl,
+    originalAbsolutePath: absolute,
+    originalExists: true,
+    savedFileUrl: publishedFileUrl,
+  })
+
+  return publishedFileUrl
 }
 
 
@@ -58,11 +71,15 @@ export async function POST(req: NextRequest)   {
       payload.code = normalizeCode(payload.code)
     }
 
-    if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerDepartmentId) {
+   if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerDepartmentId) {
       return NextResponse.json({ error: 'Preencha código, título, tipo de documento e centro responsável.' }, { status: 400 })
     }
 
-
+    console.info('[documents.create] payload-file-url', {
+      code: payload.code,
+      title: payload.title,
+      fileUrl: payload.fileUrl ?? null,
+    })
 
     const flow = await prisma.documentTypeApprovalFlow.findMany({
       where: { documentTypeId: payload.documentTypeId, active: true },

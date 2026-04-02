@@ -1,29 +1,38 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { randomUUID } from 'node:crypto'
 import { applyUncontrolledCopyWatermark, hasUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
 import { isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
+import {
+  buildStoredDocumentFileName,
+  normalizeStoredDocumentUrl,
+  resolvePublicDocumentPath,
+} from '@/lib/documents/documentStorage'
 
 type Input = {
   sourceFileUrl: string
 }
 
-function normalizeStoredUrl(url: string) {
-  return url.startsWith('/') ? url : `/${url}`
-}
-
-function toPublicAbsolutePath(fileUrl: string) {
-  const normalized = normalizeStoredUrl(fileUrl)
-  const relativeToPublic = normalized.replace(/^\/+/, '')
-  return path.join(process.cwd(), 'public', relativeToPublic)
-}
 
 export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<string> {
   const fileType = resolveDocumentFileType(sourceFileUrl)
-  const sourceAbsolutePath = toPublicAbsolutePath(sourceFileUrl)
+  const pathResolution = await resolvePublicDocumentPath(sourceFileUrl)
+  const normalizedSourceFileUrl = normalizeStoredDocumentUrl(pathResolution.resolvedFileUrl)
 
+  console.info('[documents.finalize-published-pdf] source-path-resolution', {
+    sourceFileUrl,
+    resolvedFileUrl: pathResolution.resolvedFileUrl,
+    absolutePath: pathResolution.absolutePath,
+    exists: pathResolution.exists,
+    attemptedAbsolutePaths: pathResolution.attemptedAbsolutePaths,
+  })
+
+  if (!pathResolution.exists) {
+    throw new Error(`Arquivo físico da versão não encontrado: ${normalizedSourceFileUrl}`)
+  }
+
+  const sourceAbsolutePath = pathResolution.absolutePath
   const sourceBuffer = await fs.readFile(sourceAbsolutePath)
   let pdfBuffer: Buffer
 
@@ -31,7 +40,7 @@ export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<
     pdfBuffer = Buffer.from(sourceBuffer)
   } else if (fileType.isConvertibleToPdf) {
     const converted = await convertDocumentToPdf({
-      fileUrl: sourceFileUrl,
+      fileUrl: normalizedSourceFileUrl,
       sourceAbsolutePath,
     })
     pdfBuffer = converted.pdfBuffer
@@ -56,8 +65,7 @@ export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
 
-  const baseName = path.basename(sourceAbsolutePath, path.extname(sourceAbsolutePath)).replace(/\s+/g, '-')
-  const safeName = `${Date.now()}-${randomUUID()}-${baseName}.pdf`
+  const safeName = buildStoredDocumentFileName('.pdf', 'pdf')
   const outputAbsolutePath = path.join(uploadDir, safeName)
   await fs.writeFile(outputAbsolutePath, finalPdfBuffer)
 

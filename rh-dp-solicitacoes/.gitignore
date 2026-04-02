@@ -24,6 +24,8 @@ deploy/.next/
 
 # production
 /build
+/public/uploads/documents/
+/public/uploads/documents-derived/
 
 # misc
 .DS_Store

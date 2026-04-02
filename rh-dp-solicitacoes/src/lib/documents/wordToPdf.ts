@@ -6,6 +6,7 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 
 import { validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
+import { toSafeDownloadPdfName } from '@/lib/documents/documentStorage'
 
 const execFileAsync = promisify(execFile)
 let cachedSofficeBinary: string | null = null
@@ -25,9 +26,24 @@ type SofficeResult = {
   stderr: string
 }
 
+
+function sanitizeEnvPath(value: string | undefined) {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+  return trimmed.replace(/^"(.+)"$/, '$1')
+}
+
+
 function getSofficeCandidates() {
-  const libreOfficeEnvCandidate = process.env.LIBREOFFICE_PATH?.trim()
-  const legacyEnvCandidate = process.env.SOFFICE_PATH?.trim()
+  const libreOfficeEnvCandidate = sanitizeEnvPath(process.env.LIBREOFFICE_PATH)
+  const legacyEnvCandidate = sanitizeEnvPath(process.env.SOFFICE_PATH)
+
+  console.info('[documents.word-to-pdf] soffice-env-detection', {
+    hasLibreOfficePath: Boolean(libreOfficeEnvCandidate),
+    hasSofficePath: Boolean(legacyEnvCandidate),
+    libreOfficePath: libreOfficeEnvCandidate ?? null,
+    sofficePath: legacyEnvCandidate ?? null,
+  })
 
   return [
     libreOfficeEnvCandidate,
@@ -57,9 +73,16 @@ async function resolveSofficeBinary() {
         maxBuffer: 2 * 1024 * 1024,
       })
       cachedSofficeBinary = candidateBinary
+      console.info('[documents.word-to-pdf] soffice-candidate-selected', { binary: candidateBinary })
       return candidateBinary
     } catch (error) {
-     lastError = error
+      lastError = error
+      const err = error as NodeJS.ErrnoException
+      console.warn('[documents.word-to-pdf] soffice-candidate-failed', {
+        binary: candidateBinary,
+        code: err?.code ?? 'n/a',
+        message: err?.message ?? String(error),
+      })
       continue
     }
   }
@@ -119,14 +142,14 @@ function assertValidPdf(buffer: Buffer, context: { fileUrl: string; stage: 'cach
 export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: ConversionOptions): Promise<ConversionResult> {
   await fs.access(sourceAbsolutePath, fs.constants.R_OK)
   const sourceStat = await fs.stat(sourceAbsolutePath)
-  const sourceBaseName = path.basename(sourceAbsolutePath, path.extname(sourceAbsolutePath))
+  const outputFileName = toSafeDownloadPdfName(fileUrl)
 
   const derivedDir = path.join(process.cwd(), 'public', 'uploads', 'documents-derived')
   await fs.mkdir(derivedDir, { recursive: true })
   await fs.access(derivedDir, fs.constants.W_OK)
 
   const cacheKey = toDerivedCacheKey(fileUrl, sourceStat)
-  const derivedFileName = `${sourceBaseName}-${cacheKey}.pdf`
+  const derivedFileName = `drv-${cacheKey}.pdf`
   const derivedAbsolutePath = path.join(derivedDir, derivedFileName)
 
   const cachedPdf = await fs.readFile(derivedAbsolutePath).catch(() => null)
@@ -136,7 +159,7 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
       console.info('[documents.word-to-pdf] using-derived-cache', { fileUrl, derivedAbsolutePath, bytes: cachedPdf.length })
       return {
         pdfBuffer: cachedPdf,
-        outputFileName: `${sourceBaseName}.pdf`,
+        outputFileName,
       }
     } catch (error) {
       console.warn('[documents.word-to-pdf] cache-invalid-reconvert', {
@@ -151,7 +174,8 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'word-to-pdf-'))
 
   try {
-    const tempInputName = path.basename(sourceAbsolutePath)
+    const sourceExtension = path.extname(sourceAbsolutePath).toLowerCase() || '.docx'
+    const tempInputName = `input${sourceExtension}`
     const tempInputPath = path.join(tempDir, tempInputName)
     await fs.copyFile(sourceAbsolutePath, tempInputPath)
 
@@ -190,7 +214,7 @@ export async function convertWordToPdf({ fileUrl, sourceAbsolutePath }: Conversi
 
     return {
       pdfBuffer: convertedPdf,
-      outputFileName: `${sourceBaseName}.pdf`,
+      outputFileName,
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)

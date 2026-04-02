@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-
 import type { DocumentAccessIntent, DocumentTermChallenge } from '@/lib/documentVersionAccess'
 import { resolveDocumentVersionAccess } from '@/lib/documentVersionAccess'
 import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
+import { normalizeStoredDocumentUrl, resolvePublicDocumentPath } from '@/lib/documents/documentStorage'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 import {
   applyUncontrolledCopyWatermark,
@@ -55,24 +55,6 @@ const defaultDeps: BuildControlledPdfDeps = {
   applyWatermark: applyUncontrolledCopyWatermark,
 }
 
-function normalizeStoredUrl(url: string) {
-  const slashNormalized = url.replace(/\\/g, '/').trim()
-  const decoded = (() => {
-    try {
-      return decodeURIComponent(slashNormalized)
-    } catch {
-      return slashNormalized
-    }
-  })()
-
-  return decoded.startsWith('/') ? decoded : `/${decoded}`
-}
-
-function toPublicAbsolutePath(fileUrl: string) {
-  const normalized = normalizeStoredUrl(fileUrl)
-  const relativeToPublic = normalized.replace(/^\/+/, '')
-  return path.join(process.cwd(), 'public', ...relativeToPublic.split('/'))
-}
 
 export async function buildControlledPdfWithDeps(
   versionId: string,
@@ -95,8 +77,26 @@ export async function buildControlledPdfWithDeps(
     }
   }
 
-  const normalizedFileUrl = normalizeStoredUrl(access.fileUrl)
-  const absolutePath = toPublicAbsolutePath(access.fileUrl)
+  const pathResolution = await resolvePublicDocumentPath(access.fileUrl)
+  const normalizedFileUrl = normalizeStoredDocumentUrl(pathResolution.resolvedFileUrl)
+
+  console.info('[documents.controlled-pdf] source-path-resolution', {
+    versionId,
+    intent,
+    fileUrl: access.fileUrl,
+    resolvedFileUrl: pathResolution.resolvedFileUrl,
+    absolutePath: pathResolution.absolutePath,
+    exists: pathResolution.exists,
+    attemptedAbsolutePaths: pathResolution.attemptedAbsolutePaths,
+  })
+
+  if (!pathResolution.exists) {
+    const error = new Error(`Arquivo físico do documento não encontrado para ${normalizedFileUrl}`)
+    ;(error as NodeJS.ErrnoException).code = 'ENOENT'
+    throw error
+  }
+
+  const absolutePath = pathResolution.absolutePath
   const sourceBuffer = await deps.readSourceFile(absolutePath)
   const originalFileName = path.basename(normalizedFileUrl)
   const sourceType = deps.detectFileType(access.fileUrl)
