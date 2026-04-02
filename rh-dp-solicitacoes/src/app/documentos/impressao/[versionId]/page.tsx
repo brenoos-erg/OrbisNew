@@ -1,6 +1,5 @@
 import { requireActiveUser } from '@/lib/auth'
-
-import ImpressaoDocumentoClient from './impressao-documento-client'
+import { redirect } from 'next/navigation'
 
 type Props = {
   params: Promise<{ versionId: string }>
@@ -10,5 +9,5 @@ export default async function ImpressaoDocumentoPage({ params }: Props) {
   await requireActiveUser()
   const { versionId } = await params
 
-  return <ImpressaoDocumentoClient versionId={versionId} />
+  redirect(`/documents/view/${encodeURIComponent(versionId)}?intent=print`)
 }

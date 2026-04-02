@@ -4,6 +4,7 @@ import ControlledPdfViewer from '@/components/documents/ControlledPdfViewer'
 type SearchParams = {
   allowDownload?: string
   allowPrint?: string
+  intent?: string
 }
 
 export default async function DocumentViewPage({
@@ -20,11 +21,12 @@ export default async function DocumentViewPage({
   // Flags opcionais para esconder ações por permissão (ex.: ?allowDownload=0&allowPrint=0)
   const canDownload = query.allowDownload !== '0'
   const canPrint = query.allowPrint !== '0'
+  const initialIntent = query.intent === 'print' ? 'print' : 'view'
 
   return (
     <main className="min-h-screen bg-slate-100 p-4">
       <div className="mx-auto w-full max-w-6xl">
-        <ControlledPdfViewer versionId={versionId} canDownload={canDownload} canPrint={canPrint} />
+        <ControlledPdfViewer versionId={versionId} initialIntent={initialIntent} canDownload={canDownload} canPrint={canPrint} />
       </div>
     </main>
   )

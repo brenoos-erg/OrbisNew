@@ -8,11 +8,12 @@ GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', i
 
 type Props = {
   versionId: string
+  initialIntent?: 'view' | 'print'
   canDownload?: boolean
   canPrint?: boolean
 }
 
-export default function ControlledPdfViewer({ versionId, canDownload = true, canPrint = true }: Props) {
+export default function ControlledPdfViewer({ versionId, initialIntent = 'view', canDownload = true, canPrint = true }: Props) {
   const [loading, setLoading] = useState(true)
   const [rendering, setRendering] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +21,7 @@ export default function ControlledPdfViewer({ versionId, canDownload = true, can
   const [pageCount, setPageCount] = useState(0)
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null)
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
+  const initialIntentRef = useRef<'view' | 'print'>(initialIntent)
 
   const endpointBase = useMemo(() => `/api/documents/versions/${encodeURIComponent(versionId)}/controlled`, [versionId])
 
@@ -28,7 +30,10 @@ export default function ControlledPdfViewer({ versionId, canDownload = true, can
     setError(null)
 
     try {
-      const response = await fetch(`${endpointBase}?action=view`, {
+      const intent = initialIntentRef.current
+      initialIntentRef.current = 'view'
+
+      const response = await fetch(`${endpointBase}?action=${intent}`, {
         cache: 'no-store',
         credentials: 'include',
       })
@@ -107,15 +112,8 @@ export default function ControlledPdfViewer({ versionId, canDownload = true, can
 
   const printFile = async () => {
     try {
-      const response = await fetch(`${endpointBase}?action=print`, {
-        cache: 'no-store',
-        credentials: 'include',
-      })
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(payload?.error ?? 'Não foi possível preparar o PDF para impressão.')
-      }
+      const response = await fetch(`${endpointBase}?action=print`, { cache: 'no-store', credentials: 'include' })
+      if (!response.ok) throw new Error('Não foi possível preparar o PDF para impressão.')
 
       const blob = await response.blob()
       const objectUrl = URL.createObjectURL(blob)
@@ -128,13 +126,13 @@ export default function ControlledPdfViewer({ versionId, canDownload = true, can
       frame.style.border = '0'
       frame.src = objectUrl
 
-      frame.onload = () => {
+        frame.onload = () => {
         frame.contentWindow?.focus()
         frame.contentWindow?.print()
         setTimeout(() => {
           URL.revokeObjectURL(objectUrl)
           frame.remove()
-        }, 500)
+        }, 30_000)
       }
 
       document.body.appendChild(frame)
@@ -142,7 +140,6 @@ export default function ControlledPdfViewer({ versionId, canDownload = true, can
       setError(reason instanceof Error ? reason.message : 'Falha ao acionar impressão do documento.')
     }
   }
-
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-slate-600">

@@ -128,7 +128,7 @@ async function executeControlledDocumentActionWithDeps(
     fileExtension: resolved.sourceExtension,
     url: `/api/documents/versions/${input.versionId}/file?disposition=inline&auditAction=${intentUpper}`,
     downloadUrl: `/api/documents/versions/${input.versionId}/file?disposition=attachment&auditAction=${intentUpper}`,
-    printUrl: `/documentos/impressao/${input.versionId}`,
+    printUrl: `/documents/view/${input.versionId}?intent=print`,
     document: {
       code: resolved.access.documentCode,
       title: resolved.access.documentTitle,

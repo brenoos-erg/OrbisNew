@@ -160,7 +160,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-   try {
+  try {
       const res = await fetch('/api/documents/term/active', { cache: 'no-store' })
       const data = await parseJsonSafely<{ id: string; title: string; content: string }>(res)
       if (!res.ok || !data?.id) {
@@ -175,8 +175,9 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    if (intent === 'view') {
-      router.push(`/documents/view/${encodeURIComponent(versionId)}`)
+    if (intent === 'view' || intent === 'print') {
+      const search = intent === 'print' ? '?intent=print' : ''
+      router.push(`/documents/view/${encodeURIComponent(versionId)}${search}`)
       return
     }
 
@@ -190,8 +191,6 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       anchor.click()
       return
     }
-
-    window.open(endpoint, '_blank', 'noopener,noreferrer')
   }
 
   const decideApproval = async (versionId: string, action: 'approve' | 'reject') => {
