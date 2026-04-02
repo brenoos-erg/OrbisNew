@@ -56,13 +56,22 @@ const defaultDeps: BuildControlledPdfDeps = {
 }
 
 function normalizeStoredUrl(url: string) {
-  return url.startsWith('/') ? url : `/${url}`
+  const slashNormalized = url.replace(/\\/g, '/').trim()
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(slashNormalized)
+    } catch {
+      return slashNormalized
+    }
+  })()
+
+  return decoded.startsWith('/') ? decoded : `/${decoded}`
 }
 
 function toPublicAbsolutePath(fileUrl: string) {
   const normalized = normalizeStoredUrl(fileUrl)
   const relativeToPublic = normalized.replace(/^\/+/, '')
-  return path.join(process.cwd(), 'public', relativeToPublic)
+  return path.join(process.cwd(), 'public', ...relativeToPublic.split('/'))
 }
 
 export async function buildControlledPdfWithDeps(

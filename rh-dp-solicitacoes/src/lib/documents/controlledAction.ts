@@ -26,13 +26,57 @@ type ControlledActionFailure =
   | { error: string; status: 401 | 403 | 404 | 422 }
   | { termChallenge: unknown; status: 403 }
 
-export async function executeControlledDocumentAction(input: {
-  req: NextRequest
-  versionId: string
-  userId: string
-  intent: ControlledIntent
-}): Promise<ControlledActionSuccess | ControlledActionFailure> {
-  const resolved = await buildControlledPdf(input.versionId, input.userId, input.intent)
+type ControlledActionDeps = {
+  buildControlledPdf: typeof buildControlledPdf
+  createDownloadLog: (data: {
+    documentId: string
+    versionId: string
+    userId: string
+    ip: string | null
+    userAgent: string | null
+  }) => Promise<unknown>
+  createPrintCopy: (data: {
+    documentId: string
+    versionId: string
+    userId: string
+  }) => Promise<unknown>
+  registerAuditLog: typeof registerDocumentAuditLog
+}
+
+const defaultDeps: ControlledActionDeps = {
+  buildControlledPdf,
+  createDownloadLog: (data) =>
+    prisma.documentDownloadLog.create({
+      data: {
+        documentId: data.documentId,
+        versionId: data.versionId,
+        userId: data.userId,
+        ip: data.ip,
+        userAgent: data.userAgent,
+      },
+    }),
+  createPrintCopy: (data) =>
+    prisma.printCopy.create({
+      data: {
+        documentId: data.documentId,
+        versionId: data.versionId,
+        type: PrintCopyType.UNCONTROLLED,
+        issuedById: data.userId,
+      },
+    }),
+  registerAuditLog: registerDocumentAuditLog,
+}
+
+async function executeControlledDocumentActionWithDeps(
+  input: {
+    req: NextRequest
+    versionId: string
+    userId: string
+    intent: ControlledIntent
+  },
+  deps: ControlledActionDeps,
+): Promise<ControlledActionSuccess | ControlledActionFailure> {
+  const resolved = await deps.buildControlledPdf(input.versionId, input.userId, input.intent)
   if ('error' in resolved) return { error: resolved.error, status: resolved.status }
   if ('termChallenge' in resolved) return { termChallenge: resolved.termChallenge, status: resolved.status }
 
@@ -41,29 +85,24 @@ export async function executeControlledDocumentAction(input: {
   const intentUpper = input.intent.toUpperCase() as 'VIEW' | 'DOWNLOAD' | 'PRINT'
 
   if (input.intent === 'download') {
-    await prisma.documentDownloadLog.create({
-      data: {
-        documentId: resolved.access.documentId,
-        versionId: resolved.access.versionId,
-        userId: input.userId,
-        ip,
-        userAgent,
-      },
+    await deps.createDownloadLog({
+      documentId: resolved.access.documentId,
+      versionId: resolved.access.versionId,
+      userId: input.userId,
+      ip,
+      userAgent,
     })
   }
 
   if (input.intent === 'print') {
-    await prisma.printCopy.create({
-      data: {
-        documentId: resolved.access.documentId,
-        versionId: resolved.access.versionId,
-        type: PrintCopyType.UNCONTROLLED,
-        issuedById: input.userId,
-      },
+    await deps.createPrintCopy({
+      documentId: resolved.access.documentId,
+      versionId: resolved.access.versionId,
+      userId: input.userId,
     })
   }
 
-  await registerDocumentAuditLog({
+  await deps.registerAuditLog({
     action: intentUpper,
     documentId: resolved.access.documentId,
     versionId: resolved.access.versionId,
@@ -97,3 +136,14 @@ export async function executeControlledDocumentAction(input: {
     },
   }
 }
+
+export function executeControlledDocumentAction(input: {
+  req: NextRequest
+  versionId: string
+  userId: string
+  intent: ControlledIntent
+}) {
+  return executeControlledDocumentActionWithDeps(input, defaultDeps)
+}
+
+export { executeControlledDocumentActionWithDeps }
