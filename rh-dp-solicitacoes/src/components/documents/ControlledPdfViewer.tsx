@@ -26,7 +26,9 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
 
   const endpointBase = useMemo(() => `/api/documents/versions/${encodeURIComponent(versionId)}/controlled`, [versionId])
   const acceptTermForIntent = async (term: { id: string; title: string; content: string }, intent: 'VIEW' | 'DOWNLOAD' | 'PRINT') => {
-    const accepted = window.confirm(`Para continuar, é necessário aceitar o termo "${term.title}" para a ação ${intent}. Deseja aceitar agora?`)
+    const accepted = window.confirm(
+      `Para continuar, é necessário aceitar o termo "${term.title}" para a ação ${intent}.\n\n${term.content}\n\nDeseja aceitar agora?`,
+    )
     if (!accepted) return false
 
     const response = await fetch('/api/documents/term/accept', {
@@ -41,6 +43,47 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
     })
 
     return response.ok
+  }
+  const fetchControlledAction = async (
+    intent: 'download' | 'print',
+    retryAfterTermAcceptance = true,
+  ): Promise<Response> => {
+    const response = await fetch(`${endpointBase}?action=${intent}`, {
+      cache: 'no-store',
+      credentials: 'include',
+    })
+
+    if (response.ok) return response
+
+    const payload = (await response.json().catch(() => null)) as
+      | { error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string } }
+      | null
+
+    if (retryAfterTermAcceptance && response.status === 403 && payload?.requiresTerm && payload.term?.id) {
+      const accepted = await acceptTermForIntent(payload.term, intent.toUpperCase() as 'DOWNLOAD' | 'PRINT')
+      if (accepted) return fetchControlledAction(intent, false)
+      throw new Error(
+        intent === 'download'
+          ? 'O termo de responsabilidade para download não foi aceito.'
+          : 'O termo de responsabilidade para impressão não foi aceito.',
+      )
+    }
+
+    throw new Error(
+      payload?.error
+        ?? (intent === 'download'
+          ? 'Não foi possível preparar o arquivo para download.'
+          : 'Não foi possível preparar o PDF para impressão.'),
+    )
+  }
+
+  const getSuggestedFileName = (response: Response) => {
+    const disposition = response.headers.get('content-disposition') ?? ''
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+    if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
+    const basicMatch = disposition.match(/filename="?([^"]+)"?/i)
+    if (basicMatch?.[1]) return basicMatch[1]
+    return `documento-${versionId}.pdf`
   }
   const loadPdf = async () => {
     setLoading(true)
@@ -136,36 +179,33 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
     void renderPages()
   }, [pdf, pageCount])
 
-  const downloadFile = () => {
-    window.location.href = `${endpointBase}?action=download`
+  const downloadFile = async () => {
+    try {
+      const response = await fetchControlledAction('download')
+      const blob = await response.blob()
+      const downloadUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = downloadUrl
+      anchor.download = getSuggestedFileName(response)
+      anchor.rel = 'noreferrer'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 30_000)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Falha ao baixar o documento.')
+    }
   }
 
- const printFile = async (retryAfterTermAcceptance = true) => {
-    if (nativeMode) {
-      window.open(`${endpointBase}?action=print`, '_blank', 'noopener,noreferrer')
-      return
-    }
+ const printFile = async () => {
     try {
-      const response = await fetch(`${endpointBase}?action=print`, { cache: 'no-store', credentials: 'include' })
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string; requiresTerm?: boolean; term?: { id: string; title: string; content: string } }
-          | null
-
-        if (retryAfterTermAcceptance && response.status === 403 && payload?.requiresTerm && payload.term?.id) {
-          const accepted = await acceptTermForIntent(payload.term, 'PRINT')
-          if (accepted) {
-            await printFile(false)
-            return
-          }
-          throw new Error('O termo de responsabilidade para impressão não foi aceito.')
-        }
-        throw new Error(payload?.error ?? 'Não foi possível preparar o PDF para impressão.')
-      }
+      const response = await fetchControlledAction('print')
 
      const blob = await response.blob()
       if (!blob.type.toLowerCase().includes('pdf')) {
-        window.open(`${endpointBase}?action=print`, '_blank', 'noopener,noreferrer')
+        const objectUrl = URL.createObjectURL(blob)
+        window.open(objectUrl, '_blank', 'noopener,noreferrer')
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
         return
       }
       const objectUrl = URL.createObjectURL(blob)
@@ -242,7 +282,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
           {canDownload ? (
             <button
               className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
-              onClick={downloadFile}
+              onClick={() => void downloadFile()}
             >
               <Download size={14} /> Baixar
             </button>
