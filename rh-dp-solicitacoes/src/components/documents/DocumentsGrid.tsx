@@ -20,7 +20,7 @@ type GridRow = {
 }
 
 
-type Option = { id: string; name?: string; description?: string; fullName?: string }
+type Option = { id: string; name?: string; description?: string; fullName?: string; departmentId?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -62,25 +62,26 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
   const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
-  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', file: null as File | null })
+  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', file: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
     code: '',
     title: '',
     documentTypeId: '',
-    ownerDepartmentId: '',
+    ownerCostCenterId: '',
     authorUserId: '',
     status: fixedStatus ?? '',
   })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
 
-   const [meta, setMeta] = useState<{ documentTypes: Option[]; departments: Option[]; authors: Option[] }>({
+  const [meta, setMeta] = useState<{ documentTypes: Option[]; departments: Option[]; authors: Option[]; responsibleCostCenters: Option[] }>({
     documentTypes: [],
     departments: [],
     authors: [],
+    responsibleCostCenters: [],
   })
   const hasActiveFilters = useMemo(
-    () => Boolean(appliedFilters.code || appliedFilters.title || appliedFilters.documentTypeId || appliedFilters.ownerDepartmentId || appliedFilters.authorUserId),
+    () => Boolean(appliedFilters.code || appliedFilters.title || appliedFilters.documentTypeId || appliedFilters.ownerCostCenterId || appliedFilters.authorUserId),
     [appliedFilters],
   )
 
@@ -241,7 +242,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
  const createDocument = async () => {
     const normalizedCode = createForm.code.trim()
 
-    if (!normalizedCode || !createForm.title || !createForm.documentTypeId || !createForm.ownerDepartmentId) {
+     if (!normalizedCode || !createForm.title || !createForm.documentTypeId || !createForm.ownerCostCenterId) {
       setCreateError('Preencha os campos obrigatórios.')
       return
     }
@@ -262,7 +263,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     formData.set('code', normalizedCode)
     formData.set('title', createForm.title)
     formData.set('documentTypeId', createForm.documentTypeId)
-    formData.set('ownerDepartmentId', createForm.ownerDepartmentId)
+    formData.set('ownerCostCenterId', createForm.ownerCostCenterId)
     formData.set('authorUserId', createForm.authorUserId)
     if (createForm.revisionNumber) formData.set('revisionNumber', createForm.revisionNumber)
     formData.set('file', createForm.file)
@@ -278,7 +279,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
      const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
     setShowCreate(false)
-    setCreateForm({ code: '', title: '', documentTypeId: '', ownerDepartmentId: '', authorUserId: '', revisionNumber: '', file: null })
+    setCreateForm({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', file: null })
     setCodeValidation({ status: 'idle', message: null })
     setCreateSuccess(data?.routing ?? { status: 'PUBLICADO', targetTab: 'publicados', targetPath: '/dashboard/controle-documentos/publicados', message: 'Documento cadastrado com sucesso.' })
     clearFilters()
@@ -359,7 +360,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       code: '',
       title: '',
       documentTypeId: '',
-      ownerDepartmentId: '',
+      ownerCostCenterId: '',
       authorUserId: '',
       status: fixedStatus ?? '',
     }
@@ -386,9 +387,13 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         <option value="">Tipo Documento</option>
         {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
       </select>
-      <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.ownerDepartmentId} onChange={(e) => setDraftFilters((v) => ({ ...v, ownerDepartmentId: e.target.value }))}>
+      <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.ownerCostCenterId} onChange={(e) => setDraftFilters((v) => ({ ...v, ownerCostCenterId: e.target.value }))}>
         <option value="">Centro Responsável</option>
-        {meta.departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+        {meta.responsibleCostCenters.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.description}
+          </option>
+        ))}
       </select>
       <select className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100" value={draftFilters.authorUserId} onChange={(e) => setDraftFilters((v) => ({ ...v, authorUserId: e.target.value }))}>
         <option value="">Elaborador / Revisor</option>
@@ -624,10 +629,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
               <select className="rounded border px-3 py-2" value={createForm.documentTypeId} onChange={(e) => setCreateForm((v) => ({ ...v, documentTypeId: e.target.value }))}>
                 <option value="">Tipo de documento</option>
                 {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
-              </select>
-              <select className="rounded border px-3 py-2" value={createForm.ownerDepartmentId} onChange={(e) => setCreateForm((v) => ({ ...v, ownerDepartmentId: e.target.value }))}>
+             </select>
+              <select className="rounded border px-3 py-2" value={createForm.ownerCostCenterId} onChange={(e) => setCreateForm((v) => ({ ...v, ownerCostCenterId: e.target.value }))}>
                 <option value="">Centro responsável</option>
-                {meta.departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                {meta.responsibleCostCenters.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.description}
+                  </option>
+                ))}
               </select>
               <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
                 <option value="">Elaborador/Revisor (auto)</option>

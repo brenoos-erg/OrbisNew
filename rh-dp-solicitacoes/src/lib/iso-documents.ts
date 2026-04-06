@@ -36,7 +36,7 @@ export function parseGridParams(params: URLSearchParams) {
       code: params.get('code') ?? undefined,
       title: params.get('title') ?? undefined,
       documentTypeId: params.get('documentTypeId') ?? undefined,
-      ownerDepartmentId: params.get('ownerDepartmentId') ?? undefined,
+      ownerCostCenterId: params.get('ownerCostCenterId') ?? undefined,
       authorUserId: params.get('authorUserId') ?? undefined,
       status: params.get('status') as DocumentVersionStatus | null,
     },
@@ -50,12 +50,19 @@ export function buildVersionWhere(filters: ReturnType<typeof parseGridParams>['f
       code: filters.code ? { contains: filters.code } : undefined,
       title: filters.title ? { contains: filters.title } : undefined,
       documentTypeId: filters.documentTypeId,
-      ownerDepartmentId: filters.ownerDepartmentId,
+      ownerDepartment: filters.ownerCostCenterId
+        ? {
+            costCenters: {
+              some: {
+                id: filters.ownerCostCenterId,
+              },
+            },
+          }
+        : undefined,
       authorUserId: filters.authorUserId,
     },
   } satisfies Prisma.DocumentVersionWhereInput
 }
-
 function buildOrderBy(sortBy: GridSortBy, sortOrder: Prisma.SortOrder): Prisma.DocumentVersionOrderByWithRelationInput[] {
   if (sortBy === 'code') {
     return [{ document: { code: sortOrder } }, { createdAt: 'desc' }]
