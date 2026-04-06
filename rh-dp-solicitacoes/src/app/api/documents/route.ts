@@ -44,38 +44,77 @@ async function saveUploadedDocument(file: File) {
 
 
 export async function POST(req: NextRequest)   {
+  let failureStage = 'request:start'
   try {
+    failureStage = 'auth:require-active-user'
     const me = await requireActiveUser()
 
+    failureStage = 'request:parse-content-type'
     const contentType = req.headers.get('content-type') ?? ''
     let payload: any = {}
 
-      if (contentType.includes('multipart/form-data')) {
+    if (contentType.includes('multipart/form-data')) {
+      failureStage = 'request:parse-form-data'
       const form = await req.formData()
       const uploadedFile = form.get('file') ?? form.get('pdf')
-      const fileUrl = uploadedFile instanceof File && uploadedFile.size > 0 ? await saveUploadedDocument(uploadedFile) : null
+      let fileUrl: string | null = null
+
+      if (uploadedFile instanceof File && uploadedFile.size > 0) {
+        failureStage = 'file:save-uploaded-document'
+        fileUrl = await saveUploadedDocument(uploadedFile)
+      }
 
       payload = {
         code: normalizeCode(form.get('code')),
         title: String(form.get('title') ?? ''),
         documentTypeId: String(form.get('documentTypeId') ?? ''),
         ownerCostCenterId: String(form.get('ownerCostCenterId') ?? ''),
-        authorUserId: String(form.get('authorUserId') ?? me.id),
+        authorUserId: String(form.get('authorUserId') ?? '').trim(),
         summary: String(form.get('summary') ?? ''),
         affectedAreasNotes: String(form.get('affectedAreasNotes') ?? ''),
         fileUrl,
         revisionNumber: form.get('revisionNumber'),
       }
     } else {
-      payload = await req.json()
+       payload = await req.json()
       payload.code = normalizeCode(payload.code)
       payload.ownerCostCenterId = payload.ownerCostCenterId ?? ''
+      payload.authorUserId = String(payload.authorUserId ?? '').trim()
     }
 
+    console.info('[documents.create][debug] payload-received', {
+      hasMultipart: contentType.includes('multipart/form-data'),
+      code: payload.code ?? '',
+      title: payload.title ?? '',
+      documentTypeId: payload.documentTypeId ?? '',
+      ownerCostCenterId: payload.ownerCostCenterId ?? '',
+      authorUserId: payload.authorUserId || me.id,
+      revisionNumber: payload.revisionNumber ?? null,
+      hasFileUrl: Boolean(payload.fileUrl),
+    })
+
+    const authorUserId = payload.authorUserId || me.id
+
+    failureStage = 'validation:required-fields'
     if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerCostCenterId) {
       return NextResponse.json({ error: 'Preencha código, título, tipo de documento e centro responsável.' }, { status: 400 })
     }
 
+    if (!payload.fileUrl) {
+      return NextResponse.json({ error: 'Anexe um arquivo válido (PDF, DOC ou DOCX) para criar o documento.' }, { status: 400 })
+    }
+
+    failureStage = 'validation:document-type'
+    const documentType = await prisma.documentTypeCatalog.findUnique({
+      where: { id: String(payload.documentTypeId) },
+      select: { id: true },
+    })
+
+    if (!documentType) {
+      return NextResponse.json({ error: 'Tipo de documento inválido.' }, { status: 400 })
+    }
+
+    failureStage = 'validation:cost-center'
     const ownerCostCenter = await prisma.costCenter.findUnique({
       where: { id: String(payload.ownerCostCenterId) },
       select: { id: true, departmentId: true },
@@ -84,12 +123,23 @@ export async function POST(req: NextRequest)   {
       return NextResponse.json({ error: 'Centro responsável inválido.' }, { status: 400 })
     }
 
+    failureStage = 'validation:author-user'
+    const authorUser = await prisma.user.findUnique({
+      where: { id: authorUserId },
+      select: { id: true },
+    })
+
+    if (!authorUser) {
+      return NextResponse.json({ error: 'Elaborador/Revisor inválido.' }, { status: 400 })
+    }
+
     console.info('[documents.create] payload-file-url', {
       code: payload.code,
       title: payload.title,
       fileUrl: payload.fileUrl ?? null,
     })
 
+    failureStage = 'document-type-flow:load'
     const flow = await prisma.documentTypeApprovalFlow.findMany({
       where: { documentTypeId: payload.documentTypeId, active: true },
       orderBy: { order: 'asc' },
@@ -99,6 +149,7 @@ export async function POST(req: NextRequest)   {
     const initialStatus = resolveInitialVersionStatus(flow)
     const revisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
 
+    failureStage = 'documents:check-duplicate-code'
     const existing = await prisma.isoDocument.findUnique({
       where: { code: payload.code },
       select: {
@@ -123,6 +174,7 @@ export async function POST(req: NextRequest)   {
     }
 
    if (existing && existing.versions.length === 0) {
+      failureStage = 'documents:recover-orphan-version'
       const recoveredVersion = await prisma.$transaction(async (tx) => {
         const version = await tx.documentVersion.create({
           data: {
@@ -136,7 +188,6 @@ export async function POST(req: NextRequest)   {
             isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
           },
         })
-
         if (flow.length > 0) {
           await tx.documentApproval.createMany({
             data: flow.map((item) => ({
@@ -165,14 +216,15 @@ export async function POST(req: NextRequest)   {
       )
     }
 
-   const created = await prisma.isoDocument.create({
+     failureStage = 'documents:create-document-and-version'
+    const created = await prisma.isoDocument.create({
       data: {
         code: payload.code,
         title: payload.title,
         documentTypeId: payload.documentTypeId,
         ownerDepartmentId: ownerCostCenter.departmentId ?? null,
         ownerCostCenterId: ownerCostCenter.id,
-        authorUserId: payload.authorUserId ?? me.id,
+        authorUserId,
         physicalLocation: payload.physicalLocation,
         accessType: payload.accessType ?? 'INTERNO',
         validityAt: payload.validityAt ? new Date(payload.validityAt) : null,
@@ -193,7 +245,7 @@ export async function POST(req: NextRequest)   {
       include: { versions: true },
     })
 
-    if (flow.length > 0 && created.versions[0]) {
+    failureStage = 'documents:create-approvals'    if (flow.length > 0 && created.versions[0]) {
       await prisma.documentApproval.createMany({
         data: flow.map((item) => ({
           versionId: created.versions[0].id,
@@ -203,6 +255,7 @@ export async function POST(req: NextRequest)   {
       })
     }
 
+   failureStage = 'response:success'
     const routing = routingForStatus(initialStatus)
 
      return NextResponse.json(
@@ -220,7 +273,12 @@ export async function POST(req: NextRequest)   {
       return NextResponse.json({ error: 'O código informado já está em uso. Informe outro código.' }, { status: 409 })
     }
 
-    console.error('Erro ao criar documento ISO', error)
-    return NextResponse.json({ error: 'Erro ao criar documento.' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Erro inesperado ao criar documento.'
+    console.error('[documents.create][debug] failure', {
+      stage: failureStage,
+      message: errorMessage,
+      error,
+    })
+    return NextResponse.json({ error: `Falha ao criar documento (${failureStage}): ${errorMessage}` }, { status: 500 })
   }
 }

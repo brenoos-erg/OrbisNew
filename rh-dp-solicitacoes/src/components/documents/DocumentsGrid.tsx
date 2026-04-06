@@ -141,6 +141,22 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       return null
     }
   }
+
+  const parseApiErrorMessage = async (res: Response, fallback: string) => {
+    const body = (await res.text()).trim()
+    if (!body) return fallback
+
+    try {
+      const data = JSON.parse(body) as { error?: string; message?: string }
+      if (data?.error?.trim()) return data.error
+      if (data?.message?.trim()) return data.message
+    } catch {
+      return body
+    }
+
+    if (body) return body
+    return fallback
+  }
   const buildQuery = (format?: 'csv' | 'pdf') => {
     const params = new URLSearchParams()
     params.set('page', String(page))
@@ -310,19 +326,31 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       return
     }
 
-    setTargetRow(null)
+      setTargetRow(null)
     await load()
   }
  const createDocument = async () => {
     const normalizedCode = createForm.code.trim()
+    const normalizedTitle = createForm.title.trim()
+    const normalizedRevisionNumber = createForm.revisionNumber.trim()
 
-     if (!normalizedCode || !createForm.title || !createForm.documentTypeId || !createForm.ownerCostCenterId) {
+     if (!normalizedCode || !normalizedTitle || !createForm.documentTypeId || !createForm.ownerCostCenterId) {
       setCreateError('Preencha os campos obrigatórios.')
       return
     }
 
     if (codeValidation.status === 'duplicate') {
       setCreateError(codeValidation.message ?? 'O código informado já está em uso. Informe outro código.')
+      return
+    }
+
+    if (createForm.authorUserId && !createForm.authorUserId.trim()) {
+      setCreateError('Informe um elaborador/revisor válido.')
+      return
+    }
+
+    if (normalizedRevisionNumber && Number.isNaN(Number(normalizedRevisionNumber))) {
+      setCreateError('Número de revisão inválido.')
       return
     }
 
@@ -335,19 +363,19 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
     setCreating(true)
     const formData = new FormData()
     formData.set('code', normalizedCode)
-    formData.set('title', createForm.title)
+    formData.set('title', normalizedTitle)
     formData.set('documentTypeId', createForm.documentTypeId)
     formData.set('ownerCostCenterId', createForm.ownerCostCenterId)
-    formData.set('authorUserId', createForm.authorUserId)
-    if (createForm.revisionNumber) formData.set('revisionNumber', createForm.revisionNumber)
+    if (createForm.authorUserId?.trim()) formData.set('authorUserId', createForm.authorUserId.trim())
+    if (normalizedRevisionNumber) formData.set('revisionNumber', normalizedRevisionNumber)
     formData.set('file', createForm.file)
 
     const res = await fetch('/api/documents', { method: 'POST', body: formData })
     setCreating(false)
 
     if (!res.ok) {
-      const data = await parseJsonSafely<{ error?: string }>(res)
-      setCreateError(data?.error ?? 'Erro ao cadastrar documento.')
+      const message = await parseApiErrorMessage(res, 'Erro ao cadastrar documento.')
+      setCreateError(message)
       return
     }
 
