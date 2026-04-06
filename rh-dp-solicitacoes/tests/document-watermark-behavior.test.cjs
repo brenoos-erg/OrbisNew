@@ -32,6 +32,8 @@ assert.equal(hasUncontrolledCopyWatermark(output), true)
 const rendered = output.toString('latin1')
 const watermarkStreams = (rendered.match(/\/GSWm gs/g) || []).length
 assert.equal(watermarkStreams, 2, 'watermark should be injected on every page')
+const watermarkTextDrawCommands = (rendered.match(/\(CÓPIA CONTROLADA\) Tj/g) || []).length
+assert.equal(watermarkTextDrawCommands, 2, 'watermark text should be drawn once per page')
 
 const badPdf = Buffer.from('%PDF-1.4\nsem eof', 'latin1')
 const badValidation = validatePdfBuffer(badPdf)

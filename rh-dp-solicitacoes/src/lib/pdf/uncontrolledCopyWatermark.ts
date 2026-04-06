@@ -1,10 +1,8 @@
 const WATERMARK_TEXT = 'CÓPIA CONTROLADA'
 
-const TEXT_COLOR = '0.58 0.58 0.58'
+const TEXT_COLOR = '0.45 0.45 0.45'
 const DEFAULT_PAGE_WIDTH = 595
 const DEFAULT_PAGE_HEIGHT = 842
-const WATERMARK_MARGIN = 28
-
 const escapePdfText = (value: string) => value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
 
 type PdfValidation = { valid: true } | { valid: false; reason: string }
@@ -52,34 +50,22 @@ const parseMediaBox = (objectBody: string) => {
 }
 
 const buildWatermarkStream = (width: number, height: number) => {
-  const fontSize = Math.max(16, Math.min(26, Math.round(Math.min(width, height) * 0.034)))
+  const fontSize = Math.max(34, Math.min(54, Math.round(Math.min(width, height) * 0.064)))
   const radians = (-32 * Math.PI) / 180
   const cos = Math.cos(radians).toFixed(5)
   const sin = Math.sin(radians).toFixed(5)
-  const centerX = width * 0.19
-  const centerY = height * 0.54
-  const secondaryX = width * 0.08
-  const secondaryY = Math.max(WATERMARK_MARGIN * 2.2, height * 0.28)
+  const centerX = width * 0.18
+  const centerY = height * 0.52
 
-  const watermarks: string[] = [
+  const commands = [
+    'q',
+    '/GSWm gs',
     'BT',
     `${TEXT_COLOR} rg`,
     `/Fwm ${fontSize} Tf`,
     `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${centerX.toFixed(2)} ${centerY.toFixed(2)} Tm`,
     `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
     'ET',
-    'BT',
-    `${TEXT_COLOR} rg`,
-    `/Fwm ${Math.max(14, Math.round(fontSize * 0.86))} Tf`,
-    `${cos} ${sin} ${(-Number(sin)).toFixed(5)} ${cos} ${secondaryX.toFixed(2)} ${secondaryY.toFixed(2)} Tm`,
-    `(${escapePdfText(WATERMARK_TEXT)}) Tj`,
-    'ET',
-  ]
-
-  const commands = [
-    'q',
-    '/GSWm gs',
-    ...watermarks,
 
     'Q',
   ].join('\n')
@@ -172,8 +158,8 @@ export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
   const gsObjectId = nextObjectId++
 
    const appendedObjects: string[] = [
-    `${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`,
-    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.07 /ca 0.07 >>\nendobj\n`,
+    `${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n`,
+    `${gsObjectId} 0 obj\n<< /Type /ExtGState /CA 0.11 /ca 0.11 >>\nendobj\n`,
   ]
 
   let updatedSource = source
