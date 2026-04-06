@@ -24,6 +24,7 @@ type Option = { id: string; name?: string; code?: string; description?: string; 
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
+type CostCenterResponse = Option[] | { items?: Option[] }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 const STATUS_STYLES: Record<string, string> = {
@@ -41,34 +42,45 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
 const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
 const OFFICIAL_COST_CENTER_PAGE_SIZE = 200
 
+function normalizeCostCenters(data: CostCenterResponse): Option[] {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.items)) return data.items
+  return []
+}
+
 async function fetchOfficialCostCenters(): Promise<Option[]> {
-  const firstResponse = await fetch(`/api/cost-centers?page=1&pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}`, { cache: 'no-store' })
-  if (!firstResponse.ok) return []
-
-  const firstPayload = await firstResponse.json().catch(() => null) as { items?: Option[]; total?: number } | null
-  const firstItems = Array.isArray(firstPayload?.items) ? firstPayload.items : []
-  const total = Number(firstPayload?.total ?? firstItems.length)
-  const totalPages = Math.max(1, Math.ceil(total / OFFICIAL_COST_CENTER_PAGE_SIZE))
-
-  if (totalPages === 1) {
-    return [...firstItems].sort((a, b) =>
-      `${a.code ?? ''}${a.description ?? ''}`.localeCompare(`${b.code ?? ''}${b.description ?? ''}`, 'pt-BR'),
-    )
-  }
-
-  const remainingRequests = Array.from({ length: totalPages - 1 }, (_, index) => {
-    const pageNumber = index + 2
-    return fetch(`/api/cost-centers?page=${pageNumber}&pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}`, { cache: 'no-store' })
-      .then(async (response) => (response.ok ? response.json() : null))
-      .then((payload) => (Array.isArray(payload?.items) ? payload.items as Option[] : []))
-      .catch(() => [])
+  const selectResponse = await fetch('/api/cost-centers/select', {
+    cache: 'no-store',
   })
 
-  const remainingPages = await Promise.all(remainingRequests)
-  return [...firstItems, ...remainingPages.flat()].sort((a, b) =>
-    `${a.code ?? ''}${a.description ?? ''}`.localeCompare(`${b.code ?? ''}${b.description ?? ''}`, 'pt-BR'),
-  )
-}
+  if (selectResponse.ok) {
+    const data = (await selectResponse.json()) as CostCenterResponse
+    const normalized = normalizeCostCenters(data)
+
+    if (normalized.length > 0) {
+      return normalized
+    }
+  }
+
+  const aggregated: Option[] = []
+  let page = 1
+
+  while (true) {
+    const fallbackResponse = await fetch(`/api/cost-centers?pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}&page=${page}`, {
+      cache: 'no-store',
+    })
+
+    if (!fallbackResponse.ok) return []
+
+    const fallbackData = (await fallbackResponse.json()) as CostCenterResponse
+    const pageItems = normalizeCostCenters(fallbackData)
+    aggregated.push(...pageItems)
+
+    if (pageItems.length < OFFICIAL_COST_CENTER_PAGE_SIZE) break
+    page += 1
+  }
+
+  return aggregated}
 
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
