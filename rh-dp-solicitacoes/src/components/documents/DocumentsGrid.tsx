@@ -128,10 +128,26 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetch('/api/documents/filters', { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => setMeta(data))
+useEffect(() => {
+    Promise.all([
+      fetch('/api/documents/filters', { cache: 'no-store' }),
+      fetch('/api/cost-centers/select', { cache: 'no-store' }),
+    ])
+      .then(async ([filtersRes, costCentersRes]) => {
+        const [filtersData, costCentersData] = await Promise.all([
+          filtersRes.ok ? filtersRes.json() : null,
+          costCentersRes.ok ? costCentersRes.json() : null,
+        ])
+
+        if (!filtersData) return
+
+        setMeta({
+          ...filtersData,
+          responsibleCostCenters: Array.isArray(costCentersData)
+            ? costCentersData
+            : filtersData.responsibleCostCenters ?? [],
+        })
+      })
       .catch(() => null)
   }, [])
 
