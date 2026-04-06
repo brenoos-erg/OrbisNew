@@ -40,7 +40,7 @@ export default function CostCenterSelect({
 
   return (
     <Select.Root value={value} onValueChange={onValueChange} disabled={disabled}>
-      <Select.Trigger className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-orange-500/70">
+      <Select.Trigger className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:opacity-60">
         <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
           <Select.Value placeholder={placeholder}>{triggerLabel || placeholder}</Select.Value>
         </span>
@@ -51,8 +51,12 @@ export default function CostCenterSelect({
       <Select.Portal>
         <Select.Content
           position="popper"
+          side="bottom"
+          align="start"
+          avoidCollisions
+          collisionPadding={8}
           sideOffset={4}
-          className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
+          className="z-[1000] w-[var(--radix-select-trigger-width)] min-w-[220px] max-w-[700px] overflow-hidden rounded-md border border-slate-200 bg-white text-slate-900 shadow-2xl"
         >
           <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
             {options.map((cc) => {
@@ -61,7 +65,7 @@ export default function CostCenterSelect({
                 <Select.Item
                   key={cc.id}
                   value={cc.id}
-                  className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                  className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[disabled]:pointer-events-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
                 >
                   <Select.ItemText>
                     <span className="block whitespace-nowrap overflow-hidden text-ellipsis" title={optionLabel}>

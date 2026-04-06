@@ -3,7 +3,7 @@
 import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
+import CostCenterSelect, { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
 import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
@@ -20,7 +20,6 @@ type GridRow = {
   vencimento: string | null
   status: string
 }
-
 
 type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
 type FiltersResponse = { documentTypes?: Option[]; authors?: Option[] }
@@ -705,26 +704,12 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
                 <option value="">Tipo de documento</option>
                 {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
              </select>
-               <div className="space-y-2">
-                <select
-                  className="w-full rounded border px-3 py-2"
-                  value={createForm.ownerCostCenterId}
-                  onChange={(e) => setCreateForm((v) => ({ ...v, ownerCostCenterId: e.target.value }))}
-                >
-                  <option value="">Centro responsável</option>
-                  {meta.responsibleCostCenters.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {formatCostCenterOption(option)}
-                    </option>
-                  ))}
-                </select>
-                <div className="rounded border border-dashed border-slate-300 bg-slate-50 p-2 text-xs text-slate-600">
-                  <p>Qtd centros: {meta.responsibleCostCenters.length}</p>
-                  {meta.responsibleCostCenters.slice(0, 5).map((option) => (
-                    <p key={`preview-${option.id}`}>{formatCostCenterOption(option)}</p>
-                  ))}
-                </div>
-              </div>
+             <CostCenterSelect
+                value={createForm.ownerCostCenterId}
+                options={meta.responsibleCostCenters}
+                placeholder="Centro responsável"
+                onValueChange={(nextValue) => setCreateForm((v) => ({ ...v, ownerCostCenterId: nextValue }))}
+              />
               <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
                 <option value="">Elaborador/Revisor (auto)</option>
                 {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
