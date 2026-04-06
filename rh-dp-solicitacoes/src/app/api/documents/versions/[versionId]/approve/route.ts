@@ -5,6 +5,7 @@ import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
 import { notifyDocumentPublished } from '@/lib/isoDocumentNotifications'
 import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
+import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -44,16 +45,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     if (!version.fileUrl) {
       return NextResponse.json({ error: 'A versão não possui arquivo para publicação.' }, { status: 422 })
     }
+    const familyRule = resolveDocumentFamilyRule(version.document.code)
 
     try {
-      publishedFileUrl = await finalizeToPublishedPdf({
-        sourceFileUrl: version.fileUrl,
+      publishedFileUrl = familyRule.family === 'non-controlled-native'
+        ? version.fileUrl
+        : await finalizeToPublishedPdf({
+          sourceFileUrl: version.fileUrl,
+          documentCode: version.document.code,
+        })
+      console.info('[documents.approve] publication-file-finalized', {
+        versionId,
         documentCode: version.document.code,
+        family: familyRule.family,
+        sourceFileUrl: version.fileUrl,
+        publishedFileUrl,
       })
     } catch (error) {
       console.error('Falha ao finalizar versão em PDF com marca d\'água no momento da publicação.', {
         versionId,
         fileUrl: version.fileUrl,
+        documentCode: version.document.code,
         error,
       })
       if (error instanceof DocumentPublishPipelineError) {

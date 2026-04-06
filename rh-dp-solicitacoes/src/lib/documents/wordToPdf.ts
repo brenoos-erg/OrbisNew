@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -33,10 +34,39 @@ function sanitizeEnvPath(value: string | undefined) {
   return trimmed.replace(/^"(.+)"$/, '$1')
 }
 
+function isWindowsPlatform() {
+  return process.platform === 'win32'
+}
+
+function normalizeWindowsPath(value: string) {
+  return value.replace(/\//g, '\\').toLowerCase()
+}
+
+function isValidWindowsSofficeExecutablePath(value: string) {
+  const normalized = normalizeWindowsPath(value)
+  return normalized.endsWith('\\program\\soffice.exe')
+}
+
+function isWindowsExecutableCandidate(binary: string) {
+  const lower = binary.trim().toLowerCase()
+  if (!lower) return false
+  if (lower.endsWith('.bat') || lower.endsWith('.cmd') || lower.endsWith('.lnk')) return false
+  return lower.endsWith('.exe')
+}
+
+async function fileExistsReadable(filePath: string) {
+  try {
+    await fs.access(filePath, fsConstants.R_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 function getSofficeCandidates() {
   const libreOfficeEnvCandidate = sanitizeEnvPath(process.env.LIBREOFFICE_PATH)
   const legacyEnvCandidate = sanitizeEnvPath(process.env.SOFFICE_PATH)
+  const windows = isWindowsPlatform()
 
   console.info('[documents.word-to-pdf] soffice-env-detection', {
     hasLibreOfficePath: Boolean(libreOfficeEnvCandidate),
@@ -45,14 +75,12 @@ function getSofficeCandidates() {
     sofficePath: legacyEnvCandidate ?? null,
   })
 
-  return [
+ return [
     libreOfficeEnvCandidate,
     legacyEnvCandidate,
-    'soffice',
-    '/usr/bin/soffice',
-    '/usr/local/bin/soffice',
     'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
     'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+    ...(windows ? [] : ['soffice', '/usr/bin/soffice', '/usr/local/bin/soffice']),
   ].filter((candidate): candidate is string => Boolean(candidate))
 }
 
@@ -63,10 +91,49 @@ async function resolveSofficeBinary() {
   let lastError: unknown = null
 
   for (const binary of getSofficeCandidates()) {
-    attemptedBinaries.push(binary)
-    const candidateBinary = path.extname(binary).toLowerCase() === '.exe' || path.basename(binary).toLowerCase().includes('soffice')
-      ? binary
-      : path.join(binary, process.platform === 'win32' ? 'soffice.exe' : 'soffice')
+    const candidateBinary = binary
+    attemptedBinaries.push(candidateBinary)
+
+    if (isWindowsPlatform()) {
+      if (!isWindowsExecutableCandidate(candidateBinary)) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          reason: 'windows-non-executable-or-wrapper',
+        })
+        continue
+      }
+
+      if (!isValidWindowsSofficeExecutablePath(candidateBinary)) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          reason: 'windows-path-must-end-with-program-soffice.exe',
+        })
+        if (candidateBinary === sanitizeEnvPath(process.env.LIBREOFFICE_PATH)) {
+          console.error('[documents.word-to-pdf] libreoffice-path-invalid', {
+            envVar: 'LIBREOFFICE_PATH',
+            value: candidateBinary,
+            expectedSuffix: '\\program\\soffice.exe',
+          })
+        }
+        if (candidateBinary === sanitizeEnvPath(process.env.SOFFICE_PATH)) {
+          console.error('[documents.word-to-pdf] libreoffice-path-invalid', {
+            envVar: 'SOFFICE_PATH',
+            value: candidateBinary,
+            expectedSuffix: '\\program\\soffice.exe',
+          })
+        }
+        continue
+      }
+
+      const exists = await fileExistsReadable(candidateBinary)
+      if (!exists) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          reason: 'windows-soffice-exe-not-found',
+        })
+        continue
+      }
+    }
     try {
       await execFileAsync(candidateBinary, ['--version'], {
         timeout: 20_000,
@@ -74,7 +141,15 @@ async function resolveSofficeBinary() {
         windowsHide: true,
       })
       cachedSofficeBinary = candidateBinary
-      console.info('[documents.word-to-pdf] soffice-candidate-selected', { binary: candidateBinary })
+      console.info('[documents.word-to-pdf] soffice-candidate-selected', {
+        binary: candidateBinary,
+        source:
+          candidateBinary === sanitizeEnvPath(process.env.LIBREOFFICE_PATH)
+            ? 'LIBREOFFICE_PATH'
+            : candidateBinary === sanitizeEnvPath(process.env.SOFFICE_PATH)
+              ? 'SOFFICE_PATH'
+              : 'auto-detected',
+      })
       return candidateBinary
     } catch (error) {
       lastError = error
@@ -87,6 +162,7 @@ async function resolveSofficeBinary() {
       continue
     }
   }
+
 
   const message = lastError instanceof Error ? lastError.message : String(lastError)
   throw new Error(`LibreOffice (soffice) não encontrado. Caminhos tentados: ${attemptedBinaries.join(', ')}. Último erro: ${message}`)

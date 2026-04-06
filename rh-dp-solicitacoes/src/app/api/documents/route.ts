@@ -13,6 +13,7 @@ import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
 import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
+import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -27,12 +28,15 @@ async function saveUploadedDocument(file: File, documentCode: string) {
   const originalFileUrl = `/uploads/documents/${safeName}`
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(absolute, buffer)
-
-  const publishedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
+  const familyRule = resolveDocumentFamilyRule(documentCode)
+  const publishedFileUrl = familyRule.family === 'non-controlled-native'
+    ? originalFileUrl
+    : await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
 
   console.info('[documents.create] upload-persisted', {
     originalName: file.name,
     safeName,
+    family: familyRule.family,
     originalFileUrl,
     originalAbsolutePath: absolute,
     originalExists: true,
@@ -41,7 +45,6 @@ async function saveUploadedDocument(file: File, documentCode: string) {
 
   return publishedFileUrl
 }
-
 
 export async function POST(req: NextRequest)   {
   let failureStage = 'request:start'

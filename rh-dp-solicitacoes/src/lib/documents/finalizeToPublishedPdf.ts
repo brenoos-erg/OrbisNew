@@ -29,6 +29,11 @@ export class DocumentPublishPipelineError extends Error {
 export async function finalizeToPublishedPdf({ sourceFileUrl, documentCode }: Input): Promise<string> {
   const familyRule = resolveDocumentFamilyRule(documentCode)
   if (familyRule.family === 'non-controlled-native') {
+    console.info('[documents.finalize-published-pdf] bypassed-for-non-controlled-native', {
+      documentCode,
+      sourceFileUrl,
+      family: familyRule.family,
+    })
     return sourceFileUrl
   }
 
