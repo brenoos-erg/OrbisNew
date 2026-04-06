@@ -10,11 +10,15 @@ export async function notifyDocumentPublished(versionId: string) {
   if (!version || !version.document) return { sent: false, reason: 'not-found' as const }
   if (!version.publishedAt || !version.isCurrentPublished) return { sent: false, reason: 'not-published' as const }
 
-  const users = await prisma.user.findMany({
-    where: buildDocumentPublicationRecipientWhere(version.document.ownerDepartmentId),
-    select: { email: true },
-    take: 300,
-  })
+   const ownerDepartmentId = version.document.ownerDepartmentId
+
+  const users = ownerDepartmentId
+    ? await prisma.user.findMany({
+        where: buildDocumentPublicationRecipientWhere(ownerDepartmentId),
+        select: { email: true },
+        take: 300,
+      })
+    : []
 
   const to = Array.from(new Set(users.map((user) => user.email).filter(Boolean)))
   if (to.length === 0) return { sent: false, reason: 'no-recipients' as const }
@@ -26,7 +30,7 @@ export async function notifyDocumentPublished(versionId: string) {
     `Código: ${version.document.code}`,
     `Título: ${version.document.title}`,
     `Revisão: REV${String(version.revisionNumber).padStart(2, '0')}`,
-    `Departamento: ${version.document.ownerDepartment.name}`,
+    `Departamento: ${version.document.ownerDepartment?.name ?? '-'}`,
     `Publicado em: ${version.publishedAt?.toLocaleString('pt-BR') ?? '-'}`,
   ].join('\n')
 
