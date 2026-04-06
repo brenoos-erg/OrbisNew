@@ -167,6 +167,19 @@ function getTipoDisplayName(nome: string) {
     : trimmed.replace(/^RQ[_.]?\d+\s*-\s*/i, '');
 }
 
+function isCostCenterField(campo: Pick<CampoEspecifico, 'name' | 'label' | 'type'>) {
+  const normalizedName = (campo.name ?? '').toLowerCase();
+  const normalizedLabel = (campo.label ?? '').toLowerCase();
+  return (
+    campo.type === 'cost_center' ||
+    normalizedName.includes('centrocusto') ||
+    normalizedName.includes('costcenter') ||
+    normalizedLabel.includes('centro de custo') ||
+    normalizedLabel.includes('centro custo') ||
+    normalizedLabel.includes('contrato (destino)')
+  );
+}
+
 const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
   'Linhas telefônicas': [
     'Ramais internos',
@@ -1173,7 +1186,7 @@ export default function NovaSolicitacaoPage() {
             const nextValue = extras[campo.name] ?? '';
             acc[campo.name] = campo.name === 'placaVeiculo' ? nextValue.trim().toUpperCase() : nextValue;
 
-            if (campo.type === 'cost_center' && nextValue) {
+            if (isCostCenterField(campo) && nextValue) {
               const labelValue = extras[`${campo.name}Label`] ?? buildCostCenterLabel(nextValue);
               if (labelValue) acc[`${campo.name}Label`] = labelValue;
             }
@@ -2685,9 +2698,7 @@ useEffect(() => {
                     const autoFillValue = getAutoFillValueFromMe(campo.name);
                     const isNomeFuncionario = isNomeFuncionarioField(campo.name);
                     const isAutoFilled = !isNomeFuncionario && autoFillValue !== null;
-                    const hasCostCenterName = /centro\s*custo|centrocusto/i.test(campo.name);
-                    const normalizedType =
-                      campo.type === 'cost_center' || hasCostCenterName ? 'cost_center' : campo.type;
+                    const normalizedType = isCostCenterField(campo) ? 'cost_center' : campo.type;
                     const value = isAutoFilled ? (autoFillValue ?? '') : (extras[campo.name] ?? '');
                     const shouldShowEnderecoEnvio =
                       campo.name !== 'enderecoEnvio' ||

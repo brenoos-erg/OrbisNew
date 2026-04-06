@@ -45,10 +45,14 @@ const asStringArray = (value: unknown): string[] => {
 
 const normalizeCampo = (campo: CampoEspecifico): CampoEspecifico => {
   const normalizedName = campo.name.toLowerCase()
+  const normalizedLabel = (campo.label ?? '').toLowerCase()
   const isCostCenterField =
     campo.type === 'cost_center' ||
     normalizedName.includes('centrocusto') ||
-    normalizedName.includes('costcenter')
+    normalizedName.includes('costcenter') ||
+    normalizedLabel.includes('centro de custo') ||
+    normalizedLabel.includes('centro custo') ||
+    normalizedLabel.includes('contrato (destino)')
 
   const autoFillFromMe = ['emailsolicitante', 'nomesolicitante', 'telefonesolicitante', 'departamentosolicitante', 'cargosolicitante'].some((token) => normalizedName.includes(token))
 
