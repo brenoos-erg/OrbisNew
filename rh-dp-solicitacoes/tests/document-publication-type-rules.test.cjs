@@ -1,0 +1,18 @@
+const fs = require('node:fs')
+const assert = require('node:assert/strict')
+
+const familyRules = fs.readFileSync('src/lib/documents/documentFamilyRules.ts', 'utf8')
+const finalizeSource = fs.readFileSync('src/lib/documents/finalizeToPublishedPdf.ts', 'utf8')
+const createRoute = fs.readFileSync('src/app/api/documents/route.ts', 'utf8')
+const approveRoute = fs.readFileSync('src/app/api/documents/versions/[versionId]/approve/route.ts', 'utf8')
+const wordToPdf = fs.readFileSync('src/lib/documents/wordToPdf.ts', 'utf8')
+
+assert.match(familyRules, /new Set\(\['RQ', 'DOCEXT', 'LEG'\]\)/)
+assert.match(familyRules, /new Set\(\['PG', 'IT', 'DD', 'COD', 'MAN', 'POL'\]\)/)
+assert.match(finalizeSource, /if \(familyRule\.family === 'non-controlled-native'\) {\s*return sourceFileUrl/s)
+assert.match(createRoute, /finalizeToPublishedPdf\(\{ sourceFileUrl: originalFileUrl, documentCode \}\)/)
+assert.match(approveRoute, /document: \{ select: \{ code: true \} \}/)
+assert.match(approveRoute, /documentCode: version\.document\.code/)
+assert.match(wordToPdf, /windowsHide: true/)
+
+console.log('document-publication-type-rules ok')

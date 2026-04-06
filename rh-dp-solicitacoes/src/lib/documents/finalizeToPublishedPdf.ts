@@ -9,14 +9,31 @@ import {
   normalizeStoredDocumentUrl,
   resolvePublicDocumentPath,
 } from '@/lib/documents/documentStorage'
+import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 
 type Input = {
   sourceFileUrl: string
+  documentCode: string
 }
 
+export class DocumentPublishPipelineError extends Error {
+  constructor(
+    message: string,
+    public readonly reason: 'RULE' | 'NOT_FOUND' | 'CONVERSION' | 'WATERMARK',
+  ) {
+    super(message)
+    this.name = 'DocumentPublishPipelineError'
+  }
+}
 
-export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<string> {
-  const fileType = resolveDocumentFileType(sourceFileUrl)
+export async function finalizeToPublishedPdf({ sourceFileUrl, documentCode }: Input): Promise<string> {
+  const familyRule = resolveDocumentFamilyRule(documentCode)
+  if (familyRule.family === 'non-controlled-native') {
+    return sourceFileUrl
+  }
+
+
+const fileType = resolveDocumentFileType(sourceFileUrl)
   const pathResolution = await resolvePublicDocumentPath(sourceFileUrl)
   const normalizedSourceFileUrl = normalizeStoredDocumentUrl(pathResolution.resolvedFileUrl)
 
@@ -29,7 +46,10 @@ export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<
   })
 
   if (!pathResolution.exists) {
-    throw new Error(`Arquivo físico da versão não encontrado: ${normalizedSourceFileUrl}`)
+    throw new DocumentPublishPipelineError(
+      `Arquivo físico da versão não encontrado: ${normalizedSourceFileUrl}`,
+      'NOT_FOUND',
+    )
   }
 
   const sourceAbsolutePath = pathResolution.absolutePath
@@ -39,18 +59,28 @@ export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<
   if (fileType.isPdf && isPdfBuffer(sourceBuffer)) {
     pdfBuffer = Buffer.from(sourceBuffer)
   } else if (fileType.isConvertibleToPdf) {
-    const converted = await convertDocumentToPdf({
-      fileUrl: normalizedSourceFileUrl,
-      sourceAbsolutePath,
-    })
-    pdfBuffer = converted.pdfBuffer
+    try {
+      const converted = await convertDocumentToPdf({
+        fileUrl: normalizedSourceFileUrl,
+        sourceAbsolutePath,
+      })
+      pdfBuffer = converted.pdfBuffer
+    } catch (error) {
+      throw new DocumentPublishPipelineError(
+        error instanceof Error ? error.message : 'Falha de conversão Word para PDF.',
+        'CONVERSION',
+      )
+    }
   } else {
-    throw new Error(`Formato ${fileType.extension || 'desconhecido'} não suportado para publicação em PDF.`)
+    throw new DocumentPublishPipelineError(
+      `Formato ${fileType.extension || 'desconhecido'} não suportado para publicação em PDF.`,
+      'RULE',
+    )
   }
 
   const validation = validatePdfBuffer(pdfBuffer)
   if (!validation.valid) {
-    throw new Error(`PDF inválido para publicação: ${validation.reason}`)
+    throw new DocumentPublishPipelineError(`PDF inválido para publicação: ${validation.reason}`, 'CONVERSION')
   }
 
   const finalPdfBuffer = hasUncontrolledCopyWatermark(pdfBuffer)
@@ -59,7 +89,10 @@ export async function finalizeToPublishedPdf({ sourceFileUrl }: Input): Promise<
 
   const outputValidation = validatePdfBuffer(finalPdfBuffer)
   if (!outputValidation.valid) {
-    throw new Error(`PDF final inválido após marca d'água: ${outputValidation.reason}`)
+    throw new DocumentPublishPipelineError(
+      `PDF final inválido após marca d'água: ${outputValidation.reason}`,
+      'WATERMARK',
+    )
   }
 
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')

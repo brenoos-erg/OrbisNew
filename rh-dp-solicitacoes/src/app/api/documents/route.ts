@@ -11,14 +11,14 @@ import {
 } from '@/lib/iso-document-routing'
 import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
-import { finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
+import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
 }
 
-async function saveUploadedDocument(file: File) {
+async function saveUploadedDocument(file: File, documentCode: string) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
   const extension = path.extname(file.name || '').toLowerCase() || '.bin'
@@ -28,7 +28,7 @@ async function saveUploadedDocument(file: File) {
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(absolute, buffer)
 
-  const publishedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl })
+  const publishedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
 
   console.info('[documents.create] upload-persisted', {
     originalName: file.name,
@@ -57,15 +57,16 @@ export async function POST(req: NextRequest)   {
       failureStage = 'request:parse-form-data'
       const form = await req.formData()
       const uploadedFile = form.get('file') ?? form.get('pdf')
+      const code = normalizeCode(form.get('code'))
       let fileUrl: string | null = null
 
       if (uploadedFile instanceof File && uploadedFile.size > 0) {
         failureStage = 'file:save-uploaded-document'
-        fileUrl = await saveUploadedDocument(uploadedFile)
+        fileUrl = await saveUploadedDocument(uploadedFile, code)
       }
 
       payload = {
-        code: normalizeCode(form.get('code')),
+        code,
         title: String(form.get('title') ?? ''),
         documentTypeId: String(form.get('documentTypeId') ?? ''),
         ownerCostCenterId: String(form.get('ownerCostCenterId') ?? ''),
@@ -272,6 +273,15 @@ export async function POST(req: NextRequest)   {
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'O código informado já está em uso. Informe outro código.' }, { status: 409 })
+    }
+    if (error instanceof DocumentPublishPipelineError) {
+      const reasonMessage = {
+        CONVERSION: 'Falha na conversão Word -> PDF. Verifique se o LibreOffice (LIBREOFFICE_PATH/SOFFICE_PATH) está instalado e acessível.',
+        NOT_FOUND: 'Falha ao localizar o arquivo enviado no servidor.',
+        WATERMARK: 'Falha ao aplicar a marca d’água no PDF final.',
+        RULE: 'Regra inválida para o tipo documental informado.',
+      }[error.reason]
+      return NextResponse.json({ error: `${reasonMessage} Detalhes: ${error.message}` }, { status: 422 })
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Erro inesperado ao criar documento.'

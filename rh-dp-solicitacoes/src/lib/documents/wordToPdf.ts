@@ -71,6 +71,7 @@ async function resolveSofficeBinary() {
       await execFileAsync(candidateBinary, ['--version'], {
         timeout: 20_000,
         maxBuffer: 2 * 1024 * 1024,
+        windowsHide: true,
       })
       cachedSofficeBinary = candidateBinary
       console.info('[documents.word-to-pdf] soffice-candidate-selected', { binary: candidateBinary })
@@ -106,6 +107,7 @@ async function runSofficeConvert(args: string[]): Promise<SofficeResult> {
     const result = await execFileAsync(binary, args, {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
+      windowsHide: true,
     })
     return {
       binary,

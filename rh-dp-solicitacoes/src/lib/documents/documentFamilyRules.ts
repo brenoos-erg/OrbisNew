@@ -28,3 +28,7 @@ export function resolveDocumentFamilyRule(documentCode: string): DocumentFamilyR
 
   return { prefix, family: 'controlled-pdf' }
 }
+
+export function shouldUseControlledPdfFlow(documentCode: string): boolean {
+  return resolveDocumentFamilyRule(documentCode).family === 'controlled-pdf'
+}

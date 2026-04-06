@@ -4,13 +4,21 @@ import { requireActiveUser } from '@/lib/auth'
 import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
 import { notifyDocumentPublished } from '@/lib/isoDocumentNotifications'
-import { finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
+import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
   const { versionId } = await params
 
-  const version = await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { id: true, status: true, fileUrl: true } })
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: versionId },
+    select: {
+      id: true,
+      status: true,
+      fileUrl: true,
+      document: { select: { code: true } },
+    },
+  })
   if (!version) return NextResponse.json({ error: 'Versão não encontrada.' }, { status: 404 })
 
   const stage = version.status === DocumentVersionStatus.AG_APROVACAO ? 2 : version.status === DocumentVersionStatus.EM_ANALISE_QUALIDADE ? 3 : null
@@ -38,13 +46,25 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     }
 
     try {
-      publishedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: version.fileUrl })
+      publishedFileUrl = await finalizeToPublishedPdf({
+        sourceFileUrl: version.fileUrl,
+        documentCode: version.document.code,
+      })
     } catch (error) {
       console.error('Falha ao finalizar versão em PDF com marca d\'água no momento da publicação.', {
         versionId,
         fileUrl: version.fileUrl,
         error,
       })
+      if (error instanceof DocumentPublishPipelineError) {
+        const reasonMessage = {
+          CONVERSION: 'Falha de conversão Word -> PDF para publicação.',
+          NOT_FOUND: 'Arquivo da versão não encontrado para publicação.',
+          WATERMARK: 'Falha ao aplicar marca d’água no PDF final da publicação.',
+          RULE: 'Regra inválida para o tipo documental na publicação.',
+        }[error.reason]
+        return NextResponse.json({ error: `${reasonMessage} Detalhes: ${error.message}` }, { status: 422 })
+      }
       return NextResponse.json({ error: 'Não foi possível converter/aplicar marca d\'água ao PDF final para publicação.' }, { status: 422 })
     }
   }
