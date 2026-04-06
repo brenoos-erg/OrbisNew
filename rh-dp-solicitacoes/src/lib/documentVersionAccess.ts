@@ -50,6 +50,8 @@ export async function resolveDocumentVersionAccess(
     return { error: 'Usuário inválido.', status: 401 as const }
   }
 
+  const ownerDepartmentId = version.document.ownerDepartmentId
+
   const [moduleAccess, departmentLink] = await Promise.all([
     prisma.userModuleAccess.findFirst({
       where: {
@@ -59,13 +61,15 @@ export async function resolveDocumentVersionAccess(
       },
       select: { id: true },
     }),
-    prisma.userDepartment.findFirst({
-      where: {
-        userId,
-        departmentId: version.document.ownerDepartmentId,
-      },
-      select: { id: true },
-    }),
+    ownerDepartmentId
+      ? prisma.userDepartment.findFirst({
+        where: {
+          userId,
+          departmentId: ownerDepartmentId,
+        },
+        select: { id: true },
+      })
+      : Promise.resolve(null),
   ])
 
   const canRead =
