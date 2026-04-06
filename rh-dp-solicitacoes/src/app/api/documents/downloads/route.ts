@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     prisma.documentDownloadLog.count({ where }),
     prisma.documentDownloadLog.findMany({
       where,
-      include: { version: { include: { document: { include: { ownerDepartment: true, author: true } } } }, user: true },
+      include: { version: { include: { document: { include: { ownerCostCenter: true, author: true } } } }, user: true },
       orderBy: { downloadedAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       codigo: log.version.document.code,
       nrRevisao: log.version.revisionNumber,
       titulo: log.version.document.title,
-      centroResponsavel: log.version.document.ownerDepartment.name,
+      centroResponsavel: [log.version.document.ownerCostCenter?.code, log.version.document.ownerCostCenter?.description].filter(Boolean).join(' - ') || '-',
       elaborador: log.version.document.author.fullName,
       vencimento: log.version.expiresAt,
       status: `DOWNLOAD por ${log.user.fullName}`,

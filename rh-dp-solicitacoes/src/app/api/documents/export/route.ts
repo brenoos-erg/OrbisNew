@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const rows = await prisma.documentVersion.findMany({
     where: buildVersionWhere(filters),
-    include: { document: { include: { ownerDepartment: true, author: true } } },
+    include: { document: { include: { ownerCostCenter: true, author: true } } },
     orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
   })
 
@@ -34,12 +34,13 @@ export async function GET(req: NextRequest) {
       r.document.code,
       String(r.revisionNumber),
       r.document.title,
-      r.document.ownerDepartment.name,
+      [r.document.ownerCostCenter?.code, r.document.ownerCostCenter?.description].filter(Boolean).join(' - ') || '-',
       r.document.author.fullName,
       r.expiresAt?.toISOString() ?? '',
       r.status,
     ]),
   ]
+
 
   if (format === 'pdf') {
     const text = tableRows.map((row) => row.join(' | ')).join('\n')

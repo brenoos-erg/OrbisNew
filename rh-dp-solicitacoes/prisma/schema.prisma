@@ -102,9 +102,11 @@ model CostCenter {
   nonConformitiesOriginated  NonConformity[]              @relation("NonConformityOriginCenter")
   ncActionsImpactCenter      NonConformityActionItem[]    @relation("NcActionImpactCenter")
   ncActionsResponsibleCenter NonConformityActionItem[]    @relation("NcActionResponsibleCenter")
+  isoDocuments               IsoDocument[]
 
   @@map("CostCenter")
 }
+
 
 model Position {
   id                      String      @id @default(uuid())
@@ -427,7 +429,8 @@ model IsoDocument {
   code               String               @unique
   title              String
   documentTypeId     String
-  ownerDepartmentId  String
+  ownerDepartmentId  String?
+  ownerCostCenterId  String?
   authorUserId       String
   physicalLocation   String?
   accessType         String
@@ -437,7 +440,8 @@ model IsoDocument {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   documentType       DocumentTypeCatalog  @relation(fields: [documentTypeId], references: [id])
-  ownerDepartment    Department           @relation(fields: [ownerDepartmentId], references: [id])
+  ownerDepartment    Department?          @relation(fields: [ownerDepartmentId], references: [id])
+  ownerCostCenter    CostCenter?          @relation(fields: [ownerCostCenterId], references: [id])
   author             User                 @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
   versions           DocumentVersion[]
   downloadLogs       DocumentDownloadLog[]
@@ -446,6 +450,7 @@ model IsoDocument {
   printCopies        PrintCopy[]
 
   @@index([ownerDepartmentId])
+  @@index([ownerCostCenterId])
   @@index([authorUserId])
 }
 

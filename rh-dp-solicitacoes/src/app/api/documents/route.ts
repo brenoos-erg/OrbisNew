@@ -50,7 +50,7 @@ export async function POST(req: NextRequest)   {
     const contentType = req.headers.get('content-type') ?? ''
     let payload: any = {}
 
-     if (contentType.includes('multipart/form-data')) {
+      if (contentType.includes('multipart/form-data')) {
       const form = await req.formData()
       const uploadedFile = form.get('file') ?? form.get('pdf')
       const fileUrl = uploadedFile instanceof File && uploadedFile.size > 0 ? await saveUploadedDocument(uploadedFile) : null
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest)   {
         code: normalizeCode(form.get('code')),
         title: String(form.get('title') ?? ''),
         documentTypeId: String(form.get('documentTypeId') ?? ''),
-        ownerCostCenterId: String(form.get('ownerCostCenterId') ?? form.get('ownerDepartmentId') ?? ''),
+        ownerCostCenterId: String(form.get('ownerCostCenterId') ?? ''),
         authorUserId: String(form.get('authorUserId') ?? me.id),
         summary: String(form.get('summary') ?? ''),
         affectedAreasNotes: String(form.get('affectedAreasNotes') ?? ''),
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest)   {
     } else {
       payload = await req.json()
       payload.code = normalizeCode(payload.code)
-      payload.ownerCostCenterId = payload.ownerCostCenterId ?? payload.ownerDepartmentId ?? ''
+      payload.ownerCostCenterId = payload.ownerCostCenterId ?? ''
     }
 
     if (!payload.code || !payload.title || !payload.documentTypeId || !payload.ownerCostCenterId) {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest)   {
       where: { id: String(payload.ownerCostCenterId) },
       select: { id: true, departmentId: true },
     })
-    if (!ownerCostCenter?.departmentId) {
+    if (!ownerCostCenter) {
       return NextResponse.json({ error: 'Centro responsável inválido.' }, { status: 400 })
     }
 
@@ -165,12 +165,13 @@ export async function POST(req: NextRequest)   {
       )
     }
 
-    const created = await prisma.isoDocument.create({
+   const created = await prisma.isoDocument.create({
       data: {
         code: payload.code,
         title: payload.title,
         documentTypeId: payload.documentTypeId,
-        ownerDepartmentId: ownerCostCenter.departmentId,
+        ownerDepartmentId: ownerCostCenter.departmentId ?? null,
+        ownerCostCenterId: ownerCostCenter.id,
         authorUserId: payload.authorUserId ?? me.id,
         physicalLocation: payload.physicalLocation,
         accessType: payload.accessType ?? 'INTERNO',
