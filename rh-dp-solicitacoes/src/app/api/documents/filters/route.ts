@@ -10,9 +10,18 @@ export async function GET() {
     prisma.user.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true } }),
     prisma.costCenter.findMany({
       orderBy: [{ code: 'asc' }, { description: 'asc' }],
-      select: { id: true, code: true, description: true },
+      select: { id: true, code: true, externalCode: true, description: true },
     }),
   ])
 
-  return NextResponse.json({ documentTypes, authors, responsibleCostCenters })
+  const normalizedResponsibleCostCenters = responsibleCostCenters
+    .filter((item) => Boolean(item.externalCode?.trim() || item.code?.trim()))
+    .map((item) => ({
+      id: item.id,
+      code: item.code,
+      externalCode: item.externalCode,
+      description: item.description,
+    }))
+
+  return NextResponse.json({ documentTypes, authors, responsibleCostCenters: normalizedResponsibleCostCenters })
 }

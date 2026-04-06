@@ -1,9 +1,8 @@
 'use client'
 
-import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
+mport { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
@@ -22,7 +21,7 @@ type GridRow = {
 }
 
 
-type Option = { id: string; name?: string; code?: string; description?: string; fullName?: string }
+type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -40,7 +39,10 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos para Aprovação': 'Analise documentos pendentes de aprovação e registre decisões com mais clareza.',
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
 }
-const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
+const getCostCenterLabel = (option: Option) => {
+  const code = option.externalCode?.trim() || option.code?.trim() || ''
+  return [code, option.description].filter(Boolean).join(' - ')
+}
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const router = useRouter()
   const [items, setItems] = useState<GridRow[]>([])
@@ -130,19 +132,13 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
 useEffect(() => {
-    Promise.all([
-      fetch('/api/documents/filters', { cache: 'no-store' }),
-      fetchOfficialCostCenters(),
-    ])
-      .then(async ([filtersRes, officialCostCenters]) => {
+    fetch('/api/documents/filters', { cache: 'no-store' })
+      .then(async (filtersRes) => {
         const filtersData = filtersRes.ok ? await filtersRes.json() : null
 
         if (!filtersData) return
 
-        setMeta({
-          ...filtersData,
-          responsibleCostCenters: officialCostCenters,
-        })
+        setMeta(filtersData)
       })
       .catch(() => null)
   }, [])
