@@ -20,7 +20,7 @@ type GridRow = {
 }
 
 
-type Option = { id: string; name?: string; description?: string; fullName?: string; departmentId?: string }
+type Option = { id: string; name?: string; code?: string; description?: string; fullName?: string; departmentId?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -38,6 +38,7 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos para Aprovação': 'Analise documentos pendentes de aprovação e registre decisões com mais clareza.',
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
 }
+const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const router = useRouter()
@@ -74,9 +75,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
 
-  const [meta, setMeta] = useState<{ documentTypes: Option[]; departments: Option[]; authors: Option[]; responsibleCostCenters: Option[] }>({
+  const [meta, setMeta] = useState<{ documentTypes: Option[]; authors: Option[]; responsibleCostCenters: Option[] }>({
     documentTypes: [],
-    departments: [],
     authors: [],
     responsibleCostCenters: [],
   })
@@ -391,7 +391,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
         <option value="">Centro Responsável</option>
         {meta.responsibleCostCenters.map((option) => (
           <option key={option.id} value={option.id}>
-            {option.description}
+            {getCostCenterLabel(option)}
           </option>
         ))}
       </select>
@@ -625,7 +625,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                   </p>
                 ) : null}
               </div>
-              <input className="rounded border px-3 py-2" placeholder="Título" value={createForm.title} onChange={(e) => setCreateForm((v) => ({ ...v, title: e.target.value }))} />
+               <input className="rounded border px-3 py-2" placeholder="Título" value={createForm.title} onChange={(e) => setCreateForm((v) => ({ ...v, title: e.target.value }))} />
               <select className="rounded border px-3 py-2" value={createForm.documentTypeId} onChange={(e) => setCreateForm((v) => ({ ...v, documentTypeId: e.target.value }))}>
                 <option value="">Tipo de documento</option>
                 {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
@@ -634,7 +634,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                 <option value="">Centro responsável</option>
                 {meta.responsibleCostCenters.map((option) => (
                   <option key={option.id} value={option.id}>
-                    {option.description}
+                    {getCostCenterLabel(option)}
                   </option>
                 ))}
               </select>
