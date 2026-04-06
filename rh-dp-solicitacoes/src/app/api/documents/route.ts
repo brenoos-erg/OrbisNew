@@ -245,7 +245,8 @@ export async function POST(req: NextRequest)   {
       include: { versions: true },
     })
 
-    failureStage = 'documents:create-approvals'    if (flow.length > 0 && created.versions[0]) {
+    failureStage = 'documents:create-approvals'
+    if (flow.length > 0 && created.versions[0]) {
       await prisma.documentApproval.createMany({
         data: flow.map((item) => ({
           versionId: created.versions[0].id,
