@@ -20,7 +20,7 @@ type GridRow = {
 }
 
 
-type Option = { id: string; name?: string; code?: string; description?: string; fullName?: string; departmentId?: string }
+type Option = { id: string; name?: string; code?: string; description?: string; fullName?: string }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -39,6 +39,37 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
 }
 const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
+const OFFICIAL_COST_CENTER_PAGE_SIZE = 200
+
+async function fetchOfficialCostCenters(): Promise<Option[]> {
+  const firstResponse = await fetch(`/api/cost-centers?page=1&pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}`, { cache: 'no-store' })
+  if (!firstResponse.ok) return []
+
+  const firstPayload = await firstResponse.json().catch(() => null) as { items?: Option[]; total?: number } | null
+  const firstItems = Array.isArray(firstPayload?.items) ? firstPayload.items : []
+  const total = Number(firstPayload?.total ?? firstItems.length)
+  const totalPages = Math.max(1, Math.ceil(total / OFFICIAL_COST_CENTER_PAGE_SIZE))
+
+  if (totalPages === 1) {
+    return [...firstItems].sort((a, b) =>
+      `${a.code ?? ''}${a.description ?? ''}`.localeCompare(`${b.code ?? ''}${b.description ?? ''}`, 'pt-BR'),
+    )
+  }
+
+  const remainingRequests = Array.from({ length: totalPages - 1 }, (_, index) => {
+    const pageNumber = index + 2
+    return fetch(`/api/cost-centers?page=${pageNumber}&pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}`, { cache: 'no-store' })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((payload) => (Array.isArray(payload?.items) ? payload.items as Option[] : []))
+      .catch(() => [])
+  })
+
+  const remainingPages = await Promise.all(remainingRequests)
+  return [...firstItems, ...remainingPages.flat()].sort((a, b) =>
+    `${a.code ?? ''}${a.description ?? ''}`.localeCompare(`${b.code ?? ''}${b.description ?? ''}`, 'pt-BR'),
+  )
+}
+
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const router = useRouter()
@@ -131,21 +162,16 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 useEffect(() => {
     Promise.all([
       fetch('/api/documents/filters', { cache: 'no-store' }),
-      fetch('/api/cost-centers/select', { cache: 'no-store' }),
+      fetchOfficialCostCenters(),
     ])
-      .then(async ([filtersRes, costCentersRes]) => {
-        const [filtersData, costCentersData] = await Promise.all([
-          filtersRes.ok ? filtersRes.json() : null,
-          costCentersRes.ok ? costCentersRes.json() : null,
-        ])
+      .then(async ([filtersRes, officialCostCenters]) => {
+        const filtersData = filtersRes.ok ? await filtersRes.json() : null
 
         if (!filtersData) return
 
         setMeta({
           ...filtersData,
-          responsibleCostCenters: Array.isArray(costCentersData)
-            ? costCentersData
-            : filtersData.responsibleCostCenters ?? [],
+          responsibleCostCenters: officialCostCenters,
         })
       })
       .catch(() => null)
