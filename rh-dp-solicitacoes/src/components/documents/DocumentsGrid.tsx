@@ -92,6 +92,19 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
     if (typeof window === 'undefined') return
 
     const originalFetch = window.fetch.bind(window)
+    const resolveCallerFromStack = (stack: string) => {
+      const stackLines = stack
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+
+      const firstAppFrame = stackLines.find((line) =>
+        line.includes('/src/') || line.includes('/app/') || line.includes('/components/'),
+      )
+
+      return firstAppFrame ?? stackLines[1] ?? 'origem não identificada'
+    }
+
     const tracedFetch: typeof window.fetch = async (input, init) => {
       const requestUrl =
         typeof input === 'string'
@@ -102,7 +115,12 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
 
       if (requestUrl.includes('/api/departments')) {
         const trace = new Error('[DocumentsGrid][debug] /api/departments call trace').stack ?? 'stack indisponível'
-        console.error('[DocumentsGrid][debug] Tentativa de chamada para /api/departments detectada.', { requestUrl, trace })
+        const caller = resolveCallerFromStack(trace)
+        console.error('[DocumentsGrid][debug] Tentativa de chamada para /api/departments detectada.', {
+          requestUrl,
+          caller,
+          trace,
+        })
       }
 
       return originalFetch(input, init)
