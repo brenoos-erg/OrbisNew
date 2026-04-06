@@ -3,7 +3,7 @@
 import * as Select from '@radix-ui/react-select'
 import { Check, ChevronDown } from 'lucide-react'
 
-type CostCenterOption = {
+export type CostCenterOption = {
   id: string
   code?: string | null
   description: string

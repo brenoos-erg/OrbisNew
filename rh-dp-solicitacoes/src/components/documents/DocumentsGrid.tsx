@@ -1,9 +1,9 @@
 'use client'
 
-mport { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
+import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect'
+import CostCenterSelect, { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -22,6 +22,7 @@ type GridRow = {
 
 
 type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
+type FiltersResponse = { documentTypes?: Option[]; authors?: Option[]; responsibleCostCenters?: CostCenterOption[] }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -38,10 +39,6 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos Publicados': 'Acompanhe versões publicadas, consulte detalhes e exporte a listagem quando necessário.',
   'Documentos para Aprovação': 'Analise documentos pendentes de aprovação e registre decisões com mais clareza.',
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
-}
-const getCostCenterLabel = (option: Option) => {
-  const code = option.externalCode?.trim() || option.code?.trim() || ''
-  return [code, option.description].filter(Boolean).join(' - ')
 }
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const router = useRouter()
@@ -78,7 +75,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   })
   const [appliedFilters, setAppliedFilters] = useState(draftFilters)
 
-  const [meta, setMeta] = useState<{ documentTypes: Option[]; authors: Option[]; responsibleCostCenters: Option[] }>({
+  const [meta, setMeta] = useState<{ documentTypes: Option[]; authors: Option[]; responsibleCostCenters: CostCenterOption[] }>({
     documentTypes: [],
     authors: [],
     responsibleCostCenters: [],
@@ -131,14 +128,27 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     setLoading(false)
   }
 
-useEffect(() => {
+  useEffect(() => {
     fetch('/api/documents/filters', { cache: 'no-store' })
       .then(async (filtersRes) => {
-        const filtersData = filtersRes.ok ? await filtersRes.json() : null
+        const filtersData = filtersRes.ok ? await parseJsonSafely<FiltersResponse>(filtersRes) : null
 
         if (!filtersData) return
 
-        setMeta(filtersData)
+        const responsibleCostCenters = (filtersData.responsibleCostCenters ?? [])
+          .filter((option) => Boolean(option.id && option.description?.trim() && (option.externalCode?.trim() || option.code?.trim())))
+          .map((option) => ({
+            id: option.id,
+            description: option.description.trim(),
+            code: option.code ?? null,
+            externalCode: option.externalCode ?? null,
+          }))
+
+        setMeta({
+          documentTypes: filtersData.documentTypes ?? [],
+          authors: filtersData.authors ?? [],
+          responsibleCostCenters,
+        })
       })
       .catch(() => null)
   }, [])
@@ -399,7 +409,7 @@ useEffect(() => {
         <option value="">Centro Responsável</option>
         {meta.responsibleCostCenters.map((option) => (
           <option key={option.id} value={option.id}>
-            {getCostCenterLabel(option)}
+             {formatCostCenterOption(option)}
           </option>
         ))}
       </select>
@@ -640,7 +650,7 @@ useEffect(() => {
              </select>
               <CostCenterSelect
                 value={createForm.ownerCostCenterId}
-                options={meta.responsibleCostCenters as Array<{ id: string; code?: string | null; description: string; externalCode?: string | null }>}
+                 options={meta.responsibleCostCenters}
                 onValueChange={(nextValue) => setCreateForm((v) => ({ ...v, ownerCostCenterId: nextValue }))}
                 placeholder="Centro responsável"
               />
