@@ -4,6 +4,7 @@ import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from '
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CostCenterSelect, { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
+import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -22,7 +23,7 @@ type GridRow = {
 
 
 type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
-type FiltersResponse = { documentTypes?: Option[]; authors?: Option[]; responsibleCostCenters?: CostCenterOption[] }
+type FiltersResponse = { documentTypes?: Option[]; authors?: Option[] }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
@@ -128,25 +129,26 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetch('/api/documents/filters', { cache: 'no-store' })
-      .then(async (filtersRes) => {
+ useEffect(() => {
+    Promise.all([
+      fetch('/api/documents/filters', { cache: 'no-store' }),
+      fetchOfficialCostCenters<CostCenterOption>(),
+    ])
+      .then(async ([filtersRes, officialCostCenters]) => {
         const filtersData = filtersRes.ok ? await parseJsonSafely<FiltersResponse>(filtersRes) : null
 
-        if (!filtersData) return
-
-        const responsibleCostCenters = (filtersData.responsibleCostCenters ?? [])
+        const responsibleCostCenters = (officialCostCenters ?? [])
           .filter((option) => Boolean(option.id && option.description?.trim() && (option.externalCode?.trim() || option.code?.trim())))
           .map((option) => ({
             id: option.id,
-            description: option.description.trim(),
+            description: option.description?.trim() ?? '',
             code: option.code ?? null,
             externalCode: option.externalCode ?? null,
           }))
 
         setMeta({
-          documentTypes: filtersData.documentTypes ?? [],
-          authors: filtersData.authors ?? [],
+          documentTypes: filtersData?.documentTypes ?? [],
+          authors: filtersData?.authors ?? [],
           responsibleCostCenters,
         })
       })
