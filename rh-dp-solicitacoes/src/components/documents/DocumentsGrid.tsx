@@ -63,7 +63,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
-  const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
+const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
   const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', file: null as File | null })
 
   const [draftFilters, setDraftFilters] = useState({
@@ -87,6 +87,32 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   )
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const originalFetch = window.fetch.bind(window)
+    const tracedFetch: typeof window.fetch = async (input, init) => {
+      const requestUrl =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url
+
+      if (requestUrl.includes('/api/departments')) {
+        const trace = new Error('[DocumentsGrid][debug] /api/departments call trace').stack ?? 'stack indisponível'
+        console.error('[DocumentsGrid][debug] Tentativa de chamada para /api/departments detectada.', { requestUrl, trace })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    window.fetch = tracedFetch
+    return () => {
+      window.fetch = originalFetch
+    }
+  }, [])
 
   const parseJsonSafely = async <T,>(res: Response): Promise<T | null> => {
     const body = await res.text()
@@ -146,13 +172,22 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             externalCode: option.externalCode ?? null,
           }))
 
+        console.info('[DocumentsGrid][debug] Centros de custo carregados para modal de cadastro.', {
+          endpoint: '/api/cost-centers/select (fallback: /api/cost-centers)',
+          totalOfficial: officialCostCenters?.length ?? 0,
+          totalDisplayed: responsibleCostCenters.length,
+        })
+
         setMeta({
           documentTypes: filtersData?.documentTypes ?? [],
           authors: filtersData?.authors ?? [],
           responsibleCostCenters,
         })
       })
-      .catch(() => null)
+      .catch((error) => {
+        console.error('[DocumentsGrid][debug] Falha ao carregar centros de custo no modal de cadastro.', error)
+        return null
+      })
   }, [])
 
     useEffect(() => {
