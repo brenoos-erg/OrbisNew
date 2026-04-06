@@ -16,7 +16,7 @@ assert.doesNotMatch(controlledAction, /\/print['"`]/)
 assert.match(fileRoute, /const disposition = .*attachment.*inline/)
 assert.match(fileRoute, /const resolved = await buildControlledPdf\(versionId, me\.id, intent\)/)
 assert.match(fileRoute, /'Content-Type': resolved\.mimeType/)
-assert.match(fileRoute, /'X-Document-Watermark': resolved\.watermarkApplied \? 'CÓPIA NÃO CONTROLADA' : 'UNAVAILABLE'/)
+assert.match(fileRoute, /'X-Document-Watermark': resolved\.watermarkApplied \? 'CÓPIA CONTROLADA' : 'UNAVAILABLE'/)
 
 assert.match(controlledPipeline, /mimeType:\s*DOCUMENT_PDF_MIME/)
 assert.match(controlledPipeline, /if \(!watermarkApplied\)\s*{\s*finalPdfBuffer = deps\.applyWatermark\(pdfSourceBuffer\)/s)
