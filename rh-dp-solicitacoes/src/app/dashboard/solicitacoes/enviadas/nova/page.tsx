@@ -29,6 +29,7 @@ import {
   SolicitacoesToastViewport,
   useSolicitacoesToast,
 } from '@/components/solicitacoes/SolicitacoesToast';
+import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource';
 /* ================================================================
    TYPES
 ================================================================ */
@@ -69,11 +70,6 @@ type CostCenterOption = {
   externalCode?: string | null;
 };
 
-type CostCenterResponse =
-  | CostCenterOption[]
-  | {
-      items?: CostCenterOption[];
-    };
 
 type CampoEspecifico = {
   name: string;
@@ -161,11 +157,7 @@ function toSentenceCaseWithAcronyms(value: string) {
   });
 }
 
-function normalizeCostCenters(data: CostCenterResponse): CostCenterOption[] {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
-  return [];
-}
+
 
 function getTipoDisplayName(nome: string) {
   const trimmed = nome.trim();
@@ -375,51 +367,18 @@ export default function NovaSolicitacaoPage() {
   }, [prefillFromNc.departamentoId]);
 
   useEffect(() => {
-  async function loadCostCenters() {
+   async function loadCostCenters() {
       try {
-        const selectResponse = await fetch('/api/cost-centers/select', {
-          cache: 'no-store',
-        });
-
-        if (selectResponse.ok) {
-          const data = (await selectResponse.json()) as CostCenterResponse;
-          const normalized = normalizeCostCenters(data);
-
-          if (normalized.length > 0) {
-            setCostCenters(normalized);
-            return;
-          }
-        }
-
-         const pageSize = 200;
-        const aggregated: CostCenterOption[] = [];
-        let page = 1;
-
-        while (true) {
-          const fallbackResponse = await fetch(`/api/cost-centers?pageSize=${pageSize}&page=${page}`, {
-            cache: 'no-store',
-          });
-
-          if (!fallbackResponse.ok) {
-            throw new Error('Erro ao buscar centros de custo');
-          }
-
-          const fallbackData = (await fallbackResponse.json()) as CostCenterResponse;
-          const pageItems = normalizeCostCenters(fallbackData);
-          aggregated.push(...pageItems);
-
-          if (pageItems.length < pageSize) break;
-          page += 1;
-        }
-
-        setCostCenters(aggregated);
+        const officialCostCenters =
+          await fetchOfficialCostCenters<CostCenterOption>();
+        setCostCenters(officialCostCenters);
       } catch (error) {
         console.error('Falha ao carregar centros de custo:', error);
         setCostCenters([]);
       }
     }
-  loadCostCenters();
-  }, []);
+
+    loadCostCenters();  }, []);
 
   /* ============================================================
    3) /api/tipos-solicitacao?departamentoId=

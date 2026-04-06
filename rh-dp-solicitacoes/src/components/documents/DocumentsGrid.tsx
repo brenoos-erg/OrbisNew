@@ -3,6 +3,7 @@
 import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -24,7 +25,6 @@ type Option = { id: string; name?: string; code?: string; description?: string; 
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
 type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
 type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
-type CostCenterResponse = Option[] | { items?: Option[] }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 const STATUS_STYLES: Record<string, string> = {
@@ -40,47 +40,6 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
 }
 const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
-const OFFICIAL_COST_CENTER_PAGE_SIZE = 200
-
-function normalizeCostCenters(data: CostCenterResponse): Option[] {
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.items)) return data.items
-  return []
-}
-
-async function fetchOfficialCostCenters(): Promise<Option[]> {
-  const selectResponse = await fetch('/api/cost-centers/select', {
-    cache: 'no-store',
-  })
-
-  if (selectResponse.ok) {
-    const data = (await selectResponse.json()) as CostCenterResponse
-    const normalized = normalizeCostCenters(data)
-
-    if (normalized.length > 0) {
-      return normalized
-    }
-  }
-
-  const aggregated: Option[] = []
-  let page = 1
-
-  while (true) {
-    const fallbackResponse = await fetch(`/api/cost-centers?pageSize=${OFFICIAL_COST_CENTER_PAGE_SIZE}&page=${page}`, {
-      cache: 'no-store',
-    })
-
-    if (!fallbackResponse.ok) return []
-
-    const fallbackData = (await fallbackResponse.json()) as CostCenterResponse
-    const pageItems = normalizeCostCenters(fallbackData)
-    aggregated.push(...pageItems)
-
-    if (pageItems.length < OFFICIAL_COST_CENTER_PAGE_SIZE) break
-    page += 1
-  }
-
-  return aggregated}
 
 
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
