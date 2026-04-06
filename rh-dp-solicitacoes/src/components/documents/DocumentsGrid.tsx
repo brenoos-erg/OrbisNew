@@ -4,6 +4,7 @@ import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from '
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
+import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -40,8 +41,6 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'Documentos em Revisão da Qualidade': 'Visualize itens em validação da qualidade e acompanhe o andamento da etapa.',
 }
 const getCostCenterLabel = (option: Option) => [option.code, option.description].filter(Boolean).join(' - ')
-
-
 export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalStage, allowCreate }: Props) {
   const router = useRouter()
   const [items, setItems] = useState<GridRow[]>([])
@@ -637,20 +636,18 @@ useEffect(() => {
                     {codeValidation.message}
                   </p>
                 ) : null}
-              </div>
+               </div>
                <input className="rounded border px-3 py-2" placeholder="Título" value={createForm.title} onChange={(e) => setCreateForm((v) => ({ ...v, title: e.target.value }))} />
               <select className="rounded border px-3 py-2" value={createForm.documentTypeId} onChange={(e) => setCreateForm((v) => ({ ...v, documentTypeId: e.target.value }))}>
                 <option value="">Tipo de documento</option>
                 {meta.documentTypes.map((option) => <option key={option.id} value={option.id}>{option.description}</option>)}
              </select>
-              <select className="rounded border px-3 py-2" value={createForm.ownerCostCenterId} onChange={(e) => setCreateForm((v) => ({ ...v, ownerCostCenterId: e.target.value }))}>
-                <option value="">Centro responsável</option>
-                {meta.responsibleCostCenters.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {getCostCenterLabel(option)}
-                  </option>
-                ))}
-              </select>
+              <CostCenterSelect
+                value={createForm.ownerCostCenterId}
+                options={meta.responsibleCostCenters as Array<{ id: string; code?: string | null; description: string; externalCode?: string | null }>}
+                onValueChange={(nextValue) => setCreateForm((v) => ({ ...v, ownerCostCenterId: nextValue }))}
+                placeholder="Centro responsável"
+              />
               <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
                 <option value="">Elaborador/Revisor (auto)</option>
                 {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
