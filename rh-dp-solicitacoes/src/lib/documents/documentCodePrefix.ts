@@ -1,4 +1,4 @@
-const FALLBACK_CODE_PREFIXES = new Set(['PG', 'IT', 'DD', 'COD', 'MAN', 'POL', 'RQ', 'DOCEXT', 'LEG'])
+const FALLBACK_CODE_PREFIXES = new Set(['PG', 'IT', 'DD', 'COD', 'MAN', 'POL', 'RQ', 'DOCEXT', 'LEG', 'MSIG'])
 
 function sanitizeSegment(value: string) {
   return value

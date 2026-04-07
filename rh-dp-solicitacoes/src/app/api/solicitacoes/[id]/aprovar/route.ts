@@ -78,7 +78,7 @@ export async function POST(
       canApproveByDepartment
 
     if (!canApproveSolicitation) {
-      return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
+     return NextResponse.json({ error: 'Você não é o responsável por esta solicitação.' }, { status: 403 })
     }
   const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(solic.tipo)
     const isDesligamento = isSolicitacaoDesligamento(solic.tipo)
@@ -92,7 +92,7 @@ export async function POST(
     let rhCostCenter = null
     let rhDepartment: { id: string; name: string } | null = null
 
-     if (isSolicitacaoPessoalTipo || isDesligamento) {
+     if (isSolicitacaoPessoalTipo) {
       rhDepartment = await prisma.department.findFirst({
         where: {
           OR: [
@@ -123,13 +123,21 @@ export async function POST(
             { code: { contains: 'RH' } },
           ],
         },
-      })
+     })
     }
 
     const rhDepartmentId = rhDepartment?.id
-      const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
+    const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
 
+    if (isDesligamento && !dpDepartment) {
+      return NextResponse.json(
+        {
+          error: 'Departamento Pessoal (DP) não encontrado para encaminhar a solicitação de desligamento aprovada.',
+        },
+        { status: 400 },
+      )
+    }
 
     const isFeriasDpStage = isFerias && solic.department?.code === '08'
 
@@ -146,7 +154,11 @@ export async function POST(
           : 'ABERTA',
     }
 
-  if ((isSolicitacaoPessoalTipo || isDesligamento) && rhDepartmentId) {
+  if (isDesligamento && dpDepartment) {
+      // Regra vigente: todo desligamento deve seguir para DP, inclusive quando houver substituição.
+      updateData.departmentId = dpDepartment.id
+      updateData.costCenterId = null
+    } else if (isSolicitacaoPessoalTipo && rhDepartmentId) {
       updateData.costCenterId = rhCostCenter?.id ?? null
       updateData.departmentId = rhDepartmentId
     } else if (isFerias && dpDepartment) {
@@ -174,12 +186,12 @@ export async function POST(
       data: updateData,
     })
 
-     let timelineMessage: string
+      let timelineMessage: string
 
     if (approvalComment && approvalComment.length > 0) {
       timelineMessage = approvalComment
-    } else if (isDesligamento && rhDepartment) {
-      timelineMessage = `Solicitação aprovada e encaminhada para ${rhDepartment.name}.`
+    } else if (isDesligamento && dpDepartment) {
+      timelineMessage = `Solicitação aprovada e encaminhada para ${dpDepartment.name}.`
     } else if (isFerias && dpDepartment && !isFeriasDpStage) {
       timelineMessage = `Solicitação aprovada pelo gestor e encaminhada para aprovação do ${dpDepartment.name}.`
     } else if (isFerias && dpDepartment && isFeriasDpStage) {

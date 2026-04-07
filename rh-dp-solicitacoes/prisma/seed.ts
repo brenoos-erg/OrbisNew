@@ -3261,12 +3261,17 @@ async function main() {
     )
   } else {
     const isoPrisma = prisma as any
-    const documentTypes = ['MAN', 'RQ', 'DA', 'PG', 'IT', 'POL', 'DD', 'COD', 'DOCEXT', 'LEG']
+    const documentTypes = ['MAN', 'RQ', 'DA', 'PG', 'IT', 'POL', 'DD', 'COD', 'DOCEXT', 'LEG', 'MSIG']
     for (const code of documentTypes) {
       await isoPrisma.documentTypeCatalog.upsert({
         where: { code },
-        update: { description: `Tipo ${code}` },
-        create: { code, description: `Tipo ${code}` },
+        update: {
+          description: code === 'MSIG' ? 'MSIG - Manual do Sistema Integrado de Gestão' : `Tipo ${code}`,
+        },
+        create: {
+          code,
+          description: code === 'MSIG' ? 'MSIG - Manual do Sistema Integrado de Gestão' : `Tipo ${code}`,
+        },
       })
     }
 
