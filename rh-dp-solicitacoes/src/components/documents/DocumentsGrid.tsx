@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CostCenterSelect, { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
 import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource'
+import {
+  codeMatchesRequiredPrefix,
+  enforceDocumentCodePrefix,
+  extractDocumentCodeSuffix,
+  resolveDocumentCodePrefixFromTypeCode,
+} from '@/lib/documents/documentCodePrefix'
 
 type Props = { endpoint: string; title: string; fixedStatus?: string; approvalStage?: 2 | 3; allowCreate?: boolean }
 
@@ -80,12 +86,18 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
     authors: [],
     responsibleCostCenters: [],
   })
-  const hasActiveFilters = useMemo(
+   const hasActiveFilters = useMemo(
     () => Boolean(appliedFilters.code || appliedFilters.title || appliedFilters.documentTypeId || appliedFilters.ownerCostCenterId || appliedFilters.authorUserId),
     [appliedFilters],
   )
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
+  const selectedDocumentType = useMemo(
+    () => meta.documentTypes.find((option) => option.id === createForm.documentTypeId) ?? null,
+    [createForm.documentTypeId, meta.documentTypes],
+  )
+  const requiredCodePrefix = useMemo(() => resolveDocumentCodePrefixFromTypeCode(selectedDocumentType?.code), [selectedDocumentType?.code])
+  const codeSuffix = useMemo(() => extractDocumentCodeSuffix(createForm.code, requiredCodePrefix), [createForm.code, requiredCodePrefix])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -344,6 +356,11 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       return
     }
 
+    if (!codeMatchesRequiredPrefix(normalizedCode, requiredCodePrefix)) {
+      setCreateError(`O código deve começar com o prefixo "${requiredCodePrefix}" para o tipo documental selecionado.`)
+      return
+    }
+
     if (createForm.authorUserId && !createForm.authorUserId.trim()) {
       setCreateError('Informe um elaborador/revisor válido.')
       return
@@ -431,6 +448,18 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       controller.abort()
     }
   }, [createForm.code, showCreate])
+
+  useEffect(() => {
+    if (!showCreate) return
+    if (!createForm.documentTypeId) return
+
+    setCreateError(null)
+    setCreateForm((prev) => {
+      const adjustedCode = enforceDocumentCodePrefix(prev.code, requiredCodePrefix)
+      if (adjustedCode === prev.code) return prev
+      return { ...prev, code: adjustedCode }
+    })
+  }, [createForm.documentTypeId, requiredCodePrefix, showCreate])
   const acceptTerm = async () => {
     if (!term || !pendingAction) return
     const response = await fetch('/api/documents/term/accept', {
@@ -712,16 +741,29 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
             <h2 className="text-lg font-semibold">Cadastrar documento</h2>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <div>
-                <input
-                  className={`w-full rounded border px-3 py-2 ${codeValidation.status === 'duplicate' ? 'border-red-500' : 'border-slate-300'}`}
-                  placeholder="Código"
-                  value={createForm.code}
-                  onChange={(e) => {
-                    setCreateError(null)
-                    setCreateForm((v) => ({ ...v, code: e.target.value }))
-                  }}
-                />
-                {codeValidation.message ? (
+                 <div className={`flex overflow-hidden rounded border ${codeValidation.status === 'duplicate' ? 'border-red-500' : 'border-slate-300'}`}>
+                  <span className="flex items-center border-r border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
+                    {requiredCodePrefix || 'TIPO.'}
+                  </span>
+                  <input
+                    className="w-full px-3 py-2 outline-none"
+                    placeholder="Complemento do código"
+                    value={codeSuffix}
+                    onChange={(e) => {
+                      setCreateError(null)
+                      const nextCode = requiredCodePrefix
+                        ? `${requiredCodePrefix}${e.target.value.trim().toUpperCase()}`
+                        : e.target.value.trim().toUpperCase()
+                      setCreateForm((v) => ({ ...v, code: nextCode }))
+                    }}
+                    disabled={!createForm.documentTypeId}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {createForm.documentTypeId
+                    ? `Prefixo obrigatório do tipo selecionado: ${requiredCodePrefix}`
+                    : 'Selecione o tipo documental para preencher o prefixo automático.'}
+                </p>                {codeValidation.message ? (
                   <p className={`mt-1 text-xs ${codeValidation.status === 'duplicate' || codeValidation.status === 'error' ? 'text-red-600' : codeValidation.status === 'available' ? 'text-emerald-700' : 'text-slate-500'}`}>
                     {codeValidation.message}
                   </p>

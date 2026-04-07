@@ -8,12 +8,13 @@ import {
   duplicateCodeMessage,
   resolveInitialVersionStatus,
   routingForStatus,
-} from '@/lib/iso-document-routing'
+}  from '@/lib/iso-document-routing'
 import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
 import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
+import { codeMatchesRequiredPrefix, resolveDocumentCodePrefixFromTypeCode } from '@/lib/documents/documentCodePrefix'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest)   {
       return NextResponse.json({ error: 'Preencha código, título, tipo de documento e centro responsável.' }, { status: 400 })
     }
 
+    
     if (!payload.fileUrl) {
       return NextResponse.json({ error: 'Anexe um arquivo válido (PDF, DOC ou DOCX) para criar o documento.' }, { status: 400 })
     }
@@ -122,11 +124,21 @@ export async function POST(req: NextRequest)   {
     failureStage = 'validation:document-type'
     const documentType = await prisma.documentTypeCatalog.findUnique({
       where: { id: String(payload.documentTypeId) },
-      select: { id: true },
+      select: { id: true, code: true },
     })
 
     if (!documentType) {
       return NextResponse.json({ error: 'Tipo de documento inválido.' }, { status: 400 })
+    }
+
+    const requiredCodePrefix = resolveDocumentCodePrefixFromTypeCode(documentType.code)
+    if (!codeMatchesRequiredPrefix(payload.code, requiredCodePrefix)) {
+      return NextResponse.json(
+        {
+          error: `Código incompatível com o tipo documental selecionado. Este tipo exige prefixo "${requiredCodePrefix}".`,
+        },
+        { status: 400 },
+      )
     }
 
     failureStage = 'validation:cost-center'
