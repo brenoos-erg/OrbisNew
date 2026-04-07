@@ -11,6 +11,10 @@ import { toSafeDownloadPdfName } from '@/lib/documents/documentStorage'
 
 const execFileAsync = promisify(execFile)
 let cachedSofficeBinary: string | null = null
+const WINDOWS_SOFFICE_ALLOWED_PATHS = [
+  'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+] as const
 
 type ConversionResult = {
   pdfBuffer: Buffer
@@ -25,6 +29,10 @@ type SofficeResult = {
   args: string[]
   stdout: string
   stderr: string
+}
+type SofficeCandidate = {
+  binary: string
+  source: 'LIBREOFFICE_PATH' | 'SOFFICE_PATH' | 'auto-detected'
 }
 
 
@@ -42,16 +50,16 @@ function normalizeWindowsPath(value: string) {
   return value.replace(/\//g, '\\').toLowerCase()
 }
 
-function isValidWindowsSofficeExecutablePath(value: string) {
-  const normalized = normalizeWindowsPath(value)
-  return normalized.endsWith('\\program\\soffice.exe')
-}
-
 function isWindowsExecutableCandidate(binary: string) {
   const lower = binary.trim().toLowerCase()
   if (!lower) return false
   if (lower.endsWith('.bat') || lower.endsWith('.cmd') || lower.endsWith('.lnk')) return false
   return lower.endsWith('.exe')
+}
+
+function isExplicitWindowsSofficePath(binary: string) {
+  const normalized = normalizeWindowsPath(binary)
+  return WINDOWS_SOFFICE_ALLOWED_PATHS.some((allowedPath) => normalizeWindowsPath(allowedPath) === normalized)
 }
 
 async function fileExistsReadable(filePath: string) {
@@ -63,25 +71,40 @@ async function fileExistsReadable(filePath: string) {
   }
 }
 
-function getSofficeCandidates() {
-  const libreOfficeEnvCandidate = sanitizeEnvPath(process.env.LIBREOFFICE_PATH)
-  const legacyEnvCandidate = sanitizeEnvPath(process.env.SOFFICE_PATH)
+function getSofficeCandidates(): SofficeCandidate[] {
+  const libreOfficeEnvRaw = process.env.LIBREOFFICE_PATH
+  const sofficeEnvRaw = process.env.SOFFICE_PATH
+  const libreOfficeEnvCandidate = sanitizeEnvPath(libreOfficeEnvRaw)
+  const legacyEnvCandidate = sanitizeEnvPath(sofficeEnvRaw)
   const windows = isWindowsPlatform()
 
   console.info('[documents.word-to-pdf] soffice-env-detection', {
-    hasLibreOfficePath: Boolean(libreOfficeEnvCandidate),
-    hasSofficePath: Boolean(legacyEnvCandidate),
+    libreOfficePathRaw: libreOfficeEnvRaw ?? null,
+    sofficePathRaw: sofficeEnvRaw ?? null,
     libreOfficePath: libreOfficeEnvCandidate ?? null,
     sofficePath: legacyEnvCandidate ?? null,
   })
 
- return [
-    libreOfficeEnvCandidate,
-    legacyEnvCandidate,
-    'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-    'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
-    ...(windows ? [] : ['soffice', '/usr/bin/soffice', '/usr/local/bin/soffice']),
-  ].filter((candidate): candidate is string => Boolean(candidate))
+ const candidates: SofficeCandidate[] = []
+  if (libreOfficeEnvCandidate) candidates.push({ binary: libreOfficeEnvCandidate, source: 'LIBREOFFICE_PATH' })
+  if (legacyEnvCandidate) candidates.push({ binary: legacyEnvCandidate, source: 'SOFFICE_PATH' })
+
+  if (windows) {
+    for (const binary of WINDOWS_SOFFICE_ALLOWED_PATHS) candidates.push({ binary, source: 'auto-detected' })
+  } else {
+    candidates.push(
+      { binary: 'soffice', source: 'auto-detected' },
+      { binary: '/usr/bin/soffice', source: 'auto-detected' },
+      { binary: '/usr/local/bin/soffice', source: 'auto-detected' },
+    )
+  }
+
+  const deduped = new Map<string, SofficeCandidate>()
+  for (const candidate of candidates) {
+    const key = windows ? normalizeWindowsPath(candidate.binary) : candidate.binary
+    if (!deduped.has(key)) deduped.set(key, candidate)
+  }
+  return Array.from(deduped.values())
 }
 
 async function resolveSofficeBinary() {
@@ -90,50 +113,78 @@ async function resolveSofficeBinary() {
   const attemptedBinaries: string[] = []
   let lastError: unknown = null
 
-  for (const binary of getSofficeCandidates()) {
-    const candidateBinary = binary
+  for (const candidate of getSofficeCandidates()) {
+    const candidateBinary = candidate.binary
     attemptedBinaries.push(candidateBinary)
 
     if (isWindowsPlatform()) {
       if (!isWindowsExecutableCandidate(candidateBinary)) {
         console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
           binary: candidateBinary,
+          source: candidate.source,
           reason: 'windows-non-executable-or-wrapper',
         })
         continue
       }
 
-      if (!isValidWindowsSofficeExecutablePath(candidateBinary)) {
+      const baseName = path.basename(candidateBinary).toLowerCase()
+      if (baseName !== 'soffice.exe') {
         console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
           binary: candidateBinary,
-          reason: 'windows-path-must-end-with-program-soffice.exe',
+          source: candidate.source,
+          reason: 'windows-basename-must-be-soffice.exe',
         })
-        if (candidateBinary === sanitizeEnvPath(process.env.LIBREOFFICE_PATH)) {
-          console.error('[documents.word-to-pdf] libreoffice-path-invalid', {
-            envVar: 'LIBREOFFICE_PATH',
-            value: candidateBinary,
-            expectedSuffix: '\\program\\soffice.exe',
-          })
-        }
-        if (candidateBinary === sanitizeEnvPath(process.env.SOFFICE_PATH)) {
-          console.error('[documents.word-to-pdf] libreoffice-path-invalid', {
-            envVar: 'SOFFICE_PATH',
-            value: candidateBinary,
-            expectedSuffix: '\\program\\soffice.exe',
-          })
-        }
         continue
+      }
+
+      if (!isExplicitWindowsSofficePath(candidateBinary)) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          source: candidate.source,
+          reason: 'windows-path-not-allowed',
+          allowedPaths: WINDOWS_SOFFICE_ALLOWED_PATHS,
+        })
+         continue
       }
 
       const exists = await fileExistsReadable(candidateBinary)
       if (!exists) {
         console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
           binary: candidateBinary,
+          source: candidate.source,
           reason: 'windows-soffice-exe-not-found',
         })
         continue
       }
+
+      const fileStats = await fs.lstat(candidateBinary).catch(() => null)
+      if (!fileStats?.isFile()) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          source: candidate.source,
+          reason: 'windows-candidate-not-a-file',
+        })
+        continue
+      }
+
+      if (fileStats.isSymbolicLink()) {
+        console.warn('[documents.word-to-pdf] soffice-candidate-rejected', {
+          binary: candidateBinary,
+          source: candidate.source,
+          reason: 'windows-symlink-not-allowed',
+        })
+        continue
+      }
+
+      cachedSofficeBinary = candidateBinary
+      console.info('[documents.word-to-pdf] soffice-candidate-selected', {
+        binary: candidateBinary,
+        source: candidate.source,
+        platform: 'win32',
+      })
+      return candidateBinary
     }
+
     try {
       await execFileAsync(candidateBinary, ['--version'], {
         timeout: 20_000,
@@ -143,12 +194,7 @@ async function resolveSofficeBinary() {
       cachedSofficeBinary = candidateBinary
       console.info('[documents.word-to-pdf] soffice-candidate-selected', {
         binary: candidateBinary,
-        source:
-          candidateBinary === sanitizeEnvPath(process.env.LIBREOFFICE_PATH)
-            ? 'LIBREOFFICE_PATH'
-            : candidateBinary === sanitizeEnvPath(process.env.SOFFICE_PATH)
-              ? 'SOFFICE_PATH'
-              : 'auto-detected',
+        source: candidate.source,
       })
       return candidateBinary
     } catch (error) {
@@ -156,6 +202,7 @@ async function resolveSofficeBinary() {
       const err = error as NodeJS.ErrnoException
       console.warn('[documents.word-to-pdf] soffice-candidate-failed', {
         binary: candidateBinary,
+        source: candidate.source,
         code: err?.code ?? 'n/a',
         message: err?.message ?? String(error),
       })
@@ -163,11 +210,9 @@ async function resolveSofficeBinary() {
     }
   }
 
-
   const message = lastError instanceof Error ? lastError.message : String(lastError)
   throw new Error(`LibreOffice (soffice) não encontrado. Caminhos tentados: ${attemptedBinaries.join(', ')}. Último erro: ${message}`)
 }
-
 function trimCommandOutput(value: string) {
   const normalized = value.trim()
   if (!normalized) return ''
