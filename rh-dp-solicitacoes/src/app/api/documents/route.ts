@@ -44,7 +44,7 @@ async function saveUploadedDocument(file: File, documentCode: string) {
     savedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
   }
 
-  onsole.info('[documents.create] upload-persisted', {
+  console.info('[documents.create] upload-persisted', {
     originalName: file.name,
     safeName,
     family: familyRule.family,
