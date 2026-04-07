@@ -46,14 +46,24 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
       return NextResponse.json({ error: 'A versão não possui arquivo para publicação.' }, { status: 422 })
     }
     const familyRule = resolveDocumentFamilyRule(version.document.code)
+    const shouldFinalizeToPdf = familyRule.family === 'controlled-pdf'
 
     try {
-      publishedFileUrl = familyRule.family === 'non-controlled-native'
-        ? version.fileUrl
-        : await finalizeToPublishedPdf({
+      console.info('[documents.approve] publication-flow-selected', {
+        versionId,
+        documentCode: version.document.code,
+        prefix: familyRule.prefix,
+        family: familyRule.family,
+        sourceFileUrl: version.fileUrl,
+        shouldFinalizeToPdf,
+      })
+
+      publishedFileUrl = shouldFinalizeToPdf
+        ? await finalizeToPublishedPdf({
           sourceFileUrl: version.fileUrl,
           documentCode: version.document.code,
         })
+        : version.fileUrl
       console.info('[documents.approve] publication-file-finalized', {
         versionId,
         documentCode: version.document.code,

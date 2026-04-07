@@ -9,10 +9,12 @@ const wordToPdf = fs.readFileSync('src/lib/documents/wordToPdf.ts', 'utf8')
 
 assert.match(familyRules, /new Set\(\['RQ', 'DOCEXT', 'LEG'\]\)/)
 assert.match(familyRules, /new Set\(\['PG', 'IT', 'DD', 'COD', 'MAN', 'POL'\]\)/)
-assert.match(finalizeSource, /if \(familyRule\.family === 'non-controlled-native'\) {\s*return sourceFileUrl/s)
+assert.match(finalizeSource, /if \(familyRule\.family === 'non-controlled-native'\) \{[\s\S]*?return sourceFileUrl/s)
 assert.match(createRoute, /finalizeToPublishedPdf\(\{ sourceFileUrl: originalFileUrl, documentCode \}\)/)
+assert.match(createRoute, /const shouldFinalizeToPdf = familyRule\.family === 'controlled-pdf'/)
 assert.match(approveRoute, /document: \{ select: \{ code: true \} \}/)
 assert.match(approveRoute, /documentCode: version\.document\.code/)
+assert.match(approveRoute, /const shouldFinalizeToPdf = familyRule\.family === 'controlled-pdf'/)
 assert.match(wordToPdf, /windowsHide: true/)
 
 console.log('document-publication-type-rules ok')

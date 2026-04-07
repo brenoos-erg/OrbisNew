@@ -11,8 +11,8 @@ export type DocumentFamilyRule = {
 function extractDocumentPrefix(documentCode: string): string {
   const normalized = String(documentCode ?? '').trim().toUpperCase()
   if (!normalized) return ''
-  const [prefix] = normalized.split('.', 1)
-  return prefix?.trim() ?? ''
+  const matchedPrefix = normalized.match(/^[A-Z]+/)
+  return matchedPrefix?.[0]?.trim() ?? ''
 }
 
 export function resolveDocumentFamilyRule(documentCode: string): DocumentFamilyRule {

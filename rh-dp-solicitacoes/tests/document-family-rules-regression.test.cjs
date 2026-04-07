@@ -6,6 +6,7 @@ const controlledPipeline = fs.readFileSync('src/lib/documents/controlledPdfPipel
 
 assert.match(familyRules, /NON_CONTROLLED_PREFIXES = new Set\(\['RQ', 'DOCEXT', 'LEG'\]\)/)
 assert.match(familyRules, /CONTROLLED_PREFIXES = new Set\(\['PG', 'IT', 'DD', 'COD', 'MAN', 'POL'\]\)/)
+assert.match(familyRules, /normalized\.match\(\/\^\[A-Z\]\+\/\)/)
 assert.match(familyRules, /return \{ prefix, family: 'non-controlled-native' \}/)
 assert.match(familyRules, /return \{ prefix, family: 'controlled-pdf' \}/)
 assert.match(controlledPipeline, /resolveDocumentFamilyRule\(access\.documentCode\)/)

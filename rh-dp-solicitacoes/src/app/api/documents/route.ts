@@ -18,7 +18,6 @@ import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
 }
-
 async function saveUploadedDocument(file: File, documentCode: string) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
@@ -29,21 +28,33 @@ async function saveUploadedDocument(file: File, documentCode: string) {
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(absolute, buffer)
   const familyRule = resolveDocumentFamilyRule(documentCode)
-  const publishedFileUrl = familyRule.family === 'non-controlled-native'
-    ? originalFileUrl
-    : await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
+  const shouldFinalizeToPdf = familyRule.family === 'controlled-pdf'
+  let savedFileUrl = originalFileUrl
 
-  console.info('[documents.create] upload-persisted', {
+  console.info('[documents.create] upload-flow-selected', {
+    originalName: file.name,
+    safeName,
+    documentCode,
+    prefix: familyRule.prefix,
+    family: familyRule.family,
+    shouldFinalizeToPdf,
+  })
+
+  if (shouldFinalizeToPdf) {
+    savedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
+  }
+
+  onsole.info('[documents.create] upload-persisted', {
     originalName: file.name,
     safeName,
     family: familyRule.family,
     originalFileUrl,
     originalAbsolutePath: absolute,
     originalExists: true,
-    savedFileUrl: publishedFileUrl,
+    savedFileUrl,
   })
 
-  return publishedFileUrl
+  return savedFileUrl
 }
 
 export async function POST(req: NextRequest)   {
