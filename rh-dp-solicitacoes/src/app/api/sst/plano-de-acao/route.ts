@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
 
    const { searchParams } = new URL(req.url)
     const q = searchParams.get('q')?.trim()
+    const numeroProcesso = searchParams.get('numeroProcesso')?.trim()
     const status = searchParams.get('status')
     const responsavel = searchParams.get('responsavel')?.trim()
     const emAtraso = searchParams.get('emAtraso') === '1'
@@ -79,13 +80,12 @@ export async function GET(req: NextRequest) {
             },
           }
         : {}),
-      ...(q
+      ...((q || numeroProcesso)
         ? {
             OR: [
-              { descricao: { contains: q } },
-              { evidencias: { contains: q } },
-              { referencia: { contains: q } },
-              { nonConformity: { numeroRnc: { contains: q } } },
+              ...(q ? [{ descricao: { contains: q } }, { evidencias: { contains: q } }] : []),
+              { referencia: { contains: numeroProcesso || q || '' } },
+              { nonConformity: { numeroRnc: { contains: numeroProcesso || q || '' } } },
             ],
           }
         : {}),
@@ -117,6 +117,11 @@ export async function GET(req: NextRequest) {
         nonConformityId: true,
         referencia: true,
         origem: true,
+        dataConclusao: true,
+        rapidez: true,
+        autonomia: true,
+        beneficio: true,
+        centroResponsavel: { select: { description: true } },
         createdBy: { select: { id: true, fullName: true, email: true } },
         centroImpactado: { select: { description: true } },
         nonConformity: {

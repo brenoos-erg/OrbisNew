@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { NonConformityActionPlanOrigin, NonConformityActionStatus } from '@prisma/client'
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { NonConformityActionStatus } from '@prisma/client'
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import { actionStatusLabel } from '@/lib/sst/serializers'
 import SstModuleTabs from '@/components/sst/SstModuleTabs'
 
@@ -11,34 +11,22 @@ type ActionRow = {
   descricao: string
   responsavelNome?: string | null
   prazo?: string | null
+  dataConclusao?: string | null
   status: NonConformityActionStatus
   createdAt: string
-  origemPlano: NonConformityActionPlanOrigin
-  nonConformityId?: string | null
-  nonConformity?: {
-    id: string
-    numeroRnc: string
-    centroQueOriginou?: { description: string } | null
-    centroQueDetectou?: { description: string } | null
-  } | null
+  referencia?: string | null
+  origem?: string | null
+  rapidez?: number | null
+  autonomia?: number | null
+  beneficio?: number | null
+  centroResponsavel?: { description: string } | null
 }
 
-function toDateOnly(dateValue?: string | null) {
-  if (!dateValue) return null
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return null
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
+type PriorityFilter = 'TODAS' | 'ALTA' | 'MEDIA' | 'BAIXA'
 
-function isOverdue(action: ActionRow) {
-  const prazo = toDateOnly(action.prazo)
-  if (!prazo) return false
-  if (action.status === NonConformityActionStatus.CONCLUIDA || action.status === NonConformityActionStatus.CANCELADA) return false
+const ACTION_STATUS_FILTER_OPTIONS = ['TODOS', ...Object.values(NonConformityActionStatus)] as const
 
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return prazo < today
-}
+type FilterStatus = (typeof ACTION_STATUS_FILTER_OPTIONS)[number]
 
 function formatDate(value?: string | null) {
   if (!value) return '-'
@@ -47,158 +35,211 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString('pt-BR')
 }
 
-const ACTION_STATUS_FILTER_OPTIONS = ['TODOS', ...Object.values(NonConformityActionStatus)] as const
+function toDateOnly(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+ if (Number.isNaN(date.getTime())) return null
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
 
-type FilterStatus = (typeof ACTION_STATUS_FILTER_OPTIONS)[number]
+function getOnde(origem?: string | null) {
+  if (!origem) return '-'
+  return origem.startsWith('LOCAL:') ? origem.slice(6) : origem
+}
+
+function getPriority(item: ActionRow): PriorityFilter {
+  const score = (item.rapidez || 0) + (item.autonomia || 0) + (item.beneficio || 0)
+  if (score >= 11) return 'ALTA'
+  if (score >= 7) return 'MEDIA'
+  return 'BAIXA'
+}
+
+function isOverdue(action: ActionRow) {
+  const prazo = toDateOnly(action.prazo)
+  if (!prazo) return false
+  if (action.status === NonConformityActionStatus.CONCLUIDA || action.status === NonConformityActionStatus.CANCELADA) return false
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return prazo < today
+}
 
 export default function PlanosDeAcaoClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<ActionRow[]>([])
-  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const [qDraft, setQDraft] = useState('')
+  const [numeroProcessoDraft, setNumeroProcessoDraft] = useState('')
+  const [centroResponsavelDraft, setCentroResponsavelDraft] = useState('')
   const [responsavelDraft, setResponsavelDraft] = useState('')
   const [statusDraft, setStatusDraft] = useState<FilterStatus>('TODOS')
+  const [prioridadeDraft, setPrioridadeDraft] = useState<PriorityFilter>('TODAS')
+  const [ondeDraft, setOndeDraft] = useState('')
   const [emAtrasoDraft, setEmAtrasoDraft] = useState(false)
+  const [dataCriacaoInicioDraft, setDataCriacaoInicioDraft] = useState('')
+  const [dataCriacaoFimDraft, setDataCriacaoFimDraft] = useState('')
+  const [dataConclusaoInicioDraft, setDataConclusaoInicioDraft] = useState('')
+  const [dataConclusaoFimDraft, setDataConclusaoFimDraft] = useState('')
 
-  const [q, setQ] = useState('')
+  const [numeroProcesso, setNumeroProcesso] = useState('')
+  const [centroResponsavel, setCentroResponsavel] = useState('')
   const [responsavel, setResponsavel] = useState('')
   const [status, setStatus] = useState<FilterStatus>('TODOS')
+  const [prioridade, setPrioridade] = useState<PriorityFilter>('TODAS')
+  const [onde, setOnde] = useState('')
   const [emAtraso, setEmAtraso] = useState(false)
+  const [dataCriacaoInicio, setDataCriacaoInicio] = useState('')
+  const [dataCriacaoFim, setDataCriacaoFim] = useState('')
+  const [dataConclusaoInicio, setDataConclusaoInicio] = useState('')
+  const [dataConclusaoFim, setDataConclusaoFim] = useState('')
 
-  const [novoDescricao, setNovoDescricao] = useState('')
-  const [novoResponsavel, setNovoResponsavel] = useState('')
-  const [novoPrazo, setNovoPrazo] = useState('')
-  const [novoStatus, setNovoStatus] = useState<NonConformityActionStatus>(NonConformityActionStatus.PENDENTE)
-  const [novaEvidencia, setNovaEvidencia] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 10
 
   async function load() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (q.trim()) params.set('q', q.trim())
+      if (numeroProcesso.trim()) params.set('numeroProcesso', numeroProcesso.trim())
       if (responsavel.trim()) params.set('responsavel', responsavel.trim())
       if (status !== 'TODOS') params.set('status', status)
       if (emAtraso) params.set('emAtraso', '1')
 
       const res = await fetch(`/api/sst/plano-de-acao?${params.toString()}`, { cache: 'no-store' })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Erro ao carregar planos de ação.')
+      if (!res.ok) throw new Error(data?.error || 'Erro ao carregar ações do plano.')
 
       setItems(Array.isArray(data.items) ? data.items : [])
       setError(null)
     } catch (e: any) {
-      setError(e?.message || 'Erro ao carregar planos de ação.')
+      setError(e?.message || 'Erro ao carregar ações do plano.')
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleCreateStandalonePlan(e: FormEvent) {
-    e.preventDefault()
-    if (!novoDescricao.trim()) return
-
-     try {
-      setSaving(true)
-      const res = await fetch('/api/sst/plano-de-acao', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          descricao: novoDescricao,
-          responsavelNome: novoResponsavel || null,
-          prazo: novoPrazo || null,
-          origem: 'PLANO AVULSO',
-          status: novoStatus,
-          evidencias: novaEvidencia || null,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Erro ao criar plano avulso.')
-
-      setNovoDescricao('')
-      setNovoResponsavel('')
-      setNovoPrazo('')
-      setNovoStatus(NonConformityActionStatus.PENDENTE)
-      setNovaEvidencia('')
-      await load()
-    } catch (e: any) {
-      setError(e?.message || 'Erro ao criar plano avulso.')
-    } finally {
-      setSaving(false)
-    }
-  }
   useEffect(() => {
     load()
-  }, [q, responsavel, status, emAtraso])
+  }, [numeroProcesso, responsavel, status, emAtraso])
 
-  const totalAtrasadas = useMemo(() => items.filter((item) => isOverdue(item)).length, [items])
+  const filteredItems = useMemo(() => {
+    const criacaoIni = toDateOnly(dataCriacaoInicio)
+    const criacaoFim = toDateOnly(dataCriacaoFim)
+    const conclusaoIni = toDateOnly(dataConclusaoInicio)
+    const conclusaoFim = toDateOnly(dataConclusaoFim)
+
+    return items.filter((item) => {
+      if (centroResponsavel.trim()) {
+        const centro = item.centroResponsavel?.description || ''
+        if (!centro.toLowerCase().includes(centroResponsavel.toLowerCase())) return false
+      }
+
+      if (onde.trim() && !getOnde(item.origem).toLowerCase().includes(onde.toLowerCase())) return false
+      if (prioridade !== 'TODAS' && getPriority(item) !== prioridade) return false
+
+      const createdAt = toDateOnly(item.createdAt)
+      if (criacaoIni && createdAt && createdAt < criacaoIni) return false
+      if (criacaoFim && createdAt && createdAt > criacaoFim) return false
+
+      const dtConclusao = toDateOnly(item.dataConclusao)
+      if (conclusaoIni && (!dtConclusao || dtConclusao < conclusaoIni)) return false
+      if (conclusaoFim && (!dtConclusao || dtConclusao > conclusaoFim)) return false
+
+      return true
+    })
+  }, [items, centroResponsavel, onde, prioridade, dataCriacaoInicio, dataCriacaoFim, dataConclusaoInicio, dataConclusaoFim])
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const pagedItems = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredItems.slice(start, start + pageSize)
+  }, [filteredItems, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filteredItems.length])
+
+  async function handleDelete(item: ActionRow) {
+    if (!window.confirm('Deseja excluir esta ação?')) return
+    try {
+      setDeletingId(item.id)
+      const res = await fetch(`/api/sst/plano-de-acao/${item.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Erro ao excluir ação.')
+      await load()
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao excluir ação.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   function handleSearch(e: FormEvent) {
     e.preventDefault()
-    setQ(qDraft)
+    setNumeroProcesso(numeroProcessoDraft)
+    setCentroResponsavel(centroResponsavelDraft)
     setResponsavel(responsavelDraft)
     setStatus(statusDraft)
+    setPrioridade(prioridadeDraft)
+    setOnde(ondeDraft)
     setEmAtraso(emAtrasoDraft)
+    setDataCriacaoInicio(dataCriacaoInicioDraft)
+    setDataCriacaoFim(dataCriacaoFimDraft)
+    setDataConclusaoInicio(dataConclusaoInicioDraft)
+    setDataConclusaoFim(dataConclusaoFimDraft)
   }
 
   function limparFiltros() {
-    setQDraft('')
+    setNumeroProcessoDraft('')
+    setCentroResponsavelDraft('')
     setResponsavelDraft('')
     setStatusDraft('TODOS')
+    setPrioridadeDraft('TODAS')
+    setOndeDraft('')
     setEmAtrasoDraft(false)
-    setQ('')
+    setDataCriacaoInicioDraft('')
+    setDataCriacaoFimDraft('')
+    setDataConclusaoInicioDraft('')
+    setDataConclusaoFimDraft('')
+
+    setNumeroProcesso('')
+    setCentroResponsavel('')
     setResponsavel('')
     setStatus('TODOS')
+    setPrioridade('TODAS')
+    setOnde('')
     setEmAtraso(false)
+    setDataCriacaoInicio('')
+    setDataCriacaoFim('')
+    setDataConclusaoInicio('')
+    setDataConclusaoFim('')
   }
 
- return (
+  return (
     <div className="space-y-5">
       <SstModuleTabs active="planos-de-acao" />
       <div className="flex flex-wrap items-start gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase text-slate-500">SST</p>
-          <h1 className="text-3xl font-bold text-slate-900">Planos de ação</h1>
-          <p className="max-w-3xl text-slate-600">Visualize planos vinculados à não conformidade e também planos avulsos.</p>
+          <p className="text-sm font-semibold uppercase text-slate-500">SGI / Qualidade</p>
+          <h1 className="text-3xl font-bold text-slate-900">Ações do plano de ação</h1>
+          <p className="max-w-3xl text-slate-600">Listagem completa das ações com filtros, visualização, edição e exclusão.</p>
         </div>
-        <Link href="/dashboard/sgi/qualidade/nao-conformidades" className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-          Voltar para não conformidades
-        </Link>
       </div>
 
-      <form onSubmit={handleCreateStandalonePlan} className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Novo plano avulso</p>
-        <div className="grid gap-3 md:grid-cols-3">
-          <input value={novoDescricao} onChange={(e) => setNovoDescricao(e.target.value)} placeholder="Descrição do plano" className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2" required />
-          <input value={novoResponsavel} onChange={(e) => setNovoResponsavel(e.target.value)} placeholder="Responsável" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
-            <input type="date" value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
-          <select value={novoStatus} onChange={(e) => setNovoStatus(e.target.value as NonConformityActionStatus)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-            {Object.values(NonConformityActionStatus).map((option) => (
-              <option key={option} value={option}>{actionStatusLabel[option]}</option>
-            ))}
-          </select>
-          <input value={novaEvidencia} onChange={(e) => setNovaEvidencia(e.target.value)} placeholder="Histórico/observação inicial" className="rounded-md border border-slate-300 px-3 py-2 text-sm md:col-span-2" />
-        </div>
-        <button disabled={saving} className="mt-3 rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">{saving ? 'Salvando...' : 'Criar plano avulso'}</button>
-      </form>
-
       <form onSubmit={handleSearch} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-sm font-medium text-slate-700">Buscar
-            <input value={qDraft} onChange={(e) => setQDraft(e.target.value)} placeholder="Nº RNC, descrição ou evidência" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
-          </label>
-          <label className="text-sm font-medium text-slate-700">Responsável
-            <input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} placeholder="Nome do responsável" className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
-          </label>
-          <label className="text-sm font-medium text-slate-700">Status
-            <select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-              {ACTION_STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>
-              ))}
-            </select>
-          </label>
-          <label className="mt-6 flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={emAtrasoDraft} onChange={(e) => setEmAtrasoDraft(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />Somente em atraso</label>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Nº Processo"><input value={numeroProcessoDraft} onChange={(e) => setNumeroProcessoDraft(e.target.value)} className="input" /></Field>
+          <Field label="Centro responsável"><input value={centroResponsavelDraft} onChange={(e) => setCentroResponsavelDraft(e.target.value)} className="input" /></Field>
+          <Field label="Responsável"><input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} className="input" /></Field>
+          <Field label="Prioridade"><select value={prioridadeDraft} onChange={(e) => setPrioridadeDraft(e.target.value as PriorityFilter)} className="input"><option value="TODAS">Todas</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></Field>
+          <Field label="Status"><select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="input">{ACTION_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>)}</select></Field>
+          <Field label="Onde"><input value={ondeDraft} onChange={(e) => setOndeDraft(e.target.value)} className="input" /></Field>
+          <label className="flex items-end gap-2 pb-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={emAtrasoDraft} onChange={(e) => setEmAtrasoDraft(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />Em atraso</label>
+          <div />
+          <Field label="Data criação (início)"><input type="date" value={dataCriacaoInicioDraft} onChange={(e) => setDataCriacaoInicioDraft(e.target.value)} className="input" /></Field>
+          <Field label="Data criação (fim)"><input type="date" value={dataCriacaoFimDraft} onChange={(e) => setDataCriacaoFimDraft(e.target.value)} className="input" /></Field>
+          <Field label="Data conclusão (início)"><input type="date" value={dataConclusaoInicioDraft} onChange={(e) => setDataConclusaoInicioDraft(e.target.value)} className="input" /></Field>
+          <Field label="Data conclusão (fim)"><input type="date" value={dataConclusaoFimDraft} onChange={(e) => setDataConclusaoFimDraft(e.target.value)} className="input" /></Field>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="submit" className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600">Pesquisar</button>
@@ -206,61 +247,69 @@ export default function PlanosDeAcaoClient() {
         </div>
       </form>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <StatCard label="Total de planos" value={String(items.length)} />
-        <StatCard label="Em atraso" value={String(totalAtrasadas)} />
-        <StatCard label="Concluídas" value={String(items.filter((item) => item.status === NonConformityActionStatus.CONCLUIDA).length)} />
-      </section>
-
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-3 py-2">Origem</th>
               <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Nº processo</th>
+              <th className="px-3 py-2">Nº Processo</th>
               <th className="px-3 py-2">Data criação</th>
-              <th className="px-3 py-2">Prazo</th>
+              <th className="px-3 py-2">Prioridade</th>
               <th className="px-3 py-2">O quê</th>
-              <th className="px-3 py-2">Responsável</th>
-             </tr>
+              <th className="px-3 py-2">Onde</th>
+              <th className="px-3 py-2">Centro responsável</th>
+              <th className="px-3 py-2">Ações</th>
+            </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {pagedItems.map((item) => {
+              const detailHref = `/dashboard/sgi/qualidade/planos-de-acao/${item.id}`
               const atrasada = isOverdue(item)
-              const detailHref = item.nonConformityId
-                ? `/dashboard/sgi/qualidade/nao-conformidades/${item.nonConformityId}/acoes/${item.id}`
-                : `/dashboard/sgi/qualidade/planos-de-acao/${item.id}`
 
               return (
-                <tr key={item.id} className="border-t border-slate-100 hover:bg-orange-50/60">
-                  <td className="px-3 py-2 text-xs font-semibold text-slate-700">{item.origemPlano === 'PLANO_AVULSO' ? 'PLANO AVULSO' : 'NÃO CONFORMIDADE'}</td>
+                <tr key={item.id} className="border-t border-slate-100">
                   <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${atrasada ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>{atrasada ? 'Em atraso' : actionStatusLabel[item.status]}</span></td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{item.nonConformity?.numeroRnc || '-'}</td>
+                  <td className="px-3 py-2 font-medium text-slate-900">{item.referencia || '-'}</td>
                   <td className="px-3 py-2 text-slate-600">{formatDate(item.createdAt)}</td>
-                  <td className="px-3 py-2 text-slate-600">{formatDate(item.prazo)}</td>
+                  <td className="px-3 py-2 text-slate-700">{getPriority(item)}</td>
                   <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
-                  <td className="px-3 py-2 text-slate-700"><div className="flex items-center justify-between gap-2"><span>{item.responsavelNome || '-'}</span><Link href={detailHref} className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700">Abrir plano</Link></div></td>
+                  <td className="px-3 py-2 text-slate-700">{getOnde(item.origem)}</td>
+                  <td className="px-3 py-2 text-slate-700">{item.centroResponsavel?.description || '-'}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-2">
+                      <Link href={detailHref} className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700">Visualizar / Editar</Link>
+                      <button type="button" onClick={() => handleDelete(item)} disabled={deletingId === item.id} className="rounded bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60">Excluir</button>
+                    </div>
+                  </td>
                 </tr>
               )
             })}
-            {!loading && items.length === 0 ? <tr><td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">Nenhum plano de ação encontrado com os filtros atuais.</td></tr> : null}
-
+            {!loading && pagedItems.length === 0 ? <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-500">Nenhuma ação encontrada com os filtros atuais.</td></tr> : null}
           </tbody>
         </table>
       </div>
 
-      {loading ? <p className="text-sm text-slate-600">Carregando planos de ação...</p> : null}
+      <footer className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+        <p className="text-slate-600">Registros: {filteredItems.length}</p>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50">Anterior</button>
+          <span>Página {page} de {totalPages}</span>
+          <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50">Próxima</button>
+        </div>
+        <p className="text-slate-600">Legenda: <span className="font-medium text-rose-700">Em atraso</span> · <span className="font-medium">Concluída</span> · <span className="font-medium">Cancelada</span></p>
+      </footer>
+
+      {loading ? <p className="text-sm text-slate-600">Carregando ações...</p> : null}
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
     </div>
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-    </article>
+    <label className="text-sm font-medium text-slate-700">
+      <span>{label}</span>
+      <div className="mt-1">{children}</div>
+    </label>
   )
 }
