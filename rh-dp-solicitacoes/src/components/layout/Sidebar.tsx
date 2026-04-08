@@ -613,7 +613,7 @@ export default function Sidebar({
                       className={`${submenuItemBase}
                         ${
                           pathname.startsWith('/dashboard/controle-equipamentos-ti/outros')
-                            ? 'bg-orange-500/90 text-white'
+                              ? 'bg-orange-500/90 text-white'
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
@@ -638,7 +638,8 @@ export default function Sidebar({
               </button>
 
               {openSst && !collapsed && (
-                <div className="mt-1 ml-9 flex flex-col gap-1">
+                <div className="mt-1 ml-9 flex flex-col gap-1 text-slate-200">
+                  <p className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Não conformidade</p>
                   <Link
                     href="/dashboard/sgi/qualidade/nao-conformidades"
                     className={`${submenuItemBase}
@@ -648,8 +649,15 @@ export default function Sidebar({
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <ClipboardCheck size={16} /> <span className={labelBase}>Não Conformidades</span>
+                    <ClipboardCheck size={16} /> <span className={labelBase}>Não conformidades</span>
                   </Link>
+                  <Link
+                    href="/dashboard/sgi/qualidade/nao-conformidades"
+                    className={`${submenuItemBase} text-slate-200 hover:bg-orange-500/90 hover:text-white`}
+                  >
+                    <ClipboardList size={16} /> <span className={labelBase}>Ações da não conformidade</span>
+                  </Link>
+                  <p className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Planos de ações</p>
                   <Link
                     href="/dashboard/sgi/qualidade/planos-de-acao"
                     className={`${submenuItemBase}
@@ -659,7 +667,13 @@ export default function Sidebar({
                           : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                       }`}
                   >
-                    <ClipboardList size={16} /> <span className={labelBase}>Plano de ação</span>
+                    <ClipboardList size={16} /> <span className={labelBase}>Registrar plano de ação</span>
+                  </Link>
+                  <Link
+                    href="/dashboard/sgi/qualidade/planos-de-acao"
+                    className={`${submenuItemBase} text-slate-200 hover:bg-orange-500/90 hover:text-white`}
+                  >
+                    <ClipboardList size={16} /> <span className={labelBase}>Ações do plano de ação</span>
                   </Link>
                 </div>
               )}

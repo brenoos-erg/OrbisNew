@@ -61,11 +61,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(req.url)
+   const { searchParams } = new URL(req.url)
     const q = searchParams.get('q')?.trim()
     const status = searchParams.get('status')
     const responsavel = searchParams.get('responsavel')?.trim()
     const emAtraso = searchParams.get('emAtraso') === '1'
+    const referencia = searchParams.get('referencia')?.trim()
 
     const where: Prisma.NonConformityActionItemWhereInput = {
       ...(status && Object.values(NonConformityActionStatus).includes(status as NonConformityActionStatus)
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
         : {}),
       ...(q
         ? {
-               OR: [
+            OR: [
               { descricao: { contains: q } },
               { evidencias: { contains: q } },
               { referencia: { contains: q } },
@@ -88,6 +89,8 @@ export async function GET(req: NextRequest) {
             ],
           }
         : {}),
+      ...(referencia ? { referencia: { equals: referencia } } : {}),
+      origemPlano: NonConformityActionPlanOrigin.PLANO_AVULSO,
     }
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
@@ -112,7 +115,10 @@ export async function GET(req: NextRequest) {
         updatedAt: true,
         origemPlano: true,
         nonConformityId: true,
+        referencia: true,
+        origem: true,
         createdBy: { select: { id: true, fullName: true, email: true } },
+        centroImpactado: { select: { description: true } },
         nonConformity: {
           select: {
             id: true,
