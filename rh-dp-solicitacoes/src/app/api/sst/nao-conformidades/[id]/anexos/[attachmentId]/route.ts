@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel } from '@prisma/client'
 import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { getInlineMimeType, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; attachmentId: string }> }) {
   try {
@@ -42,14 +42,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       userCostCenterIds,
     })
     if (!canAccess) {
-      return NextResponse.json({ error: 'Sem acesso ao anexo.' }, { status: 403 })
+       return NextResponse.json({ error: 'Sem acesso ao anexo.' }, { status: 403 })
     }
 
-    const normalizedUrl = String(attachment.url || '').replace(/^\/+/, '')
-    const absPath = path.join(process.cwd(), 'public', normalizedUrl)
-    const fileBuffer = await readFile(absPath)
+    const resolved = await resolveExistingAttachmentPath(attachment.url)
+    if (!resolved) {
+      return NextResponse.json({ error: 'Arquivo do anexo não encontrado.' }, { status: 404 })
+    }
 
-    const mimeType = attachment.mimeType || 'application/octet-stream'
+    const fileBuffer = await readFile(resolved.absolutePath)
+
+    const mimeType = getInlineMimeType(attachment.mimeType, attachment.filename)
     const isInline = mimeType === 'application/pdf' || mimeType.startsWith('image/')
     const dispositionType = isInline ? 'inline' : 'attachment'
     const fallbackName = attachment.filename?.trim() || 'anexo'

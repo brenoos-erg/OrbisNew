@@ -1,12 +1,13 @@
 import { mkdir, writeFile, unlink } from 'node:fs/promises'
-import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { buildDocumentUploadPaths, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
 
 async function ensureSensitiveHiringAccess(solicitationId: string, user: { id: string; role: 'COLABORADOR' | 'RH' | 'DP' | 'ADMIN'; departmentId?: string | null }) {
   const solicitation = await prisma.solicitation.findUnique({
@@ -84,15 +85,14 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
   return { changed: true }
 }
 
-async function saveFile(file: File, folder: string) {
+async function saveFile(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer())
   const ext = path.extname(file.name) || '.bin'
   const name = `${randomUUID()}${ext}`
-  const relPath = `/uploads/${folder}/${name}`
-  const absPath = path.join(process.cwd(), 'public', relPath)
-  await mkdir(path.dirname(absPath), { recursive: true })
-  await writeFile(absPath, bytes)
-  return relPath
+  const { relativeUrl, absolutePath } = buildDocumentUploadPaths(name)
+  await mkdir(path.dirname(absolutePath), { recursive: true })
+  await writeFile(absolutePath, bytes)
+  return relativeUrl
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const files = form.getAll('files').filter((f): f is File => f instanceof File)
   const created = []
   for (const file of files) {
-    const url = await saveFile(file, 'solicitacoes')
+    const url = await saveFile(file)
     const row = await prisma.attachment.create({ data: { id: randomUUID(), solicitationId, filename: file.name, url, mimeType: file.type || 'application/octet-stream', sizeBytes: file.size } })
     created.push(row)
   }
@@ -147,7 +147,10 @@ export async function DELETE(req: NextRequest) {
   }
   await prisma.attachment.deleteMany({ where: { id: { in: ids } } })
   for (const row of rows) {
-    try { await unlink(path.join(process.cwd(), 'public', row.url)) } catch {}
+    try {
+      const resolved = await resolveExistingAttachmentPath(row.url)
+      if (resolved) await unlink(resolved.absolutePath)
+    } catch {}
   }
   return NextResponse.json({ ok: true })
 }

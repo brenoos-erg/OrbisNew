@@ -1,13 +1,9 @@
 import { readFile } from 'node:fs/promises'
-import path from 'node:path'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-function normalizeStoredUrl(url: string) {
-  return url.startsWith('/') ? url : `/${url}`
-}
+import { getInlineMimeType, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
 
 export async function GET(
   _req: NextRequest,
@@ -28,17 +24,21 @@ export async function GET(
     return NextResponse.json({ error: 'Anexo não encontrado.' }, { status: 404 })
   }
 
-  const fileUrl = normalizeStoredUrl(attachment.url)
-  const absolutePath = path.join(process.cwd(), 'public', fileUrl)
+  const resolved = await resolveExistingAttachmentPath(attachment.url)
+  if (!resolved) {
+    return NextResponse.json({ error: 'Arquivo do anexo não encontrado.' }, { status: 404 })
+  }
 
   try {
-    const fileBuffer = await readFile(absolutePath)
+    const fileBuffer = await readFile(resolved.absolutePath)
+    const mimeType = getInlineMimeType(attachment.mimeType, attachment.filename)
     const encodedName = encodeURIComponent(attachment.filename)
+    const disposition = mimeType === 'application/pdf' || mimeType.startsWith('image/') ? 'inline' : 'attachment'
 
     return new NextResponse(fileBuffer, {
       headers: {
-        'Content-Type': attachment.mimeType || 'application/octet-stream',
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodedName}`,
+        'Content-Type': mimeType,
+        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedName}`,
         'Cache-Control': 'private, max-age=0, no-cache',
       },
     })
