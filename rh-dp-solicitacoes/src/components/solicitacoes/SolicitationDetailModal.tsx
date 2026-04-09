@@ -21,9 +21,11 @@ import {
 } from '@/lib/solicitationTypes'
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
 import {
+  EXPERIENCE_EVALUATION_COMPETENCIES,
   extractExperienceEvaluationData,
   isExperienceEvaluationTipo,
 } from '@/lib/experienceEvaluationForm'
+
 
 
 
@@ -145,24 +147,6 @@ type AvaliacaoGestorForm = {
   comentarioFinal: string
 }
 
-const AVALIACAO_GESTOR_FIELDS: Array<{
-  name: keyof AvaliacaoGestorForm
-  label: string
-}> = [
-  { name: 'relacionamentoNota', label: 'Relacionamento' },
-  { name: 'comunicacaoNota', label: 'Comunicação' },
-  { name: 'atitudeNota', label: 'Atitude' },
-  { name: 'saudeSegurancaNota', label: 'Saúde e segurança' },
-  {
-    name: 'dominioTecnicoProcessosNota',
-    label: 'Domínio técnico e processos',
-  },
-  { name: 'adaptacaoMudancaNota', label: 'Adaptação à mudança' },
-  {
-    name: 'autogestaoGestaoPessoasNota',
-    label: 'Autogestão e gestão de pessoas',
-  },
-]
 
 const AVALIACAO_GESTOR_NOTA_OPTIONS = [
   'INSUFICIENTE',
@@ -2727,70 +2711,87 @@ async function handleEncaminharAprovacaoComAnexo() {
               )}
                
                 {isAvaliacaoExperiencia && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
                     Avaliação do gestor imediato
                   </p>
+                  <p className="mb-4 text-xs text-slate-600">
+                    Competências comportamentais e técnicas
+                  </p>
 
-                  <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-                    {AVALIACAO_GESTOR_FIELDS.map((field) => (
-                      <div key={field.name}>
-                        <label className={LABEL_RO}>{field.label}</label>
-                        <select
-                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
-                          value={gestorAvaliacaoForm[field.name]}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            setGestorAvaliacaoForm((prev) => ({
-                              ...prev,
-                              [field.name]: value,
-                            }))
-                            setGestorAvaliacaoFieldErrors((prev) => ({
-                              ...prev,
-                              [field.name]: value.trim() ? '' : 'Campo obrigatório',
-                            }))
-                          }}
-                          disabled={!canEditAvaliacaoGestor}
-                        >
-                          <option value="">Selecione...</option>
-                          {AVALIACAO_GESTOR_NOTA_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        {canEditAvaliacaoGestor &&
-                        (!gestorAvaliacaoForm[field.name].trim() ||
-                          gestorAvaliacaoFieldErrors[field.name]) ? (
-                          <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
-                        ) : null}
+                  <div className="space-y-3">
+                    {EXPERIENCE_EVALUATION_COMPETENCIES.map((competency) => (
+                      <div key={competency.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <label className="text-xs font-bold uppercase tracking-wide text-slate-800">
+                              {competency.label}
+                            </label>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-slate-600">
+                              {competency.description}
+                            </p>
+                          </div>
+
+                          <div className="w-full lg:w-56 lg:flex-none">
+                            <label className={LABEL_RO}>Nota</label>
+                            <select
+                              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                              value={gestorAvaliacaoForm[competency.key]}
+                              onChange={(e) => {
+                                const value = e.target.value
+                                setGestorAvaliacaoForm((prev) => ({
+                                  ...prev,
+                                  [competency.key]: value,
+                                }))
+                                setGestorAvaliacaoFieldErrors((prev) => ({
+                                  ...prev,
+                                  [competency.key]: value.trim() ? '' : 'Campo obrigatório',
+                                }))
+                              }}
+                              disabled={!canEditAvaliacaoGestor}
+                            >
+                              <option value="">Selecione...</option>
+                              {AVALIACAO_GESTOR_NOTA_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            {canEditAvaliacaoGestor &&
+                            (!gestorAvaliacaoForm[competency.key].trim() ||
+                              gestorAvaliacaoFieldErrors[competency.key]) ? (
+                              <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
                     ))}
-                    <div className="md:col-span-2">
-                      <label className={LABEL_RO}>Comentário final</label>
-                      <textarea
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
-                        value={gestorAvaliacaoForm.comentarioFinal}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          setGestorAvaliacaoForm((prev) => ({
-                            ...prev,
-                            comentarioFinal: value,
-                          }))
-                          setGestorAvaliacaoFieldErrors((prev) => ({
-                            ...prev,
-                            comentarioFinal: value.trim() ? '' : 'Campo obrigatório',
-                          }))
-                        }}
-                         placeholder="Descreva o parecer da avaliação"
-                        disabled={!canEditAvaliacaoGestor}
-                      />
-                      {canEditAvaliacaoGestor &&
-                      (!gestorAvaliacaoForm.comentarioFinal.trim() ||
-                        gestorAvaliacaoFieldErrors.comentarioFinal) ? (
-                        <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
-                      ) : null}
-                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <label className={LABEL_RO}>Deseja realizar algum comentário sobre o colaborador em questão?</label>
+                    <textarea
+                      className="mt-1 min-h-[160px] w-full rounded-md border border-slate-300 px-3 py-3 text-sm"
+                      value={gestorAvaliacaoForm.comentarioFinal}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setGestorAvaliacaoForm((prev) => ({
+                          ...prev,
+                          comentarioFinal: value,
+                        }))
+                        setGestorAvaliacaoFieldErrors((prev) => ({
+                          ...prev,
+                          comentarioFinal: value.trim() ? '' : 'Campo obrigatório',
+                        }))
+                      }}
+                      placeholder="Descreva o parecer da avaliação"
+                      disabled={!canEditAvaliacaoGestor}
+                    />
+                    {canEditAvaliacaoGestor &&
+                    (!gestorAvaliacaoForm.comentarioFinal.trim() ||
+                      gestorAvaliacaoFieldErrors.comentarioFinal) ? (
+                      <p className="mt-1 text-xs text-red-600">Campo obrigatório</p>
+                    ) : null}
                   </div>
 
                   {canEditAvaliacaoGestor && (
