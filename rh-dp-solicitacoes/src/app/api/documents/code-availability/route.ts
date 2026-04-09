@@ -22,9 +22,9 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         versions: {
-          orderBy: [{ createdAt: 'desc' }],
+          orderBy: [{ revisionNumber: 'desc' }, { createdAt: 'desc' }],
           take: 1,
-          select: { id: true, status: true },
+          select: { id: true, status: true, revisionNumber: true },
         },
       },
     })
@@ -33,7 +33,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ available: true, message: 'Código disponível.' })
     }
 
-    const feedback = evaluateCodeAvailability(code, document.versions[0]?.status ?? null)
+    const feedback = evaluateCodeAvailability(
+      code,
+      document.versions[0]?.status ?? null,
+      document.versions[0]?.revisionNumber ?? null,
+    )
     return NextResponse.json(feedback)
   } catch (error) {
     console.error('Erro ao validar código de documento ISO', error)

@@ -5,7 +5,6 @@ import { DocumentApprovalStatus, DocumentVersionStatus, Prisma } from '@prisma/c
 import { requireActiveUser } from '@/lib/auth'
 import {
   createSuccessMessageByStatus,
-  duplicateCodeMessage,
   resolveInitialVersionStatus,
   routingForStatus,
 }  from '@/lib/iso-document-routing'
@@ -88,6 +87,7 @@ export async function POST(req: NextRequest)   {
         authorUserId: String(form.get('authorUserId') ?? '').trim(),
         summary: String(form.get('summary') ?? ''),
         affectedAreasNotes: String(form.get('affectedAreasNotes') ?? ''),
+        revisionReason: String(form.get('revisionReason') ?? '').trim(),
         fileUrl,
         revisionNumber: form.get('revisionNumber'),
       }
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest)   {
       payload.code = normalizeCode(payload.code)
       payload.ownerCostCenterId = payload.ownerCostCenterId ?? ''
       payload.authorUserId = String(payload.authorUserId ?? '').trim()
+      payload.revisionReason = String(payload.revisionReason ?? '').trim()
     }
 
     console.info('[documents.create][debug] payload-received', {
@@ -106,8 +107,10 @@ export async function POST(req: NextRequest)   {
       ownerCostCenterId: payload.ownerCostCenterId ?? '',
       authorUserId: payload.authorUserId || me.id,
       revisionNumber: payload.revisionNumber ?? null,
+      hasRevisionReason: Boolean(payload.revisionReason),
       hasFileUrl: Boolean(payload.fileUrl),
     })
+
 
     const authorUserId = payload.authorUserId || me.id
 
@@ -174,41 +177,68 @@ export async function POST(req: NextRequest)   {
     })
 
     const initialStatus = resolveInitialVersionStatus(flow)
-    const revisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
+    const requestedInitialRevisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
 
-    failureStage = 'documents:check-duplicate-code'
+    failureStage = 'documents:check-existing-code'
     const existing = await prisma.isoDocument.findUnique({
       where: { code: payload.code },
       select: {
         id: true,
+        code: true,
+        title: true,
+        documentTypeId: true,
+        ownerDepartmentId: true,
+        ownerCostCenterId: true,
+        authorUserId: true,
+        physicalLocation: true,
+        accessType: true,
+        validityAt: true,
+        summary: true,
+        affectedAreasNotes: true,
         versions: {
-          orderBy: [{ createdAt: 'desc' }],
+          orderBy: [{ revisionNumber: 'desc' }, { createdAt: 'desc' }],
           take: 1,
-          select: { id: true, status: true },
+          select: { id: true, status: true, revisionNumber: true },
         },
       },
     })
 
-    if (existing?.versions[0]) {
-      const status = existing.versions[0].status
+    if (existing && !payload.revisionReason) {
       return NextResponse.json(
-        {
-          error: duplicateCodeMessage(payload.code, status),
-          routing: routingForStatus(status),
-        },
-        { status: 409 },
+        { error: 'Informe o motivo da revisão para criar uma nova revisão de código existente.' },
+        { status: 400 },
       )
     }
 
-   if (existing && existing.versions.length === 0) {
-      failureStage = 'documents:recover-orphan-version'
-      const recoveredVersion = await prisma.$transaction(async (tx) => {
+    if (existing) {
+      const currentRevisionNumber = existing.versions[0]?.revisionNumber ?? null
+      const nextRevisionNumber = currentRevisionNumber === null ? requestedInitialRevisionNumber : currentRevisionNumber + 1
+
+      failureStage = currentRevisionNumber === null ? 'documents:recover-orphan-version' : 'documents:create-next-revision'
+      const revisedVersion = await prisma.$transaction(async (tx) => {
+        await tx.isoDocument.update({
+          where: { id: existing.id },
+          data: {
+            title: payload.title,
+            documentTypeId: payload.documentTypeId,
+            ownerDepartmentId: ownerCostCenter.departmentId ?? null,
+            ownerCostCenterId: ownerCostCenter.id,
+            authorUserId,
+            physicalLocation: payload.physicalLocation,
+            accessType: payload.accessType ?? existing.accessType ?? 'INTERNO',
+            validityAt: payload.validityAt ? new Date(payload.validityAt) : existing.validityAt,
+            summary: payload.summary ?? existing.summary,
+            affectedAreasNotes: payload.affectedAreasNotes ?? existing.affectedAreasNotes,
+          },
+        })
+
         const version = await tx.documentVersion.create({
           data: {
             documentId: existing.id,
-            revisionNumber,
+            revisionNumber: nextRevisionNumber,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
+            revisionReason: payload.revisionReason,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
             nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
             publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,
@@ -232,11 +262,16 @@ export async function POST(req: NextRequest)   {
       return NextResponse.json(
         {
           id: existing.id,
-          recoveredOrphan: true,
-          versionId: recoveredVersion.id,
+          createdRevision: true,
+          currentRevisionNumber,
+          nextRevisionNumber,
+          versionId: revisedVersion.id,
           routing: {
             ...routing,
-            message: 'Documento existente sem versão visível foi regularizado e retornou ao fluxo de publicação.',
+            message:
+              currentRevisionNumber === null
+                ? 'Documento existente sem versão visível foi regularizado e retornou ao fluxo de publicação.'
+                : `Nova revisão criada com sucesso (REV${String(nextRevisionNumber).padStart(2, '0')}).`,
           },
         },
         { status: 201 },
@@ -259,9 +294,10 @@ export async function POST(req: NextRequest)   {
         affectedAreasNotes: payload.affectedAreasNotes,
         versions: {
           create: {
-           revisionNumber,
+           revisionNumber: requestedInitialRevisionNumber,
             status: initialStatus,
             fileUrl: payload.fileUrl ?? null,
+            revisionReason: null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
             nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
             publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,

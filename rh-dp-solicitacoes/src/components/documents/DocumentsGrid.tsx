@@ -30,8 +30,19 @@ type GridRow = {
 type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
 type FiltersResponse = { documentTypes?: Option[]; authors?: Option[] }
 type CreateRouting = { status: string; targetTab: string; targetPath: string; message: string }
-type CodeAvailabilityResponse = { available?: boolean; error?: string; message?: string; routing?: CreateRouting }
-type CodeValidation = { status: 'idle' | 'checking' | 'available' | 'duplicate' | 'error'; message: string | null }
+type CodeAvailabilityResponse = {
+  available?: boolean
+  error?: string
+  message?: string
+  isRevision?: boolean
+  currentRevisionNumber?: number | null
+  routing?: CreateRouting
+}
+type CodeValidation = {
+  status: 'idle' | 'checking' | 'available' | 'revision' | 'error'
+  message: string | null
+  currentRevisionNumber?: number | null
+}
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 const STATUS_STYLES: Record<string, string> = {
@@ -68,8 +79,18 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createSuccess, setCreateSuccess] = useState<CreateRouting | null>(null)
-const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null })
-  const [createForm, setCreateForm] = useState({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', file: null as File | null })
+  const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: 'idle', message: null, currentRevisionNumber: null })
+  const [createForm, setCreateForm] = useState({
+    code: '',
+    title: '',
+    documentTypeId: '',
+    ownerCostCenterId: '',
+    authorUserId: '',
+    revisionNumber: '',
+    revisionReason: '',
+    file: null as File | null,
+  })
+  const isRevisionFlow = codeValidation.status === 'revision'
 
   const [draftFilters, setDraftFilters] = useState({
     code: '',
@@ -351,8 +372,8 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       return
     }
 
-    if (codeValidation.status === 'duplicate') {
-      setCreateError(codeValidation.message ?? 'O código informado já está em uso. Informe outro código.')
+   if (isRevisionFlow && !createForm.revisionReason.trim()) {
+      setCreateError('Informe o motivo da revisão.')
       return
     }
 
@@ -376,7 +397,7 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
       return
     }
 
-     setCreateError(null)
+       setCreateError(null)
     setCreating(true)
     const formData = new FormData()
     formData.set('code', normalizedCode)
@@ -385,6 +406,7 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
     formData.set('ownerCostCenterId', createForm.ownerCostCenterId)
     if (createForm.authorUserId?.trim()) formData.set('authorUserId', createForm.authorUserId.trim())
     if (normalizedRevisionNumber) formData.set('revisionNumber', normalizedRevisionNumber)
+    if (isRevisionFlow) formData.set('revisionReason', createForm.revisionReason.trim())
     formData.set('file', createForm.file)
 
     const res = await fetch('/api/documents', { method: 'POST', body: formData })
@@ -398,8 +420,8 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
 
      const data = await parseJsonSafely<{ routing?: CreateRouting }>(res)
     setShowCreate(false)
-    setCreateForm({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', file: null })
-    setCodeValidation({ status: 'idle', message: null })
+    setCreateForm({ code: '', title: '', documentTypeId: '', ownerCostCenterId: '', authorUserId: '', revisionNumber: '', revisionReason: '', file: null })
+    setCodeValidation({ status: 'idle', message: null, currentRevisionNumber: null })
     setCreateSuccess(data?.routing ?? { status: 'PUBLICADO', targetTab: 'publicados', targetPath: '/dashboard/controle-documentos/publicados', message: 'Documento cadastrado com sucesso.' })
     clearFilters()
     await load()
@@ -410,7 +432,8 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
 
     const normalizedCode = createForm.code.trim()
     if (!normalizedCode) {
-      setCodeValidation({ status: 'idle', message: null })
+      setCodeValidation({ status: 'idle', message: null, currentRevisionNumber: null })
+      setCreateForm((prev) => ({ ...prev, revisionNumber: '', revisionReason: '' }))
       return
     }
 
@@ -427,19 +450,26 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
         const data = await parseJsonSafely<CodeAvailabilityResponse>(res)
 
         if (!res.ok) {
-          setCodeValidation({ status: 'error', message: data?.error ?? 'Não foi possível validar o código agora.' })
+          setCodeValidation({ status: 'error', message: data?.error ?? 'Não foi possível validar o código agora.', currentRevisionNumber: null })
           return
         }
 
-        if (data?.available) {
-          setCodeValidation({ status: 'available', message: data.message ?? 'Código disponível.' })
-          return
+        if (data?.available && data?.isRevision) {
+          const currentRevisionNumber = data.currentRevisionNumber ?? 0
+          setCodeValidation({
+            status: 'revision',
+            message: data.message ?? `Código já cadastrado. A próxima revisão será criada automaticamente.`,
+            currentRevisionNumber,
+          })
+          setCreateForm((prev) => ({ ...prev, revisionNumber: String(currentRevisionNumber) }))
+           return
         }
 
-        setCodeValidation({ status: 'duplicate', message: data?.message ?? `Já existe um documento com o código ${normalizedCode}.` })
+        setCodeValidation({ status: 'available', message: data?.message ?? 'Código disponível.', currentRevisionNumber: null })
+        setCreateForm((prev) => ({ ...prev, revisionNumber: '', revisionReason: '' }))
       } catch (error) {
         if ((error as Error).name === 'AbortError') return
-        setCodeValidation({ status: 'error', message: 'Não foi possível validar o código agora.' })
+        setCodeValidation({ status: 'error', message: 'Não foi possível validar o código agora.', currentRevisionNumber: null })
       }
     }, 350)
 
@@ -560,10 +590,10 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
         <div className="flex flex-wrap gap-2">
           {allowCreate ? (
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
+             className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-orange-600"
               onClick={() => {
                 setCreateError(null)
-                setCodeValidation({ status: 'idle', message: null })
+                setCodeValidation({ status: 'idle', message: null, currentRevisionNumber: null })
                 setShowCreate(true)
               }}
             ><Plus size={16} />Novo documento</button>
@@ -740,8 +770,8 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
           <div className="w-full max-w-2xl space-y-3 rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">Cadastrar documento</h2>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <div>
-                 <div className={`flex overflow-hidden rounded border ${codeValidation.status === 'duplicate' ? 'border-red-500' : 'border-slate-300'}`}>
+               <div>
+                 <div className={`flex overflow-hidden rounded border ${codeValidation.status === 'error' ? 'border-red-500' : codeValidation.status === 'revision' ? 'border-amber-500' : 'border-slate-300'}`}>
                   <span className="flex items-center border-r border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
                     {requiredCodePrefix || 'TIPO.'}
                   </span>
@@ -763,8 +793,9 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
                   {createForm.documentTypeId
                     ? `Prefixo obrigatório do tipo selecionado: ${requiredCodePrefix}`
                     : 'Selecione o tipo documental para preencher o prefixo automático.'}
-                </p>                {codeValidation.message ? (
-                  <p className={`mt-1 text-xs ${codeValidation.status === 'duplicate' || codeValidation.status === 'error' ? 'text-red-600' : codeValidation.status === 'available' ? 'text-emerald-700' : 'text-slate-500'}`}>
+                </p>
+                {codeValidation.message ? (
+                  <p className={`mt-1 text-xs ${codeValidation.status === 'error' ? 'text-red-600' : codeValidation.status === 'available' ? 'text-emerald-700' : codeValidation.status === 'revision' ? 'text-amber-700' : 'text-slate-500'}`}>
                     {codeValidation.message}
                   </p>
                 ) : null}
@@ -780,17 +811,31 @@ const [codeValidation, setCodeValidation] = useState<CodeValidation>({ status: '
                 placeholder="Centro responsável"
                 onValueChange={(nextValue) => setCreateForm((v) => ({ ...v, ownerCostCenterId: nextValue }))}
               />
-              <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
+            <select className="rounded border px-3 py-2" value={createForm.authorUserId} onChange={(e) => setCreateForm((v) => ({ ...v, authorUserId: e.target.value }))}>
                 <option value="">Elaborador/Revisor (auto)</option>
                 {meta.authors.map((option) => <option key={option.id} value={option.id}>{option.fullName}</option>)}
               </select>
-                <input className="rounded border px-3 py-2" placeholder="Revisão inicial (opcional)" value={createForm.revisionNumber} onChange={(e) => setCreateForm((v) => ({ ...v, revisionNumber: e.target.value.replace(/[^0-9]/g, '') }))} />
-              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, file: e.target.files?.[0] ?? null }))} />
+                <input
+                  className={`rounded border px-3 py-2 ${isRevisionFlow ? 'bg-slate-100 text-slate-700' : ''}`}
+                  placeholder={isRevisionFlow ? 'Revisão atual' : 'Revisão inicial (opcional)'}
+                  value={createForm.revisionNumber}
+                  onChange={(e) => setCreateForm((v) => ({ ...v, revisionNumber: e.target.value.replace(/[^0-9]/g, '') }))}
+                  readOnly={isRevisionFlow}
+                  disabled={isRevisionFlow}
+                />
+              {isRevisionFlow ? (
+                <textarea
+                  className="min-h-[100px] rounded border border-amber-300 bg-amber-50 px-3 py-2 md:col-span-2"
+                  placeholder="Motivo da revisão (obrigatório)"
+                  value={createForm.revisionReason}
+                  onChange={(e) => setCreateForm((v) => ({ ...v, revisionReason: e.target.value }))}
+                />
+              ) : null}              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, file: e.target.files?.[0] ?? null }))} />
             </div>
             {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
             <div className="flex justify-end gap-2">
               <button className="rounded border px-3 py-2" onClick={() => setShowCreate(false)}>Cancelar</button>
-              <button className="rounded bg-orange-500 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60" disabled={creating || codeValidation.status === 'duplicate' || codeValidation.status === 'checking'} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
+              <button className="rounded bg-orange-500 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60" disabled={creating || codeValidation.status === 'checking'} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
         </div>

@@ -10,9 +10,10 @@ export type DocumentRouting = {
 export type CodeAvailabilityFeedback = {
   available: boolean
   message: string
+  isRevision?: boolean
+  currentRevisionNumber?: number | null
   routing?: Omit<DocumentRouting, 'message'>
 }
-
 export function resolveInitialVersionStatus(flow: Array<{ stepType: DocumentFlowStepType }>) {
   if (flow.length === 0) {
     return DocumentVersionStatus.PUBLICADO
@@ -71,26 +72,34 @@ export function createSuccessMessageByStatus(status: DocumentVersionStatus) {
   return 'Documento cadastrado com sucesso.'
 }
 
-export function duplicateCodeMessage(code: string, status: DocumentVersionStatus) {
+export function existingCodeRevisionMessage(code: string, status: DocumentVersionStatus, currentRevisionNumber: number) {
   const location = routingForStatus(status)
-  return `Já existe um documento com o código ${code}. Ele está no status ${status} e pode ser consultado em ${location.targetPath}.`
+  return `Código ${code} já cadastrado (revisão atual ${currentRevisionNumber}). O novo envio criará automaticamente a próxima revisão e seguirá o fluxo de aprovação padrão. Último status: ${status}.`
 }
 
 export function orphanCodeMessage(code: string) {
   return `Já existe um cadastro com o código ${code}, mas sem versão ativa. O envio vai regularizar esse documento.`
 }
 
-export function evaluateCodeAvailability(code: string, status: DocumentVersionStatus | null): CodeAvailabilityFeedback {
-  if (!status) {
+export function evaluateCodeAvailability(
+  code: string,
+  status: DocumentVersionStatus | null,
+  currentRevisionNumber: number | null,
+): CodeAvailabilityFeedback {
+  if (!status || currentRevisionNumber === null) {
     return {
       available: true,
+      isRevision: false,
+      currentRevisionNumber: null,
       message: orphanCodeMessage(code),
     }
   }
 
   return {
-    available: false,
-    message: duplicateCodeMessage(code, status),
+    available: true,
+    isRevision: true,
+    currentRevisionNumber,
+    message: existingCodeRevisionMessage(code, status, currentRevisionNumber),
     routing: routingForStatus(status),
   }
 }
