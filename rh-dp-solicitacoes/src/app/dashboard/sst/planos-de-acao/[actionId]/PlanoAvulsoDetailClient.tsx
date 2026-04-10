@@ -32,12 +32,13 @@ type ActionItem = {
   rapidez?: number | null
   autonomia?: number | null
   beneficio?: number | null
-  createdBy?: { fullName?: string | null; email?: string | null } | null
+   createdBy?: { fullName?: string | null; email?: string | null } | null
 }
 
 type PlanoResponse = { item?: ActionItem; error?: string }
 type PlanoListResponse = { items?: ActionItem[]; error?: string }
 type GestoresResponse = { members?: Gestor[] }
+type UploadResponse = { url?: string; uploadedAt?: string; uploadedBy?: string; originalName?: string; error?: string }
 
 type TabKey = 'plano' | 'causa'
 type ModalTab = 'dados' | 'evidencias'
@@ -61,6 +62,24 @@ function parseEvidenceList(text?: string | null) {
     .filter(Boolean)
 }
 
+type ParsedEvidenceFile = {
+  type: 'file'
+  raw: string
+  url: string
+  displayName: string
+  uploadedAt?: string | null
+  uploadedBy?: string | null
+}
+
+type ParsedEvidenceNote = {
+  type: 'note'
+  raw: string
+  message: string
+  uploadedAt?: string | null
+  uploadedBy?: string | null
+}
+
+type ParsedEvidenceItem = ParsedEvidenceFile | ParsedEvidenceNote
 function normalizeEvidenceEntry(entry: string) {
   const trimmed = entry.trim()
   if (!trimmed) return ''
@@ -79,6 +98,72 @@ function toFileViewUrl(entry: string) {
     return `/api/files/${relative.split('/').map(encodeURIComponent).join('/')}`
   }
   return normalized
+}
+
+function parseLegacyEvidenceNote(entry: string): Pick<ParsedEvidenceNote, 'message' | 'uploadedAt' | 'uploadedBy'> {
+  const match = entry.match(/^\[([^\]]+)\]\s*([^:]+):\s*(.+)$/)
+  if (!match) return { message: entry }
+  return {
+    uploadedAt: match[1] || null,
+    uploadedBy: match[2]?.trim() || null,
+    message: match[3]?.trim() || entry,
+  }
+}
+
+function parseEvidenceItem(entry: string): ParsedEvidenceItem {
+  const trimmed = entry.trim()
+  if (!trimmed) return { type: 'note', raw: entry, message: '' }
+
+  if (trimmed.startsWith('FILE|')) {
+    const [, rawUrl = '', encodedName = '', uploadedAt = '', encodedBy = ''] = trimmed.split('|')
+    const normalizedUrl = normalizeEvidenceEntry(decodeURIComponent(rawUrl))
+    return {
+      type: 'file',
+      raw: entry,
+      url: normalizedUrl,
+      displayName: decodeURIComponent(encodedName || '') || getEvidenceName(normalizedUrl),
+      uploadedAt: uploadedAt || null,
+      uploadedBy: decodeURIComponent(encodedBy || '') || null,
+    }
+  }
+
+  const normalizedEntry = normalizeEvidenceEntry(trimmed)
+  const isUrl = /^https?:\/\//i.test(normalizedEntry) || normalizedEntry.startsWith('/uploads/') || normalizedEntry.startsWith('/api/files/')
+  if (isUrl) {
+    const defaultName = getEvidenceName(normalizedEntry)
+    const fromTimestamp = defaultName.match(/^(\d{13})-/)
+    const uploadedAt = fromTimestamp?.[1] ? new Date(Number(fromTimestamp[1])).toISOString() : null
+    return {
+      type: 'file',
+      raw: entry,
+      url: normalizedEntry,
+      displayName: defaultName,
+      uploadedAt,
+      uploadedBy: null,
+    }
+  }
+
+  const note = parseLegacyEvidenceNote(trimmed)
+  return {
+    type: 'note',
+    raw: entry,
+    message: note.message,
+    uploadedAt: note.uploadedAt,
+    uploadedBy: note.uploadedBy,
+  }
+}
+
+function formatEvidenceMetaDate(value?: string | null) {
+  if (!value) return 'Não informado'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('pt-BR')
+}
+
+function serializeUploadedEvidence(url: string, originalName: string, uploadedAt?: string, uploadedBy?: string) {
+  const safeName = encodeURIComponent(originalName || getEvidenceName(url))
+  const safeBy = encodeURIComponent(uploadedBy || '')
+  return `FILE|${encodeURIComponent(url)}|${safeName}|${uploadedAt || ''}|${safeBy}`
 }
 
 function getEvidenceName(entry: string) {
@@ -147,10 +232,10 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
     evidencias: '',
   })
 
-  const rootAction = useMemo(() => allActions.find((a) => a.id === actionId) ?? allActions[0] ?? null, [allActions, actionId])
+   const rootAction = useMemo(() => allActions.find((a) => a.id === actionId) ?? allActions[0] ?? null, [allActions, actionId])
   const planReference = rootAction?.referencia || rootAction?.id || actionId
   const childActions = useMemo(() => allActions.filter((a) => a.id !== rootAction?.id), [allActions, rootAction])
-  const evidenceItems = useMemo(() => parseEvidenceList(evidencias), [evidencias])
+  const evidenceItems = useMemo(() => parseEvidenceList(evidencias).map(parseEvidenceItem), [evidencias])
 
  const load = useCallback(async () => {
     try {
@@ -214,16 +299,16 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
     setModalOpen(true)
   }
 
-  async function uploadEvidence(file: File, onSuccess: (url: string) => void) {
+ async function uploadEvidence(file: File, onSuccess: (serializedEntry: string) => void) {
     try {
       setUploadingEvidence(true)
       const body = new FormData(); body.set('file', file)
       const res = await fetch('/api/uploads?scope=plano-acao-avulso', { method: 'POST', body })
 
-      const data = await parseJsonSafe<{ url?: string; error?: string }>(res)
+      const data = await parseJsonSafe<UploadResponse>(res)
 
       if (!res.ok || !data?.url) throw new Error(data?.error || 'Falha no upload do arquivo.')
-      onSuccess(data.url)
+      onSuccess(serializeUploadedEvidence(data.url, data.originalName || file.name, data.uploadedAt, data.uploadedBy))
     } catch (e: any) {
       setError(e?.message || 'Falha no upload do arquivo.')
     } finally {
@@ -335,20 +420,32 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
               {uploadingEvidence && <span className="text-sm text-slate-600">Enviando...</span>}
              </div>
             <textarea value={evidencias} onChange={(e) => setEvidencias(e.target.value)} rows={4} className="input" />
-            <div className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">{evidenceItems.length === 0 ? <p className="text-sm text-slate-500">Nenhuma evidência anexada.</p> : evidenceItems.map((entry, idx) => {
-              const normalizedEntry = normalizeEvidenceEntry(entry)
-              const fileViewUrl = toFileViewUrl(normalizedEntry)
-              const isUrl = /^https?:\/\//i.test(normalizedEntry) || normalizedEntry.startsWith('/uploads/') || normalizedEntry.startsWith('/api/files/')
-              return isUrl ? (
-                <div key={`${entry}-${idx}`} className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2">
-                  <span className="text-sm text-slate-700">{getEvidenceName(normalizedEntry)}</span>
-                  <div className="flex items-center gap-2">
-                    <a href={fileViewUrl} target="_blank" rel="noreferrer" className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700">Visualizar</a>
-                    <a href={fileViewUrl} download className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Baixar</a>
-                  </div>
-                </div>
-              ) : (
-                <p key={`${entry}-${idx}`} className="text-sm text-slate-700">{entry}</p>
+            <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">{evidenceItems.length === 0 ? <p className="text-sm text-slate-500">Nenhuma evidência anexada.</p> : evidenceItems.map((item, idx) => {
+              if (item.type === 'file') {
+                const fileViewUrl = toFileViewUrl(item.url)
+                return (
+                  <article key={`${item.raw}-${idx}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-slate-800">📎 {item.displayName}</p>
+                        <p className="text-xs text-slate-500">Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p>
+                        <p className="text-xs text-slate-500">Usuário: {item.uploadedBy || 'Não informado'}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a href={fileViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">👁️ Visualizar</a>
+                        <a href={fileViewUrl} download className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">⬇️ Baixar</a>
+                      </div>
+                    </div>
+                  </article>
+                )
+              }
+
+              return (
+                <article key={`${item.raw}-${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Observação</p>
+                  <p className="mt-1 text-sm text-amber-900">{item.message}</p>
+                  <p className="mt-2 text-xs text-amber-700">Autor: {item.uploadedBy || 'Não informado'} · Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p>
+                </article>
               )
             })}</div>
           </Block>
@@ -363,8 +460,8 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[95vh] w-full max-w-6xl overflow-auto rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="text-lg font-semibold">{editingAction ? 'Editar ação' : 'Nova ação'}</h2><button type="button" onClick={() => setModalOpen(false)} className="rounded border px-2 py-1 text-sm">Fechar</button></div>
-            <div className="flex gap-1 border-b px-4"><button type="button" onClick={() => setModalTab('dados')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'dados' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Ação - Dados Básicos</button><button type="button" onClick={() => setModalTab('evidencias')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'evidencias' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Evidências</button></div>
-            {modalTab === 'dados' ? <div className="grid gap-4 p-4 lg:grid-cols-[2fr_1fr]"><div className="grid gap-3 md:grid-cols-2"><Field label="Nº Processo"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Criado em"><input value={editingAction ? formatDate(editingAction.createdAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="Criado por"><input value={editingAction?.createdBy?.fullName || editingAction?.createdBy?.email || '-'} readOnly className="input bg-slate-50" /></Field><Field label="Última atualização"><input value={editingAction ? formatDate(editingAction.updatedAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="O que?" className="md:col-span-2"><textarea value={actionForm.descricao} onChange={(e) => setActionForm((p) => ({ ...p, descricao: e.target.value }))} rows={2} className="input" /></Field><Field label="Por quê?"><textarea value={actionForm.motivo} onChange={(e) => setActionForm((p) => ({ ...p, motivo: e.target.value }))} rows={2} className="input" /></Field><Field label="Como?"><textarea value={actionForm.como} onChange={(e) => setActionForm((p) => ({ ...p, como: e.target.value }))} rows={2} className="input" /></Field><Field label="Onde?"><input value={actionForm.onde} onChange={(e) => setActionForm((p) => ({ ...p, onde: e.target.value }))} className="input" /></Field><Field label="Quem?"><input value={actionForm.quem} onChange={(e) => setActionForm((p) => ({ ...p, quem: e.target.value }))} className="input" /></Field><Field label="Centro responsável"><select value={actionForm.centroResponsavelId} onChange={(e) => setActionForm((p) => ({ ...p, centroResponsavelId: e.target.value }))} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Início"><input type="date" value={actionForm.dataInicio} onChange={(e) => setActionForm((p) => ({ ...p, dataInicio: e.target.value }))} className="input" /></Field><Field label="Fim"><input type="date" value={actionForm.dataFim} onChange={(e) => setActionForm((p) => ({ ...p, dataFim: e.target.value }))} className="input" /></Field><Field label="Status"><select value={actionForm.status} onChange={(e) => setActionForm((p) => ({ ...p, status: e.target.value as NonConformityActionStatus }))} className="input">{STATUS_OPTIONS.map((o) => <option key={o} value={o}>{STATUS_LABELS[o]}</option>)}</select></Field><Field label="Tipo"><select value={actionForm.tipo} onChange={(e) => setActionForm((p) => ({ ...p, tipo: e.target.value as NonConformityActionType }))} className="input">{TYPE_OPTIONS.map((o) => <option key={o} value={o}>{TYPE_LABELS[o]}</option>)}</select></Field><Field label="Origem"><input value={actionForm.origem} onChange={(e) => setActionForm((p) => ({ ...p, origem: e.target.value }))} className="input" /></Field><Field label="Referência"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Histórico (somente leitura)" className="md:col-span-2"><textarea value={actionForm.historico} readOnly rows={2} className="input bg-slate-50" /></Field><Field label="Data conclusão"><input type="date" value={actionForm.dataConclusao} onChange={(e) => setActionForm((p) => ({ ...p, dataConclusao: e.target.value }))} className="input" /></Field><Field label="Quanto? (custo)"><input type="number" step="0.01" value={actionForm.custo} onChange={(e) => setActionForm((p) => ({ ...p, custo: e.target.value }))} className="input" /></Field></div><aside className="rounded-lg border border-slate-200 bg-slate-50 p-3"><h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Gráfico RAB - média</h3><RadarPreview rapidez={actionForm.rapidez} autonomia={actionForm.autonomia} beneficio={actionForm.beneficio} /><Field label="Rapidez"><input type="number" min={1} max={5} value={actionForm.rapidez} onChange={(e) => setActionForm((p) => ({ ...p, rapidez: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Autonomia"><input type="number" min={1} max={5} value={actionForm.autonomia} onChange={(e) => setActionForm((p) => ({ ...p, autonomia: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Benefício"><input type="number" min={1} max={5} value={actionForm.beneficio} onChange={(e) => setActionForm((p) => ({ ...p, beneficio: Number(e.target.value || 1) }))} className="input" /></Field></aside></div> : <div className="space-y-3 p-4"><label className="inline-flex cursor-pointer items-center gap-2 rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">📎 Adicionar evidência<input type="file" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadEvidence(file, (url) => setActionForm((p) => ({ ...p, evidencias: `${p.evidencias ? `${p.evidencias}\n` : ''}${url}` }))); e.currentTarget.value = '' }} /></label><textarea value={actionForm.evidencias} onChange={(e) => setActionForm((p) => ({ ...p, evidencias: e.target.value }))} rows={5} className="input" /><div className="rounded border border-slate-200 bg-slate-50 p-3">{parseEvidenceList(actionForm.evidencias).map((entry, idx) => { const normalizedEntry = normalizeEvidenceEntry(entry); const fileViewUrl = toFileViewUrl(normalizedEntry); const isUrl = /^https?:\/\//i.test(normalizedEntry) || normalizedEntry.startsWith('/uploads/') || normalizedEntry.startsWith('/api/files/'); return isUrl ? <div key={`${entry}-${idx}`} className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2"><span className="text-sm text-slate-700">{getEvidenceName(normalizedEntry)}</span><div className="flex items-center gap-2"><a href={fileViewUrl} target="_blank" rel="noreferrer" className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700">Visualizar</a><a href={fileViewUrl} download className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">Baixar</a></div></div> : <p key={`${entry}-${idx}`} className="text-sm">{entry}</p> })}</div></div>}
+           <div className="flex gap-1 border-b px-4"><button type="button" onClick={() => setModalTab('dados')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'dados' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Ação - Dados Básicos</button><button type="button" onClick={() => setModalTab('evidencias')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'evidencias' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Evidências</button></div>
+            {modalTab === 'dados' ? <div className="grid gap-4 p-4 lg:grid-cols-[2fr_1fr]"><div className="grid gap-3 md:grid-cols-2"><Field label="Nº Processo"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Criado em"><input value={editingAction ? formatDate(editingAction.createdAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="Criado por"><input value={editingAction?.createdBy?.fullName || editingAction?.createdBy?.email || '-'} readOnly className="input bg-slate-50" /></Field><Field label="Última atualização"><input value={editingAction ? formatDate(editingAction.updatedAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="O que?" className="md:col-span-2"><textarea value={actionForm.descricao} onChange={(e) => setActionForm((p) => ({ ...p, descricao: e.target.value }))} rows={2} className="input" /></Field><Field label="Por quê?"><textarea value={actionForm.motivo} onChange={(e) => setActionForm((p) => ({ ...p, motivo: e.target.value }))} rows={2} className="input" /></Field><Field label="Como?"><textarea value={actionForm.como} onChange={(e) => setActionForm((p) => ({ ...p, como: e.target.value }))} rows={2} className="input" /></Field><Field label="Onde?"><input value={actionForm.onde} onChange={(e) => setActionForm((p) => ({ ...p, onde: e.target.value }))} className="input" /></Field><Field label="Quem?"><input value={actionForm.quem} onChange={(e) => setActionForm((p) => ({ ...p, quem: e.target.value }))} className="input" /></Field><Field label="Centro responsável"><select value={actionForm.centroResponsavelId} onChange={(e) => setActionForm((p) => ({ ...p, centroResponsavelId: e.target.value }))} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Início"><input type="date" value={actionForm.dataInicio} onChange={(e) => setActionForm((p) => ({ ...p, dataInicio: e.target.value }))} className="input" /></Field><Field label="Fim"><input type="date" value={actionForm.dataFim} onChange={(e) => setActionForm((p) => ({ ...p, dataFim: e.target.value }))} className="input" /></Field><Field label="Status"><select value={actionForm.status} onChange={(e) => setActionForm((p) => ({ ...p, status: e.target.value as NonConformityActionStatus }))} className="input">{STATUS_OPTIONS.map((o) => <option key={o} value={o}>{STATUS_LABELS[o]}</option>)}</select></Field><Field label="Tipo"><select value={actionForm.tipo} onChange={(e) => setActionForm((p) => ({ ...p, tipo: e.target.value as NonConformityActionType }))} className="input">{TYPE_OPTIONS.map((o) => <option key={o} value={o}>{TYPE_LABELS[o]}</option>)}</select></Field><Field label="Origem"><input value={actionForm.origem} onChange={(e) => setActionForm((p) => ({ ...p, origem: e.target.value }))} className="input" /></Field><Field label="Referência"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Histórico (somente leitura)" className="md:col-span-2"><textarea value={actionForm.historico} readOnly rows={2} className="input bg-slate-50" /></Field><Field label="Data conclusão"><input type="date" value={actionForm.dataConclusao} onChange={(e) => setActionForm((p) => ({ ...p, dataConclusao: e.target.value }))} className="input" /></Field><Field label="Quanto? (custo)"><input type="number" step="0.01" value={actionForm.custo} onChange={(e) => setActionForm((p) => ({ ...p, custo: e.target.value }))} className="input" /></Field></div><aside className="rounded-lg border border-slate-200 bg-slate-50 p-3"><h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Gráfico RAB - média</h3><RadarPreview rapidez={actionForm.rapidez} autonomia={actionForm.autonomia} beneficio={actionForm.beneficio} /><Field label="Rapidez"><input type="number" min={1} max={5} value={actionForm.rapidez} onChange={(e) => setActionForm((p) => ({ ...p, rapidez: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Autonomia"><input type="number" min={1} max={5} value={actionForm.autonomia} onChange={(e) => setActionForm((p) => ({ ...p, autonomia: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Benefício"><input type="number" min={1} max={5} value={actionForm.beneficio} onChange={(e) => setActionForm((p) => ({ ...p, beneficio: Number(e.target.value || 1) }))} className="input" /></Field></aside></div> : <div className="space-y-3 p-4"><label className="inline-flex cursor-pointer items-center gap-2 rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">📎 Adicionar evidência<input type="file" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadEvidence(file, (serializedEntry) => setActionForm((p) => ({ ...p, evidencias: `${p.evidencias ? `${p.evidencias}\n` : ''}${serializedEntry}` }))); e.currentTarget.value = '' }} /></label><textarea value={actionForm.evidencias} onChange={(e) => setActionForm((p) => ({ ...p, evidencias: e.target.value }))} rows={5} className="input" /><div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">{parseEvidenceList(actionForm.evidencias).map((entry, idx) => { const item = parseEvidenceItem(entry); if (item.type === 'file') { const fileViewUrl = toFileViewUrl(item.url); return <article key={`${entry}-${idx}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div className="space-y-1"><p className="text-sm font-semibold text-slate-800">📎 {item.displayName}</p><p className="text-xs text-slate-500">Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p><p className="text-xs text-slate-500">Usuário: {item.uploadedBy || 'Não informado'}</p></div><div className="flex flex-wrap items-center gap-2"><a href={fileViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">👁️ Visualizar</a><a href={fileViewUrl} download className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">⬇️ Baixar</a></div></div></article> } return <article key={`${entry}-${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Observação</p><p className="mt-1 text-sm text-amber-900">{item.message}</p><p className="mt-2 text-xs text-amber-700">Autor: {item.uploadedBy || 'Não informado'} · Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p></article> })}</div></div>}
             <div className="flex justify-end gap-2 border-t px-4 py-3"><button type="button" onClick={() => setModalOpen(false)} className="rounded border px-3 py-2 text-sm">Cancelar</button><button type="button" onClick={saveAction} disabled={saving} className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white">{saving ? 'Salvando...' : 'Salvar ação'}</button></div>
           </div>
         </div>

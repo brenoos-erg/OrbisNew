@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  await requireActiveUser()
+  const me = await requireActiveUser()
   const form = await req.formData()
   const file = form.get('file')
   const scope = String(req.nextUrl.searchParams.get('scope') ?? 'general').replace(/[^a-z0-9-]/gi, '')
@@ -19,5 +19,10 @@ export async function POST(req: NextRequest) {
   const safeName = `${Date.now()}-${randomUUID()}-${file.name.replace(/\s+/g, '-')}`
   await fs.writeFile(path.join(uploadDir, safeName), Buffer.from(await file.arrayBuffer()))
 
-  return NextResponse.json({ url: `/uploads/${scope}/${safeName}` })
+  return NextResponse.json({
+    url: `/uploads/${scope}/${safeName}`,
+    originalName: file.name,
+    uploadedAt: new Date().toISOString(),
+    uploadedBy: me.fullName || me.email,
+  })
 }
