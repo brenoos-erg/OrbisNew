@@ -17,11 +17,22 @@ const TABS: TabItem[] = [
 
 type Props = {
   isAdmin?: boolean
+  canAccessApprovalDocuments?: boolean
+  canAccessQualityReviewDocuments?: boolean
 }
 
-export default function DocumentControlTabs({ isAdmin = false }: Props) {
+export default function DocumentControlTabs({
+  isAdmin = false,
+  canAccessApprovalDocuments = false,
+  canAccessQualityReviewDocuments = false,
+}: Props) {
   const pathname = usePathname()
-  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || isAdmin)
+  const visibleTabs = TABS.filter((tab) => {
+    if (tab.adminOnly && !isAdmin) return false
+    if (tab.href.endsWith('/para-aprovacao') && !canAccessApprovalDocuments) return false
+    if (tab.href.endsWith('/em-analise-qualidade') && !canAccessQualityReviewDocuments) return false
+    return true
+  })
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">

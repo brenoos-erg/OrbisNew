@@ -9,6 +9,7 @@ import { Action, ModuleLevel, Prisma } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { SessionProvider } from '@/components/session/SessionProvider'
+import { canAccessApprovalDocuments, canAccessQualityReviewDocuments, isAdmin } from '@/lib/documentApprovalControl'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,8 +94,7 @@ export default async function DashboardLayout({
     const current = level ? order.indexOf(level) : -1
     return current >= order.indexOf(min)
   }
-
-   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
+  // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
   let showSolic = false
   let showConfig = false
   let canApprove = false
@@ -106,6 +106,9 @@ export default async function DashboardLayout({
   let canAccessRefusalPanel = false
   let showMyDocuments = false
   let showDocumentControl = false
+  let canAccessDocumentApprovalTab2 = false
+  let canAccessDocumentApprovalTab3 = false
+  let userIsAdmin = false
   let configFeatures = {
     painel: false,
     usuarios: false,
@@ -149,9 +152,10 @@ export default async function DashboardLayout({
     outros: false,
   }
 
-  if (appUser.id) {
+ if (appUser.id) {
      try {
       const levels = appUser.moduleLevels ?? {}
+      userIsAdmin = isAdmin(appUser)
       const hasStructure = await userHasDepartmentOrCostCenter(
         appUser.id,
         appUser.costCenterId,
@@ -340,6 +344,10 @@ export default async function DashboardLayout({
       showDocumentControl =
         hasMinLevel(documentControlLevel, ModuleLevel.NIVEL_1) &&
         hasStructure
+      ;[canAccessDocumentApprovalTab2, canAccessDocumentApprovalTab3] = await Promise.all([
+        canAccessApprovalDocuments(appUser.id, appUser.role),
+        canAccessQualityReviewDocuments(appUser.id, appUser.role),
+      ])
       showEquipments =
         hasMinLevel(equipmentLevel, ModuleLevel.NIVEL_1) && Object.values(equipmentFeatures).some(Boolean)
       canApprove =
@@ -378,6 +386,9 @@ export default async function DashboardLayout({
           showEquipments={showEquipments}
           showMyDocuments={showMyDocuments}
           showDocumentControl={showDocumentControl}
+          canAccessDocumentApprovalTab2={canAccessDocumentApprovalTab2}
+          canAccessDocumentApprovalTab3={canAccessDocumentApprovalTab3}
+          isAdmin={userIsAdmin}
           canApprove={canApprove}
           canReviewRefusal={canReviewRefusal}
           canAccessRefusalPanel={canAccessRefusalPanel}

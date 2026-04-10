@@ -25,7 +25,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
   const stage = version.status === DocumentVersionStatus.AG_APROVACAO ? 2 : version.status === DocumentVersionStatus.EM_ANALISE_QUALIDADE ? 3 : null
   if (!stage) return NextResponse.json({ error: 'Esta versão não está em etapa de aprovação.' }, { status: 400 })
 
-  const canApprove = await canApproveDocumentStage(me.id, stage)
+  const canApprove = await canApproveDocumentStage(me.id, stage, me.role)
   if (!canApprove) return NextResponse.json({ error: 'Você não possui permissão para aprovar nesta etapa.' }, { status: 403 })
 
   const approval = await prisma.documentApproval.findFirst({

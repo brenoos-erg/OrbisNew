@@ -39,6 +39,9 @@ type Props = {
   showEquipments: boolean
   showMyDocuments: boolean
   showDocumentControl: boolean
+  canAccessDocumentApprovalTab2: boolean
+  canAccessDocumentApprovalTab3: boolean
+  isAdmin: boolean
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
@@ -95,6 +98,9 @@ export default function Sidebar({
   showEquipments,
   showMyDocuments,
   showDocumentControl,
+  canAccessDocumentApprovalTab2,
+  canAccessDocumentApprovalTab3,
+  isAdmin,
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
@@ -364,44 +370,49 @@ export default function Sidebar({
                   >
                     <span className={labelBase}>Documentos Publicados</span>
                   </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/para-aprovacao"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/para-aprovacao')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Documentos para Aprovação</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/em-analise-qualidade"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/em-analise-qualidade')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Documentos em Revisão da Qualidade</span>
-                  </Link>
-                  <Link
-                    href="/dashboard/controle-documentos/controle-aprovadores"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname.startsWith('/dashboard/controle-documentos/controle-aprovadores')
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <span className={labelBase}>Controle de Aprovadores</span>
-                  </Link>
+                  {canAccessDocumentApprovalTab2 && (
+                    <Link
+                      href="/dashboard/controle-documentos/para-aprovacao"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/controle-documentos/para-aprovacao')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <span className={labelBase}>Documentos para Aprovação</span>
+                    </Link>
+                  )}
+                  {canAccessDocumentApprovalTab3 && (
+                    <Link
+                      href="/dashboard/controle-documentos/em-analise-qualidade"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/controle-documentos/em-analise-qualidade')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <span className={labelBase}>Documentos em Revisão da Qualidade</span>
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <Link
+                      href="/dashboard/controle-documentos/controle-aprovadores"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/controle-documentos/controle-aprovadores')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <span className={labelBase}>Controle de Aprovadores</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
           )}
-
 
           {showFleet && (
             <div>
