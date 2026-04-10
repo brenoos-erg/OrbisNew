@@ -18,7 +18,7 @@ function canAccessAction(
 function toDate(value: unknown) {
   if (value === undefined) return undefined
   if (!value) return null
-  return new Date(String(value))
+ return new Date(String(value))
 }
 
 function toOptionalString(value: unknown) {
@@ -41,6 +41,23 @@ function toOptionalDecimal(value: unknown) {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return undefined
   return parsed
+}
+
+function normalizeEvidenceText(value: unknown) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const normalized = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      if (line.startsWith('/public/uploads/')) return line.replace('/public/uploads/', '/uploads/')
+      if (line.startsWith('public/uploads/')) return `/${line.replace(/^public\//, '')}`
+      if (line.startsWith('uploads/')) return `/${line}`
+      return line
+    })
+    .join('\n')
+  return normalized || null
 }
 
 function resolveStatusForPatch(currentStatus: NonConformityActionStatus, nextStatus: unknown) {
@@ -127,8 +144,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
     const shouldSetConclusion = desiredStatus === NonConformityActionStatus.CONCLUIDA
     const shouldClearConclusion = desiredStatus === NonConformityActionStatus.PENDENTE || desiredStatus === NonConformityActionStatus.EM_ANDAMENTO
 
-    const baseEvidence =
-      body?.evidencias !== undefined ? (body?.evidencias ? String(body.evidencias).trim() : null) : (current?.evidencias || null)
+   const baseEvidence =
+      body?.evidencias !== undefined ? normalizeEvidenceText(body?.evidencias) : (current?.evidencias || null)
     const evidenciasWithObs = observacao
       ? `${baseEvidence ? `${baseEvidence}\n\n` : ''}[${new Date().toLocaleString('pt-BR')}] ${me.fullName || me.email}: ${observacao}`
       : baseEvidence

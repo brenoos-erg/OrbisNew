@@ -50,6 +50,23 @@ function toOptionalDecimal(value: unknown) {
   return parsed
 }
 
+function normalizeEvidenceText(value: unknown) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const normalized = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      if (line.startsWith('/public/uploads/')) return line.replace('/public/uploads/', '/uploads/')
+      if (line.startsWith('public/uploads/')) return `/${line.replace(/^public\//, '')}`
+      if (line.startsWith('uploads/')) return `/${line}`
+      return line
+    })
+    .join('\n')
+  return normalized || null
+}
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -174,10 +191,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
     }
 
-    const desiredStatus = Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
+     const desiredStatus = Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
       ? (body.status as NonConformityActionStatus)
       : NonConformityActionStatus.PENDENTE
-    const evidencias = body?.evidencias ? String(body.evidencias).trim() : null
+    const evidencias = normalizeEvidenceText(body?.evidencias)
     if (desiredStatus === NonConformityActionStatus.CONCLUIDA && !evidencias) {
       return NextResponse.json({ error: 'Anexe evidência antes de concluir a ação.' }, { status: 400 })
     }

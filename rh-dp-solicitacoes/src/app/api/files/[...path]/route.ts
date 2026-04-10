@@ -3,8 +3,9 @@ import { Readable } from 'node:stream'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireActiveUser } from '@/lib/auth'
 
-const DOCUMENTS_ROOT = path.join(process.cwd(), 'public', 'uploads', 'documents')
+const UPLOADS_ROOT = path.join(process.cwd(), 'public', 'uploads')
 
 function detectMimeType(filePath: string) {
   const ext = path.extname(filePath).toLowerCase()
@@ -14,15 +15,21 @@ function detectMimeType(filePath: string) {
   if (ext === '.gif') return 'image/gif'
   if (ext === '.webp') return 'image/webp'
   if (ext === '.svg') return 'image/svg+xml'
+  if (ext === '.txt') return 'text/plain; charset=utf-8'
+  if (ext === '.doc') return 'application/msword'
+  if (ext === '.docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  if (ext === '.xls') return 'application/vnd.ms-excel'
+  if (ext === '.xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   return 'application/octet-stream'
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  await requireActiveUser()
+
   const rawParts = (await params).path || []
   if (rawParts.length === 0) {
     return NextResponse.json({ error: 'Arquivo não informado.' }, { status: 400 })
   }
-
   const safeParts = rawParts
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
@@ -31,8 +38,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pat
     return NextResponse.json({ error: 'Caminho inválido.' }, { status: 400 })
   }
 
-  const absolutePath = path.join(DOCUMENTS_ROOT, ...safeParts)
-  const relative = path.relative(DOCUMENTS_ROOT, absolutePath)
+  const absolutePath = path.join(UPLOADS_ROOT, ...safeParts)
+  const relative = path.relative(UPLOADS_ROOT, absolutePath)
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
     return NextResponse.json({ error: 'Caminho inválido.' }, { status: 400 })
   }
