@@ -2694,7 +2694,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </label>
                       <textarea
                         className={`${INPUT_RO} min-h-[90px]`}
-                        readOnly
+                           readOnly
                         value={experienceData.comentarioFinal || '-'}
                       />
                     </div>
@@ -2718,6 +2718,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                   <p className="mb-4 text-xs text-slate-600">
                     Competências comportamentais e técnicas
                   </p>
+
+                  <div className="mb-4 rounded-lg border border-slate-200 bg-white/80 p-3">
+                    <p className="text-xs leading-5 text-slate-700">
+                      1 - Avalie o colaborador nas questões conforme a legenda abaixo e utilize como parâmetro as competências mapeadas para o seu cargo no Gesto.Com.
+                    </p>
+                  </div>
 
                   <div className="space-y-3">
                     {EXPERIENCE_EVALUATION_COMPETENCIES.map((competency) => (
