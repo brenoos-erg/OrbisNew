@@ -41,12 +41,12 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
   if (contentsArrayMatch) {
     const current = contentsArrayMatch[1]
     if (current.includes(`${streamObjectId} 0 R`)) return pageBody
-    return pageBody.replace(/\/Contents\s*\[([\s\S]*?)\]/, `/Contents [${streamObjectId} 0 R ${current}]`)
+    return pageBody.replace(/\/Contents\s*\[([\s\S]*?)\]/, `/Contents [${current} ${streamObjectId} 0 R]`)
   }
 
   const singleRefMatch = pageBody.match(/\/Contents\s+(\d+)\s+\d+\s+R/)
   if (singleRefMatch) {
-    return pageBody.replace(/\/Contents\s+\d+\s+\d+\s+R/, `/Contents [${streamObjectId} 0 R ${singleRefMatch[1]} 0 R]`)
+    return pageBody.replace(/\/Contents\s+\d+\s+\d+\s+R/, `/Contents [${singleRefMatch[1]} 0 R ${streamObjectId} 0 R]`)
   }
 
   return pageBody.replace('>>', `\n/Contents [${streamObjectId} 0 R]\n>>`)
