@@ -68,6 +68,14 @@ export default function PlanosDeAcaoClient() {
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<ActionRow[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    descricao: '',
+    responsavelNome: '',
+    prazo: '',
+    status: NonConformityActionStatus.PENDENTE as NonConformityActionStatus,
+  })
 
   const [numeroProcessoDraft, setNumeroProcessoDraft] = useState('')
   const [centroResponsavelDraft, setCentroResponsavelDraft] = useState('')
@@ -174,6 +182,43 @@ export default function PlanosDeAcaoClient() {
     }
   }
 
+  async function handleCreateAction(e: FormEvent) {
+    e.preventDefault()
+    const descricao = createForm.descricao.trim()
+    if (!descricao) {
+      setError('Preencha a descrição da ação para registrar.')
+      return
+    }
+    try {
+      setCreating(true)
+      const res = await fetch('/api/sst/plano-de-acao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao,
+          responsavelNome: createForm.responsavelNome.trim() || null,
+          prazo: createForm.prazo || null,
+          status: createForm.status,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Erro ao registrar ação.')
+      setCreateModalOpen(false)
+      setCreateForm({
+        descricao: '',
+        responsavelNome: '',
+        prazo: '',
+        status: NonConformityActionStatus.PENDENTE,
+      })
+      setError(null)
+      await load()
+    } catch (e: any) {
+      setError(e?.message || 'Erro ao registrar ação.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   function handleSearch(e: FormEvent) {
     e.preventDefault()
     setNumeroProcesso(numeroProcessoDraft)
@@ -215,16 +260,22 @@ export default function PlanosDeAcaoClient() {
     setDataConclusaoFim('')
   }
 
-  return (
+ return (
     <div className="space-y-5">
       <SstModuleTabs active="planos-de-acao" />
-      <div className="flex flex-wrap items-start gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold uppercase text-slate-500">SGI / Qualidade</p>
           <h1 className="text-3xl font-bold text-slate-900">Ações do plano de ação</h1>
           <p className="max-w-3xl text-slate-600">Listagem completa das ações com filtros, visualização, edição e exclusão.</p>
         </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => setCreateModalOpen(true)}
+          className="rounded bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+        >
+          Registrar ação
+        </button>      </div>
 
       <form onSubmit={handleSearch} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -295,12 +346,66 @@ export default function PlanosDeAcaoClient() {
           <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50">Anterior</button>
           <span>Página {page} de {totalPages}</span>
           <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50">Próxima</button>
-        </div>
+         </div>
         <p className="text-slate-600">Legenda: <span className="font-medium text-rose-700">Em atraso</span> · <span className="font-medium">Concluída</span> · <span className="font-medium">Cancelada</span></p>
       </footer>
 
       {loading ? <p className="text-sm text-slate-600">Carregando ações...</p> : null}
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+      {createModalOpen ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 className="text-lg font-semibold text-slate-900">Registrar ação do plano</h2>
+              <button type="button" onClick={() => setCreateModalOpen(false)} className="rounded border px-2 py-1 text-sm">Fechar</button>
+            </div>
+            <form onSubmit={handleCreateAction} className="space-y-4 p-4">
+              <Field label="Descrição *">
+                <textarea
+                  value={createForm.descricao}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, descricao: e.target.value }))}
+                  className="input min-h-24"
+                  required
+                />
+              </Field>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Field label="Responsável">
+                  <input
+                    value={createForm.responsavelNome}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, responsavelNome: e.target.value }))}
+                    className="input"
+                  />
+                </Field>
+                <Field label="Prazo">
+                  <input
+                    type="date"
+                    value={createForm.prazo}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, prazo: e.target.value }))}
+                    className="input"
+                  />
+                </Field>
+                <Field label="Status">
+                  <select
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
+                    className="input"
+                  >
+                    {Object.values(NonConformityActionStatus).map((option) => (
+                      <option key={option} value={option}>{actionStatusLabel[option]}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setCreateModalOpen(false)} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
+                <button type="submit" disabled={creating} className="rounded bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
+                  {creating ? 'Registrando...' : 'Registrar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
