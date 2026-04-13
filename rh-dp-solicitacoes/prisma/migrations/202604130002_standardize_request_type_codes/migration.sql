@@ -1,0 +1,12 @@
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.063' WHERE `id` = 'RQ_063' AND `codigo` <> 'RQ.063';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.091' WHERE `id` = 'RQ_091' AND `codigo` <> 'RQ.091';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.092' WHERE `id` = 'RQ_092' AND `codigo` <> 'RQ.092';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.043' WHERE `id` = 'RQ_043' AND `codigo` <> 'RQ.043';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.088' WHERE `id` = 'RQ_088' AND `codigo` <> 'RQ.088';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.089' WHERE `id` = 'RQ_LOG_EQUIPAMENTOS' AND `codigo` <> 'RQ.089';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.106' WHERE `id` = 'RQ_106' AND `codigo` <> 'RQ.106';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.115' WHERE `id` = 'RQ_115' AND `codigo` <> 'RQ.115';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.240' WHERE `id` = 'RQ_240' AND `codigo` <> 'RQ.240';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.247' WHERE `id` = 'RQ_247' AND `codigo` <> 'RQ.247';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.113' WHERE `id` = 'RQ_301' AND `codigo` <> 'RQ.113';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.016' WHERE `id` = 'RQ_300' AND `codigo` <> 'RQ.016';

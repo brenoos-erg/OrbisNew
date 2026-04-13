@@ -295,11 +295,11 @@ async function main() {
     })
   }
 
-  if (dpDepartment) {
+   if (dpDepartment) {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_106' },
       update: {
-        codigo: 'RQ.DP.004',
+        codigo: 'RQ.106',
        nome: 'Exclusão no plano saúde/odonto para dependentes',
         descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
         schemaJson: {
@@ -312,7 +312,7 @@ async function main() {
       },
       create: {
         id: 'RQ_106',
-        codigo: 'RQ.DP.004',
+        codigo: 'RQ.106',
         nome: 'Exclusão no plano saúde/odonto para dependentes',
         descricao: 'Solicitação de exclusão de dependente em plano de saúde/odonto.',
         schemaJson: {
@@ -328,7 +328,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_115' },
       update: {
-        codigo: 'RQ.DP.005',
+        codigo: 'RQ.115',
          nome: 'Renúncia de benefício',
         descricao: 'Solicitação de renúncia de benefício.',
         schemaJson: {
@@ -341,7 +341,7 @@ async function main() {
       },
       create: {
         id: 'RQ_115',
-        codigo: 'RQ.DP.005',
+        codigo: 'RQ.115',
         nome: 'Renúncia de benefício',
         descricao: 'Solicitação de renúncia de benefício.',
         schemaJson: {
@@ -357,7 +357,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_240' },
       update: {
-        codigo: 'RQ.DP.006',
+        codigo: 'RQ.240',
         nome: 'Transferência de funcionário',
         descricao: 'Solicitação de transferência de funcionário.',
         schemaJson: {
@@ -370,7 +370,7 @@ async function main() {
       },
       create: {
         id: 'RQ_240',
-        codigo: 'RQ.DP.006',
+        codigo: 'RQ.240',
         nome: 'Transferência de funcionário',
         descricao: 'Solicitação de transferência de funcionário.',
         schemaJson: {
@@ -387,7 +387,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_301' },
       update: {
-        codigo: 'RQ.DP.008',
+        codigo: 'RQ.113',
         nome: 'Autorização de inclusão no plano odontológico e / ou plano médico para dependentes',
         descricao:
           'Formulário para solicitação de inclusão ou exclusão de dependentes em benefícios da empresa.',
@@ -419,7 +419,7 @@ async function main() {
       },
       create: {
         id: 'RQ_301',
-        codigo: 'RQ.DP.008',
+        codigo: 'RQ.113',
         nome: 'Autorização de inclusão no plano odontológico e / ou plano médico para dependentes',
         descricao:
           'Formulário para solicitação de inclusão ou exclusão de dependentes em benefícios da empresa.',
@@ -590,7 +590,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_063' },
       update: {
-        codigo: 'RQ.RH.001',
+        codigo: 'RQ.063',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: {
@@ -620,7 +620,7 @@ async function main() {
       },
        create: {
         id: 'RQ_063',
-        codigo: 'RQ.RH.001',
+        codigo: 'RQ.063',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: {
@@ -693,7 +693,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_091' },
       update: {
-        codigo: 'RQ.RH.003',
+        codigo: 'RQ.091',
         nome: 'Solicitação de incentivo à educação',
         descricao: 'FORMULÁRIO PARA REQUISIÇÃO DE VERBA PARA INCENTIVO À EDUCAÇÃO.',
         schemaJson: incentivoEducacaoSchema,
@@ -701,7 +701,7 @@ async function main() {
       },
       create: {
         id: 'RQ_091',
-        codigo: 'RQ.RH.003',
+        codigo: 'RQ.091',
         nome: 'Solicitação de incentivo à educação',
         descricao: 'FORMULÁRIO PARA REQUISIÇÃO DE VERBA PARA INCENTIVO À EDUCAÇÃO.',
         schemaJson: incentivoEducacaoSchema,
@@ -1093,7 +1093,7 @@ async function main() {
      await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_088' },
       update: {
-        codigo: 'RQ.LOG.001',
+        codigo: 'RQ.088',
         nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
         schemaJson: {
@@ -1104,7 +1104,7 @@ async function main() {
       },
       create: {
         id: 'RQ_088',
-        codigo: 'RQ.LOG.001',
+        codigo: 'RQ.088',
         nome: 'Solicitação de veículos',
         descricao: 'Solicitação de veículos com aprovação e envio à Logística',
         schemaJson: {
@@ -1294,10 +1294,10 @@ async function main() {
       },
     ]
 
-    const solicitacaoEquipamentos = await prisma.tipoSolicitacao.upsert({
+     const solicitacaoEquipamentos = await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_LOG_EQUIPAMENTOS' },
       update: {
-        codigo: 'RQ.LOG.003',
+        codigo: 'RQ.089',
         nome: 'Solicitação de equipamentos',
         descricao: 'Solicitação de equipamentos para Logística',
         schemaJson: {
@@ -1312,7 +1312,7 @@ async function main() {
       },
       create: {
         id: 'RQ_LOG_EQUIPAMENTOS',
-        codigo: 'RQ.LOG.003',
+        codigo: 'RQ.089',
         nome: 'Solicitação de equipamentos',
         descricao: 'Solicitação de equipamentos para Logística',
         schemaJson: {
@@ -1878,10 +1878,10 @@ async function main() {
       ],
     }
 
-    await prisma.tipoSolicitacao.upsert({
+     await prisma.tipoSolicitacao.upsert({
        where: { id: 'RQ_247' },
       update: {
-        codigo: 'RQ.DP.002',
+        codigo: 'RQ.247',
         nome: 'Desligamento de pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
@@ -1889,7 +1889,7 @@ async function main() {
       },
      create: {
         id: 'RQ_247',
-        codigo: 'RQ.DP.002',
+        codigo: 'RQ.247',
         nome: 'Desligamento de pessoal',
         descricao: 'SERVIÇOS DE DP - desligamento de funcionário',
         schemaJson: desligamentoSchema,
@@ -2023,7 +2023,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_092' },
       update: {
-        codigo: 'RQ.SST.002',
+        codigo: 'RQ.092',
         nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
@@ -2031,7 +2031,7 @@ async function main() {
       },
       create: {
         id: 'RQ_092',
-        codigo: 'RQ.SST.002',
+        codigo: 'RQ.092',
         nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
@@ -2137,7 +2137,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_043' },
       update: {
-        codigo: 'RQ.SST.001',
+        codigo: 'RQ.043',
          nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
@@ -2145,7 +2145,7 @@ async function main() {
       },
       create: {
         id: 'RQ_043',
-        codigo: 'RQ.SST.001',
+        codigo: 'RQ.043',
         nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
@@ -2732,7 +2732,7 @@ async function main() {
      await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_300' },
       update: {
-        codigo: 'RQ.DP.007',
+        codigo: 'RQ.016',
        nome: 'Nada consta',
         descricao: 'Solicitação de nada consta (Departamento Pessoal)',
         schemaJson: nadaConstaSchema,
@@ -2740,14 +2740,14 @@ async function main() {
       },
       create: {
         id: 'RQ_300',
-        codigo: 'RQ.DP.007',
+        codigo: 'RQ.016',
         nome: 'Nada consta',
         descricao: 'Solicitação de nada consta (Departamento Pessoal)',
         schemaJson: nadaConstaSchema,
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "RQ.300 NADA CONSTA" ok.')
+    console.log('✅ Tipo "RQ.016 NADA CONSTA" ok.')
     const avaliacaoExperienciaSchema = {
       meta: {
         departamentos: [rhDepartment?.id].filter((value): value is string => Boolean(value)),

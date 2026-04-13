@@ -33,7 +33,7 @@ export async function GET() {
       ],
       OR: [
          {
-          status: 'ABERTA',
+           status: 'ABERTA',
           AND: [
             receivedVisibilityWhere,
             {
@@ -41,7 +41,7 @@ export async function GET() {
                 AND: [
                    { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
-                  { OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }] },
+                  { OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: { in: ['RQ.063', 'RQ.RH.001'] } } }] },
                 ],
               },
             },

@@ -223,7 +223,7 @@ export const GET = withModuleLevel(
                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
                    {
-                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: 'RQ.RH.001' } }],
+                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: { in: ['RQ.063', 'RQ.RH.001'] } } }],
                   },
                 ],
               },

@@ -49,9 +49,11 @@ export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
 export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_TIPO_ID = 'RQ_091'
-export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO = 'RQ.RH.003'
+export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO = 'RQ.091'
+export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO_LEGADO = 'RQ.RH.003'
 export const SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_TIPO_ID = 'RQ_301'
-export const SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO = 'RQ.DP.008'
+export const SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO = 'RQ.113'
+export const SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO_LEGADO = 'RQ.DP.008'
 
 export type NadaConstaSetorKey =
   | 'DP'
@@ -381,7 +383,10 @@ export function isSolicitacaoInclusaoPlanoDependentes(
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_TIPO_ID) return true
   const codigo = tipo.codigo?.trim().toUpperCase()
-  return codigo === SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO
+  return (
+    codigo === SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO ||
+    codigo === SOLICITACAO_INCLUSAO_PLANO_DEPENDENTES_CODIGO_LEGADO
+  )
 }
 
 export function isSolicitacaoIncentivoEducacao(
@@ -392,10 +397,10 @@ export function isSolicitacaoIncentivoEducacao(
   if (id === SOLICITACAO_INCENTIVO_EDUCACAO_TIPO_ID) return true
   const codigo = tipo.codigo?.trim().toUpperCase()
   if (codigo === SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO) return true
+  if (codigo === SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO_LEGADO) return true
   const nome = normalizeSolicitacaoName(tipo.nome)
   return nome.includes('INCENTIVO A EDUCACAO')
 }
-
 
 export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false

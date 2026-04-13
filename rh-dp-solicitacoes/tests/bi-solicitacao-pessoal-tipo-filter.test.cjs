@@ -5,7 +5,7 @@ const source = fs.readFileSync('src/lib/bi/solicitacoesPessoal.ts', 'utf8')
 
 assert.match(
   source,
-  /codigo:\s*\{\s*in:\s*\['RQ\.RH\.001',\s*'RQ\.DP\.001'\]\s*\}/,
+  /codigo:\s*\{\s*in:\s*\['RQ\.063',\s*'RQ\.RH\.001',\s*'RQ\.DP\.001'\]\s*\}/,
   'Filtro BI deve conter somente códigos de Solicitação de Pessoal/Admissão',
 )
 

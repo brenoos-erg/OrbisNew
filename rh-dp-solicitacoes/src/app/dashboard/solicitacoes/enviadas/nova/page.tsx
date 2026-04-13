@@ -524,7 +524,7 @@ export default function NovaSolicitacaoPage() {
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
   const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(selectedTipo);
   const isSolicitacaoExamesSst =
-    selectedTipo?.id === 'RQ_092' || selectedTipo?.codigo?.toUpperCase() === 'RQ.SST.002';
+    selectedTipo?.id === 'RQ_092' || ['RQ.092', 'RQ.SST.002'].includes(selectedTipo?.codigo?.toUpperCase() ?? '');
   const isRQ247 = selectedTipo?.id === 'RQ_247';
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
