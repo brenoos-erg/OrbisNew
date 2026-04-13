@@ -5,9 +5,9 @@ import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
+import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 
 const TIMELINE_DONE = new Set(['CONCLUIDA', 'ENCERRADA', 'APROVADA'])
-
 const STATUS_LABEL: Record<SolicitationStatus, string> = {
   ABERTA: 'Aberta',
   EM_ATENDIMENTO: 'Em atendimento',
@@ -99,6 +99,63 @@ function resolveExperienceEvaluatorId(
 
   return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
 }
+
+function stringifyComparable(value: unknown) {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const objectId = normalizeStringValue((value as Record<string, unknown>).id)
+    if (objectId) return objectId
+  }
+  return JSON.stringify(value)
+}
+
+function hasFieldValueChanged(before: unknown, after: unknown) {
+  return stringifyComparable(before) !== stringifyComparable(after)
+}
+
+function resolveUserIdFromValue(value: unknown, users: Array<{ id: string; fullName: string }>) {
+  const directId = normalizeStringValue(value)
+  if (directId && users.some((user) => user.id === directId)) return directId
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const objectId = normalizeStringValue((value as Record<string, unknown>).id)
+    if (objectId && users.some((user) => user.id === objectId)) return objectId
+  }
+
+  const byName = normalizeStringValue(value).toLocaleLowerCase('pt-BR')
+  if (!byName) return null
+  return users.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? null
+}
+
+function resolveDepartmentIdFromValue(value: unknown, departments: Array<{ id: string; name: string }>) {
+  const directId = normalizeStringValue(value)
+  if (directId && departments.some((department) => department.id === directId)) return directId
+
+  const byName = normalizeStringValue(value).toLocaleLowerCase('pt-BR')
+  if (!byName) return null
+  return departments.find((department) => department.name.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? null
+}
+
+function isFlowField(fieldName: string) {
+  const normalized = fieldName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  return [
+    'responsavel',
+    'avaliador',
+    'aprovador',
+    'gestorimediatoavaliador',
+    'departamento',
+    'setor',
+    'fila',
+    'etapa',
+  ].some((token) => normalized.includes(token))
+}
+
 
 
 function summarizePayloadBlocks(payload: unknown) {
@@ -306,8 +363,26 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliador') ||
       Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliadorId')
 
-    if (hasExperienceEvaluatorField) {
+    const [activeUsers, departments] = await Promise.all([
+      prisma.user.findMany({
+        where: { status: 'ATIVO' },
+        select: { id: true, fullName: true },
+        orderBy: { fullName: 'asc' },
+        take: 500,
+      }),
+      prisma.department.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ])
+
+    const flowChanges: string[] = []
+    let resolvedApproverId: string | null | undefined = undefined
+    let resolvedResponsibleId: string | null | undefined = undefined
+    let resolvedDepartmentId: string | null | undefined = undefined
+      if (hasExperienceEvaluatorField) {
       const experienceEvaluators = await listExperienceEvaluators()
+      const previousEvaluatorId = resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
       const evaluatorId = resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
 
       if (evaluatorId) {
@@ -320,6 +395,46 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
         if (incomingEvaluatorId === '' || incomingEvaluator === '') {
           mergedCampos.gestorImediatoAvaliadorId = ''
           mergedCampos.gestorImediatoAvaliador = ''
+        }
+      }
+
+      if (previousEvaluatorId !== evaluatorId) {
+        flowChanges.push(`avaliador alterado (${previousEvaluatorId || '—'} → ${evaluatorId || '—'})`)
+        resolvedApproverId = evaluatorId || null
+      }
+    }
+
+    for (const [fieldName, afterValue] of Object.entries(mergedCampos)) {
+      if (!isFlowField(fieldName)) continue
+      const beforeValue = currentCampos[fieldName]
+      if (!hasFieldValueChanged(beforeValue, afterValue)) continue
+
+      const normalizedField = fieldName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+
+      if ((normalizedField.includes('departamento') || normalizedField.includes('setor')) && normalizedField.includes('id')) {
+        const targetDepartmentId = resolveDepartmentIdFromValue(afterValue, departments)
+        if (targetDepartmentId && targetDepartmentId !== solicitation.departmentId) {
+          resolvedDepartmentId = targetDepartmentId
+          flowChanges.push(`departamento/setor alterado (${stringifyComparable(beforeValue) || '—'} → ${stringifyComparable(afterValue) || '—'})`)
+        }
+      }
+
+      if (normalizedField.includes('aprovador') || normalizedField.includes('avaliador')) {
+        const targetApproverId = resolveUserIdFromValue(afterValue, activeUsers)
+        if (targetApproverId && targetApproverId !== solicitation.approverId) {
+          resolvedApproverId = targetApproverId
+          flowChanges.push(`${fieldName} alterado (${stringifyComparable(beforeValue) || '—'} → ${stringifyComparable(afterValue) || '—'})`)
+        }
+      }
+
+      if (normalizedField.includes('responsavel')) {
+        const targetResponsibleId = resolveUserIdFromValue(afterValue, activeUsers)
+        if (targetResponsibleId && targetResponsibleId !== solicitation.assumidaPorId) {
+          resolvedResponsibleId = targetResponsibleId
+          flowChanges.push(`responsável alterado (${stringifyComparable(beforeValue) || '—'} → ${stringifyComparable(afterValue) || '—'})`)
         }
       }
     }
@@ -335,6 +450,11 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
         titulo: typeof body.titulo === 'string' ? body.titulo : solicitation.titulo,
         descricao: typeof body.descricao === 'string' || body.descricao === null ? body.descricao : solicitation.descricao,
         payload: updatedPayload as any,
+        ...(resolvedApproverId !== undefined ? { approverId: resolvedApproverId } : {}),
+        ...(resolvedResponsibleId !== undefined ? { assumidaPorId: resolvedResponsibleId } : {}),
+        ...(resolvedDepartmentId !== undefined ? { departmentId: resolvedDepartmentId } : {}),
+        // Regra de negócio: manter dataAbertura original e não resetar automaticamente prazos/SLA.
+        // O recálculo de SLA deve ser tratado por rotina específica, se necessário.
       },
     })
 
@@ -342,10 +462,24 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       data: {
         solicitationId: id,
         status: 'EM_ATENDIMENTO',
-        message: `Dados do chamado atualizados por ${ctx.me.fullName ?? ctx.me.id}${body.reason ? `: ${body.reason}` : '.'}`,
+        message: [
+          `Dados do chamado atualizados por ${ctx.me.fullName ?? ctx.me.id}.`,
+          flowChanges.length > 0 ? `Fluxo reprocessado: ${flowChanges.join('; ')}.` : null,
+          body.reason ? `Motivo: ${body.reason}.` : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
       },
     })
 
+    if (flowChanges.length > 0) {
+      await notifyWorkflowStepEntry({
+        solicitationId: id,
+        preferredKind: resolvedApproverId !== undefined ? 'APROVACAO' : undefined,
+        preferredDepartmentId: resolvedDepartmentId ?? undefined,
+        forceReplay: true,
+      })
+    }
     return NextResponse.json({ ok: true, updatedId: updated.id })
   }
 

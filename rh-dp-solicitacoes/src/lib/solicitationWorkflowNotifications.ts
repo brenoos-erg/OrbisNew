@@ -15,6 +15,7 @@ type NotifyInput = {
   solicitationId: string
   preferredKind?: WorkflowStepKind
   preferredDepartmentId?: string | null
+  forceReplay?: boolean
 }
 
 type NotificationAccessRule = {
@@ -137,10 +138,10 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
       templateKey: targetStep.kind === 'APROVACAO' ? 'approvalTemplate' : 'notificationTemplate',
       error: 'Regra de disparo desativada no painel.',
     })
-    return { skipped: true, reason: 'rule_disabled' as const }
+     return { skipped: true, reason: 'rule_disabled' as const }
   }
 
-   if (lastNotifiedStepKey === targetStep.stepKey) {
+   if (!input.forceReplay && lastNotifiedStepKey === targetStep.stepKey) {
     return { skipped: true, reason: 'already_notified' as const }
   }
 
@@ -268,7 +269,7 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     },
   })
 
-  await appendSolicitationEmailLog({
+ await appendSolicitationEmailLog({
     solicitationId: solicitation.id,
     typeId: solicitation.tipoId,
     event: targetStep.kind === 'APROVACAO' ? 'notificacao_aprovador' : `etapa_${targetStep.order}` ,
@@ -282,7 +283,9 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   await notifySolicitationEvent({
     solicitationId: solicitation.id,
     event: targetStep.kind === 'APROVACAO' ? 'AWAITING_APPROVAL' : 'STEP_CHANGED',
-    dedupeKey: `WORKFLOW:${targetStep.stepKey}:${solicitation.id}`,
+    dedupeKey: input.forceReplay
+      ? `WORKFLOW:REPLAY:${targetStep.stepKey}:${solicitation.id}:${Date.now()}`
+      : `WORKFLOW:${targetStep.stepKey}:${solicitation.id}`,
   })
 
   return { skipped: false, targetStep: targetStep.stepKey, result }
