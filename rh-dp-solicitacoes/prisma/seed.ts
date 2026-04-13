@@ -268,7 +268,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_RH_103' },
       update: {
-        codigo: 'RQ.RH.002',
+        codigo: 'RQ.RH.103',
         nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
         schemaJson: {
@@ -281,7 +281,7 @@ async function main() {
       },
       create: {
         id: 'RQ_RH_103',
-        codigo: 'RQ.RH.002',
+        codigo: 'RQ.RH.103',
         nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
         schemaJson: {

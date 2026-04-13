@@ -47,7 +47,6 @@ export const BI_SOLICITACAO_PESSOAL_COLUMNS = [
   'Motivo da Vaga',
   'Ordem',
 ] as const
-
 export const BI_SOLICITACAO_PESSOAL_TIPO_WHERE = {
   AND: [
     {
@@ -60,7 +59,7 @@ export const BI_SOLICITACAO_PESSOAL_TIPO_WHERE = {
       NOT: {
         OR: [
           { id: { in: ['RQ_RH_103'] } },
-          { codigo: { in: ['RQ.RH.002'] } },
+          { codigo: { in: ['RQ.RH.103'] } },
         ],
       },
     },

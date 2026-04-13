@@ -23,7 +23,7 @@ assert.doesNotMatch(
 
 assert.match(
   source,
-  /NOT:\s*\{\s*[\s\S]*RQ_RH_103[\s\S]*RQ\.RH\.002[\s\S]*\}/,
+  /NOT:\s*\{\s*[\s\S]*RQ_RH_103[\s\S]*RQ\.RH\.103[\s\S]*\}/,
   'Filtro BI deve excluir explicitamente o tipo de Avaliação do Período de Experiência',
 )
 
