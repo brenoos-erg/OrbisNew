@@ -26,11 +26,13 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
+import { isExperienceEvaluationEvaluator } from '@/lib/experienceEvaluation'
 import {
   EXPERIENCE_EVALUATION_COMPETENCIES,
   extractExperienceEvaluationData,
   isExperienceEvaluationTipo,
 } from '@/lib/experienceEvaluationForm'
+
 
 
 
@@ -769,7 +771,10 @@ export function SolicitationDetailModal({
   const isAvaliacaoExperiencia = isExperienceEvaluationTipo(detail?.tipo)
   const canEditAvaliacaoGestor =
     Boolean(currentUser?.id) &&
-    currentUser?.id === detail?.approverId &&
+    isExperienceEvaluationEvaluator(
+      { payload: detail?.payload, approverId: detail?.approverId },
+      currentUser ?? {},
+    ) &&
     effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
 
   const missingGestorAvaliacaoFields = useMemo(() => {

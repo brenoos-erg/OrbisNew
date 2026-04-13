@@ -7,6 +7,7 @@ import {
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
+  isExperienceEvaluationEvaluator,
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
 
@@ -78,12 +79,18 @@ export async function POST(
       )
     }
 
-    if (solicitation.approverId !== me.id) {
+     if (
+      !isExperienceEvaluationEvaluator(
+        { payload: solicitation.payload, approverId: solicitation.approverId },
+        me,
+      )
+    ) {
       return NextResponse.json(
         { error: 'Somente o gestor imediato avaliador pode preencher esta etapa.' },
         { status: 403 },
       )
     }
+
 
     if ((solicitation.status as string) !== EXPERIENCE_EVALUATION_STATUS) {
       return NextResponse.json(
