@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Action } from '@prisma/client'
 import {
   DEFAULT_TEMPLATE,
   createWorkflowRow,
@@ -8,6 +9,9 @@ import {
   type WorkflowStepKind,
 } from '@/lib/solicitationWorkflowsStore'
 import { prisma } from '@/lib/prisma'
+import { requireActiveUser } from '@/lib/auth'
+import { canFeature } from '@/lib/permissions'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 
 type ApiNodeKind = 'DEPARTMENT' | 'APPROVERS'
 
@@ -25,6 +29,14 @@ type ApiPayload = {
     approverUserIds?: string[]
     approverUserId?: string | null
     approvalTemplate?: { subject?: string; body?: string }
+    notificationChannels?: {
+      notifyRequester?: boolean
+      notifyDepartment?: boolean
+      notifyApprover?: boolean
+      notifyAdmins?: boolean
+    }
+    notificationAdminEmails?: string[]
+    enabled?: boolean
   }>
   edges?: Array<{ id?: string; source: string; target: string }>
 }
@@ -75,6 +87,14 @@ function normalizeApiNodes(input: NonNullable<ApiPayload['nodes']>) {
           subject: node.approvalTemplate?.subject ?? DEFAULT_TEMPLATE.subject,
           body: node.approvalTemplate?.body ?? DEFAULT_TEMPLATE.body,
         },
+        notificationChannels: {
+          notifyRequester: node.notificationChannels?.notifyRequester ?? false,
+          notifyDepartment: node.notificationChannels?.notifyDepartment ?? true,
+          notifyApprover: node.notificationChannels?.notifyApprover ?? normalizedKind === 'APPROVERS',
+          notifyAdmins: node.notificationChannels?.notifyAdmins ?? false,
+        },
+        notificationAdminEmails: node.notificationAdminEmails ?? [],
+        enabled: node.enabled ?? true,
       }
     })
     .filter((node) => Boolean(node.id))
@@ -100,7 +120,7 @@ function normalizeForPersistence(nodesInput: NonNullable<ApiPayload['nodes']>, e
       suffix += 1
     }
 
-    nodes.push({
+   nodes.push({
       id: finalStepId,
       label: 'Setor Destino',
       kind: 'DEPARTMENT',
@@ -111,6 +131,14 @@ function normalizeForPersistence(nodesInput: NonNullable<ApiPayload['nodes']>, e
       notificationTemplate: { ...DEFAULT_TEMPLATE },
       approverUserIds: [],
       approvalTemplate: { ...DEFAULT_TEMPLATE },
+      notificationChannels: {
+        notifyRequester: false,
+        notifyDepartment: true,
+        notifyApprover: false,
+        notifyAdmins: false,
+      },
+      notificationAdminEmails: [],
+      enabled: true,
     })
 
     edges.push({ id: `auto-${finalStepId}`, source: lastNode.id, target: finalStepId })
@@ -131,6 +159,9 @@ function normalizeForPersistence(nodesInput: NonNullable<ApiPayload['nodes']>, e
     canFinalize: node.id === finalDepartmentId,
     posX: node.posX,
     posY: node.posY,
+    notificationChannels: node.notificationChannels,
+    notificationAdminEmails: node.notificationAdminEmails,
+    enabled: node.enabled,
   })) as WorkflowDraft['steps']
   return {
     steps: normalizedSteps,
@@ -140,7 +171,6 @@ function normalizeForPersistence(nodesInput: NonNullable<ApiPayload['nodes']>, e
     })),
   }
 }
-
 function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
   const orderedSteps = [...row.steps].sort((a, b) => a.order - b.order)
   const rawNodes = orderedSteps.map((step, index) => {
@@ -159,6 +189,14 @@ function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
       notificationTemplate: step.notificationTemplate ?? DEFAULT_TEMPLATE,
       approverUserIds: step.approverUserIds ?? (step.approverUserId ? [step.approverUserId] : []),
       approvalTemplate: step.approvalTemplate ?? DEFAULT_TEMPLATE,
+      notificationChannels: step.notificationChannels ?? {
+        notifyRequester: false,
+        notifyDepartment: true,
+        notifyApprover: step.kind === 'APROVACAO',
+        notifyAdmins: false,
+      },
+      notificationAdminEmails: step.notificationAdminEmails ?? [],
+      enabled: step.enabled ?? true,
      }
   })
   const validIds = new Set(rawNodes.map((node) => node.id))
@@ -175,7 +213,26 @@ function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
   }
 }
 
+
+async function getAccess(action: Action) {
+  const appUser = await requireActiveUser()
+  const isSuperAdminEmail = appUser.email?.toLowerCase() === 'superadmin@ergengenharia.com.br'
+  const hasFeatureAccess = await canFeature(
+    appUser.id,
+    MODULE_KEYS.SOLICITACOES,
+    FEATURE_KEYS.SOLICITACOES.FLUXOS,
+    action,
+  )
+
+  return hasFeatureAccess && isSuperAdminEmail
+}
+
+
 export async function GET(req: Request) {
+  if (!(await getAccess('VIEW'))) {
+    return NextResponse.json({ error: 'Sem permissão para visualizar o painel de e-mails.' }, { status: 403 })
+  }
+
   const { searchParams } = new URL(req.url)
   const typeId = searchParams.get('typeId')
   if (!typeId) {
@@ -220,8 +277,13 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if (!(await getAccess('UPDATE'))) {
+    return NextResponse.json({ error: 'Sem permissão para editar o painel de e-mails.' }, { status: 403 })
+  }
+
   const body = (await req.json().catch(() => null)) as ApiPayload | null
   const { typeId, nodes, edges } = body ?? {}
+
 
   if (!typeId) {
     return NextResponse.json({ error: 'typeId obrigatório' }, { status: 400 })

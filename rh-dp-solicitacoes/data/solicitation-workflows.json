@@ -24,7 +24,15 @@
         },
         "canFinalize": false,
         "posX": 40,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -46,7 +54,15 @@
         },
         "canFinalize": false,
         "posX": 280,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -66,7 +82,15 @@
         },
         "canFinalize": false,
         "posX": 520,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -86,7 +110,15 @@
         },
         "canFinalize": true,
         "posX": 760,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -128,7 +160,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -147,10 +187,18 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
-         "order": 3,
+        "order": 3,
         "stepKey": "DP",
         "label": "Departamento Pessoal trata no mesmo chamado",
         "kind": "DEPARTAMENTO",
@@ -166,7 +214,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -185,7 +241,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -227,7 +291,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -246,7 +318,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -265,7 +345,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -284,7 +372,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -326,7 +422,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -345,7 +449,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -364,7 +476,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -383,7 +503,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -414,18 +542,27 @@
         "label": "Usuário abre chamado",
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
-        "posX": 40,
-        "posY": 120,
         "notificationEmails": [],
-        "approverUserIds": [],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": false,
+        "posX": 40,
+        "posY": 120,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -433,37 +570,60 @@
         "label": "SST trata e finaliza",
         "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
-        "posX": 300,
-        "posY": 120,
-        "notificationEmails": [],
-        "approverUserIds": [],
+        "notificationEmails": [
+          "brenoos@ergenheria.com.br",
+          "saude@ergengenharia.com.br"
+        ],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": false,
+        "posX": 300,
+        "posY": 120,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
         "stepKey": "FIM",
-        "label": "Fim",
-        "kind": "FIM",
+        "label": "Departamento final",
+        "kind": "DEPARTAMENTO",
         "defaultDepartmentId": null,
-        "posX": 560,
-        "posY": 120,
-        "notificationEmails": [],
-        "approverUserIds": [],
+        "notificationEmails": [
+          "saude@ergengenharia.com.br"
+        ],
         "notificationTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
         },
+        "approverUserIds": [],
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "canFinalize": true,
+        "posX": 560,
+        "posY": 120,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -501,7 +661,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -520,7 +688,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -539,7 +715,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -558,7 +742,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 5,
@@ -577,7 +769,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -623,7 +823,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -642,7 +850,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -661,7 +877,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -694,7 +918,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -710,7 +942,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -726,7 +966,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -742,7 +990,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -781,7 +1037,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -797,7 +1061,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -813,7 +1085,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -829,7 +1109,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -873,7 +1161,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -892,7 +1188,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -911,7 +1215,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -930,7 +1242,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 5,
@@ -949,7 +1269,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -998,7 +1326,15 @@
         },
         "canFinalize": false,
         "posX": 40,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -1018,7 +1354,15 @@
         },
         "canFinalize": false,
         "posX": 280,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -1038,7 +1382,15 @@
         },
         "canFinalize": false,
         "posX": 520,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 4,
@@ -1058,7 +1410,15 @@
         },
         "canFinalize": true,
         "posX": 760,
-        "posY": 80
+        "posY": 80,
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -1095,7 +1455,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 2,
@@ -1111,7 +1479,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       },
       {
         "order": 3,
@@ -1127,7 +1503,15 @@
         "approvalTemplate": {
           "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
           "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
-        }
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
       }
     ],
     "transitions": [
@@ -1141,6 +1525,188 @@
       }
     ],
     "id": "f2b57480-b54c-43a7-b902-428a6fd12f6b",
+    "departmentId": null
+  },
+  {
+    "name": "Fluxo padrão",
+    "tipoId": "RQ_301",
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      }
+    ],
+    "id": "543297a5-b357-4b74-b437-fee96bf8c03b",
+    "departmentId": null
+  },
+  {
+    "name": "Fluxo padrão",
+    "tipoId": "RQ_LOG_EQUIPAMENTOS",
+    "active": true,
+    "steps": [
+      {
+        "order": 1,
+        "stepKey": "SETOR_ORIGEM",
+        "label": "Setor Origem",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      },
+      {
+        "order": 2,
+        "stepKey": "APROVADORES",
+        "label": "Aprovadores",
+        "kind": "APROVACAO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": true,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      },
+      {
+        "order": 3,
+        "stepKey": "SETOR_DESTINO",
+        "label": "Setor Destino",
+        "kind": "DEPARTAMENTO",
+        "notificationEmails": [],
+        "approverUserIds": [],
+        "notificationTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "approvalTemplate": {
+          "subject": "[{tipoCodigo}] Nova etapa: {departamentoAtual}",
+          "body": "Olá, o chamado {protocolo} ({tipoCodigo} - {tipoNome}) entrou na etapa {departamentoAtual}. Acesse: {link}"
+        },
+        "notificationChannels": {
+          "notifyRequester": false,
+          "notifyDepartment": true,
+          "notifyApprover": false,
+          "notifyAdmins": false
+        },
+        "notificationAdminEmails": [],
+        "enabled": true
+      }
+    ],
+    "transitions": [
+      {
+        "fromStepKey": "SETOR_ORIGEM",
+        "toStepKey": "APROVADORES"
+      },
+      {
+        "fromStepKey": "APROVADORES",
+        "toStepKey": "SETOR_DESTINO"
+      }
+    ],
+    "id": "fb6cef7e-3595-4017-a74d-9f473f2528c5",
     "departmentId": null
   }
 ]

@@ -1,0 +1,93 @@
+[
+  {
+    "id": "01f6b605-c05e-4678-8af6-763f107ce65a",
+    "createdAt": "2026-04-13T13:35:18.181Z",
+    "typeId": "RQ_092",
+    "event": "teste_manual",
+    "recipients": [
+      "brenoos@ergengenharia.com.br"
+    ],
+    "status": "TEST",
+    "subject": "[Teste] Painel de e-mails das solicitações",
+    "error": null,
+    "metadata": {
+      "provider": "smtp",
+      "source": "email-control-panel"
+    },
+    "templateKey": null,
+    "solicitationId": null
+  },
+  {
+    "id": "099576b1-3094-48d4-8ba6-544ff699f62f",
+    "createdAt": "2026-04-13T13:35:16.644Z",
+    "typeId": "RQ_092",
+    "event": "teste_manual",
+    "recipients": [
+      "brenoos@ergengenharia.com.br"
+    ],
+    "status": "TEST",
+    "subject": "[Teste] Painel de e-mails das solicitações",
+    "error": null,
+    "metadata": {
+      "provider": "smtp",
+      "source": "email-control-panel"
+    },
+    "templateKey": null,
+    "solicitationId": null
+  },
+  {
+    "id": "5f93f4b8-dab9-407b-aa73-4fe9cbf78b11",
+    "createdAt": "2026-04-13T13:29:53.094Z",
+    "solicitationId": "d6f5fc41-4c01-4389-8bfb-92837e25e77c",
+    "typeId": "RQ_092",
+    "event": "step_changed",
+    "recipients": [
+      "superadmin@ergengenharia.com.br",
+      "zzbrenovinicius@gmail.com"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.002] Solicitação em nova etapa · RQ2026-00029",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "WORKFLOW:USUARIO:d6f5fc41-4c01-4389-8bfb-92837e25e77c"
+    }
+  },
+  {
+    "id": "fd4383b3-4da1-4526-9af8-6db1a76b713f",
+    "createdAt": "2026-04-13T13:29:51.611Z",
+    "solicitationId": "d6f5fc41-4c01-4389-8bfb-92837e25e77c",
+    "typeId": "RQ_092",
+    "event": "etapa_1",
+    "recipients": [
+      "superadmin@ergengenharia.com.br",
+      "zzbrenovinicius@gmail.com"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "notificationTemplate",
+    "subject": "[RQ.SST.002] Nova etapa: Segurança do Trabalho",
+    "metadata": {
+      "provider": "smtp",
+      "elapsedMs": 1644
+    },
+    "error": null
+  },
+  {
+    "id": "b016906a-a6e0-458b-a572-2a6a26d64fb1",
+    "createdAt": "2026-04-13T13:29:49.825Z",
+    "solicitationId": "d6f5fc41-4c01-4389-8bfb-92837e25e77c",
+    "typeId": "RQ_092",
+    "event": "opened",
+    "recipients": [
+      "superadmin@ergengenharia.com.br",
+      "zzbrenovinicius@gmail.com"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.002] Nova solicitação aberta · RQ2026-00029",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "OPENED:d6f5fc41-4c01-4389-8bfb-92837e25e77c"
+    }
+  }
+]

@@ -169,7 +169,7 @@ export async function POST(
     }
 
     const statusValue = camposAtualizados[setorMeta.constaField]
-    const saudeOuSstStatus =
+     const saudeOuSstStatus =
       normalizedSetor === 'SAUDE' || normalizedSetor === 'SST' ? normalizeSaudeStatusValue(statusValue) : null
     const constaFlag =
       normalizedSetor === 'SAUDE' || normalizedSetor === 'SST'
@@ -193,6 +193,18 @@ export async function POST(
         },
         { status: 400 },
       )
+    }
+    if (shouldFinalize) {
+      const hasObservacao = Object.entries(camposAtualizados).some(([key, value]) => {
+        if (!key.toLowerCase().includes('obs')) return false
+        return typeof value === 'string' && value.trim().length > 0
+      })
+      if (!hasObservacao) {
+        return NextResponse.json(
+          { error: 'Adicione uma observação antes de finalizar o setor.' },
+          { status: 400 },
+        )
+      }
     }
 
     const agora = new Date()

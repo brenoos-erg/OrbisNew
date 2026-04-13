@@ -31,6 +31,8 @@ type FilterState = {
   text: string
   page: number
   pageSize: number
+  sortBy: string
+  sortDir: 'asc' | 'desc'
 }
 
 type ListResponse = {
@@ -69,6 +71,8 @@ const DEFAULT_FILTERS: FilterState = {
   text: '',
   page: 1,
   pageSize: 10,
+  sortBy: 'dataAbertura',
+  sortDir: 'desc',
 }
 
 const STATUS_OPTIONS = [
@@ -93,16 +97,17 @@ const SITUACAO_OPTIONS = [
 
 
 function mapStatusLabel(status: string) {
-  if (status === 'ABERTA') return 'AGUARDANDO ATENDIMENTO'
-  if (status === 'EM_ATENDIMENTO') return 'EM ATENDIMENTO'
-  if (status === 'AGUARDANDO_APROVACAO') return 'AGUARD. APROVAÇÃO'
-  if (status === 'AGUARDANDO_TERMO') return 'AGUARD. TERMO'
-  if (status === 'AGUARDANDO_AVALIACAO_GESTOR') return 'AGUARD. AVALIAÇÃO GESTOR'
-  if (status === 'AGUARDANDO_FINALIZACAO_AVALIACAO') return 'AGUARD. FINALIZAÇÃO RH'
-  if (status === 'CONCLUIDA') return 'CONCLUÍDA'
-  if (status === 'CANCELADA') return 'CANCELADA'
+  if (status === 'ABERTA') return '⏳ AGUARDANDO ATENDIMENTO'
+  if (status === 'EM_ATENDIMENTO') return '👩‍💻 EM ATENDIMENTO'
+  if (status === 'AGUARDANDO_APROVACAO') return '⚖️ AGUARD. APROVAÇÃO'
+  if (status === 'AGUARDANDO_TERMO') return '✍️ AGUARD. TERMO'
+  if (status === 'AGUARDANDO_AVALIACAO_GESTOR') return '👔 AGUARD. AVALIAÇÃO GESTOR'
+  if (status === 'AGUARDANDO_FINALIZACAO_AVALIACAO') return '📁 AGUARD. FINALIZAÇÃO RH'
+  if (status === 'CONCLUIDA') return '✅ CONCLUÍDA'
+  if (status === 'CANCELADA') return '❌ CANCELADA'
   return status
 }
+
 
 function buildPaginationItems(
   currentPage: number,
@@ -160,10 +165,12 @@ export default function ReceivedRequestsPage() {
     setLoading(true)
     setError(null)
 
-    try {
+      try {
       const params = new URLSearchParams()
       params.set('page', String(filters.page))
       params.set('pageSize', String(filters.pageSize))
+      params.set('sortBy', filters.sortBy)
+      params.set('sortDir', filters.sortDir)
 
       if (filters.protocolo) params.set('protocolo', filters.protocolo)
       if (filters.solicitanteNome) params.set('solicitanteNome', filters.solicitanteNome)
@@ -250,13 +257,14 @@ export default function ReceivedRequestsPage() {
     }
   }
 
-  const filterCount = useMemo(() => {
+ const filterCount = useMemo(() => {
     const keys = Object.keys(DEFAULT_FILTERS) as Array<keyof FilterState>
     return keys.filter((key) => {
-      if (key === 'page' || key === 'pageSize') return false
+      if (key === 'page' || key === 'pageSize' || key === 'sortBy' || key === 'sortDir') return false
       return Boolean(filters[key])
     }).length
   }, [filters])
+
 
   useEffect(() => {
     fetchList()
@@ -287,7 +295,7 @@ export default function ReceivedRequestsPage() {
       }
     }, 5000)
 
-    return () => clearInterval(interval)
+      return () => clearInterval(interval)
   }, [detailOpen, selectedRow])
 
   const rows = data?.rows ?? []
@@ -298,6 +306,75 @@ export default function ReceivedRequestsPage() {
   const paginationItems = buildPaginationItems(page, totalPages)
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total)
+  function handleSort(sortBy: string) {
+    setFilters((prev) => {
+      const nextSortDir: 'asc' | 'desc' =
+        prev.sortBy === sortBy && prev.sortDir === 'asc' ? 'desc' : 'asc'
+      const next = {
+        ...prev,
+        page: 1,
+        sortBy,
+        sortDir: nextSortDir,
+      }
+      setFormFilters((formPrev) => ({ ...formPrev, sortBy: next.sortBy, sortDir: next.sortDir }))
+      return next
+    })
+  }
+
+  function sortIndicator(sortBy: string) {
+    if (filters.sortBy !== sortBy) return '↕'
+    return filters.sortDir === 'asc' ? '↑' : '↓'
+  }
+
+  async function exportExcel() {
+    const params = new URLSearchParams()
+    params.set('page', '1')
+    params.set('pageSize', '1000')
+    params.set('sortBy', filters.sortBy)
+    params.set('sortDir', filters.sortDir)
+    if (filters.protocolo) params.set('protocolo', filters.protocolo)
+    if (filters.solicitanteNome) params.set('solicitanteNome', filters.solicitanteNome)
+    if (filters.solicitanteLogin) params.set('solicitanteLogin', filters.solicitanteLogin)
+    if (filters.matricula) params.set('matricula', filters.matricula)
+    if (filters.tipoId) params.set('tipoId', filters.tipoId)
+    if (filters.departmentId) params.set('departmentId', filters.departmentId)
+    if (filters.costCenterId) params.set('costCenterId', filters.costCenterId)
+    if (filters.status) params.set('status', filters.status)
+    if (filters.situacao) params.set('situacao', filters.situacao)
+    if (filters.responsavel) params.set('responsavel', filters.responsavel)
+    if (filters.openedDate) params.set('openedDate', filters.openedDate)
+    if (filters.openedStart) params.set('openedStart', filters.openedStart)
+    if (filters.openedEnd) params.set('openedEnd', filters.openedEnd)
+    if (filters.closedDate) params.set('closedDate', filters.closedDate)
+    if (filters.closedStart) params.set('closedStart', filters.closedStart)
+    if (filters.closedEnd) params.set('closedEnd', filters.closedEnd)
+    if (filters.text) params.set('text', filters.text)
+    const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`)
+    if (!res.ok) {
+      setError('Não foi possível exportar os dados.')
+      return
+    }
+    const json = (await res.json()) as ListResponse
+    const header = ['Status', 'Protocolo', 'Nome do Solicitante', 'Data de Abertura', 'Solicitação', 'Departamento Responsável', 'Atendente', 'Nada Consta']
+    const lines = json.rows.map((row) => [
+      mapStatusLabel(row.status),
+      row.protocolo ?? '',
+      row.solicitanteNome ?? row.autor?.fullName ?? '',
+      row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '',
+      row.tipo ? `${row.tipo.codigo ?? ''} - ${row.tipo.nome}` : row.titulo,
+      row.setorDestino ?? '',
+      row.status === 'ABERTA' ? '-' : row.status === 'CONCLUIDA' ? (row.finalizador?.fullName ?? row.responsavel?.fullName ?? '-') : (row.responsavel?.fullName ?? '-'),
+      row.nadaConstaStatus === 'PREENCHIDO' ? 'Preenchido' : row.nadaConstaStatus === 'PENDENTE' ? 'Pendente' : '',
+    ])
+    const csv = [header, ...lines].map((line) => line.map((col) => `"${String(col).replaceAll('"', '""')}"`).join(';')).join('\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `solicitacoes-recebidas-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
@@ -538,7 +615,7 @@ export default function ReceivedRequestsPage() {
             Pesquisar
           </button>
 
-          <button
+             <button
             type="button"
             className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             disabled={loading}
@@ -549,6 +626,13 @@ export default function ReceivedRequestsPage() {
             }}
           >
               Limpar filtros
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+            onClick={exportExcel}
+          >
+            Exportar Excel
           </button>
         </div>
       </div>
@@ -569,31 +653,44 @@ export default function ReceivedRequestsPage() {
           </div>
         </div>
 
-        {error && <div className="p-4 text-sm text-red-600">{error}</div>}
+          {error && <div className="p-4 text-sm text-red-600">{error}</div>}
 
         <div className="overflow-x-auto">
           <div className="max-h-[60vh] overflow-y-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Protocolo</th>
-                  <th className="px-4 py-2">Data Abertura</th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('status')}>Status {sortIndicator('status')}</button>
+                  </th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('protocolo')}>Protocolo {sortIndicator('protocolo')}</button>
+                  </th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('nomeSolicitante')}>Nome do Solicitante {sortIndicator('nomeSolicitante')}</button>
+                  </th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('dataAbertura')}>Data Abertura {sortIndicator('dataAbertura')}</button>
+                  </th>
                   <th className="px-4 py-2">Solicitação</th>
-                  <th className="px-4 py-2">Departamento responsável</th>
-                  <th className="px-4 py-2">Atendente</th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('departamentoResponsavel')}>Departamento responsável {sortIndicator('departamentoResponsavel')}</button>
+                  </th>
+                  <th className="px-4 py-2">
+                    <button type="button" onClick={() => handleSort('atendente')}>Atendente {sortIndicator('atendente')}</button>
+                  </th>
+                  <th className="px-4 py-2">Nada Consta</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-4 text-center text-sm text-slate-500">
+                    <td colSpan={8} className="px-4 py-4 text-center text-sm text-slate-500">
                       Nenhuma solicitação recebida encontrada.
                     </td>
                   </tr>
                 )}
-
-                {rows.map((row) => (
+    {rows.map((row) => (
                   <tr
                     key={row.id}
                     className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
@@ -601,6 +698,7 @@ export default function ReceivedRequestsPage() {
                   >
                     <td className="px-4 py-2 text-xs font-semibold">{mapStatusLabel(row.status)}</td>
                     <td className="px-4 py-2 text-xs">{row.protocolo}</td>
+                    <td className="px-4 py-2 text-xs">{row.solicitanteNome ?? row.autor?.fullName ?? '-'}</td>
                     <td className="px-4 py-2 text-xs">{row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '-'}</td>
                     <td className="px-4 py-2 text-xs">{row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : row.titulo}</td>
                     <td className="px-4 py-2 text-xs">{row.setorDestino ?? '-'}</td>
@@ -610,6 +708,13 @@ export default function ReceivedRequestsPage() {
                         : row.status === 'CONCLUIDA'
                           ? (row.finalizador?.fullName ?? row.responsavel?.fullName ?? '-')
                           : (row.responsavel?.fullName ?? '-')}
+                    </td>
+                    <td className="px-4 py-2 text-xs font-semibold">
+                      {row.nadaConstaStatus === 'PREENCHIDO'
+                        ? '✅ Preenchido'
+                        : row.nadaConstaStatus === 'PENDENTE'
+                          ? '⏳ Pendente'
+                          : '-'}
                     </td>
                   </tr>
                 ))}

@@ -83,7 +83,7 @@ export const NADA_CONSTA_TI_FIELDS: NadaConstaCampoDef[] = [
   },
   {
     name: 'tiCancelamentos',
-    label: 'Cancel. (E-mail, Geartech, BITRIX, AD, Sapiens, MS, AUTODESK)',
+    label: 'Cancel. (E-mail, SGI, AD, Sapiens, MS, AUTODESK)',
     type: 'select',
     options: ['Sim', 'Não', 'Não Aplicável'],
     stage: 'ti',

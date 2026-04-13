@@ -9,6 +9,7 @@ import { hasRequiredWorkflowNotificationAccess } from '@/lib/workflowNotificatio
 import { buildWorkflowNotificationPath } from '@/lib/workflowNotificationLink'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
+import { appendSolicitationEmailLog } from '@/lib/solicitationEmailLogStore'
 
 type NotifyInput = {
   solicitationId: string
@@ -100,13 +101,13 @@ function pickTargetStep(
 
   return departments[0]
 }
-
 export async function notifyWorkflowStepEntry(input: NotifyInput) {
   const solicitation = await prisma.solicitation.findUnique({
     where: { id: input.solicitationId },
     include: {
       tipo: { select: { id: true, nome: true, codigo: true } },
       solicitante: { select: { fullName: true, email: true } },
+      approver: { select: { email: true } },
       department: { select: { id: true, name: true } },
     },
   })
@@ -126,14 +127,27 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
     lastNotifiedStepKey,
   )
   if (!targetStep) return { skipped: true, reason: 'step_not_found' as const }
+  if (targetStep.enabled === false) {
+    await appendSolicitationEmailLog({
+      solicitationId: solicitation.id,
+      typeId: solicitation.tipoId,
+      event: targetStep.kind === 'APROVACAO' ? 'notificacao_aprovador' : `etapa_${targetStep.order}`,
+      recipients: [],
+      status: 'SKIPPED',
+      templateKey: targetStep.kind === 'APROVACAO' ? 'approvalTemplate' : 'notificationTemplate',
+      error: 'Regra de disparo desativada no painel.',
+    })
+    return { skipped: true, reason: 'rule_disabled' as const }
+  }
 
-  if (lastNotifiedStepKey === targetStep.stepKey) {
+   if (lastNotifiedStepKey === targetStep.stepKey) {
     return { skipped: true, reason: 'already_notified' as const }
   }
 
   let recipients: string[] = []
   let subjectTemplate = ''
   let bodyTemplate = ''
+  const channels = targetStep.notificationChannels ?? {}
 
    if (targetStep.kind === 'APROVACAO') {
     const tipoApproverIds = await resolveTipoApproverIds(solicitation.tipoId)
@@ -161,20 +175,39 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
       where: { id: { in: approverIds } },
       select: { email: true },
     })
-    recipients = users.map((user) => user.email)
+    recipients = channels.notifyApprover === false ? [] : users.map((user) => user.email)
     const template = resolveTemplate(targetStep.approvalTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body
   } else {
-    recipients = await resolveDepartmentRecipients(targetStep, solicitation.departmentId)
+    const departmentRecipients = channels.notifyDepartment === false ? [] : await resolveDepartmentRecipients(targetStep, solicitation.departmentId)
+    recipients = departmentRecipients
     const template = resolveTemplate(targetStep.notificationTemplate)
     subjectTemplate = template.subject
     bodyTemplate = template.body
   }
 
-  recipients = normalizeAndValidateEmails(recipients)
+  const adminRecipients = channels.notifyAdmins ? targetStep.notificationAdminEmails ?? [] : []
+  const requesterRecipient = channels.notifyRequester ? [solicitation.solicitante?.email] : []
+  const approverRecipient = channels.notifyApprover ? [solicitation.approver?.email] : []
+
+  recipients = normalizeAndValidateEmails([
+    ...recipients,
+    ...adminRecipients,
+    ...requesterRecipient.filter(Boolean),
+    ...approverRecipient.filter(Boolean),
+  ] as string[])
   if (recipients.length === 0) {
-     return { skipped: true, reason: 'no_recipients' as const }
+    await appendSolicitationEmailLog({
+      solicitationId: solicitation.id,
+      typeId: solicitation.tipoId,
+      event: targetStep.kind === 'APROVACAO' ? 'notificacao_aprovador' : `etapa_${targetStep.order}`,
+      recipients: [],
+      status: 'SKIPPED',
+      templateKey: targetStep.kind === 'APROVACAO' ? 'approvalTemplate' : 'notificationTemplate',
+      error: 'Nenhum destinatário após aplicar regras de canal.',
+    })
+    return { skipped: true, reason: 'no_recipients' as const }
   }
 
   const baseUrl = resolveAppBaseUrl({ context: 'workflow-email' })
@@ -206,7 +239,18 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   })
 
   if (!result.sent) {
-    return { skipped: true, reason: 'send_failed' as const, result }
+    await appendSolicitationEmailLog({
+      solicitationId: solicitation.id,
+      typeId: solicitation.tipoId,
+      event: targetStep.kind === 'APROVACAO' ? 'notificacao_aprovador' : `etapa_${targetStep.order}`,
+      recipients,
+      status: 'FAILED',
+      templateKey: targetStep.kind === 'APROVACAO' ? 'approvalTemplate' : 'notificationTemplate',
+      subject,
+      error: result.error ?? 'Falha ao enviar e-mail.',
+      metadata: { provider: result.provider ?? null, elapsedMs },
+    })
+     return { skipped: true, reason: 'send_failed' as const, result }
   }
 
     await prisma.solicitation.update({
@@ -222,6 +266,17 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
         },
       },
     },
+  })
+
+  await appendSolicitationEmailLog({
+    solicitationId: solicitation.id,
+    typeId: solicitation.tipoId,
+    event: targetStep.kind === 'APROVACAO' ? 'notificacao_aprovador' : `etapa_${targetStep.order}` ,
+    recipients,
+    status: 'SUCCESS',
+    templateKey: targetStep.kind === 'APROVACAO' ? 'approvalTemplate' : 'notificationTemplate',
+    subject,
+    metadata: { provider: result.provider ?? null, elapsedMs },
   })
 
   await notifySolicitationEvent({

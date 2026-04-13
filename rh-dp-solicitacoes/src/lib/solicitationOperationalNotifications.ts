@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
 import { resolveAppBaseUrl } from '@/lib/site-url'
 import { normalizeAndValidateEmails } from '@/lib/solicitationEmailTemplates'
+import { appendSolicitationEmailLog } from '@/lib/solicitationEmailLogStore'
 
 export type SolicitationNotificationEvent =
   | 'OPENED'
@@ -149,7 +150,18 @@ export async function notifySolicitationEvent(input: NotifySolicitationEventInpu
     (email): email is string => Boolean(email),
   )
   const recipients = normalizeAndValidateEmails(rawRecipients)
-  if (recipients.length === 0) return { skipped: true as const, reason: 'no_recipients' as const }
+  if (recipients.length === 0) {
+    await appendSolicitationEmailLog({
+      solicitationId: solicitation.id,
+      typeId: solicitation.tipoId,
+      event: input.event.toLowerCase(),
+      recipients: [],
+      status: 'SKIPPED',
+      templateKey: 'operational-default',
+      error: 'Nenhum destinatário para o evento operacional.',
+    })
+    return { skipped: true as const, reason: 'no_recipients' as const }
+  }
 
   const baseUrl = resolveAppBaseUrl({ context: 'solicitation-email' })
   const link = baseUrl ? `${baseUrl}/dashboard/solicitacoes?open=${solicitation.id}` : ''
@@ -163,6 +175,18 @@ export async function notifySolicitationEvent(input: NotifySolicitationEventInpu
   })
 
   const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
+
+  await appendSolicitationEmailLog({
+    solicitationId: solicitation.id,
+    typeId: solicitation.tipoId,
+    event: input.event.toLowerCase(),
+    recipients,
+    status: result.sent ? 'SUCCESS' : 'FAILED',
+    templateKey: 'operational-default',
+    subject,
+    error: result.sent ? null : result.error ?? 'Falha no envio operacional.',
+    metadata: { dedupeKey: dedupeKey ?? null },
+  })
 
   const nowIso = new Date().toISOString()
   const audit = Array.isArray(policy.audit) ? policy.audit : []

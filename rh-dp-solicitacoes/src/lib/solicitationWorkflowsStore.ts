@@ -9,6 +9,13 @@ export type WorkflowTemplateDraft = {
   body: string
 }
 
+export type WorkflowNotificationChannels = {
+  notifyRequester?: boolean
+  notifyDepartment?: boolean
+  notifyApprover?: boolean
+  notifyAdmins?: boolean
+}
+
 export type WorkflowStepDraft = {
   order: number
   stepKey: string
@@ -24,6 +31,9 @@ export type WorkflowStepDraft = {
   notificationEmails?: string[]
   notificationTemplate?: WorkflowTemplateDraft
   approvalTemplate?: WorkflowTemplateDraft
+  notificationChannels?: WorkflowNotificationChannels
+  notificationAdminEmails?: string[]
+  enabled?: boolean
 }
 
 export type WorkflowTransitionDraft = {
@@ -59,12 +69,22 @@ function normalizeStep(step: WorkflowStepDraft): WorkflowStepDraft {
   const fallbackLegacy = step.approverUserId ? [step.approverUserId] : []
   const approverUserIds = Array.from(new Set([...ids, ...fallbackLegacy]))
 
+  const channels = step.notificationChannels ?? {}
+
   return {
     ...step,
     notificationEmails: Array.from(new Set((step.notificationEmails ?? []).map((x) => x.trim()).filter(Boolean))),
     approverUserIds,
     notificationTemplate: normalizeTemplate(step.notificationTemplate),
     approvalTemplate: normalizeTemplate(step.approvalTemplate),
+    notificationChannels: {
+      notifyRequester: channels.notifyRequester ?? false,
+      notifyDepartment: channels.notifyDepartment ?? true,
+      notifyApprover: channels.notifyApprover ?? step.kind === 'APROVACAO',
+      notifyAdmins: channels.notifyAdmins ?? false,
+    },
+    notificationAdminEmails: Array.from(new Set((step.notificationAdminEmails ?? []).map((x) => x.trim()).filter(Boolean))),
+    enabled: step.enabled ?? true,
   }
 }
 

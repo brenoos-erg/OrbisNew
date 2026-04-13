@@ -72,6 +72,8 @@ export type Row = {
   finalizador?: { fullName: string } | null
   finalizadorId?: string | null
   autor?: { fullName: string } | null
+  solicitanteNome?: string | null
+  nadaConstaStatus?: 'PENDENTE' | 'PREENCHIDO' | null
   sla?: string | null
   setorDestino?: string | null
   requiresApproval?: boolean
@@ -453,18 +455,19 @@ function getStatusLabel(s: {
     s.approvalStatus === 'APROVADO' &&
     !s.assumidaPorId
   ) {
-     return 'Aguardando atendimento'
+     return '⏳ Aguardando atendimento'
   }
 
   // Mapeia os demais status normalmente
   const map: Record<string, string> = {
-    ABERTA: 'Aberta',
-    EM_ATENDIMENTO: 'Em atendimento',
-    AGUARDANDO_APROVACAO: 'Aguardando aprovação',
-    AGUARDANDO_TERMO: 'Aguardando termo',
-    AGUARDANDO_AVALIACAO_GESTOR: 'Aguardando avaliação do gestor',
-    CONCLUIDA: 'Concluída',
-    CANCELADA: 'Cancelada',
+    ABERTA: '⏳ Aberta',
+    EM_ATENDIMENTO: '👩‍💻 Em atendimento',
+    AGUARDANDO_APROVACAO: '⚖️ Aguardando aprovação',
+    AGUARDANDO_TERMO: '✍️ Aguardando termo',
+    AGUARDANDO_AVALIACAO_GESTOR: '👔 Aguardando avaliação do gestor',
+    AGUARDANDO_FINALIZACAO_AVALIACAO: '📁 Aguardando finalização RH',
+    CONCLUIDA: '✅ Concluída',
+    CANCELADA: '❌ Cancelada',
   }
 
   return map[s.status] ?? s.status
@@ -680,6 +683,7 @@ export function SolicitationDetailModal({
    const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
   const [novoComentario, setNovoComentario] = useState('')
+  const [existeTermoParaAnexar, setExisteTermoParaAnexar] = useState<'SIM' | 'NAO' | ''>('')
   const [salvandoComentario, setSalvandoComentario] = useState(false)
   const [rhDataExameDemissional, setRhDataExameDemissional] = useState('')
    const [rhDataLiberacaoPpp, setRhDataLiberacaoPpp] = useState('')
@@ -764,7 +768,7 @@ export function SolicitationDetailModal({
     setRhDataExameDemissional(
       (payloadCampos.rhDataExameDemissional as string) || '',
     )
-      setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
+       setRhDataLiberacaoPpp((payloadCampos.rhDataLiberacaoPpp as string) || '')
     setRhConsideracoes((payloadCampos.rhConsideracoes as string) || '')
     setDpDataDemissao((payloadCampos.dpDataDemissao as string) || '')
     setDpDataPrevistaAcerto((payloadCampos.dpDataPrevistaAcerto as string) || '')
@@ -775,6 +779,8 @@ export function SolicitationDetailModal({
     setObservacaoSst1((payloadSstResposta.observacao1 as string) || '')
     setObservacaoSst2((payloadSstResposta.observacao2 as string) || '')
     const payloadAvaliacaoGestor = extractExperienceEvaluationData(payload)
+    const termoValue = String(payloadCampos.existeTermoParaAnexar ?? '').trim().toUpperCase()
+    setExisteTermoParaAnexar(termoValue === 'SIM' ? 'SIM' : termoValue === 'NAO' ? 'NAO' : '')    
     setExperienceData(payloadAvaliacaoGestor)
     setGestorAvaliacaoForm({
       relacionamentoNota: payloadAvaliacaoGestor.notas.find((item) => item.key === 'relacionamentoNota')?.value ?? '',
@@ -1307,6 +1313,16 @@ export function SolicitationDetailModal({
       },
       {},
     )
+    if (finalizar) {
+      const hasObservacao = Object.entries(camposPayload).some(([key, value]) =>
+        key.toLowerCase().includes('obs') && String(value ?? '').trim().length > 0,
+      )
+      if (!hasObservacao) {
+        setNadaConstaError('Adicione uma observação antes de finalizar o setor.')
+        setSavingNadaConsta(false)
+        return
+      }
+    }
 
     try {
       const res = await fetch(
@@ -1696,7 +1712,7 @@ async function handleEncaminharAprovacaoComAnexo() {
       setClosing(false)
     }
   }
-  async function handleFinalizarUltimaEtapa() {
+ async function handleFinalizarUltimaEtapa() {
     const solicitationId = detail?.id ?? row?.id
     if (!solicitationId) return
 
@@ -1705,8 +1721,26 @@ async function handleEncaminharAprovacaoComAnexo() {
     setCloseSuccess(null)
 
     try {
+      if (isNadaConsta && !novoComentario.trim()) {
+        throw new Error('Para finalizar Nada Consta, registre uma observação.')
+      }
+      if (isSolicitacaoEquipamentoTi && existeTermoParaAnexar === 'SIM') {
+        const hasTermoAnexo = (detail?.anexos ?? []).some((anexo) =>
+          anexo.filename.toLowerCase().includes('termo'),
+        )
+        const documents = ((detail as any)?.documents ?? []) as Array<{ type?: string; pdfUrl?: string | null; signedPdfUrl?: string | null }>
+        const hasTermoDoc = documents.some((doc) => doc.type === 'TERMO_RESPONSABILIDADE' && Boolean(doc.pdfUrl || doc.signedPdfUrl))
+        if (!hasTermoAnexo && !hasTermoDoc) {
+          throw new Error('Existe termo para anexar = SIM. Anexe/gere o termo antes de finalizar.')
+        }
+      }
       const res = await fetch(`/api/solicitacoes/${solicitationId}/finalizar`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          observacao: novoComentario.trim(),
+          existeTermoParaAnexar,
+        }),
       })
 
       if (!res.ok) {
@@ -3265,13 +3299,25 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   )}
  {isSolicitacaoEquipamentoTi && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
                         Inventário TI e decisão de atendimento
                       </p>
 
                       <div className="space-y-3">
                         <label className="space-y-1 text-xs text-slate-700">
+                          <span className="font-semibold">Existe Termo para anexar?</span>
+                          <select
+                            className="w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                            value={existeTermoParaAnexar}
+                            onChange={(e) => setExisteTermoParaAnexar(e.target.value as 'SIM' | 'NAO' | '')}
+                            disabled={isFinalizadaOuCancelada}
+                          >
+                            <option value="">Selecione...</option>
+                            <option value="SIM">SIM</option>
+                            <option value="NAO">NÃO</option>
+                          </select>
+                        </label>                        <label className="space-y-1 text-xs text-slate-700">
                           <span className="font-semibold">
                             Equipamento disponível (IN_STOCK)
                           </span>

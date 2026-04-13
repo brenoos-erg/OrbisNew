@@ -15,7 +15,7 @@ import {
 import { isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
 export async function PATCH(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -27,7 +27,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
     }
 
-    const solicitation = await prisma.solicitation.findUnique({
+    const body = await req.json().catch(() => ({}))
+    const observacao = typeof body?.observacao === 'string' ? body.observacao.trim() : ''
+    const existeTermoBody = typeof body?.existeTermoParaAnexar === 'string'
+      ? body.existeTermoParaAnexar.trim().toUpperCase()
+      : ''
+
+
+     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
       include: {
         department: { select: { id: true, code: true } },
@@ -39,8 +46,12 @@ export async function PATCH(
           },
         },
         solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
+        comentarios: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        anexos: { select: { filename: true } },
+        documents: { select: { type: true, pdfUrl: true, signedPdfUrl: true } },
       },
     })
+
 
     if (!solicitation) {
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
@@ -60,7 +71,7 @@ export async function PATCH(
       )
     }
 
-    const departamentos = Array.isArray((solicitation.tipo?.schemaJson as any)?.meta?.departamentos)
+     const departamentos = Array.isArray((solicitation.tipo?.schemaJson as any)?.meta?.departamentos)
       ? ((solicitation.tipo?.schemaJson as any).meta.departamentos as unknown[])
           .filter((item): item is string => typeof item === 'string')
       : []
@@ -70,6 +81,29 @@ export async function PATCH(
       (departamentoFinal !== null && solicitation.departmentId === departamentoFinal)
 
    const isNadaConsta = isSolicitacaoNadaConsta({ id: solicitation.tipo?.id, nome: solicitation.tipo?.nome })
+    if (isNadaConsta && !observacao) {
+      return NextResponse.json(
+        { error: 'Para finalizar Nada Consta, a observação é obrigatória.' },
+        { status: 400 },
+      )
+    }
+
+    const payloadCampos = (((solicitation.payload ?? {}) as Record<string, any>).campos ?? {}) as Record<string, unknown>
+    const isSolicitacaoEquipamento =
+      solicitation.tipo?.id === 'SOLICITACAO_EQUIPAMENTO' ||
+      solicitation.tipo?.id === 'RQ_089' ||
+      solicitation.tipo?.nome === 'SOLICITAÇÃO DE EQUIPAMENTO'
+    const existeTermoParaAnexar = existeTermoBody || String(payloadCampos.existeTermoParaAnexar ?? '').trim().toUpperCase()
+    const hasTermoAnexo = solicitation.anexos.some((anexo) => anexo.filename.toLowerCase().includes('termo'))
+    const hasTermoDocumento = solicitation.documents.some(
+      (doc) => doc.type === 'TERMO_RESPONSABILIDADE' && Boolean(doc.pdfUrl || doc.signedPdfUrl),
+    )
+    if (isSolicitacaoEquipamento && existeTermoParaAnexar === 'SIM' && !hasTermoAnexo && !hasTermoDocumento) {
+      return NextResponse.json(
+        { error: 'Existe termo para anexar = SIM. É obrigatório anexar/gerar o termo antes de finalizar.' },
+        { status: 400 },
+      )
+    }
     const todosSetoresVerdes =
       solicitation.solicitacaoSetores.length > 0 &&
       solicitation.solicitacaoSetores.every((setor) => setor.status === 'CONCLUIDO' && Boolean(setor.constaFlag))
@@ -125,6 +159,16 @@ export async function PATCH(
         message: 'Solicitação finalizada na última etapa do fluxo.',
       },
     })
+    if (observacao) {
+      await prisma.comment.create({
+        data: {
+          id: randomUUID(),
+          solicitationId: id,
+          autorId: me.id,
+          texto: observacao,
+        },
+      })
+    }
 
     await prisma.event.create({
       data: {

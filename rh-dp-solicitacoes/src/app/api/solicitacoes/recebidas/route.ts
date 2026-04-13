@@ -102,7 +102,7 @@ if (hasProtocoloFilter) {
 
   if (responsavel) {
     where.assumidaPor = {
-      fullName: { contains: responsavel },
+        fullName: { contains: responsavel },
     }
   }
 
@@ -127,9 +127,10 @@ if (hasProtocoloFilter) {
       ...(where.AND ?? []),
       {
         OR: [
-          { titulo: { contains: textValue } },
-          { descricao: { contains: textValue } },
+          { titulo: { contains: textValue, mode: 'insensitive' } },
+          { descricao: { contains: textValue, mode: 'insensitive' } },
           { payload: { path: '$.campos', string_contains: textValue } },
+          { payload: { path: '$', string_contains: textValue } },
           { payload: { path: '$.formulario', string_contains: textValue } },
           { payload: { path: '$.form', string_contains: textValue } },
           { payload: { path: '$.metadata', string_contains: textValue } },
@@ -143,10 +144,19 @@ if (hasProtocoloFilter) {
     ]
   }
 
-
-  return where
+ return where
 }
 
+function resolveOrderBy(searchParams: URLSearchParams): Prisma.SolicitationOrderByWithRelationInput[] {
+  const sortBy = searchParams.get('sortBy') ?? 'dataAbertura'
+  const sortDir = (searchParams.get('sortDir') ?? 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'
+  if (sortBy === 'protocolo') return [{ protocolo: sortDir }]
+  if (sortBy === 'nomeSolicitante') return [{ solicitante: { fullName: sortDir } }]
+  if (sortBy === 'departamentoResponsavel') return [{ department: { name: sortDir } }]
+  if (sortBy === 'atendente') return [{ assumidaPor: { fullName: sortDir } }]
+  if (sortBy === 'status') return [{ status: sortDir }]
+  return [{ dataAbertura: sortDir }]
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -161,6 +171,7 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * pageSize
     const where = buildWhereFromSearchParams(searchParams)
+    const orderBy = resolveOrderBy(searchParams)
 
 
     const userAccess = await resolveUserAccessContext({
@@ -185,7 +196,6 @@ export async function GET(req: NextRequest) {
       },
     ]
 
-
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
     where.AND = [
       ...(where.AND ?? []),
@@ -196,7 +206,7 @@ export async function GET(req: NextRequest) {
       }),
     ]
 
-    where.AND = [
+     where.AND = [
       ...(where.AND ?? []),
       {
         NOT: {
@@ -214,7 +224,7 @@ export async function GET(req: NextRequest) {
         where,
         skip,
         take: pageSize,
-        orderBy: { dataAbertura: 'desc' },
+        orderBy,
         include: {
           tipo: { select: { codigo: true, nome: true } },
           department: { select: { name: true } },
@@ -222,6 +232,7 @@ export async function GET(req: NextRequest) {
           approver: { select: { id: true, fullName: true } },
           assumidaPor: { select: { id: true, fullName: true } },
           solicitante: { select: { id: true, fullName: true } },
+          solicitacaoSetores: { select: { status: true, constaFlag: true } },
           eventos: {
             where: {
               tipo: {
@@ -254,6 +265,7 @@ export async function GET(req: NextRequest) {
         ? { fullName: finalizadorEvent.actor.fullName }
         : null,
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+      solicitanteNome: s.solicitante?.fullName ?? null,
       sla: null,
       setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
       departamentoResponsavel: s.department?.name ?? null,
@@ -261,6 +273,12 @@ export async function GET(req: NextRequest) {
       approvalStatus: s.approvalStatus,
       costCenterId: s.costCenterId ?? null,
       approverId: s.approver?.id ?? s.approverId ?? null,
+      nadaConstaStatus:
+        s.solicitacaoSetores.length === 0
+          ? null
+          : s.solicitacaoSetores.every((setor) => setor.status === 'CONCLUIDO' && Boolean(setor.constaFlag))
+            ? 'PREENCHIDO'
+            : 'PENDENTE',
       }
     })
 
