@@ -3,6 +3,7 @@
 
 import { formatDateDDMMYYYY } from '@/lib/date'
 import React, { useEffect, useMemo, useState } from 'react'
+import { Printer } from 'lucide-react'
 import {
   SolicitationDetailModal,
   type Row,
@@ -256,8 +257,17 @@ export default function ApprovalsPage() {
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {row.setorDestino ?? '—'}
-                  </td>
+                 </td>
                   <td className="px-3 py-2 text-right text-xs">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        window.open(`/solicitacoes/impressao/${row.id}`, '_blank', 'noopener,noreferrer')
+                      }}
+                      className="mr-2 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <span className="inline-flex items-center gap-1"><Printer size={12} />Imprimir</span>
+                    </button>
                     <button
                       onClick={(e) => handleApprove(e, row)}
                        disabled={!canApproveRow}

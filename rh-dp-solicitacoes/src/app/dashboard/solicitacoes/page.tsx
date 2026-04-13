@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Search, RefreshCw } from 'lucide-react'
+import { Search, RefreshCw, Printer } from 'lucide-react'
 import { formatDateDDMMYYYY } from '@/lib/date'
 export const dynamic = 'force-dynamic'
 
@@ -80,18 +80,19 @@ export default function SolicitacoesPage() {
               <th className="text-left px-4 py-2">Status</th>
               <th className="text-left px-4 py-2">Tipo</th>
               <th className="text-left px-4 py-2">Criado em</th>
+              <th className="text-left px-4 py-2">Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-slate-400">
+                <td colSpan={5} className="text-center py-6 text-slate-400">
                   Carregando...
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-slate-400">
+                <td colSpan={5} className="text-center py-6 text-slate-400">
                   Nenhuma solicitação encontrada
                 </td>
               </tr>
@@ -114,8 +115,17 @@ export default function SolicitacoesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2">{item.tipo ? `${item.tipo.codigo} - ${item.tipo.nome}` : '-'}</td>
-                  <td className="px-4 py-2 text-slate-500">
+                      <td className="px-4 py-2 text-slate-500">
                     {formatDateDDMMYYYY(item.createdAt)}
+                  </td>
+                  <td className="px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/solicitacoes/impressao/${item.id}`, '_blank', 'noopener,noreferrer')}
+                      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Printer size={12} /> Imprimir
+                    </button>
                   </td>
                 </tr>
               ))

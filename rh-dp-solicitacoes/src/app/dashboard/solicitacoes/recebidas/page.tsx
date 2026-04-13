@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { Printer } from 'lucide-react'
 import { formatDateDDMMYYYY } from '@/lib/date'
 import {
   Row,
@@ -547,7 +548,7 @@ export default function ReceivedRequestsPage() {
               setFilters(reset)
             }}
           >
-            Limpar filtros
+              Limpar filtros
           </button>
         </div>
       </div>
@@ -555,7 +556,17 @@ export default function ReceivedRequestsPage() {
       <div className="flex-1 overflow-hidden rounded-md border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <span>Solicitações Recebidas</span>
-          {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
+          <div className="flex items-center gap-2">
+            {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
+            <button
+              type="button"
+              onClick={() => selectedRow?.id && window.open(`/solicitacoes/impressao/${selectedRow.id}`, '_blank', 'noopener,noreferrer')}
+              disabled={!selectedRow?.id}
+              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Printer size={12} /> Imprimir selecionado
+            </button>
+          </div>
         </div>
 
         {error && <div className="p-4 text-sm text-red-600">{error}</div>}

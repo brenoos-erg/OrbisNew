@@ -50,7 +50,7 @@ export default function ListaSolicitacoesPage() {
       }
     }
 
-    load()
+   load()
     interval = setInterval(load, 5000)
 
     return () => {
@@ -74,17 +74,22 @@ export default function ListaSolicitacoesPage() {
       {!loading && (
         <div className="grid gap-3">
           {data.map((s) => (
-            <a
-              key={s.id}
-              href={`/solicitacoes/${s.id}`}
-              className="block rounded border bg-white p-3"
-            >
-              <div className="font-medium">{s.titulo}</div>
-              <div className="text-sm text-gray-600">
-               {s.tipo ? `${s.tipo.codigo} - ${s.tipo.nome}` : '-'} • {s.status} •{' '}
-                {new Date(s.createdAt).toLocaleString('pt-BR')}
-              </div>
-            </a>
+            <div key={s.id} className="rounded border bg-white p-3">
+              <a href={`/solicitacoes/${s.id}`} className="block">
+                <div className="font-medium">{s.titulo}</div>
+                <div className="text-sm text-gray-600">
+                 {s.tipo ? `${s.tipo.codigo} - ${s.tipo.nome}` : '-'} • {s.status} •{' '}
+                  {new Date(s.createdAt).toLocaleString('pt-BR')}
+                </div>
+              </a>
+              <button
+                type="button"
+                onClick={() => window.open(`/solicitacoes/impressao/${s.id}`, '_blank', 'noopener,noreferrer')}
+                className="mt-2 rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Imprimir
+              </button>
+            </div>
           ))}
 
           {!data.length && (

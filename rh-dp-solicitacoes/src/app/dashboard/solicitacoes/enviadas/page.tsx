@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Filter, RefreshCcw, Search, Plus, Info, Copy, Eraser } from 'lucide-react'
+import { Download, Filter, RefreshCcw, Search, Plus, Info, Copy, Eraser, Printer } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatDateDDMMYYYY } from '@/lib/date'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -346,7 +346,7 @@ export default function SentRequestsPage() {
     }
   }
 
-  const closeDetail = () => {
+ const closeDetail = () => {
     setDetailOpen(false)
     setSelectedRow(null)
     setDetail(null)
@@ -357,6 +357,14 @@ export default function SentRequestsPage() {
     if (!protocol) return
     await navigator.clipboard.writeText(protocol)
     pushToast('Copiado', 'success')
+  }
+
+  const onPrint = () => {
+    if (!selectedRow?.id) {
+      pushToast('Selecione uma solicitação na tabela', 'info')
+      return
+    }
+    window.open(`/solicitacoes/impressao/${selectedRow.id}`, '_blank', 'noopener,noreferrer')
   }
 
 
@@ -383,7 +391,7 @@ export default function SentRequestsPage() {
             <Plus size={16} /> Nova Solicitação
           </button>
 
-          <button
+         <button
             onClick={() => {
               if (!selectedRow) {
                 pushToast('Selecione uma solicitação na tabela', 'info')
@@ -394,6 +402,13 @@ export default function SentRequestsPage() {
             className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
           >
             <Info size={16} /> Detalhes
+          </button>
+
+          <button
+            onClick={onPrint}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
+          >
+            <Printer size={16} /> Imprimir
           </button>
 
           <button
