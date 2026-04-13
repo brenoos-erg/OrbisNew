@@ -6,12 +6,17 @@ import {
   resolveUserSetorKeysFromDepartments,
 } from '@/lib/solicitationVisibility'
 import {
+  isExperienceEvaluationEvaluator,
+  EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
 
 export type UserAccessContext = {
   userId: string
+  userLogin?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
   role: Role
   userDepartmentIds: string[]
   userSetorKeys: string[]
@@ -28,10 +33,14 @@ type SolicitationLike = {
   assumidaPorId?: string | null
   departmentId?: string | null
   solicitacaoSetores?: { setor?: string | null }[]
+  payload?: unknown
 }
 
 export async function resolveUserAccessContext(input: {
   userId: string
+  userLogin?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
   role: Role
   primaryDepartmentId?: string | null
   primaryDepartment?: DepartmentLike | null
@@ -66,6 +75,9 @@ export async function resolveUserAccessContext(input: {
 
   return {
     userId: input.userId,
+    userLogin: input.userLogin,
+    userEmail: input.userEmail,
+    userFullName: input.userFullName,
     role: input.role,
     userDepartmentIds: [...userDepartmentIds],
     userSetorKeys,
@@ -76,6 +88,9 @@ export async function resolveUserAccessContext(input: {
 export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.SolicitationWhereInput {
   return buildReceivedSolicitationVisibilityWhere({
     userId: ctx.userId,
+    userLogin: ctx.userLogin,
+    userEmail: ctx.userEmail,
+    userFullName: ctx.userFullName,
     role: ctx.role,
     userDepartmentIds: ctx.userDepartmentIds,
     userSetorKeys: ctx.userSetorKeys,
@@ -86,11 +101,26 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
 export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
   return (
     canUserViewSolicitationByDepartment(ctx, solicitation) ||
+    canUserActAsExperienceEvaluator(ctx, solicitation) ||
     canUserActAsFinalizerForCurrentStage(ctx, solicitation)
   )
 }
 
-function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
+function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (ctx.role === 'ADMIN') return true
+  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
+  if (solicitation.status !== EXPERIENCE_EVALUATION_STATUS) return false
+
+  return isExperienceEvaluationEvaluator(
+    { payload: solicitation.payload, approverId: solicitation.approverId },
+    {
+      id: ctx.userId,
+      login: ctx.userLogin,
+      email: ctx.userEmail,
+      fullName: ctx.userFullName,
+    },
+  )
+}function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (ctx.role === 'ADMIN') return true
   if (!solicitation.tipoId || !solicitation.status) return false
 

@@ -100,7 +100,7 @@ export async function GET(
       },
     })
 
-    if (!item) {
+     if (!item) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
@@ -113,11 +113,15 @@ export async function GET(
       getUserDepartmentIds(me.id, me.departmentId),
       resolveUserAccessContext({
         userId: me.id,
+        userLogin: me.login,
+        userEmail: me.email,
+        userFullName: me.fullName,
         role: me.role,
         primaryDepartmentId: me.departmentId,
         primaryDepartment: me.department,
       }),
     ])
+
 
     const canViewSensitive = canViewSensitiveHiringRequest({
       user: { id: me.id, role: me.role },
@@ -137,7 +141,7 @@ export async function GET(
        isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
     })
 
-    const canViewByDepartment = canViewSolicitation(
+   const canViewByDepartment = canViewSolicitation(
       userAccess,
       {
         tipoId: item.tipoId,
@@ -147,8 +151,10 @@ export async function GET(
         assumidaPorId: item.assumidaPorId,
         departmentId: item.departmentId,
         solicitacaoSetores: item.solicitacaoSetores,
+        payload: item.payload,
       },
     )
+
 
     const canViewNadaConsta = canUserViewNadaConsta(
       {

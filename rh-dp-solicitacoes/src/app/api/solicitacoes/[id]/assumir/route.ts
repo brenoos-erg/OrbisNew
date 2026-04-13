@@ -22,7 +22,7 @@ export async function POST(
     })
 
 
-    if (!solic) {
+     if (!solic) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
@@ -31,6 +31,9 @@ export async function POST(
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
       role: me.role,
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
@@ -44,8 +47,8 @@ export async function POST(
       assumidaPorId: solic.assumidaPorId,
       departmentId: solic.departmentId,
       solicitacaoSetores: solic.solicitacaoSetores,
+      payload: solic.payload,
     })
-
     if (!canAssume) {
       return NextResponse.json(
         { error: 'Você não possui permissão para assumir este chamado.' },

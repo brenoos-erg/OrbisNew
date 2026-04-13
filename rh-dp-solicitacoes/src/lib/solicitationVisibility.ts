@@ -1,6 +1,7 @@
 import { Prisma, Role } from '@prisma/client'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import {
+  EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
@@ -9,6 +10,9 @@ type DepartmentLike = { id?: string | null; code?: string | null; name?: string 
 
 type SolicitationVisibilityInput = {
   userId: string
+  userLogin?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
   role: Role
   userDepartmentIds: string[]
   userSetorKeys: string[]
@@ -69,7 +73,7 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
-  if (input.finalizerTipoIds.length > 0) {
+   if (input.finalizerTipoIds.length > 0) {
     orFilters.push({
       tipoId: {
         in: input.finalizerTipoIds,
@@ -78,6 +82,53 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
+  const userLogin = input.userLogin?.trim()
+  const userEmail = input.userEmail?.trim()
+  const userFullName = input.userFullName?.trim()
+  const evaluatorPayloadFilters: Prisma.SolicitationWhereInput[] = [
+    {
+      payload: {
+        path: '$.campos.gestorImediatoAvaliadorId',
+        equals: input.userId,
+      },
+    },
+  ]
+
+  if (userLogin) {
+    evaluatorPayloadFilters.push({
+      payload: {
+        path: '$.campos.gestorImediatoAvaliadorLogin',
+        equals: userLogin,
+      },
+    })
+  }
+
+  if (userEmail) {
+    evaluatorPayloadFilters.push({
+      payload: {
+        path: '$.campos.gestorImediatoAvaliadorEmail',
+        equals: userEmail,
+      },
+    })
+  }
+
+  if (userFullName) {
+    evaluatorPayloadFilters.push({
+      payload: {
+        path: '$.campos.gestorImediatoAvaliador',
+        equals: userFullName,
+      },
+    })
+  }
+
+  orFilters.push({
+    tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+    status: EXPERIENCE_EVALUATION_STATUS,
+    OR: [
+      { approverId: input.userId },
+      ...evaluatorPayloadFilters,
+    ],
+  })
   return {
     OR: orFilters,
   }

@@ -40,24 +40,16 @@ export async function GET(req: NextRequest) {
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
       role: me.role,
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
     })
-  const gestorAvaliadorFilter = {
-      approverId: me.id,
-      status: 'AGUARDANDO_AVALIACAO_GESTOR' as const,
-    }
-
-
     where.AND = [
       ...(where.AND ?? []),
-      {
-        OR: [
-          buildReceivedWhereByPolicy(userAccess),
-          gestorAvaliadorFilter,
-        ],
-      },
+      buildReceivedWhereByPolicy(userAccess),
     ]
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
