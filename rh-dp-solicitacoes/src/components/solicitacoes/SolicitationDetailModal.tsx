@@ -26,7 +26,7 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
-import { isExperienceEvaluationEvaluator } from '@/lib/experienceEvaluation'
+import { isExperienceEvaluationEvaluator } from '@/lib/experienceEvaluation.shared'
 import {
   EXPERIENCE_EVALUATION_COMPETENCIES,
   extractExperienceEvaluationData,
