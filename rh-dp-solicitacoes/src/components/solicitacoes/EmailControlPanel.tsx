@@ -144,7 +144,7 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
       nextBySource.set(edge.source, [...(nextBySource.get(edge.source) ?? []), edge.target])
       hasIncoming.add(edge.target)
     }
-    const start = nodes.find((node) => !hasIncoming.has(node.id))
+   const start = nodes.find((node) => !hasIncoming.has(node.id))
     if (!start) return nodes
 
     const ordered: ApiNode[] = []
@@ -165,6 +165,20 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
 
   const updateNode = (id: string, updater: (node: ApiNode) => ApiNode) => {
     setNodes((prev) => prev.map((node) => (node.id === id ? updater(node) : node)))
+  }
+
+  const removeNotificationEmail = (nodeId: string, emailToRemove: string) => {
+    updateNode(nodeId, (node) => ({
+      ...node,
+      notificationEmails: (node.notificationEmails ?? []).filter((email) => email !== emailToRemove),
+    }))
+  }
+
+  const removeNotificationAdminEmail = (nodeId: string, emailToRemove: string) => {
+    updateNode(nodeId, (node) => ({
+      ...node,
+      notificationAdminEmails: (node.notificationAdminEmails ?? []).filter((email) => email !== emailToRemove),
+    }))
   }
 
   const onSave = async () => {
@@ -314,16 +328,54 @@ export function EmailControlPanel({ canEdit }: { canEdit: boolean }) {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editingNode.notificationChannels?.notifyAdmins ?? false} onChange={(e) => updateNode(editingNode.id, (node) => ({ ...node, notificationChannels: { ...node.notificationChannels, notifyAdmins: e.target.checked } }))} /> Copiar admins/grupo</label>
             </div>
 
-            <div className="rounded border p-3">
+             <div className="rounded border p-3">
               <p className="mb-2 text-sm font-medium">Destinatários fixos</p>
               <div className="mb-2 flex gap-2"><input className="flex-1 rounded border px-2 py-2" value={newFixedEmail} onChange={(e) => setNewFixedEmail(e.target.value)} placeholder="email@empresa.com" /><button className="rounded border px-3" onClick={() => { if (!newFixedEmail.trim()) return; updateNode(editingNode.id, (node) => ({ ...node, notificationEmails: Array.from(new Set([...(node.notificationEmails ?? []), newFixedEmail.trim()])) })); setNewFixedEmail('') }}>Adicionar</button></div>
-              <div className="flex flex-wrap gap-2">{(editingNode.notificationEmails ?? []).map((email) => <span key={email} className="rounded-full bg-slate-100 px-2 py-1 text-xs">{email}</span>)}</div>
+              {(editingNode.notificationEmails ?? []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(editingNode.notificationEmails ?? []).map((email) => (
+                    <span key={email} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                      {email}
+                      <button
+                        type="button"
+                        className="rounded-full px-1 text-slate-500 transition hover:bg-red-100 hover:text-red-700"
+                        onClick={() => removeNotificationEmail(editingNode.id, email)}
+                        aria-label={`Remover ${email}`}
+                        title={`Remover ${email}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Nenhum e-mail fixo cadastrado.</p>
+              )}
             </div>
 
             <div className="rounded border p-3">
               <p className="mb-2 text-sm font-medium">E-mails de cópia/admin</p>
               <div className="mb-2 flex gap-2"><input className="flex-1 rounded border px-2 py-2" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} placeholder="grupo@empresa.com" /><button className="rounded border px-3" onClick={() => { if (!newAdminEmail.trim()) return; updateNode(editingNode.id, (node) => ({ ...node, notificationAdminEmails: Array.from(new Set([...(node.notificationAdminEmails ?? []), newAdminEmail.trim()])) })); setNewAdminEmail('') }}>Adicionar</button></div>
-              <div className="flex flex-wrap gap-2">{(editingNode.notificationAdminEmails ?? []).map((email) => <span key={email} className="rounded-full bg-slate-100 px-2 py-1 text-xs">{email}</span>)}</div>
+              {(editingNode.notificationAdminEmails ?? []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(editingNode.notificationAdminEmails ?? []).map((email) => (
+                    <span key={email} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                      {email}
+                      <button
+                        type="button"
+                        className="rounded-full px-1 text-slate-500 transition hover:bg-red-100 hover:text-red-700"
+                        onClick={() => removeNotificationAdminEmail(editingNode.id, email)}
+                        aria-label={`Remover ${email}`}
+                        title={`Remover ${email}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Nenhum e-mail de cópia/admin cadastrado.</p>
+              )}
             </div>
 
             <div className="rounded border p-3">
