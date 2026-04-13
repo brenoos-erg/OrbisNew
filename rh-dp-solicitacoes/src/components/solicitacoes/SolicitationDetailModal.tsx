@@ -5,6 +5,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYYHHMM } from '@/lib/date'
 import {
+  formatDisplayValueForUser,
+  isTruthyBooleanValue,
+  resolveFriendlyCostCenterValue,
+  toBoolean,
+} from '@/lib/solicitationPresentation'
+import {
    isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
   isSolicitacaoEquipamento,
@@ -39,22 +45,11 @@ const isBooleanLikeType = (campoType?: string) => {
 }
 
 const getBooleanValue = (value: unknown): boolean | null => {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'string') {
-    const normalizedValue = value.trim().toLowerCase()
-    if (normalizedValue === 'true') return true
-    if (normalizedValue === 'false') return false
-  }
-  return null
+  return toBoolean(value)
 }
 
 const formatDisplayValue = (value: unknown, _campoType?: string) => {
-  const booleanValue = getBooleanValue(value)
-  if (booleanValue !== null) {
-    return booleanValue ? 'Sim' : 'Não'
-  }
-  if (value === null || value === undefined) return ''
-  return String(value)
+  return formatDisplayValueForUser(value)
 }
 
 
@@ -325,46 +320,6 @@ function normalizeSaudeStatusValue(value: unknown): SaudeStatus | '' {
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-const looksTechnicalCostCenterId = (value: string) =>
-  UUID_REGEX.test(value) || /^[a-f0-9]{24,}$/i.test(value)
-
-function resolveFriendlyCostCenterValue(
-  key: string,
-  payloadCampos: Record<string, any>,
-  fallbackLabel?: string,
-) {
-  const rawValue = payloadCampos[key]
-  if (rawValue === undefined || rawValue === null) return fallbackLabel || ''
-  const rawAsString = String(rawValue).trim()
-  if (!rawAsString) return fallbackLabel || ''
-
-  const normalizedBaseKey = key.replace(/(id|uuid)$/i, '')
-  const candidateKeys = [
-    `${key}Label`,
-    `${key}Text`,
-    `${normalizedBaseKey}Label`,
-    `${normalizedBaseKey}Text`,
-    'centroCustoDestinoText',
-    'centroCustoDestinoIdLabel',
-    'centroCustoIdLabel',
-    'centroCustoLabel',
-    'costCenterText',
-    'costCenterLabel',
-  ]
-
-  for (const candidateKey of candidateKeys) {
-    const candidateValue = payloadCampos[candidateKey]
-    if (typeof candidateValue === 'string' && candidateValue.trim()) {
-      return candidateValue.trim()
-    }
-  }
-
-  if (looksTechnicalCostCenterId(rawAsString)) {
-    return fallbackLabel || ''
-  }
-
-  return rawAsString
-}
 
 function normalizeSetorKey(value: string) {
   return value
@@ -1175,7 +1130,7 @@ export function SolicitationDetailModal({
     if (campo.type === 'date') {
       return formatDateDDMMYYYY(rawValue)
     }
-    return formatDisplayValue(rawValue, campo.type)
+    return formatDisplayValueForUser(rawValue, campo.name)
   }
 
   const hasAttachments = (detail?.anexos?.length ?? 0) > 0
@@ -2430,7 +2385,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                               <input
                                 className={INPUT_RO}
                                 readOnly
-                                value={formatDisplayValue(payloadCampos[campo.name], campo.type)}
+                                value={formatDisplayValueForUser(payloadCampos[campo.name], campo.name)}
                               />
                             </div>
                           ))}
@@ -2581,7 +2536,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                                   checked={checkboxValue === true}
                                   aria-label={campo.label}
                                 />
-                                <span>{formatDisplayValue(payloadCampos[campo.name], campo.type)}</span>
+                            <span>{formatDisplayValueForUser(payloadCampos[campo.name], campo.name)}</span>
                               </div>
                             ) : (
                                 <input className={INPUT_RO} readOnly value={value} />
@@ -3542,11 +3497,11 @@ function RQ063ResumoCampos({
     'basicas' | 'contratacao' | 'academicos' | 'solicitacoes' | 'projetos' | 'admissao'
   >('basicas')
 
- const get = (key: string) => {
+  const get = (key: string) => {
     if (key.toLowerCase().includes('centrocusto') || key.toLowerCase().includes('costcenter')) {
       return resolveFriendlyCostCenterValue(key, payloadCampos, costCenterLabel)
     }
-    return formatDisplayValue(payloadCampos[key])
+    return formatDisplayValueForUser(payloadCampos[key], key)
   }
   const getFirst = (...keys: string[]) => {
     for (const key of keys) {
@@ -3561,14 +3516,13 @@ function RQ063ResumoCampos({
 
 
   const bool = (key: string) => {
-    const v = (payloadCampos[key] ?? '').toString().toLowerCase()
-    if (!v) return ''
-    return v === 'true' ? 'Sim' : 'Não'
+    const value = formatDisplayValueForUser(payloadCampos[key], key)
+    return value || ''
   }
 
   const joinIfTrue = (entries: [string, string][]) =>
     entries
-      .filter(([k]) => (payloadCampos[k] ?? '').toString().toLowerCase() === 'true')
+      .filter(([k]) => isTruthyBooleanValue(payloadCampos[k]))
       .map(([, label]) => label)
       .join(', ')
 
@@ -3775,18 +3729,15 @@ function RQ247ResumoCampos({
   dpEditable: boolean
   costCenterLabel: string
 }) {
-   const get = (key: string) => {
+    const get = (key: string) => {
     if (key.toLowerCase().includes('centrocusto') || key.toLowerCase().includes('costcenter')) {
       return resolveFriendlyCostCenterValue(key, payloadCampos, costCenterLabel)
     }
-    return formatDisplayValue(payloadCampos[key])
+    return formatDisplayValueForUser(payloadCampos[key], key)
   }
   const joinIfTrue = (entries: [string, string][]) =>
     entries
-      .filter(
-        ([k]) =>
-          (payloadCampos[k] ?? '').toString().toLowerCase() === 'true',
-      )
+      .filter(([k]) => isTruthyBooleanValue(payloadCampos[k]))
       .map(([, label]) => label)
       .join(', ')
 

@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { formatCostCenterLabel } from '@/lib/costCenter'
+import {
+  formatDisplayValueForUser,
+  normalizeFieldLabel,
+  resolveFriendlyCostCenterValue,
+} from '@/lib/solicitationPresentation'
 
 type GenericRecord = Record<string, unknown>
 type SpecificFieldSchema = { name?: string; label?: string }
@@ -81,15 +87,22 @@ function prettifyKey(key: string) {
     .replace(/^./, (char) => char.toUpperCase())
 }
 
-function normalizeScalar(value: unknown): string {
+function normalizeScalar(value: unknown, key?: string, payloadCampos?: GenericRecord, fallbackCostCenterLabel?: string): string {
   if (value == null) return ''
-  if (typeof value === 'string') return value.trim()
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (
+    key &&
+    payloadCampos &&
+    (key.toLowerCase().includes('centrocusto') || key.toLowerCase().includes('costcenter'))
+  ) {
+    return resolveFriendlyCostCenterValue(key, payloadCampos, fallbackCostCenterLabel).trim()
+  }
+  if (typeof value === 'string') return formatDisplayValueForUser(value, key).trim()
+  if (typeof value === 'boolean') return formatDisplayValueForUser(value, key).trim()
   if (typeof value === 'number') return Number.isFinite(value) ? String(value) : ''
 
   if (Array.isArray(value)) {
     const values = value
-      .map((item) => normalizeScalar(item))
+      .map((item) => normalizeScalar(item, key, payloadCampos, fallbackCostCenterLabel))
       .filter(Boolean)
     return values.join(', ')
   }
@@ -114,6 +127,7 @@ function isTechnicalKey(key: string) {
 function extractSpecificFields(
   payloadCampos: GenericRecord,
   schemaFields: SpecificFieldSchema[],
+  fallbackCostCenterLabel: string,
 ): KeyValueItem[] {
   const schemaByName = new Map<string, string>()
   schemaFields.forEach((field) => {
@@ -124,13 +138,21 @@ function extractSpecificFields(
   })
 
   const knownFields = Array.from(schemaByName.entries())
-    .map(([name, label]) => ({ key: name, label, value: normalizeScalar(payloadCampos[name]) }))
+    .map(([name, label]) => ({
+      key: name,
+      label: normalizeFieldLabel(label, name),
+      value: normalizeScalar(payloadCampos[name], name, payloadCampos, fallbackCostCenterLabel),
+    }))
     .filter((item) => item.value)
 
   const dynamicFields = Object.entries(payloadCampos)
     .filter(([key]) => !schemaByName.has(key))
     .filter(([key]) => !isTechnicalKey(key))
-    .map(([key, value]) => ({ key, label: prettifyKey(key), value: normalizeScalar(value) }))
+    .map(([key, value]) => ({
+      key,
+      label: normalizeFieldLabel(prettifyKey(key), key),
+      value: normalizeScalar(value, key, payloadCampos, fallbackCostCenterLabel),
+    }))
     .filter((item) => item.value)
 
   return [...knownFields, ...dynamicFields]
@@ -175,7 +197,7 @@ export default function PrintSolicitationPage() {
     }
   }, [solicitationId])
 
-  useEffect(() => {
+   useEffect(() => {
     if (!detail || loading || error) return
     const timeout = window.setTimeout(() => window.print(), 250)
     return () => window.clearTimeout(timeout)
@@ -184,10 +206,13 @@ export default function PrintSolicitationPage() {
   const payload = (detail?.payload ?? {}) as GenericRecord
   const payloadCampos = ((payload.campos ?? {}) as GenericRecord) ?? {}
   const camposSchema = ((detail?.tipo?.schemaJson?.camposEspecificos ?? []) as SpecificFieldSchema[]) ?? []
+  const fallbackCostCenterLabel = detail?.costCenter
+    ? formatCostCenterLabel(detail.costCenter, '')
+    : ((detail?.payload?.solicitante?.costCenterText as string | undefined) ?? '')
 
   const mainSpecificFields = useMemo(
-    () => extractSpecificFields(payloadCampos, camposSchema),
-    [payloadCampos, camposSchema],
+    () => extractSpecificFields(payloadCampos, camposSchema, fallbackCostCenterLabel),
+    [payloadCampos, camposSchema, fallbackCostCenterLabel],
   )
 
   const requesterName = detail?.payload?.solicitante?.fullName ?? '—'
@@ -261,7 +286,7 @@ export default function PrintSolicitationPage() {
         <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm md:grid-cols-2">
           <p><strong>Solicitante:</strong> {requesterName}</p>
           <p><strong>Colaborador:</strong> {collaboratorName}</p>
-          <p><strong>Centro de custo:</strong> {detail?.costCenter?.description ?? detail?.payload?.solicitante?.costCenterText ?? '—'}</p>
+          <p><strong>Centro de custo:</strong> {fallbackCostCenterLabel || '—'}</p>
           <p><strong>Departamento:</strong> {detail?.department?.name ?? '—'}</p>
           <p><strong>Data de fechamento:</strong> {formatDateTime(detail?.dataFechamento)}</p>
         </div>
