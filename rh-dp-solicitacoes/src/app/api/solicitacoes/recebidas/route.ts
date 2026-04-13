@@ -9,143 +9,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
-
-
-function buildWhereFromSearchParams(searchParams: URLSearchParams) {
-  const where: any = {}
-
-  const openedDate = searchParams.get('openedDate')
-  const dateStart = searchParams.get('dateStart') ?? searchParams.get('openedStart')
-  const dateEnd = searchParams.get('dateEnd') ?? searchParams.get('openedEnd')
-  const closedDate = searchParams.get('closedDate')
-  const closedStart = searchParams.get('closedStart')
-  const closedEnd = searchParams.get('closedEnd')
-  const centerId = searchParams.get('centerId')
-  const costCenterId = searchParams.get('costCenterId') ?? centerId
-  const departmentId = searchParams.get('departmentId')
-  const tipoId = searchParams.get('tipoId')
-  const protocolo = normalizeFilterText(searchParams.get('protocolo'))
-  const solicitante = normalizeFilterText(searchParams.get('solicitante'))
-  const solicitanteNome = normalizeFilterText(searchParams.get('solicitanteNome'))
-  const solicitanteLogin = normalizeFilterText(searchParams.get('solicitanteLogin'))
-  const matricula = normalizeFilterText(searchParams.get('matricula'))
-  const status = normalizeFilterText(searchParams.get('status'))
-  const situacao = normalizeFilterText(searchParams.get('situacao'))
-  const responsavel = normalizeFilterText(searchParams.get('responsavel'))
-  const text = normalizeFilterText(searchParams.get('text'))
-
-  if (openedDate) {
-    where.dataAbertura = {
-      gte: new Date(`${openedDate}T00:00:00`),
-      lte: new Date(`${openedDate}T23:59:59`),
-    }
-  } else {
-    const openedRange = buildUtcDateRangeFilter({ start: dateStart, end: dateEnd })
-    if (openedRange) where.dataAbertura = openedRange
-
-  }
-
-  if (departmentId) where.departmentId = departmentId
-  if (costCenterId) where.costCenterId = costCenterId
-  if (tipoId) where.tipoId = tipoId
-
-  if (closedDate) {
-    where.dataFechamento = {
-      gte: new Date(`${closedDate}T00:00:00`),
-      lte: new Date(`${closedDate}T23:59:59`),
-    }
-  } else {
-    const closedRange = buildUtcDateRangeFilter({ start: closedStart, end: closedEnd })
-    if (closedRange) where.dataFechamento = closedRange
-  }
-
-  const hasProtocoloFilter = protocolo.length > 0
-
-  if (status) {
-    where.status = status
-  } else if (situacao) {
-    const statusBySituacao: Record<string, string[]> = {
-      PENDENTE: ['ABERTA', 'AGUARDANDO_APROVACAO', 'AGUARDANDO_TERMO'],
-      EM_ATENDIMENTO: ['EM_ATENDIMENTO', 'AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
-      FINALIZADO: ['CONCLUIDA'],
-      REJEITADO: ['CANCELADA'],
-    }
-    if (statusBySituacao[situacao]) {
-      where.status = { in: statusBySituacao[situacao] }
-    }
-  }
-
-
-if (hasProtocoloFilter) {
-    where.protocolo = {
-      contains: protocolo,
-    }
-  }
-  const solicitanteBusca = solicitanteNome || solicitante
-  if (solicitanteBusca) {
-    where.solicitante = {
-      OR: [
-         { fullName: { contains: solicitanteBusca } },
-        { email: { contains: solicitanteBusca } },
-      ],
-    }
-  }
-
-  if (solicitanteLogin) {
-    where.solicitante = {
-      ...(where.solicitante ?? {}),
-      ...(where.solicitante?.OR ? {} : { OR: [] }),
-      login: { contains: solicitanteLogin },
-    }
-  }
-
-  if (responsavel) {
-    where.assumidaPor = {
-        fullName: { contains: responsavel },
-    }
-  }
-
-  if (matricula) {
-    where.AND = [
-      ...(where.AND ?? []),
-      {
-        OR: [
-          {
-            payload: {
-              path: '$.solicitante.matricula',
-              string_contains: matricula,
-            },
-          },
-        ],
-      },
-    ]
-  }
-  if (text) {
-    const textValue = text
-    where.AND = [
-      ...(where.AND ?? []),
-      {
-        OR: [
-          { titulo: { contains: textValue, mode: 'insensitive' } },
-          { descricao: { contains: textValue, mode: 'insensitive' } },
-          { payload: { path: '$.campos', string_contains: textValue } },
-          { payload: { path: '$', string_contains: textValue } },
-          { payload: { path: '$.formulario', string_contains: textValue } },
-          { payload: { path: '$.form', string_contains: textValue } },
-          { payload: { path: '$.metadata', string_contains: textValue } },
-          { payload: { path: '$.requestData', string_contains: textValue } },
-          { payload: { path: '$.dynamicForm', string_contains: textValue } },
-          { payload: { path: '$.answers', string_contains: textValue } },
-          { payload: { path: '$.fields', string_contains: textValue } },
-          { payload: { path: '$.avaliacaoGestor', string_contains: textValue } },
-        ],
-      },
-    ]
-  }
-
- return where
-}
+import { buildListAndCountArgs, buildWhereFromSearchParams } from '@/lib/receivedSolicitationsQuery'
 
 function resolveOrderBy(searchParams: URLSearchParams): Prisma.SolicitationOrderByWithRelationInput[] {
   const sortBy = searchParams.get('sortBy') ?? 'dataAbertura'
@@ -219,33 +83,15 @@ export async function GET(req: NextRequest) {
       },
     ]
 
+   const { findManyArgs, countArgs } = buildListAndCountArgs(where, {
+      skip,
+      pageSize,
+      orderBy,
+    })
+
    const [solicitations, total] = await Promise.all([
-      prisma.solicitation.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy,
-        include: {
-          tipo: { select: { codigo: true, nome: true } },
-          department: { select: { name: true } },
-          costCenter: { select: { description: true, externalCode: true, code: true } },
-          approver: { select: { id: true, fullName: true } },
-          assumidaPor: { select: { id: true, fullName: true } },
-          solicitante: { select: { id: true, fullName: true } },
-          solicitacaoSetores: { select: { status: true, constaFlag: true } },
-          eventos: {
-            where: {
-              tipo: {
-                in: ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'],
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            include: { actor: { select: { id: true, fullName: true } } },
-          },
-        },
-      }),
-      prisma.solicitation.count({ where }),
+      prisma.solicitation.findMany(findManyArgs),
+      prisma.solicitation.count(countArgs),
     ])
 
    const rows = solicitations.map((s) => {
