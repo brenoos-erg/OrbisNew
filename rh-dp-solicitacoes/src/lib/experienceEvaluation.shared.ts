@@ -10,8 +10,14 @@ const readString = (obj: Dict, key: string): string => {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+const hasOwn = (obj: Dict, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
+
 const normalize = (value: unknown) =>
-  String(value ?? '').trim().toLocaleLowerCase('pt-BR')
+  String(value ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
 
 export function resolveExperienceEvaluationAssignedEvaluator(payload: unknown) {
   const root = asRecord(payload)
@@ -27,23 +33,26 @@ export function resolveExperienceEvaluationAssignedEvaluator(payload: unknown) {
     ...campos,
   }
 
+  const dedicatedEvaluatorFieldsPresent =
+    hasOwn(merged, 'gestorImediatoAvaliadorId') ||
+    hasOwn(merged, 'gestorImediatoAvaliadorLogin') ||
+    hasOwn(merged, 'gestorImediatoAvaliadorEmail') ||
+    hasOwn(merged, 'gestorImediatoAvaliador')
+
+  const dedicatedEvaluator = {
+    id: readString(merged, 'gestorImediatoAvaliadorId'),
+    login: readString(merged, 'gestorImediatoAvaliadorLogin'),
+    email: readString(merged, 'gestorImediatoAvaliadorEmail'),
+    fullName: readString(merged, 'gestorImediatoAvaliador'),
+  }
+
+  if (dedicatedEvaluatorFieldsPresent) return dedicatedEvaluator
+
   return {
-    id:
-      readString(merged, 'gestorImediatoAvaliadorId') ||
-      readString(merged, 'avaliadorId') ||
-      readString(merged, 'gestorId'),
-    login:
-      readString(merged, 'gestorImediatoAvaliadorLogin') ||
-      readString(merged, 'avaliadorLogin') ||
-      readString(merged, 'gestorLogin'),
-    email:
-      readString(merged, 'gestorImediatoAvaliadorEmail') ||
-      readString(merged, 'avaliadorEmail') ||
-      readString(merged, 'gestorEmail'),
-    fullName:
-      readString(merged, 'gestorImediatoAvaliador') ||
-      readString(merged, 'avaliador') ||
-      readString(merged, 'gestor'),
+    id: readString(merged, 'avaliadorId') || readString(merged, 'gestorId'),
+    login: readString(merged, 'avaliadorLogin') || readString(merged, 'gestorLogin'),
+    email: readString(merged, 'avaliadorEmail') || readString(merged, 'gestorEmail'),
+    fullName: readString(merged, 'avaliador') || readString(merged, 'gestor'),
   }
 }
 
