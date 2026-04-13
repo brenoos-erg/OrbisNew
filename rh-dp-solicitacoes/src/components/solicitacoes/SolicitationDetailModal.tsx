@@ -68,6 +68,38 @@ const escapePrintHtml = (value: unknown) =>
 const formatPrintDateTime = (value?: string | null) =>
   value ? formatDateTimeDDMMYYYYHHMM(value) : '-'
 
+const isEmptyPrintValue = (value: unknown) => {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  return false
+}
+
+const prettifyFieldLabel = (rawKey: string) =>
+  rawKey
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase())
+
+const formatPrintFieldValue = (value: unknown, campoType?: string): string => {
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item): string => formatPrintFieldValue(item))
+      .filter((item) => !isEmptyPrintValue(item))
+    return parts.length > 0 ? parts.join(', ') : '-'
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, entryValue]) => `${prettifyFieldLabel(key)}: ${formatPrintFieldValue(entryValue)}`)
+      .join(' | ')
+  }
+
+  const formatted = formatDisplayValue(value, campoType)
+  return formatted && formatted.trim() ? formatted : '-'
+}
+
 
 // ===== Tipos que a página de lista já usa =====
 export type Row = {
@@ -2017,10 +2049,57 @@ async function handleEncaminharAprovacaoComAnexo() {
       ['Centro de custo', payloadSolic.costCenterText ?? '-'],
     ]
 
-    const dadosFormularioRows = Object.entries(payloadCampos ?? {}).map(([key, value]) => [
-      key,
-      formatDisplayValue(value),
-    ])
+    const getFirstFilledPayloadValue = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = payloadCampos?.[key]
+        if (!isEmptyPrintValue(value)) return value
+      }
+      return ''
+    }
+
+    const camposFormularioRows = camposFormSolicitante
+      .map((campo) => [campo.label, formatPrintFieldValue(getCampoDisplayValue(campo), campo.type)] as [string, string])
+      .filter(([, value]) => value !== '-')
+
+    const camposMapeadosNoSchema = new Set(camposFormSolicitante.map((campo) => campo.name))
+    const camposExtrasRows = Object.entries(payloadCampos ?? {})
+      .filter(([key, value]) => !camposMapeadosNoSchema.has(key) && !isEmptyPrintValue(value))
+      .map(([key, value]) => [prettifyFieldLabel(key), formatPrintFieldValue(value)] as [string, string])
+
+    const admissionRows: Array<[string, string]> = [
+      [
+        'Nome',
+        formatPrintFieldValue(
+          getFirstFilledPayloadValue('nomeColaborador', 'nomeCandidato', 'candidatoNome') ||
+            payloadSolic.fullName ||
+            '-',
+        ),
+      ],
+      [
+        'Salário',
+        formatPrintFieldValue(getFirstFilledPayloadValue('salario', 'salarioProposto', 'valorSalario')),
+      ],
+      ['Cargo', formatPrintFieldValue(getFirstFilledPayloadValue('cargoFinal', 'cargo', 'cargoProposto') || payloadSolic.positionName || '-')],
+      [
+        'Centro de custo',
+        formatPrintFieldValue(
+          getFirstFilledPayloadValue(
+            'centroCustoDestinoText',
+            'centroCustoDestinoIdLabel',
+            'centroCustoIdLabel',
+            'centroCustoLabel',
+          ) || payloadSolic.costCenterText || costCenterLabel || '-',
+        ),
+      ],
+    ]
+
+    const dadosFormularioRows = [...admissionRows, ...camposFormularioRows, ...camposExtrasRows].filter(
+      ([label, value], index, array) =>
+        value !== '-' &&
+        array.findIndex(
+          ([otherLabel, otherValue]) => otherLabel.toLowerCase() === label.toLowerCase() && otherValue === value,
+        ) === index,
+    )
 
     const buildTableRows = (rowsToRender: Array<[string, unknown]>) =>
       rowsToRender
