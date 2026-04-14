@@ -8,6 +8,7 @@ type NonConformityActionType = 'ACAO_CORRETIVA' | 'ACAO_PREVENTIVA' | 'CORRECAO'
 
 type CostCenter = { id: string; code: string; description: string }
 type Gestor = { id: string; userId: string; user: { id: string; fullName: string | null; email: string } }
+type ActiveUser = { id: string; fullName: string | null; email: string }
 
 type ActionItem = {
   id: string
@@ -37,7 +38,7 @@ type ActionItem = {
 
 type PlanoResponse = { item?: ActionItem; error?: string }
 type PlanoListResponse = { items?: ActionItem[]; error?: string }
-type GestoresResponse = { members?: Gestor[] }
+type GestoresResponse = { members?: Gestor[]; users?: ActiveUser[] }
 type UploadResponse = { url?: string; uploadedAt?: string; uploadedBy?: string; originalName?: string; error?: string }
 
 type TabKey = 'plano' | 'causa'
@@ -47,6 +48,29 @@ const STATUS_OPTIONS: NonConformityActionStatus[] = ['PENDENTE', 'EM_ANDAMENTO',
 const TYPE_OPTIONS: NonConformityActionType[] = ['ACAO_CORRETIVA', 'ACAO_PREVENTIVA', 'CORRECAO']
 const STATUS_LABELS: Record<NonConformityActionStatus, string> = { PENDENTE: 'Pendente', EM_ANDAMENTO: 'Em andamento', CONCLUIDA: 'Concluída', CANCELADA: 'Cancelada' }
 const TYPE_LABELS: Record<NonConformityActionType, string> = { ACAO_CORRETIVA: 'Ação corretiva', ACAO_PREVENTIVA: 'Ação preventiva', CORRECAO: 'Correção' }
+const RAB_LABELS = {
+  rapidez: {
+    1: '1 - Até 01 semana',
+    2: '2 - Até 15 dias',
+    3: '3 - Até 30 dias',
+    4: '4 - Até 60 dias',
+    5: '5 - Acima de 60 dias',
+  },
+  autonomia: {
+    1: '1 - Operacional',
+    2: '2 - Coordenação',
+    3: '3 - Gerência executiva',
+    4: '4 - Diretoria',
+    5: '5 - Presidência',
+  },
+  beneficio: {
+    1: '1 - Individual',
+    2: '2 - Somente o setor',
+    3: '3 - Mais de um setor',
+    4: '4 - Toda a unidade',
+    5: '5 - Organização',
+  },
+} as const
 
 function toDateInput(value?: string | null) { return value ? String(value).slice(0, 10) : '' }
 function parseJsonSafe<T>(res: Response): Promise<T | null> { return res.json().catch(() => null) }
@@ -54,7 +78,23 @@ function getOnde(origem?: string | null) { return origem?.startsWith('LOCAL:') ?
 function buildOrigem(onde?: string) { const v = (onde || '').trim(); return v ? `LOCAL:${v}` : null }
 function toCostCenterLabel(center?: CostCenter | null) { return center ? `${center.code} - ${center.description}` : '' }
 function formatDate(value?: string | null) { if (!value) return '-'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('pt-BR') }
-
+function toDateCode(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
+}
+function isTechnicalIdentifier(value?: string | null) {
+  if (!value) return false
+  const normalized = value.trim()
+  return /^[a-z0-9]{20,}$/i.test(normalized)
+}
+function buildFriendlyPlanReference(item?: ActionItem | null, fallbackId?: string) {
+  const rawId = item?.id || fallbackId || ''
+  const suffix = rawId ? rawId.slice(-6).toUpperCase() : 'NOVO'
+  const dateCode = toDateCode(item?.createdAt) || toDateCode(new Date().toISOString()) || '00000000'
+  return `PAV-${dateCode}-${suffix}`
+}
 function parseEvidenceList(text?: string | null) {
   return String(text || '')
     .split('\n')
@@ -206,6 +246,7 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
 
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
   const [gestores, setGestores] = useState<Gestor[]>([])
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([])
   const [allActions, setAllActions] = useState<ActionItem[]>([])
 
   const [objetivo, setObjetivo] = useState('')
@@ -232,8 +273,17 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
     evidencias: '',
   })
 
-   const rootAction = useMemo(() => allActions.find((a) => a.id === actionId) ?? allActions[0] ?? null, [allActions, actionId])
-  const planReference = rootAction?.referencia || rootAction?.id || actionId
+  const rootAction = useMemo(() => allActions.find((a) => a.id === actionId) ?? allActions[0] ?? null, [allActions, actionId])
+  const planReference = useMemo(() => {
+    const currentReference = rootAction?.referencia?.trim()
+    if (currentReference && !isTechnicalIdentifier(currentReference) && currentReference !== rootAction?.id) return currentReference
+    return buildFriendlyPlanReference(rootAction, actionId)
+  }, [rootAction, actionId])
+  const responsavelOptions = useMemo(() => {
+    const fromGestores = gestores.map((g) => ({ value: g.userId, label: g.user.fullName || g.user.email }))
+    if (fromGestores.length > 0) return fromGestores
+    return activeUsers.map((u) => ({ value: u.id, label: u.fullName || u.email }))
+  }, [gestores, activeUsers])
   const childActions = useMemo(() => allActions.filter((a) => a.id !== rootAction?.id), [allActions, rootAction])
   const evidenceItems = useMemo(() => parseEvidenceList(evidencias).map(parseEvidenceItem), [evidencias])
 
@@ -248,10 +298,10 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
       const data = await parseJsonSafe<PlanoResponse>(res)
       if (!res.ok || !data?.item) throw new Error(data?.error || 'Erro ao carregar plano.')
 
-      setCostCenters((await parseJsonSafe<CostCenter[]>(centersRes)) || [])
+       setCostCenters((await parseJsonSafe<CostCenter[]>(centersRes)) || [])
       const gestoresData = await parseJsonSafe<GestoresResponse>(gestoresRes)
       setGestores(Array.isArray(gestoresData?.members) ? gestoresData.members : [])
-
+      setActiveUsers(Array.isArray(gestoresData?.users) ? gestoresData.users : [])
       const item = data.item
 
       setObjetivo(item.descricao || '')
@@ -320,7 +370,8 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
     try {
       setSaving(true)
       const selectedGestor = gestores.find((g) => g.userId === responsavelId)
-      const responsavelFinal = selectedGestor?.user.fullName || selectedGestor?.user.email || responsavelNome || null
+      const selectedUser = activeUsers.find((u) => u.id === responsavelId)
+      const responsavelFinal = selectedGestor?.user.fullName || selectedGestor?.user.email || selectedUser?.fullName || selectedUser?.email || responsavelNome || null      
       const res = await fetch(`/api/sst/plano-de-acao/${rootAction?.id || actionId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ descricao: objetivo, atividadeComo: resultadoEsperado, dataInicioPrevista: dataInicioPrevista || null, dataFimPrevista: dataFimPrevista || null, status, custo: investimento ? Number(investimento) : null, tipo, dataConclusao: dataConclusao || null, centroResponsavelId: centroResponsavelId || null, responsavelId: responsavelId || null, responsavelNome: responsavelFinal, evidencias, referencia: planReference, origem: causaRaiz || null, prazo: dataFimPrevista || null }),
@@ -397,7 +448,8 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
 
           <Block title="Planejamento"><div className="grid gap-3 md:grid-cols-3"><Field label="Prev. início"><input type="date" value={dataInicioPrevista} onChange={(e) => setDataInicioPrevista(e.target.value)} className="input" /></Field><Field label="Prev. fim"><input type="date" value={dataFimPrevista} onChange={(e) => setDataFimPrevista(e.target.value)} className="input" /></Field><Field label="Data conclusão"><input type="date" value={dataConclusao} onChange={(e) => setDataConclusao(e.target.value)} className="input" /></Field><Field label="Status"><select value={status} onChange={(e) => setStatus(e.target.value as NonConformityActionStatus)} className="input">{STATUS_OPTIONS.map((o) => <option key={o} value={o}>{STATUS_LABELS[o]}</option>)}</select></Field><Field label="Tipo"><select value={tipo} onChange={(e) => setTipo(e.target.value as NonConformityActionType)} className="input">{TYPE_OPTIONS.map((o) => <option key={o} value={o}>{TYPE_LABELS[o]}</option>)}</select></Field></div></Block>
 
-          <Block title="Responsáveis"><div className="grid gap-3 md:grid-cols-2"><Field label="Centro responsável"><select value={centroResponsavelId} onChange={(e) => setCentroResponsavelId(e.target.value)} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Responsável"><select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="input"><option value="">Selecione</option>{gestores.map((g) => <option key={g.id} value={g.userId}>{g.user.fullName || g.user.email}</option>)}</select></Field>{!responsavelId && <Field label="Nome do responsável" className="md:col-span-2"><input value={responsavelNome} onChange={(e) => setResponsavelNome(e.target.value)} className="input" /></Field>}</div></Block>
+           <Block title="Responsáveis"><div className="grid gap-3 md:grid-cols-2"><Field label="Centro responsável"><select value={centroResponsavelId} onChange={(e) => setCentroResponsavelId(e.target.value)} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Responsável"><select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="input"><option value="">Selecione</option>{responsavelOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>{!responsavelId && <Field label="Nome do responsável" className="md:col-span-2"><input value={responsavelNome} onChange={(e) => setResponsavelNome(e.target.value)} className="input" /></Field>}{responsavelOptions.length === 0 && <p className="text-xs text-amber-700 md:col-span-2">Nenhum responsável configurado no grupo de gestores; exibindo campo manual.</p>}</div></Block>
+
 
           <Block title="Financeiro"><Field label="Investimento"><input type="number" step="0.01" value={investimento} onChange={(e) => setInvestimento(e.target.value)} className="input" /></Field></Block>
 
@@ -460,8 +512,8 @@ export default function PlanoAvulsoDetailClient({ actionId }: { actionId: string
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[95vh] w-full max-w-6xl overflow-auto rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="text-lg font-semibold">{editingAction ? 'Editar ação' : 'Nova ação'}</h2><button type="button" onClick={() => setModalOpen(false)} className="rounded border px-2 py-1 text-sm">Fechar</button></div>
-           <div className="flex gap-1 border-b px-4"><button type="button" onClick={() => setModalTab('dados')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'dados' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Ação - Dados Básicos</button><button type="button" onClick={() => setModalTab('evidencias')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'evidencias' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Evidências</button></div>
-            {modalTab === 'dados' ? <div className="grid gap-4 p-4 lg:grid-cols-[2fr_1fr]"><div className="grid gap-3 md:grid-cols-2"><Field label="Nº Processo"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Criado em"><input value={editingAction ? formatDate(editingAction.createdAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="Criado por"><input value={editingAction?.createdBy?.fullName || editingAction?.createdBy?.email || '-'} readOnly className="input bg-slate-50" /></Field><Field label="Última atualização"><input value={editingAction ? formatDate(editingAction.updatedAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="O que?" className="md:col-span-2"><textarea value={actionForm.descricao} onChange={(e) => setActionForm((p) => ({ ...p, descricao: e.target.value }))} rows={2} className="input" /></Field><Field label="Por quê?"><textarea value={actionForm.motivo} onChange={(e) => setActionForm((p) => ({ ...p, motivo: e.target.value }))} rows={2} className="input" /></Field><Field label="Como?"><textarea value={actionForm.como} onChange={(e) => setActionForm((p) => ({ ...p, como: e.target.value }))} rows={2} className="input" /></Field><Field label="Onde?"><input value={actionForm.onde} onChange={(e) => setActionForm((p) => ({ ...p, onde: e.target.value }))} className="input" /></Field><Field label="Quem?"><input value={actionForm.quem} onChange={(e) => setActionForm((p) => ({ ...p, quem: e.target.value }))} className="input" /></Field><Field label="Centro responsável"><select value={actionForm.centroResponsavelId} onChange={(e) => setActionForm((p) => ({ ...p, centroResponsavelId: e.target.value }))} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Início"><input type="date" value={actionForm.dataInicio} onChange={(e) => setActionForm((p) => ({ ...p, dataInicio: e.target.value }))} className="input" /></Field><Field label="Fim"><input type="date" value={actionForm.dataFim} onChange={(e) => setActionForm((p) => ({ ...p, dataFim: e.target.value }))} className="input" /></Field><Field label="Status"><select value={actionForm.status} onChange={(e) => setActionForm((p) => ({ ...p, status: e.target.value as NonConformityActionStatus }))} className="input">{STATUS_OPTIONS.map((o) => <option key={o} value={o}>{STATUS_LABELS[o]}</option>)}</select></Field><Field label="Tipo"><select value={actionForm.tipo} onChange={(e) => setActionForm((p) => ({ ...p, tipo: e.target.value as NonConformityActionType }))} className="input">{TYPE_OPTIONS.map((o) => <option key={o} value={o}>{TYPE_LABELS[o]}</option>)}</select></Field><Field label="Origem"><input value={actionForm.origem} onChange={(e) => setActionForm((p) => ({ ...p, origem: e.target.value }))} className="input" /></Field><Field label="Referência"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Histórico (somente leitura)" className="md:col-span-2"><textarea value={actionForm.historico} readOnly rows={2} className="input bg-slate-50" /></Field><Field label="Data conclusão"><input type="date" value={actionForm.dataConclusao} onChange={(e) => setActionForm((p) => ({ ...p, dataConclusao: e.target.value }))} className="input" /></Field><Field label="Quanto? (custo)"><input type="number" step="0.01" value={actionForm.custo} onChange={(e) => setActionForm((p) => ({ ...p, custo: e.target.value }))} className="input" /></Field></div><aside className="rounded-lg border border-slate-200 bg-slate-50 p-3"><h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Gráfico RAB - média</h3><RadarPreview rapidez={actionForm.rapidez} autonomia={actionForm.autonomia} beneficio={actionForm.beneficio} /><Field label="Rapidez"><input type="number" min={1} max={5} value={actionForm.rapidez} onChange={(e) => setActionForm((p) => ({ ...p, rapidez: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Autonomia"><input type="number" min={1} max={5} value={actionForm.autonomia} onChange={(e) => setActionForm((p) => ({ ...p, autonomia: Number(e.target.value || 1) }))} className="input" /></Field><Field label="Benefício"><input type="number" min={1} max={5} value={actionForm.beneficio} onChange={(e) => setActionForm((p) => ({ ...p, beneficio: Number(e.target.value || 1) }))} className="input" /></Field></aside></div> : <div className="space-y-3 p-4"><label className="inline-flex cursor-pointer items-center gap-2 rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">📎 Adicionar evidência<input type="file" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadEvidence(file, (serializedEntry) => setActionForm((p) => ({ ...p, evidencias: `${p.evidencias ? `${p.evidencias}\n` : ''}${serializedEntry}` }))); e.currentTarget.value = '' }} /></label><textarea value={actionForm.evidencias} onChange={(e) => setActionForm((p) => ({ ...p, evidencias: e.target.value }))} rows={5} className="input" /><div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">{parseEvidenceList(actionForm.evidencias).map((entry, idx) => { const item = parseEvidenceItem(entry); if (item.type === 'file') { const fileViewUrl = toFileViewUrl(item.url); return <article key={`${entry}-${idx}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div className="space-y-1"><p className="text-sm font-semibold text-slate-800">📎 {item.displayName}</p><p className="text-xs text-slate-500">Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p><p className="text-xs text-slate-500">Usuário: {item.uploadedBy || 'Não informado'}</p></div><div className="flex flex-wrap items-center gap-2"><a href={fileViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">👁️ Visualizar</a><a href={fileViewUrl} download className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">⬇️ Baixar</a></div></div></article> } return <article key={`${entry}-${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Observação</p><p className="mt-1 text-sm text-amber-900">{item.message}</p><p className="mt-2 text-xs text-amber-700">Autor: {item.uploadedBy || 'Não informado'} · Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p></article> })}</div></div>}
+            <div className="flex gap-1 border-b px-4"><button type="button" onClick={() => setModalTab('dados')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'dados' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Ação - Dados Básicos</button><button type="button" onClick={() => setModalTab('evidencias')} className={`rounded-t border px-3 py-2 text-sm ${modalTab === 'evidencias' ? 'bg-white text-blue-700' : 'bg-slate-100'}`}>Evidências</button></div>
+            {modalTab === 'dados' ? <div className="grid gap-4 p-4 lg:grid-cols-[2fr_1fr]"><div className="grid gap-3 md:grid-cols-2"><Field label="Nº Processo"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Criado em"><input value={editingAction ? formatDate(editingAction.createdAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="Criado por"><input value={editingAction?.createdBy?.fullName || editingAction?.createdBy?.email || '-'} readOnly className="input bg-slate-50" /></Field><Field label="Última atualização"><input value={editingAction ? formatDate(editingAction.updatedAt) : '-'} readOnly className="input bg-slate-50" /></Field><Field label="O que?" className="md:col-span-2"><textarea value={actionForm.descricao} onChange={(e) => setActionForm((p) => ({ ...p, descricao: e.target.value }))} rows={2} className="input" /></Field><Field label="Por quê?"><textarea value={actionForm.motivo} onChange={(e) => setActionForm((p) => ({ ...p, motivo: e.target.value }))} rows={2} className="input" /></Field><Field label="Como?"><textarea value={actionForm.como} onChange={(e) => setActionForm((p) => ({ ...p, como: e.target.value }))} rows={2} className="input" /></Field><Field label="Onde?"><input value={actionForm.onde} onChange={(e) => setActionForm((p) => ({ ...p, onde: e.target.value }))} className="input" /></Field><Field label="Quem?"><input value={actionForm.quem} onChange={(e) => setActionForm((p) => ({ ...p, quem: e.target.value }))} className="input" /></Field><Field label="Centro responsável"><select value={actionForm.centroResponsavelId} onChange={(e) => setActionForm((p) => ({ ...p, centroResponsavelId: e.target.value }))} className="input"><option value="">Selecione</option>{costCenters.map((cc) => <option key={cc.id} value={cc.id}>{toCostCenterLabel(cc)}</option>)}</select></Field><Field label="Início"><input type="date" value={actionForm.dataInicio} onChange={(e) => setActionForm((p) => ({ ...p, dataInicio: e.target.value }))} className="input" /></Field><Field label="Fim"><input type="date" value={actionForm.dataFim} onChange={(e) => setActionForm((p) => ({ ...p, dataFim: e.target.value }))} className="input" /></Field><Field label="Status"><select value={actionForm.status} onChange={(e) => setActionForm((p) => ({ ...p, status: e.target.value as NonConformityActionStatus }))} className="input">{STATUS_OPTIONS.map((o) => <option key={o} value={o}>{STATUS_LABELS[o]}</option>)}</select></Field><Field label="Tipo"><select value={actionForm.tipo} onChange={(e) => setActionForm((p) => ({ ...p, tipo: e.target.value as NonConformityActionType }))} className="input">{TYPE_OPTIONS.map((o) => <option key={o} value={o}>{TYPE_LABELS[o]}</option>)}</select></Field><Field label="Origem"><input value={actionForm.origem} onChange={(e) => setActionForm((p) => ({ ...p, origem: e.target.value }))} className="input" /></Field><Field label="Referência"><input value={actionForm.referencia} onChange={(e) => setActionForm((p) => ({ ...p, referencia: e.target.value }))} className="input" /></Field><Field label="Histórico (somente leitura)" className="md:col-span-2"><textarea value={actionForm.historico} readOnly rows={2} className="input bg-slate-50" /></Field><Field label="Data conclusão"><input type="date" value={actionForm.dataConclusao} onChange={(e) => setActionForm((p) => ({ ...p, dataConclusao: e.target.value }))} className="input" /></Field><Field label="Quanto? (custo)"><input type="number" step="0.01" value={actionForm.custo} onChange={(e) => setActionForm((p) => ({ ...p, custo: e.target.value }))} className="input" /></Field></div><aside className="rounded-lg border border-slate-200 bg-slate-50 p-3"><h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Gráfico RAB - média</h3><RadarPreview rapidez={actionForm.rapidez} autonomia={actionForm.autonomia} beneficio={actionForm.beneficio} /><Field label="Rapidez"><select value={actionForm.rapidez} onChange={(e) => setActionForm((p) => ({ ...p, rapidez: Number(e.target.value) }))} className="input">{[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{RAB_LABELS.rapidez[v as keyof typeof RAB_LABELS.rapidez]}</option>)}</select></Field><Field label="Autonomia"><select value={actionForm.autonomia} onChange={(e) => setActionForm((p) => ({ ...p, autonomia: Number(e.target.value) }))} className="input">{[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{RAB_LABELS.autonomia[v as keyof typeof RAB_LABELS.autonomia]}</option>)}</select></Field><Field label="Benefício"><select value={actionForm.beneficio} onChange={(e) => setActionForm((p) => ({ ...p, beneficio: Number(e.target.value) }))} className="input">{[1, 2, 3, 4, 5].map((v) => <option key={v} value={v}>{RAB_LABELS.beneficio[v as keyof typeof RAB_LABELS.beneficio]}</option>)}</select></Field></aside></div> : <div className="space-y-3 p-4"><label className="inline-flex cursor-pointer items-center gap-2 rounded bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600">📎 Adicionar evidência<input type="file" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; await uploadEvidence(file, (serializedEntry) => setActionForm((p) => ({ ...p, evidencias: `${p.evidencias ? `${p.evidencias}\n` : ''}${serializedEntry}` }))); e.currentTarget.value = '' }} /></label><textarea value={actionForm.evidencias} onChange={(e) => setActionForm((p) => ({ ...p, evidencias: e.target.value }))} rows={5} className="input" /><div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">{parseEvidenceList(actionForm.evidencias).map((entry, idx) => { const item = parseEvidenceItem(entry); if (item.type === 'file') { const fileViewUrl = toFileViewUrl(item.url); return <article key={`${entry}-${idx}`} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div className="space-y-1"><p className="text-sm font-semibold text-slate-800">📎 {item.displayName}</p><p className="text-xs text-slate-500">Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p><p className="text-xs text-slate-500">Usuário: {item.uploadedBy || 'Não informado'}</p></div><div className="flex flex-wrap items-center gap-2"><a href={fileViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">👁️ Visualizar</a><a href={fileViewUrl} download className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">⬇️ Baixar</a></div></div></article> } return <article key={`${entry}-${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Observação</p><p className="mt-1 text-sm text-amber-900">{item.message}</p><p className="mt-2 text-xs text-amber-700">Autor: {item.uploadedBy || 'Não informado'} · Data/hora: {formatEvidenceMetaDate(item.uploadedAt)}</p></article> })}</div></div>}
             <div className="flex justify-end gap-2 border-t px-4 py-3"><button type="button" onClick={() => setModalOpen(false)} className="rounded border px-3 py-2 text-sm">Cancelar</button><button type="button" onClick={saveAction} disabled={saving} className="rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white">{saving ? 'Salvando...' : 'Salvar ação'}</button></div>
           </div>
         </div>
