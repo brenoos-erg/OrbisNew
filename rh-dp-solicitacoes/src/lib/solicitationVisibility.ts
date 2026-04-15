@@ -73,7 +73,7 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
-   if (input.finalizerTipoIds.length > 0) {
+     if (input.finalizerTipoIds.length > 0) {
     orFilters.push({
       tipoId: {
         in: input.finalizerTipoIds,
@@ -82,44 +82,7 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
-  const userLogin = input.userLogin?.trim()
-  const userEmail = input.userEmail?.trim()
-  const userFullName = input.userFullName?.trim()
-  const evaluatorPayloadFilters: Prisma.SolicitationWhereInput[] = [
-    {
-      payload: {
-        path: '$.campos.gestorImediatoAvaliadorId',
-        equals: input.userId,
-      },
-    },
-  ]
-
-  if (userLogin) {
-    evaluatorPayloadFilters.push({
-      payload: {
-        path: '$.campos.gestorImediatoAvaliadorLogin',
-        equals: userLogin,
-      },
-    })
-  }
-
-  if (userEmail) {
-    evaluatorPayloadFilters.push({
-      payload: {
-        path: '$.campos.gestorImediatoAvaliadorEmail',
-        equals: userEmail,
-      },
-    })
-  }
-
-  if (userFullName) {
-    evaluatorPayloadFilters.push({
-      payload: {
-        path: '$.campos.gestorImediatoAvaliador',
-        equals: userFullName,
-      },
-    })
-  }
+  const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input)
 
   orFilters.push({
     tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
@@ -132,6 +95,93 @@ export function buildReceivedSolicitationVisibilityWhere(
   return {
     OR: orFilters,
   }
+}
+
+function buildExperienceEvaluatorPayloadFilters(
+  input: Pick<SolicitationVisibilityInput, 'userId' | 'userLogin' | 'userEmail' | 'userFullName'>,
+) {
+
+  const userLogin = input.userLogin?.trim()
+  const userEmail = input.userEmail?.trim()
+  const userFullName = input.userFullName?.trim()
+
+  const idPaths = [
+    '$.campos.gestorImediatoAvaliadorId',
+    '$.metadata.gestorImediatoAvaliadorId',
+    '$.requestData.gestorImediatoAvaliadorId',
+    '$.dynamicForm.gestorImediatoAvaliadorId',
+    '$.campos.avaliadorId',
+    '$.metadata.avaliadorId',
+    '$.requestData.avaliadorId',
+    '$.dynamicForm.avaliadorId',
+    '$.campos.gestorId',
+    '$.metadata.gestorId',
+    '$.requestData.gestorId',
+    '$.dynamicForm.gestorId',
+  ]
+
+  const filters: Prisma.SolicitationWhereInput[] = idPaths.map((path) => ({
+    payload: { path, equals: input.userId },
+  }))
+
+  if (userLogin) {
+    for (const path of [
+      '$.campos.gestorImediatoAvaliadorLogin',
+      '$.metadata.gestorImediatoAvaliadorLogin',
+      '$.requestData.gestorImediatoAvaliadorLogin',
+      '$.dynamicForm.gestorImediatoAvaliadorLogin',
+      '$.campos.avaliadorLogin',
+      '$.metadata.avaliadorLogin',
+      '$.requestData.avaliadorLogin',
+      '$.dynamicForm.avaliadorLogin',
+      '$.campos.gestorLogin',
+      '$.metadata.gestorLogin',
+      '$.requestData.gestorLogin',
+      '$.dynamicForm.gestorLogin',
+    ]) {
+      filters.push({ payload: { path, equals: userLogin } })
+    }
+  }
+
+  if (userEmail) {
+    for (const path of [
+      '$.campos.gestorImediatoAvaliadorEmail',
+      '$.metadata.gestorImediatoAvaliadorEmail',
+      '$.requestData.gestorImediatoAvaliadorEmail',
+      '$.dynamicForm.gestorImediatoAvaliadorEmail',
+      '$.campos.avaliadorEmail',
+      '$.metadata.avaliadorEmail',
+      '$.requestData.avaliadorEmail',
+      '$.dynamicForm.avaliadorEmail',
+      '$.campos.gestorEmail',
+      '$.metadata.gestorEmail',
+      '$.requestData.gestorEmail',
+      '$.dynamicForm.gestorEmail',
+    ]) {
+      filters.push({ payload: { path, equals: userEmail } })
+    }
+  }
+
+  if (userFullName) {
+    for (const path of [
+      '$.campos.gestorImediatoAvaliador',
+      '$.metadata.gestorImediatoAvaliador',
+      '$.requestData.gestorImediatoAvaliador',
+      '$.dynamicForm.gestorImediatoAvaliador',
+      '$.campos.avaliador',
+      '$.metadata.avaliador',
+      '$.requestData.avaliador',
+      '$.dynamicForm.avaliador',
+      '$.campos.gestor',
+      '$.metadata.gestor',
+      '$.requestData.gestor',
+      '$.dynamicForm.gestor',
+    ]) {
+      filters.push({ payload: { path, equals: userFullName } })
+    }
+  }
+
+  return filters
 }
 
 export function canUserViewSolicitationByDepartment(
