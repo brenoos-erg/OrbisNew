@@ -866,6 +866,18 @@ export default function Sidebar({
                      <FolderCog size={16} /> <span className={labelBase}>Controle de Emails</span>
                     </Link>
                   )}
+
+                  <Link
+                    href="/dashboard/solicitacoes/externas-admissao"
+                    className={`${submenuItemBase}
+                      ${
+                        pathname === '/dashboard/solicitacoes/externas-admissao'
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                  >
+                    <ClipboardList size={16} /> <span className={labelBase}>Solicitações Externas</span>
+                  </Link>
                 </div>
               )}
             </div>

@@ -17,6 +17,7 @@ type SolicitationVisibilityInput = {
   userDepartmentIds: string[]
   userSetorKeys: string[]
   finalizerTipoIds: string[]
+  allowedTipoIds: string[]
 }
 
 type SolicitationLike = {
@@ -48,13 +49,10 @@ export function buildReceivedSolicitationVisibilityWhere(
     return {}
   }
 
-  const orFilters: Prisma.SolicitationWhereInput[] = [
-    { approverId: input.userId },
-    { assumidaPorId: input.userId },
-  ]
+  const regularSolicitationOrFilters: Prisma.SolicitationWhereInput[] = [{ assumidaPorId: input.userId }]
 
   if (input.userDepartmentIds.length > 0) {
-    orFilters.push({
+    regularSolicitationOrFilters.push({
       departmentId: {
         in: input.userDepartmentIds,
       },
@@ -62,7 +60,7 @@ export function buildReceivedSolicitationVisibilityWhere(
   }
 
   if (input.userSetorKeys.length > 0) {
-    orFilters.push({
+    regularSolicitationOrFilters.push({
       solicitacaoSetores: {
         some: {
           setor: {
@@ -73,25 +71,36 @@ export function buildReceivedSolicitationVisibilityWhere(
     })
   }
 
-     if (input.finalizerTipoIds.length > 0) {
-    orFilters.push({
+  if (input.allowedTipoIds.length > 0) {
+    regularSolicitationOrFilters.push({
       tipoId: {
-        in: input.finalizerTipoIds,
+        in: input.allowedTipoIds,
       },
-      status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
     })
   }
 
   const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input)
 
-  orFilters.push({
-    tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-    status: EXPERIENCE_EVALUATION_STATUS,
-    OR: [
-      { approverId: input.userId },
-      ...evaluatorPayloadFilters,
-    ],
-  })
+  const orFilters: Prisma.SolicitationWhereInput[] = [
+    {
+      tipoId: { not: EXPERIENCE_EVALUATION_TIPO_ID },
+      OR: regularSolicitationOrFilters,
+    },
+    {
+      tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+      status: EXPERIENCE_EVALUATION_STATUS,
+      OR: [{ approverId: input.userId }, ...evaluatorPayloadFilters],
+    },
+  ]
+
+  if (input.finalizerTipoIds.length > 0) {
+    if (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)) {
+      orFilters.push({
+        tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+        status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+      })
+    }
+  }
   return {
     OR: orFilters,
   }
@@ -189,8 +198,6 @@ export function canUserViewSolicitationByDepartment(
   solicitation: SolicitationLike,
 ) {
   if (input.role === 'ADMIN') return true
-  if (solicitation.solicitanteId === input.userId) return true
-  if (solicitation.approverId === input.userId) return true
   if (solicitation.assumidaPorId === input.userId) return true
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
@@ -198,6 +205,9 @@ export function canUserViewSolicitationByDepartment(
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)
   ) {
     return true
+  }
+  if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) {
+    return false
   }
 
   if (isUserInResponsibleDepartment(input.userDepartmentIds, solicitation.departmentId)) {
@@ -214,6 +224,10 @@ export function canUserViewSolicitationByDepartment(
     for (const userSetor of input.userSetorKeys) {
       if (solicitationSetores.has(userSetor)) return true
     }
+  }
+
+  if (solicitation.tipoId && input.allowedTipoIds.includes(solicitation.tipoId)) {
+    return true
   }
 
   return false

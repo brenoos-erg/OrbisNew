@@ -194,6 +194,9 @@ export const GET = withModuleLevel(
         } else if (scope === 'received') {
            const userAccess = await resolveUserAccessContext({
             userId: me.id,
+            userLogin: me.login,
+            userEmail: me.email,
+            userFullName: me.fullName,
             role: me.role,
             primaryDepartmentId: me.departmentId,
             primaryDepartment: me.department,
