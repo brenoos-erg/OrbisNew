@@ -6,7 +6,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature } from '@/lib/permissions'
+import { assertCanFeature, canFeature } from '@/lib/permissions'
 import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
@@ -51,6 +51,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
     await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.VIEW)
+    const canUpdateNc = await canFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.UPDATE)
 
     const nc = await prisma.nonConformity.findUnique({
       where: { id },
@@ -93,7 +94,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Sem permissão para visualizar esta NC.' }, { status: 403 })
     }
 
-     return NextResponse.json({
+    const hasSgiQualidadeLevel3 = hasMinLevel(level, ModuleLevel.NIVEL_3)
+
+    return NextResponse.json({
       item: {
         ...nc,
         plano: {
@@ -103,7 +106,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         permissions: {
           canManageAllNc: canManageAllNc(level),
           canApproveQuality: canApproveNc(level),
-          canEditFirstScreen: canManageAllNc(level),
+          canEditFirstScreen: hasSgiQualidadeLevel3 && canUpdateNc,
         },
       },
     })
