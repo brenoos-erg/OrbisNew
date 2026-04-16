@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityStatus } from '@prisma/client'
+import { Action, ModuleLevel, NonConformityStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
       return NextResponse.json({ error: 'Somente qualidade (nível 2/3) pode registrar verificação de eficácia.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.VERIFICACAO_DE_EFICACIA, Action.UPDATE)
 
     const body = await req.json().catch(() => ({} as any))
     const texto = String(body?.analiseQualidade || '').trim()

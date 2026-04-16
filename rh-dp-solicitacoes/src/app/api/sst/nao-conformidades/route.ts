@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityApprovalStatus, NonConformityStatus, NonConformityType, Prisma } from '@prisma/client'
+import { Action, ModuleLevel, NonConformityApprovalStatus, NonConformityStatus, NonConformityType, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.VIEW)
 
      const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
@@ -131,6 +134,7 @@ export async function POST(req: NextRequest) {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.CREATE)
 
      const body = await req.json().catch(() => ({} as any))
     const descricao = String(body?.descricao || '').trim()

@@ -2880,7 +2880,7 @@ async function main() {
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
   const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
   const controleDocumentosModule = await ensureModule(MODULE_KEYS.CONTROLE_DOCUMENTOS, 'Controle de Documentos')
-  const sstModule = await ensureModule(MODULE_KEYS.SST, 'Não Conformidades')
+  const sstModule = await ensureModule(MODULE_KEYS.SST, 'SGI / Qualidade')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',
@@ -3135,6 +3135,12 @@ async function main() {
       moduleId: sstModule.id,
       items: [
         { key: FEATURE_KEYS.SST.NAO_CONFORMIDADES, name: 'Não conformidades' },
+        { key: FEATURE_KEYS.SST.PLANO_DE_ACAO, name: 'Plano de ação' },
+        { key: FEATURE_KEYS.SST.ESTUDO_DE_CAUSA, name: 'Estudo de causa' },
+        { key: FEATURE_KEYS.SST.VERIFICACAO_DE_EFICACIA, name: 'Verificação de eficácia' },
+        { key: FEATURE_KEYS.SST.COMENTARIOS, name: 'Comentários' },
+        { key: FEATURE_KEYS.SST.HISTORICO, name: 'Histórico' },
+        { key: FEATURE_KEYS.SST.APROVACAO_QUALIDADE, name: 'Aprovação da qualidade' },
       ],
     },
   ]

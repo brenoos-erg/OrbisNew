@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  Action,
   ModuleLevel,
   NonConformityActionPlanOrigin,
   NonConformityActionStatus,
@@ -11,6 +12,8 @@ import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -77,6 +80,7 @@ export async function GET(req: NextRequest) {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.VIEW)
 
    const { searchParams } = new URL(req.url)
     const q = searchParams.get('q')?.trim()
@@ -184,6 +188,7 @@ export async function POST(req: NextRequest) {
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.CREATE)
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
     const descricao = String(body?.descricao || '').trim()

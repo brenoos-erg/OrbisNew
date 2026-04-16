@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityApprovalStatus, NonConformityStatus } from '@prisma/client'
+import { Action, ModuleLevel, NonConformityApprovalStatus, NonConformityStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { canApproveNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
@@ -17,6 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!canApproveNc(level)) {
       return NextResponse.json({ error: 'Somente qualidade (nível 2/3) pode aprovar ou reprovar.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.APROVACAO_QUALIDADE, Action.APPROVE)
 
      const body = await req.json().catch(() => ({} as any))
     const aprovado = Boolean(body?.aprovado)

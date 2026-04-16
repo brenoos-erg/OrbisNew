@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
+import { Action, ModuleLevel, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 
 function canAccessAction(
   action: { createdById: string | null; responsavelId: string | null; nonConformity?: { solicitanteId: string } | null },
@@ -87,6 +89,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ act
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.VIEW)
 
     const { actionId } = await params
     const action = await prisma.nonConformityActionItem.findUnique({
@@ -123,6 +126,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.UPDATE)
 
     const { actionId } = await params
     const current = await prisma.nonConformityActionItem.findUnique({
@@ -201,6 +205,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.DELETE)
 
     const { actionId } = await params
     const current = await prisma.nonConformityActionItem.findUnique({
