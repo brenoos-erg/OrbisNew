@@ -60,7 +60,7 @@ type Detail = {
   }
   centroQueDetectou?: { description: string }
   centroQueOriginou?: { description: string }
-  permissions?: { canManageAllNc?: boolean; canApproveQuality?: boolean }
+  permissions?: { canManageAllNc?: boolean; canApproveQuality?: boolean; canEditFirstScreen?: boolean }
 }
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
@@ -133,6 +133,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [causaRaiz, setCausaRaiz] = useState('')
   const [uploading, setUploading] = useState(false)
   const [gutSaving, setGutSaving] = useState(false)
+  const [detailSaving, setDetailSaving] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [estudoError, setEstudoError] = useState<string | null>(null)
+  const [estudoSaving, setEstudoSaving] = useState(false)
   const [activeSection, setActiveSection] = useState<SectionKey>('naoConformidade')
   const [gut, setGut] = useState({ gravidade: 1, urgencia: 1, tendencia: 1 })
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
@@ -145,6 +149,14 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [actionModalOpen, setActionModalOpen] = useState(false)
   const [actionFiltersDraft, setActionFiltersDraft] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
  const [actionFilters, setActionFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
+  const [editingFirstScreen, setEditingFirstScreen] = useState(false)
+  const [firstScreenForm, setFirstScreenForm] = useState({
+    descricao: '',
+    evidenciaObjetiva: '',
+    referenciaSig: '',
+    tipoNc: '' as keyof typeof nonConformityTypeLabel,
+    acoesImediatas: '',
+  })
   useEffect(() => {
     if (!initialSection) return
     const validSections: SectionKey[] = ['naoConformidade', 'evidencias', 'estudoCausa', 'planoDeAcao', 'verificacao', 'comentarios', 'timeline']
@@ -154,9 +166,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   }, [initialSection])
 
 
- const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
+  const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const qualityCanEditBeforeApproval = item?.permissions?.canManageAllNc === true
   const bloqueado = !aprovado && !qualityCanEditBeforeApproval
+  const canEditFirstScreen = item?.permissions?.canEditFirstScreen === true
 
   async function load() {
     try {
@@ -172,6 +185,13 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       })
       setAnaliseQualidade(data.item.verificacaoEficaciaTexto || '')
       setCausaRaiz(data.item.causaRaiz || '')
+      setFirstScreenForm({
+        descricao: data.item.descricao || '',
+        evidenciaObjetiva: data.item.evidenciaObjetiva || '',
+        referenciaSig: data.item.referenciaSig || '',
+        tipoNc: data.item.tipoNc,
+        acoesImediatas: data.item.acoesImediatas || '',
+      })
       if (Array.isArray(data.item.estudoCausa) && data.item.estudoCausa.length) {
         setPorques(data.item.estudoCausa.map((x: any) => ({ pergunta: x.pergunta, resposta: x.resposta || '' })))
       }
@@ -279,9 +299,45 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
   async function salvarEstudoCausa(e: FormEvent) {
     e.preventDefault()
-    await fetch(`/api/sst/nao-conformidades/${id}/estudo-causa`, {
+    setEstudoSaving(true)
+    setEstudoError(null)
+    const res = await fetch(`/api/sst/nao-conformidades/${id}/estudo-causa`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ causaRaiz, items: porques }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setEstudoError(data?.error || 'Erro ao salvar estudo de causa.')
+      setEstudoSaving(false)
+      return
+    }
+    setEstudoSaving(false)
+    load()
+  }
+
+  async function salvarPrimeiraTela(e: FormEvent) {
+    e.preventDefault()
+    if (!canEditFirstScreen) return
+    setDetailSaving(true)
+    setDetailError(null)
+    const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        descricao: firstScreenForm.descricao,
+        evidenciaObjetiva: firstScreenForm.evidenciaObjetiva,
+        referenciaSig: firstScreenForm.referenciaSig,
+        tipoNc: firstScreenForm.tipoNc,
+        acoesImediatas: firstScreenForm.acoesImediatas,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setDetailError(data?.error || 'Erro ao salvar dados da não conformidade.')
+      setDetailSaving(false)
+      return
+    }
+    setDetailSaving(false)
+    setEditingFirstScreen(false)
     load()
   }
 
@@ -529,16 +585,61 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
        {activeSection === 'naoConformidade' ? (
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card title="Não conformidade">
-            <Info label="Descrição" value={item.descricao} />
-            <Info label="Evidência objetiva" value={item.evidenciaObjetiva} />
-            <Info label="Empresa" value={item.empresa} />
-            <Info label="Centro que detectou" value={item.centroQueDetectou?.description || '-'} />
-            <Info label="Centro que originou" value={item.centroQueOriginou?.description || '-'} />
-            <Info label="Prazo atendimento" value={new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')} />
-            <Info label="Referência SIG" value={item.referenciaSig || '-'} />
-             <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
-           <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
-            {item.status === 'CANCELADA' ? <Info label="Justificativa do cancelamento" value={justificativaCancelamento || '-'} /> : null}
+            {canEditFirstScreen ? (
+              <div className="flex justify-end">
+                {!editingFirstScreen ? (
+                  <button type="button" onClick={() => setEditingFirstScreen(true)} className="rounded border border-orange-300 bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700">
+                    Editar
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {editingFirstScreen ? (
+              <form onSubmit={salvarPrimeiraTela} className="space-y-3">
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Descrição
+                  <textarea value={firstScreenForm.descricao} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, descricao: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" rows={3} />
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Evidência objetiva
+                  <textarea value={firstScreenForm.evidenciaObjetiva} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, evidenciaObjetiva: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" rows={3} />
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Referência SIG
+                  <input value={firstScreenForm.referenciaSig} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, referenciaSig: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" />
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Tipo NC
+                  <select value={firstScreenForm.tipoNc} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, tipoNc: e.target.value as keyof typeof nonConformityTypeLabel }))} className="w-full rounded border px-2 py-1 text-sm font-normal">
+                    {Object.entries(nonConformityTypeLabel).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Ações imediatas
+                  <textarea value={firstScreenForm.acoesImediatas} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, acoesImediatas: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" rows={3} />
+                </label>
+                {detailError ? <p className="text-sm text-rose-700">{detailError}</p> : null}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => { setEditingFirstScreen(false); setDetailError(null) }} className="rounded border border-slate-300 px-3 py-2 text-sm">Cancelar</button>
+                  <button disabled={detailSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{detailSaving ? 'Salvando...' : 'Salvar edição'}</button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <Info label="Descrição" value={item.descricao} />
+                <Info label="Evidência objetiva" value={item.evidenciaObjetiva} />
+                <Info label="Empresa" value={item.empresa} />
+                <Info label="Centro que detectou" value={item.centroQueDetectou?.description || '-'} />
+                <Info label="Centro que originou" value={item.centroQueOriginou?.description || '-'} />
+                <Info label="Prazo atendimento" value={new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')} />
+                <Info label="Referência SIG" value={item.referenciaSig || '-'} />
+                <Info label="Tipo NC" value={nonConformityTypeLabel[item.tipoNc] || item.tipoNc} />
+                <Info label="Ações imediatas" value={item.acoesImediatas || '-'} />
+                {item.status === 'CANCELADA' ? <Info label="Justificativa do cancelamento" value={justificativaCancelamento || '-'} /> : null}
+              </>
+            )}
           </Card>
           <div className="space-y-4">
             <Card title="Matriz GUT">
@@ -597,7 +698,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
             ))}
           <button type="button" disabled={bloqueado} onClick={()=>setPorques((p)=>[...p, { pergunta: `Por quê ${p.length + 1}?`, resposta: '' }])} className="rounded border px-2 py-1 text-sm">Adicionar porquê</button>
             <textarea value={causaRaiz} onChange={(e)=>setCausaRaiz(e.target.value)} disabled={bloqueado} className="w-full rounded border px-2 py-1 text-sm" placeholder="Causa raiz" />
-            <button disabled={bloqueado} className="rounded bg-orange-500 px-3 py-2 text-sm text-white">Salvar estudo de causa</button>
+            {estudoError ? <p className="text-sm text-rose-700">{estudoError}</p> : null}
+            <button disabled={bloqueado || estudoSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{estudoSaving ? 'Salvando...' : 'Salvar estudo de causa'}</button>
           </form>
         </Card>
       ) : null}
