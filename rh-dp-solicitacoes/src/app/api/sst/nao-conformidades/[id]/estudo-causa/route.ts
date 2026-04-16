@@ -19,8 +19,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const body = await req.json().catch(() => ({} as any))
-    const causaRaiz = body?.causaRaiz ? String(body.causaRaiz).trim() : null
-    const items = Array.isArray(body?.items) ? body.items : []
+    const hasCausaRaiz = body?.causaRaiz !== undefined
+    const causaRaiz = hasCausaRaiz ? (body?.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined
+    const hasItems = Array.isArray(body?.items)
+    const items = hasItems ? body.items : []
     const id = (await params).id
 
     const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
@@ -33,25 +35,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const saved = await prisma.$transaction(async (tx) => {
-      await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId: id } })
-
       const rows = []
-      for (let idx = 0; idx < items.length; idx += 1) {
-        const item = items[idx]
-        const pergunta = String(item?.pergunta || `Por quê ${idx + 1}?`).trim()
-        const resposta = item?.resposta ? String(item.resposta).trim() : null
+      if (hasItems) {
+        await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId: id } })
+        for (let idx = 0; idx < items.length; idx += 1) {
+          const item = items[idx]
+          const pergunta = String(item?.pergunta || `Por quê ${idx + 1}?`).trim()
+          const resposta = item?.resposta ? String(item.resposta).trim() : null
 
-        rows.push(await tx.nonConformityCauseItem.create({
-          data: {
-            nonConformityId: id,
-            ordem: idx + 1,
-            pergunta,
-            resposta,
-          },
-        }))
+          rows.push(await tx.nonConformityCauseItem.create({
+            data: {
+              nonConformityId: id,
+              ordem: idx + 1,
+              pergunta,
+              resposta,
+            },
+          }))
+        }
       }
 
-      await tx.nonConformity.update({ where: { id }, data: { causaRaiz } })
+      if (hasCausaRaiz) {
+        await tx.nonConformity.update({ where: { id }, data: { causaRaiz } })
+      }
        await appendNonConformityTimelineEvent(tx, {
         nonConformityId: id,
         actorId: me.id,

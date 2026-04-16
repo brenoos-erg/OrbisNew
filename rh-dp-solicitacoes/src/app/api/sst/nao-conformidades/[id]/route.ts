@@ -100,6 +100,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         permissions: {
           canManageAllNc: canManageAllNc(level),
           canApproveQuality: canApproveNc(level),
+          canEditFirstScreen: canManageAllNc(level),
         },
       },
     })
