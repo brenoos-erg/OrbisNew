@@ -21,6 +21,7 @@ export type UserAccessContext = {
   userDepartmentIds: string[]
   userSetorKeys: string[]
   finalizerTipoIds: string[]
+  allowedTipoIds: string[]
 }
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
@@ -68,10 +69,16 @@ export async function resolveUserAccessContext(input: {
   }
 
   const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
-  const finalizerRows = await prisma.tipoSolicitacaoApprover.findMany({
-    where: { userId: input.userId, role: 'FINALIZER' },
-    select: { tipoId: true },
-  })
+  const [finalizerRows, allowedTipoRows] = await Promise.all([
+    prisma.tipoSolicitacaoApprover.findMany({
+      where: { userId: input.userId, role: 'FINALIZER' },
+      select: { tipoId: true },
+    }),
+    prisma.tipoSolicitacaoApprover.findMany({
+      where: { userId: input.userId },
+      select: { tipoId: true },
+    }),
+  ])
 
   return {
     userId: input.userId,
@@ -82,6 +89,7 @@ export async function resolveUserAccessContext(input: {
     userDepartmentIds: [...userDepartmentIds],
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
+    allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
   }
 }
 
@@ -95,6 +103,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     userDepartmentIds: ctx.userDepartmentIds,
     userSetorKeys: ctx.userSetorKeys,
     finalizerTipoIds: ctx.finalizerTipoIds,
+    allowedTipoIds: ctx.allowedTipoIds,
   })
 }
 
@@ -133,6 +142,7 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
 
 function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (ctx.role === 'ADMIN') return true
+  if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (solicitation.departmentId && ctx.userDepartmentIds.includes(solicitation.departmentId)) {
     return true
   }
@@ -147,6 +157,10 @@ function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: Solicita
     for (const userSetor of ctx.userSetorKeys) {
       if (solicitationSetores.has(userSetor)) return true
     }
+  }
+
+  if (solicitation.tipoId && ctx.allowedTipoIds.includes(solicitation.tipoId)) {
+    return true
   }
 
   return false

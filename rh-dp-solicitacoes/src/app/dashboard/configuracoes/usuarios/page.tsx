@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye } from 'lucide-react'
+import { Save, PlusCircle, Pencil, Trash2, X, Check, Eye, Download } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type UserRow = {
@@ -880,6 +880,14 @@ export default function Page() {
                     setUserPage(1)
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => window.open('/api/configuracoes/usuarios/export', '_blank', 'noopener,noreferrer')}
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  <Download size={14} />
+                  Exportar Excel
+                </button>
               </div>
             </div>
             

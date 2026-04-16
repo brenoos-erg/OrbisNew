@@ -1,0 +1,137 @@
+import crypto from 'node:crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { ModuleLevel, SolicitationStatus } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { withModuleLevel } from '@/lib/access'
+import { nextSolicitationProtocolo } from '@/lib/protocolo'
+import {
+  EXTERNAL_ADMISSION_CHECKLIST,
+  EXTERNAL_ADMISSION_STATUS,
+  EXTERNAL_ADMISSION_TYPE_CODE,
+  EXTERNAL_ADMISSION_TYPE_ID,
+  EXTERNAL_ADMISSION_TYPE_NAME,
+  toTokenHash,
+} from '@/lib/externalAdmission'
+import { getSiteUrl } from '@/lib/site-url'
+
+async function ensureAdmissionType() {
+  return prisma.tipoSolicitacao.upsert({
+    where: { id: EXTERNAL_ADMISSION_TYPE_ID },
+    update: {
+      codigo: EXTERNAL_ADMISSION_TYPE_CODE,
+      nome: EXTERNAL_ADMISSION_TYPE_NAME,
+    },
+    create: {
+      id: EXTERNAL_ADMISSION_TYPE_ID,
+      codigo: EXTERNAL_ADMISSION_TYPE_CODE,
+      nome: EXTERNAL_ADMISSION_TYPE_NAME,
+      descricao: 'Fluxo externo de admissão com checklist e upload sem login.',
+      schemaJson: {
+        meta: {
+          flow: 'external-admission',
+          external: true,
+        },
+      },
+    },
+  })
+}
+
+async function resolveRhDepartmentId() {
+  const rh = await prisma.department.findFirst({
+    where: {
+      OR: [{ code: '17' }, { sigla: { contains: 'RH' } }, { name: { contains: 'Recursos Humanos' } }],
+    },
+    select: { id: true },
+  })
+  return rh?.id ?? null
+}
+
+export const GET = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (_req, ctx) => {
+  const { me } = ctx
+  await ensureAdmissionType()
+
+  const rows = await prisma.solicitation.findMany({
+    where: {
+      tipoId: EXTERNAL_ADMISSION_TYPE_ID,
+      OR: me.role === 'ADMIN' ? undefined : [{ departmentId: me.departmentId ?? undefined }, { approverId: me.id }],
+    },
+    orderBy: [{ updatedAt: 'desc' }],
+    select: {
+      id: true,
+      protocolo: true,
+      status: true,
+      updatedAt: true,
+      payload: true,
+      solicitante: { select: { fullName: true, email: true } },
+    } as any,
+  })
+
+  const parsed = rows.map((row: any) => {
+    const metadata = (row.payload?.externalAdmission ?? {}) as Record<string, any>
+    return {
+      id: row.id,
+      protocolo: row.protocolo,
+      status: metadata.status ?? EXTERNAL_ADMISSION_STATUS.WAITING,
+      candidateName: metadata.candidateName ?? '-',
+      candidateEmail: metadata.candidateEmail ?? '-',
+      updatedAt: row.updatedAt,
+      completedAt: metadata.completedAt ?? null,
+      createdLinkAt: metadata.createdLinkAt ?? null,
+    }
+  })
+
+  return NextResponse.json({ rows: parsed })
+})
+
+export const POST = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (req, ctx) => {
+  const { me } = ctx
+  await ensureAdmissionType()
+
+  const body = await req.json().catch(() => null)
+  const candidateName = String(body?.candidateName ?? '').trim()
+  const candidateEmail = String(body?.candidateEmail ?? '').trim().toLowerCase()
+
+  if (!candidateName || !candidateEmail) {
+    return NextResponse.json({ error: 'Nome e e-mail do candidato são obrigatórios.' }, { status: 400 })
+  }
+
+  const departmentId = (await resolveRhDepartmentId()) ?? me.departmentId
+  if (!departmentId) {
+    return NextResponse.json({ error: 'Não foi possível determinar o departamento de RH.' }, { status: 400 })
+  }
+
+  const token = crypto.randomBytes(24).toString('hex')
+  const tokenHash = toTokenHash(token)
+
+  const protocolo = await nextSolicitationProtocolo()
+  const created = await prisma.solicitation.create({
+    data: {
+      protocolo,
+      tipoId: EXTERNAL_ADMISSION_TYPE_ID,
+      titulo: EXTERNAL_ADMISSION_TYPE_NAME,
+      descricao: `Checklist externo de admissão para ${candidateName}.`,
+      departmentId,
+      solicitanteId: me.id,
+      approverId: me.id,
+      status: SolicitationStatus.ABERTA,
+      payload: {
+        externalAdmission: {
+          candidateName,
+          candidateEmail,
+          checklist: EXTERNAL_ADMISSION_CHECKLIST,
+          checklistStatus: {},
+          tokenHash,
+          status: EXTERNAL_ADMISSION_STATUS.WAITING,
+          createdLinkAt: new Date().toISOString(),
+          submissions: {},
+        },
+      },
+    },
+    select: { id: true, protocolo: true },
+  })
+
+  const baseUrl = getSiteUrl() || 'http://localhost:3000'
+  const externalUrl = `${baseUrl}/solicitacoes/externo/admissao/${token}`
+
+  return NextResponse.json({ ...created, externalUrl }, { status: 201 })
+})
