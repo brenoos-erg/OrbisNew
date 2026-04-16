@@ -5,6 +5,10 @@ type ModuleKeyAliasGroup = {
 
 const MODULE_KEY_ALIAS_GROUPS: ModuleKeyAliasGroup[] = [
   {
+    canonical: 'sst',
+    aliases: ['sgi-qualidade', 'sgi_qualidade'],
+  },
+  {
     canonical: 'gestao-de-frotas',
     aliases: ['gestao_frotas'],
   },

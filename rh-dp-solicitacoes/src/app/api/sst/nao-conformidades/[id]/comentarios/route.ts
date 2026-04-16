@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
@@ -16,6 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.COMENTARIOS, Action.UPDATE)
 
     const body = await req.json().catch(() => ({} as any))
     const texto = String(body?.texto || '').trim()

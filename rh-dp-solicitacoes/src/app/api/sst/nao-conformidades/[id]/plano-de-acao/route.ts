@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, NonConformityActionPlanOrigin, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
+import { Action, ModuleLevel, NonConformityActionPlanOrigin, NonConformityActionStatus, NonConformityActionType } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { devErrorDetail } from '@/lib/apiError'
 import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { assertCanFeature } from '@/lib/permissions'
 import { canManageAllNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
@@ -90,6 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.CREATE)
 
     const id = (await params).id
     const blocked = await assertEditable(id, me.id, level)
@@ -152,6 +155,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.UPDATE)
 
     const id = (await params).id
     const blocked = await assertEditable(id, me.id, level)
@@ -241,6 +245,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
     }
+    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.DELETE)
 
     const id = (await params).id
     const blocked = await assertEditable(id, me.id, level)

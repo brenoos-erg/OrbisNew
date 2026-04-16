@@ -20,7 +20,7 @@ const CORE_MODULES = [
   { key: 'direito-de-recusa', name: 'Direito de Recusa' },
   { key: 'controle-equipamentos-ti', name: 'Controle de Equipamentos TI' },
   { key: 'celular', name: 'Celular' },
-  { key: 'sst', name: 'Não Conformidades' },
+  { key: 'sst', name: 'SGI / Qualidade' },
 ]
 
 const CORE_MODULES_TTL_MS = 5 * 60 * 1000
