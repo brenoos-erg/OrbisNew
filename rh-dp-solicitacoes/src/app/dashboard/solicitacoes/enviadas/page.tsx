@@ -174,14 +174,28 @@ export default function SentRequestsPage() {
     if (sessionExpired) return
     if (sessionData?.appUser) return
 
-    expireSessionLocally(true)
-  }, [expireSessionLocally, sessionData?.appUser, sessionExpired, sessionLoading])
+    setSessionExpired(true)
+    setData([])
+    setTotal(0)
+    if (!sessionExpiredToastShownRef.current) {
+      sessionExpiredToastShownRef.current = true
+      setSessionExpiredToastShown(true)
+      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+    }
+  }, [pushToast, sessionData?.appUser, sessionExpired, sessionLoading])
 
   const load = useCallback(async (state: SearchState) => {
     if (sessionLoading) return
     if (sessionExpired) return
     if (!sessionData?.appUser) {
-      expireSessionLocally(true)
+      setSessionExpired(true)
+      setData([])
+      setTotal(0)
+      if (!sessionExpiredToastShownRef.current) {
+        sessionExpiredToastShownRef.current = true
+        setSessionExpiredToastShown(true)
+        pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+      }
       return
     }
 
@@ -207,7 +221,7 @@ export default function SentRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [expireSessionLocally, pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionLoading, showSessionExpiredToastOnce])
+  }, [pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionLoading, showSessionExpiredToastOnce])
 
   useEffect(() => {
     if (sessionLoading) return

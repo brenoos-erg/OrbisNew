@@ -165,6 +165,14 @@ function resolveExperienceEvaluatorId(
   return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
 }
 
+function resolveExperienceEvaluatorName(
+  evaluatorId: string,
+  evaluators: ResponsibleOption[],
+) {
+  if (!evaluatorId) return ''
+  return evaluators.find((user) => user.id === evaluatorId)?.fullName ?? ''
+}
+
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -197,8 +205,9 @@ export default function FluxoSolicitacaoClient() {
       const evaluatorOptions = data.dataSources.experienceEvaluators ?? []
       const evaluatorId = resolveExperienceEvaluatorId(normalizedFields, evaluatorOptions)
       if (evaluatorId) {
+        const evaluatorName = resolveExperienceEvaluatorName(evaluatorId, evaluatorOptions)
         normalizedFields.gestorImediatoAvaliadorId = evaluatorId
-        normalizedFields.gestorImediatoAvaliador = evaluatorId
+        normalizedFields.gestorImediatoAvaliador = evaluatorName || evaluatorId
       }
     }
     setEditFields(normalizedFields)    
@@ -397,11 +406,13 @@ export default function FluxoSolicitacaoClient() {
               const selectedId = e.target.value
               setEditFields((prev) => {
                 if (!isEvaluatorField) return { ...prev, [field.name]: selectedId }
+                const evaluatorName =
+                  resolvedOptions.find((option) => option.value === selectedId)?.label ?? ''
                 return {
                   ...prev,
                   [field.name]: selectedId,
                   gestorImediatoAvaliadorId: selectedId,
-                  gestorImediatoAvaliador: selectedId,
+                  gestorImediatoAvaliador: evaluatorName || selectedId,
                 }
               })
             }}            className="w-full rounded-md border border-slate-300 px-3 py-2"
