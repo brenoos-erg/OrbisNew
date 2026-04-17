@@ -14,6 +14,7 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
+import { isActionOverdue, resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -162,13 +163,14 @@ export async function GET(req: NextRequest) {
       ? items.filter((item) => {
           const prazo = toDateOnly(item.prazo?.toISOString())
           if (!prazo || !today) return false
-          if (
-            item.status === NonConformityActionStatus.CONCLUIDA ||
-            item.status === NonConformityActionStatus.CANCELADA
-          ) {
-            return false
-          }
-          return prazo < today
+          return (
+            prazo < today &&
+            isActionOverdue({
+              prazo: item.prazo,
+              dataConclusao: item.dataConclusao,
+              status: item.status,
+            })
+          )
         })
       : items
 
@@ -196,9 +198,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
     }
 
-     const desiredStatus = Object.values(NonConformityActionStatus).includes(body?.status as NonConformityActionStatus)
-      ? (body.status as NonConformityActionStatus)
-      : NonConformityActionStatus.PENDENTE
+    const dataInicioPrevista = toDate(body?.dataInicioPrevista)
+    const dataFimPrevista = toDate(body?.dataFimPrevista)
+    const prazo = body?.prazo ? new Date(String(body.prazo)) : dataFimPrevista
+    const dataConclusao = toDate(body?.dataConclusao)
+    const desiredStatus = resolveAutomaticActionStatus({
+      requestedStatus: body?.status,
+      prazo: prazo ?? null,
+      dataInicioPrevista: dataInicioPrevista ?? null,
+      dataConclusao: dataConclusao ?? null,
+    })
     const evidencias = normalizeEvidenceText(body?.evidencias)
     if (desiredStatus === NonConformityActionStatus.CONCLUIDA && !evidencias) {
       return NextResponse.json({ error: 'Anexe evidência antes de concluir a ação.' }, { status: 400 })
@@ -215,10 +224,10 @@ export async function POST(req: NextRequest) {
         centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
 
         centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
-        dataInicioPrevista: toDate(body?.dataInicioPrevista),
-        dataFimPrevista: toDate(body?.dataFimPrevista),
+        dataInicioPrevista,
+        dataFimPrevista,
         custo: toOptionalDecimal(body?.custo),
-        dataConclusao: toDate(body?.dataConclusao),
+        dataConclusao,
         tipo: Object.values(NonConformityActionType).includes(body?.tipo as NonConformityActionType)
           ? (body.tipo as NonConformityActionType)
           : NonConformityActionType.ACAO_CORRETIVA,
@@ -229,7 +238,7 @@ export async function POST(req: NextRequest) {
         beneficio: toOptionalIntBetween(body?.beneficio),
         responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
         responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
-        prazo: body?.prazo ? new Date(String(body.prazo)) : toDate(body?.dataFimPrevista),
+        prazo,
         status: desiredStatus,
         evidencias,
       },

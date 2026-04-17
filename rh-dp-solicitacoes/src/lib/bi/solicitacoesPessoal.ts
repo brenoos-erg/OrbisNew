@@ -52,7 +52,7 @@ export const BI_SOLICITACAO_PESSOAL_TIPO_WHERE = {
     {
       OR: [
         { id: { in: ['RQ_063', 'SOLICITACAO_ADMISSAO'] } },
-        { codigo: { in: ['RQ.RH.001', 'RQ.DP.001'] } },
+        { codigo: { in: ['RQ.RH.063', 'RQ.RH.001', 'RQ.DP.001'] } },
       ],
     },
     {

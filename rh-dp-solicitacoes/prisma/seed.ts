@@ -590,7 +590,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_063' },
       update: {
-        codigo: 'RQ.063',
+        codigo: 'RQ.RH.063',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: {
@@ -620,7 +620,7 @@ async function main() {
       },
        create: {
         id: 'RQ_063',
-        codigo: 'RQ.063',
+        codigo: 'RQ.RH.063',
         nome: 'Solicitação de pessoal',
         descricao: 'Solicitação de pessoal com fluxo RH e DP',
         schemaJson: {
@@ -2023,7 +2023,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_092' },
       update: {
-        codigo: 'RQ.092',
+        codigo: 'RQ.SST.092',
         nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
@@ -2031,14 +2031,14 @@ async function main() {
       },
       create: {
         id: 'RQ_092',
-        codigo: 'RQ.092',
+        codigo: 'RQ.SST.092',
         nome: 'Solicitação de exames',
         descricao: 'Formulário para Solicitação de exames ao SST',
         schemaJson: solicitacaoExamesSstSchema,
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "RQ.092 SOLICITAÇÃO DE EXAMES" ok.')
+    console.log('✅ Tipo "RQ.SST.092 SOLICITAÇÃO DE EXAMES" ok.')
     const requisicaoEpiUniformesSchema = {
       meta: {
           departamentos: logisticaDepartment ? [logisticaDepartment.id] : [sstDepartment.id],
@@ -2137,7 +2137,7 @@ async function main() {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_043' },
       update: {
-        codigo: 'RQ.043',
+        codigo: 'RQ.SST.043',
          nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
@@ -2145,14 +2145,14 @@ async function main() {
       },
       create: {
         id: 'RQ_043',
-        codigo: 'RQ.043',
+        codigo: 'RQ.SST.043',
         nome: 'Requisição de EPI s/uniformes',
         descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
       },
     })
-    console.log('✅ Tipo "RQ.043 REQUISIÇÃO DE EPI S/UNIFORMES" ok.')
+    console.log('✅ Tipo "RQ.SST.043 REQUISIÇÃO DE EPI S/UNIFORMES" ok.')
     const nadaConstaSchema = {
      meta: {
         departamentos: [dpDepartment.id, saudeDepartment?.id].filter((value): value is string => Boolean(value)),

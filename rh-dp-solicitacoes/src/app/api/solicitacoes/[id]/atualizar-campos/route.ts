@@ -125,6 +125,27 @@ export async function POST(
       )
     }
 
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    })
+    if (!solicitation) {
+      return NextResponse.json(
+        { error: 'Solicitação não encontrada.' },
+        { status: 404 },
+      )
+    }
+
+    const solicitationIsClosed =
+      solicitation.status === 'CONCLUIDA' || solicitation.status === 'CANCELADA'
+
+    if (solicitationIsClosed) {
+      return NextResponse.json(
+        { error: 'Chamado já finalizado. Não é possível editar o setor.' },
+        { status: 409 },
+      )
+    }
+
     let setorRegistro = await prisma.solicitacaoSetor.findUnique({
       where: {
         solicitacaoId_setor: {
@@ -153,13 +174,6 @@ export async function POST(
           campos: camposIniciais,
         },
       })
-    }
-
-    if (setorRegistro.status === 'CONCLUIDO') {
-      return NextResponse.json(
-        { error: 'Setor já concluído. Não é possível editar.' },
-        { status: 409 },
-      )
     }
 
     const camposOrigem = (setorRegistro.campos ?? {}) as Record<string, any>

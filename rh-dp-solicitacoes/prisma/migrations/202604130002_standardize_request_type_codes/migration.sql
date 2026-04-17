@@ -1,7 +1,7 @@
-UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.063' WHERE `id` = 'RQ_063' AND `codigo` <> 'RQ.063';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.RH.063' WHERE `id` = 'RQ_063' AND `codigo` <> 'RQ.RH.063';
 UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.091' WHERE `id` = 'RQ_091' AND `codigo` <> 'RQ.091';
-UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.092' WHERE `id` = 'RQ_092' AND `codigo` <> 'RQ.092';
-UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.043' WHERE `id` = 'RQ_043' AND `codigo` <> 'RQ.043';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.SST.092' WHERE `id` = 'RQ_092' AND `codigo` <> 'RQ.SST.092';
+UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.SST.043' WHERE `id` = 'RQ_043' AND `codigo` <> 'RQ.SST.043';
 UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.088' WHERE `id` = 'RQ_088' AND `codigo` <> 'RQ.088';
 UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.089' WHERE `id` = 'RQ_LOG_EQUIPAMENTOS' AND `codigo` <> 'RQ.089';
 UPDATE `TipoSolicitacao` SET `codigo` = 'RQ.106' WHERE `id` = 'RQ_106' AND `codigo` <> 'RQ.106';

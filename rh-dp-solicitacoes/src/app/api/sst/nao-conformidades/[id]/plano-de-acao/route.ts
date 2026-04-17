@@ -10,6 +10,7 @@ import { assertCanFeature } from '@/lib/permissions'
 import { canManageAllNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 
 async function assertEditable(id: string, userId: string, level: ModuleLevel | undefined) {
   const nc = await prisma.nonConformity.findUnique({
@@ -67,23 +68,6 @@ function toOptionalDecimal(value: unknown) {
   return parsed
 }
 
-function resolveStatusForPatch(currentStatus: NonConformityActionStatus, nextStatus: unknown) {
-  if (!Object.values(NonConformityActionStatus).includes(nextStatus as NonConformityActionStatus)) return undefined
-
-  const typedStatus = nextStatus as NonConformityActionStatus
-  if (typedStatus === NonConformityActionStatus.CONCLUIDA) return typedStatus
-  if (typedStatus === NonConformityActionStatus.CANCELADA) return typedStatus
-
-  if (typedStatus === NonConformityActionStatus.PENDENTE || typedStatus === NonConformityActionStatus.EM_ANDAMENTO) {
-    if (currentStatus === NonConformityActionStatus.CANCELADA || currentStatus === NonConformityActionStatus.CONCLUIDA) {
-      return NonConformityActionStatus.PENDENTE
-    }
-    return typedStatus
-  }
-
-  return undefined
-}
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
@@ -103,6 +87,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!descricao) return NextResponse.json({ error: 'Descrição é obrigatória.' }, { status: 400 })
 
   const row = await prisma.$transaction(async (tx) => {
+      const dataInicioPrevista = toDate(body?.dataInicioPrevista)
+      const dataFimPrevista = toDate(body?.dataFimPrevista)
+      const prazo = body?.prazo ? new Date(body.prazo) : null
+      const dataConclusao = toDate(body?.dataConclusao)
+      const status = resolveAutomaticActionStatus({
+        requestedStatus: body?.status,
+        prazo,
+        dataInicioPrevista,
+        dataConclusao,
+      })
+
       const created = await tx.nonConformityActionItem.create({
         data: {
           nonConformityId: id,
@@ -114,10 +109,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
           centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
           centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
-          dataInicioPrevista: toDate(body?.dataInicioPrevista),
-          dataFimPrevista: toDate(body?.dataFimPrevista),
+          dataInicioPrevista,
+          dataFimPrevista,
           custo: toOptionalDecimal(body?.custo),
-          dataConclusao: toDate(body?.dataConclusao),
+          dataConclusao,
           tipo: Object.values(NonConformityActionType).includes(body?.tipo) ? body.tipo : NonConformityActionType.ACAO_CORRETIVA,
           origem: toOptionalString(body?.origem) ?? 'NÃO CONFORMIDADE',
           referencia: toOptionalString(body?.referencia),
@@ -126,8 +121,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           beneficio: toOptionalIntBetween(body?.beneficio),
           responsavelId: body?.responsavelId ? String(body.responsavelId) : null,
           responsavelNome: body?.responsavelNome ? String(body.responsavelNome).trim() : null,
-          prazo: body?.prazo ? new Date(body.prazo) : null,
-          status: Object.values(NonConformityActionStatus).includes(body?.status) ? body.status : NonConformityActionStatus.PENDENTE,
+          prazo,
+          status,
           evidencias: body?.evidencias ? String(body.evidencias).trim() : null,
         },
       })
@@ -167,13 +162,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
    const existing = await prisma.nonConformityActionItem.findUnique({
       where: { id: actionId },
-      select: { id: true, nonConformityId: true, status: true, evidencias: true },
+      select: {
+        id: true,
+        nonConformityId: true,
+        status: true,
+        evidencias: true,
+        prazo: true,
+        dataInicioPrevista: true,
+        dataConclusao: true,
+      },
     })
     if (!existing || existing.nonConformityId !== id) {
       return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
     }
 
-    const desiredStatus = resolveStatusForPatch(existing.status, body?.status)
+    const nextPrazo = body?.prazo !== undefined ? (body.prazo ? new Date(body.prazo) : null) : existing.prazo
+    const desiredStatus = resolveAutomaticActionStatus({
+      currentStatus: existing.status,
+      requestedStatus: body?.status,
+      prazo: nextPrazo,
+      dataInicioPrevista:
+        body?.dataInicioPrevista !== undefined ? toDate(body?.dataInicioPrevista) : existing.dataInicioPrevista,
+      dataConclusao: body?.dataConclusao !== undefined ? toDate(body?.dataConclusao) : existing.dataConclusao,
+    })
     const observacao = String(body?.observacao || '').trim()
     const shouldSetConclusion = desiredStatus === NonConformityActionStatus.CONCLUIDA
     const shouldClearConclusion = desiredStatus === NonConformityActionStatus.PENDENTE || desiredStatus === NonConformityActionStatus.EM_ANDAMENTO

@@ -6,6 +6,11 @@ import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
+import {
+  getNadaConstaDefaultFieldsForSetor,
+  isSolicitacaoNadaConsta,
+  NADA_CONSTA_SETORES,
+} from '@/lib/solicitationTypes'
 
 const TIMELINE_DONE = new Set(['CONCLUIDA', 'ENCERRADA', 'APROVADA'])
 const STATUS_LABEL: Record<SolicitationStatus, string> = {
@@ -154,6 +159,28 @@ function isFlowField(fieldName: string) {
     'fila',
     'etapa',
   ].some((token) => normalized.includes(token))
+}
+
+function normalizeConstaValue(value: unknown): 'CONSTA' | 'NADA_CONSTA' | null {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+  if (normalized === 'CONSTA') return 'CONSTA'
+  if (normalized === 'NADA CONSTA' || normalized === 'NADA_CONSTA') return 'NADA_CONSTA'
+  return null
+}
+
+function normalizeSaudeStatusValue(value: unknown): 'CIENTE' | null {
+  if (typeof value !== 'string') return null
+  const normalized = value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+  return normalized === 'CIENTE' ? 'CIENTE' : null
 }
 
 
@@ -344,7 +371,12 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 })
   }
 
-  const solicitation = await prisma.solicitation.findUnique({ where: { id } })
+  const solicitation = await prisma.solicitation.findUnique({
+    where: { id },
+    include: {
+      tipo: { select: { id: true, nome: true, codigo: true, schemaJson: true } },
+    },
+  })
   if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
 
   if (body.mode === 'EDIT_FIELDS') {
@@ -444,18 +476,74 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       campos: mergedCampos,
     }
 
-    const updated = await prisma.solicitation.update({
-      where: { id },
-      data: {
-        titulo: typeof body.titulo === 'string' ? body.titulo : solicitation.titulo,
-        descricao: typeof body.descricao === 'string' || body.descricao === null ? body.descricao : solicitation.descricao,
-        payload: updatedPayload as any,
-        ...(resolvedApproverId !== undefined ? { approverId: resolvedApproverId } : {}),
-        ...(resolvedResponsibleId !== undefined ? { assumidaPorId: resolvedResponsibleId } : {}),
-        ...(resolvedDepartmentId !== undefined ? { departmentId: resolvedDepartmentId } : {}),
-        // Regra de negócio: manter dataAbertura original e não resetar automaticamente prazos/SLA.
-        // O recálculo de SLA deve ser tratado por rotina específica, se necessário.
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const solicitationUpdated = await tx.solicitation.update({
+        where: { id },
+        data: {
+          titulo: typeof body.titulo === 'string' ? body.titulo : solicitation.titulo,
+          descricao: typeof body.descricao === 'string' || body.descricao === null ? body.descricao : solicitation.descricao,
+          payload: updatedPayload as any,
+          ...(resolvedApproverId !== undefined ? { approverId: resolvedApproverId } : {}),
+          ...(resolvedResponsibleId !== undefined ? { assumidaPorId: resolvedResponsibleId } : {}),
+          ...(resolvedDepartmentId !== undefined ? { departmentId: resolvedDepartmentId } : {}),
+          // Regra de negócio: manter dataAbertura original e não resetar automaticamente prazos/SLA.
+          // O recálculo de SLA deve ser tratado por rotina específica, se necessário.
+        },
+      })
+
+      if (isSolicitacaoNadaConsta(solicitation.tipo as any)) {
+        const schemaCampos = (((solicitation.tipo?.schemaJson as any)?.camposEspecificos ?? []) as CampoEdicaoSchema[])
+          .filter((campo) => campo && typeof campo.name === 'string')
+
+        for (const setorMeta of NADA_CONSTA_SETORES) {
+          const schemaFieldNames = schemaCampos
+            .filter((campo) => campo.stage === setorMeta.stage)
+            .map((campo) => campo.name)
+          const defaultFieldNames = getNadaConstaDefaultFieldsForSetor(setorMeta.key).map((field) => field.name)
+          const setorFieldNames = new Set([setorMeta.constaField, ...defaultFieldNames, ...schemaFieldNames])
+          const hasAnySetorUpdate = Array.from(setorFieldNames).some((fieldName) =>
+            Object.prototype.hasOwnProperty.call(mergedCampos, fieldName),
+          )
+          if (!hasAnySetorUpdate) continue
+
+          const setorCampos = Object.fromEntries(
+            Array.from(setorFieldNames).map((fieldName) => [fieldName, String(mergedCampos[fieldName] ?? '')]),
+          )
+
+          const rawStatus = mergedCampos[setorMeta.constaField]
+          const constaFlag =
+            setorMeta.key === 'SAUDE' || setorMeta.key === 'SST'
+              ? normalizeSaudeStatusValue(rawStatus)
+                ? 'NADA_CONSTA'
+                : null
+              : normalizeConstaValue(rawStatus)
+
+          await tx.solicitacaoSetor.upsert({
+            where: {
+              solicitacaoId_setor: {
+                solicitacaoId: id,
+                setor: setorMeta.key,
+              },
+            },
+            create: {
+              solicitacaoId: id,
+              setor: setorMeta.key,
+              campos: setorCampos,
+              constaFlag,
+              status: constaFlag ? 'CONCLUIDO' : 'PENDENTE',
+            },
+            update: {
+              campos: setorCampos,
+              constaFlag,
+              status: constaFlag ? 'CONCLUIDO' : 'PENDENTE',
+              finalizadoEm: constaFlag ? new Date() : null,
+              finalizadoPor: constaFlag ? ctx.me.id : null,
+            },
+          })
+        }
+      }
+
+      return solicitationUpdated
     })
 
     await prisma.solicitationTimeline.create({

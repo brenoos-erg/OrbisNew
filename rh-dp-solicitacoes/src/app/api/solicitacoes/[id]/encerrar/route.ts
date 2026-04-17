@@ -27,7 +27,7 @@ export async function PATCH(
     })
 
     if (!solicitation || !isSolicitacaoExamesSst(solicitation.tipo)) {
-      return NextResponse.json({ error: 'Solicitação RQ.092 não encontrada.' }, { status: 404 })
+      return NextResponse.json({ error: 'Solicitação RQ.SST.092 não encontrada.' }, { status: 404 })
     }
 
     const isSst =
@@ -51,7 +51,7 @@ export async function PATCH(
       data: {
         solicitationId: id,
         status: 'ENCERRADA',
-        message: 'Chamado RQ.092 encerrado pelo SST.',
+        message: 'Chamado RQ.SST.092 encerrado pelo SST.',
       },
     })
 

@@ -63,8 +63,8 @@ function buildWorkflowTemplates(tipos: RefItem[]): WorkflowDraft[] {
 
   return [
     {
-      name: 'RQ.063 - Solicitação de Pessoal',
-      tipoId: tipoById('RQ_063') ?? tipoByName('RQ.063') ?? '',
+      name: 'RQ.RH.063 - Solicitação de Pessoal',
+      tipoId: tipoById('RQ_063') ?? tipoByName('RQ.RH.063') ?? tipoByName('RQ.063') ?? '',
       departmentId: null,
       active: true,
       steps: [
@@ -132,8 +132,8 @@ function buildWorkflowTemplates(tipos: RefItem[]): WorkflowDraft[] {
       ],
     },
     {
-      name: 'RQ.092 - Solicitação de Exames',
-      tipoId: tipoById('RQ_092') ?? tipoByName('RQ.092') ?? '',
+      name: 'RQ.SST.092 - Solicitação de Exames',
+      tipoId: tipoById('RQ_092') ?? tipoByName('RQ.SST.092') ?? tipoByName('RQ.092') ?? '',
       departmentId: null,
       active: true,
       steps: [
@@ -143,8 +143,8 @@ function buildWorkflowTemplates(tipos: RefItem[]): WorkflowDraft[] {
       transitions: [{ fromStepKey: 'USUARIO_ABRE', toStepKey: 'SST' }],
     },
     {
-      name: 'RQ.043 - Requisição de EPI / Uniformes',
-      tipoId: tipoById('RQ_043') ?? tipoByName('RQ.043') ?? '',
+      name: 'RQ.SST.043 - Requisição de EPI / Uniformes',
+      tipoId: tipoById('RQ_043') ?? tipoByName('RQ.SST.043') ?? tipoByName('RQ.043') ?? '',
       departmentId: null,
       active: true,
       steps: [
