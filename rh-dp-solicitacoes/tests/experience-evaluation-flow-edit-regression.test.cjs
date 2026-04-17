@@ -8,5 +8,7 @@ assert.match(fluxoSource, /'gestorImediatoAvaliadorId'/)
 assert.match(fluxoSource, /Object\.prototype\.hasOwnProperty\.call\(incomingCampos, 'gestorImediatoAvaliadorId'\)/)
 assert.match(fluxoSource, /const isExperienceEvaluation = solicitation\.tipoId === EXPERIENCE_EVALUATION_TIPO_ID/)
 assert.match(fluxoSource, /resolvedResponsibleId = null/)
+assert.match(fluxoSource, /let experienceEvaluatorChanged = false/)
+assert.match(fluxoSource, /if \(experienceEvaluatorChanged\) continue/)
 
 console.log('✅ experience-evaluation-flow-edit-regression.test passed')

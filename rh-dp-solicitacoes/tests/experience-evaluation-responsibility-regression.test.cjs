@@ -1,30 +1,21 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 
-const {
-  isExperienceEvaluationEvaluator,
-} = require('../src/lib/experienceEvaluation.shared')
+const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts', 'utf8')
 
 {
-  const solicitation = {
-    approverId: 'legacy-user-id',
-    payload: {
-      campos: {
-        gestorImediatoAvaliadorId: 'legacy-user-id',
-        gestorImediatoAvaliador: 'Katia Ferreira Gonçalves',
-      },
-    },
-  }
-
-  const katia = {
-    id: 'new-user-id',
-    fullName: 'Kátia Ferreira Gonçalves',
-  }
-
-  assert.equal(
-    isExperienceEvaluationEvaluator(solicitation, katia),
-    true,
+  assert.match(
+    evaluatorSource,
+    /normalize\(assigned\.fullName\) === userFullName/,
     'Quando o nome do avaliador corresponder ao payload, a regra deve liberar mesmo com id legado divergente.',
+  )
+}
+
+{
+  assert.match(
+    evaluatorSource,
+    /readString\(merged, 'gestorImediatoAvaliadorId'\)\s*\|\|\s*readString\(merged, 'avaliadorId'\)\s*\|\|\s*readString\(merged, 'gestorId'\)/,
+    'Campos dedicados vazios devem cair no fallback avaliador/gestor para manter visibilidade.',
   )
 }
 

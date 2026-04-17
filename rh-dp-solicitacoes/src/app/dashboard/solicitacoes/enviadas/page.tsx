@@ -155,6 +155,7 @@ export default function SentRequestsPage() {
     if (sessionLoading) return
     if (sessionExpired) return
     if (!sessionData?.appUser) {
+      setSessionExpired(true)
       setData([])
       setTotal(0)
       pushToast('Sua sessão expirou. Faça login novamente.', 'error')
@@ -186,6 +187,10 @@ export default function SentRequestsPage() {
   }, [pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionLoading])
 
   useEffect(() => {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (!sessionData?.appUser) return
+
     let active = true
     const controller = new AbortController()
 
@@ -221,7 +226,7 @@ export default function SentRequestsPage() {
       active = false
       controller.abort()
     }
-  }, [])
+  }, [sessionData?.appUser, sessionExpired, sessionLoading])
   useEffect(() => {
     const raw = searchParams.toString()
     if (raw === syncedQueryRef.current) return

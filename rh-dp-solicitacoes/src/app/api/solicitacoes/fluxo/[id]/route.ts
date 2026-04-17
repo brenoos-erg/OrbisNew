@@ -436,6 +436,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     let resolvedApproverId: string | null | undefined = undefined
     let resolvedResponsibleId: string | null | undefined = undefined
     let resolvedDepartmentId: string | null | undefined = undefined
+    let experienceEvaluatorChanged = false
       if (hasExperienceEvaluatorField) {
       const experienceEvaluators = await listExperienceEvaluators()
       const previousEvaluatorId = resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
@@ -458,6 +459,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
         flowChanges.push(`avaliador alterado (${previousEvaluatorId || '—'} → ${evaluatorId || '—'})`)
         resolvedApproverId = evaluatorId || null
         resolvedResponsibleId = null
+        experienceEvaluatorChanged = true
       }
     }
 
@@ -488,6 +490,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       }
 
       if (normalizedField.includes('responsavel')) {
+        if (experienceEvaluatorChanged) continue
         const targetResponsibleId = resolveUserIdFromValue(afterValue, activeUsers)
         if (targetResponsibleId && targetResponsibleId !== solicitation.assumidaPorId) {
           resolvedResponsibleId = targetResponsibleId
