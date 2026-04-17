@@ -13,6 +13,9 @@ export async function GET() {
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
       role: me.role,
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
@@ -27,6 +30,9 @@ export async function GET() {
       AND: [
         buildSensitiveHiringVisibilityWhere({
           userId: me.id,
+          userLogin: me.login,
+          userEmail: me.email,
+          userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
         }),
@@ -49,7 +55,7 @@ export async function GET() {
         },
         {
           status: 'AGUARDANDO_AVALIACAO_GESTOR',
-          approverId: me.id,
+          AND: [receivedVisibilityWhere],
         },
         {
           status: 'AGUARDANDO_FINALIZACAO_AVALIACAO',
@@ -62,6 +68,9 @@ export async function GET() {
       AND: [
         buildSensitiveHiringVisibilityWhere({
           userId: me.id,
+          userLogin: me.login,
+          userEmail: me.email,
+          userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
         }),
