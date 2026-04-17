@@ -104,6 +104,76 @@ export function patchExperienceEvaluationEvaluatorFields(
   }
 }
 
+type EvaluatorIdentity = {
+  id: string
+  fullName?: string | null
+  login?: string | null
+  email?: string | null
+}
+
+function isObjectRecord(value: unknown): value is Dict {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeEvaluatorValue(value: unknown) {
+  return normalize(value)
+}
+
+function matchesEvaluatorByIdentity(
+  evaluator: EvaluatorIdentity,
+  assigned: { id: string; login: string; email: string; fullName: string },
+) {
+  const evaluatorId = String(evaluator.id ?? '').trim()
+  const evaluatorLogin = normalizeEvaluatorValue(evaluator.login)
+  const evaluatorEmail = normalizeEvaluatorValue(evaluator.email)
+  const evaluatorName = normalizeEvaluatorValue(evaluator.fullName)
+
+  return (
+    (assigned.id && evaluatorId && assigned.id === evaluatorId) ||
+    (assigned.login && evaluatorLogin && normalizeEvaluatorValue(assigned.login) === evaluatorLogin) ||
+    (assigned.email && evaluatorEmail && normalizeEvaluatorValue(assigned.email) === evaluatorEmail) ||
+    (assigned.fullName && evaluatorName && normalizeEvaluatorValue(assigned.fullName) === evaluatorName)
+  )
+}
+
+export function resolveExperienceEvaluationEvaluatorFromDirectory(
+  payloadOrCampos: unknown,
+  evaluators: EvaluatorIdentity[],
+) {
+  const payloadRecord = asRecord(payloadOrCampos)
+  const likelyCampos = asRecord(payloadRecord.campos)
+  const hasPayloadShape = Object.keys(payloadRecord).some((key) =>
+    ['campos', 'metadata', 'requestData', 'dynamicForm'].includes(key),
+  )
+  const sourcePayload = hasPayloadShape ? payloadOrCampos : { campos: likelyCampos }
+
+  const assigned = resolveExperienceEvaluationAssignedEvaluator(sourcePayload)
+  const byIdentity = evaluators.find((evaluator) => matchesEvaluatorByIdentity(evaluator, assigned))
+  if (byIdentity) return byIdentity
+  return null
+}
+
+export function patchExperienceEvaluationEvaluatorPayload(
+  payload: unknown,
+  evaluator: EvaluatorIdentity | null,
+) {
+  const root = isObjectRecord(payload) ? payload : {}
+  const sections: Array<'campos' | 'metadata' | 'requestData' | 'dynamicForm'> = [
+    'campos',
+    'metadata',
+    'requestData',
+    'dynamicForm',
+  ]
+
+  const result: Dict = { ...root }
+  for (const section of sections) {
+    const currentSection = isObjectRecord(result[section]) ? (result[section] as Dict) : {}
+    result[section] = patchExperienceEvaluationEvaluatorFields(currentSection, evaluator)
+  }
+
+  return result
+}
+
 export function isExperienceEvaluationEvaluator(
   solicitation: { payload?: unknown; approverId?: string | null },
   user: {

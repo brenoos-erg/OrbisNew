@@ -33,6 +33,7 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
   listExperienceEvaluators,
+  patchExperienceEvaluationEvaluatorPayload,
   patchExperienceEvaluationEvaluatorFields,
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
@@ -621,7 +622,11 @@ export const POST = withModuleLevel(
               { status: 400 },
             )
           }
-          payload.campos = patchExperienceEvaluationEvaluatorFields(payload.campos ?? {}, gestorSelecionado)
+          const normalizedPayload = patchExperienceEvaluationEvaluatorPayload(payload, gestorSelecionado)
+          payload.campos = normalizedPayload.campos ?? patchExperienceEvaluationEvaluatorFields(payload.campos ?? {}, gestorSelecionado)
+          payload.metadata = normalizedPayload.metadata ?? payload.metadata
+          payload.requestData = normalizedPayload.requestData ?? payload.requestData
+          payload.dynamicForm = normalizedPayload.dynamicForm ?? payload.dynamicForm
         }
 
         if (isSolicitacaoInclusaoPlanoDependentes(tipo)) {

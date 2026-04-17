@@ -8,7 +8,7 @@ const visibilitySource = fs.readFileSync('src/lib/solicitationVisibility.ts', 'u
 
 assert.match(
   createRoute,
-  /payload\.campos\s*=\s*patchExperienceEvaluationEvaluatorFields\(payload\.campos \?\? \{\}, gestorSelecionado\)/,
+  /patchExperienceEvaluationEvaluatorPayload\(payload,\s*gestorSelecionado\)/,
   'A criação da avaliação deve persistir referência canônica do avaliador no payload.',
 )
 

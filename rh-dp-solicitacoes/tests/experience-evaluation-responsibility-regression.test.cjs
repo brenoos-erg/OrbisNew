@@ -22,7 +22,7 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 {
   assert.match(
     evaluatorSource,
-    /export function patchExperienceEvaluationEvaluatorFields\(/,
+    /export function patchExperienceEvaluationEvaluatorPayload\(/,
     'A normalização estrutural deve manter id\/nome\/login\/email sincronizados entre frontend e backend.',
   )
 }
@@ -42,6 +42,16 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
     source,
     /tipoId:\s*EXPERIENCE_EVALUATION_TIPO_ID,\s*[\s\S]*status:\s*EXPERIENCE_EVALUATION_STATUS,\s*[\s\S]*OR:\s*\[\{ solicitanteId: input\.userId \}, \{ approverId: input\.userId \}/,
     'A visibilidade de recebidas da avaliação deve incluir o próprio solicitante.',
+  )
+}
+
+{
+  const detailSource = fs.readFileSync('src/app/api/solicitacoes/[id]/route.ts', 'utf8')
+
+  assert.match(
+    detailSource,
+    /patchExperienceEvaluationEvaluatorPayload\(payload,\s*resolvedEvaluator\)/,
+    'A API de detalhes deve devolver payload da avaliação com referência canônica de responsabilidade sincronizada.',
   )
 }
 

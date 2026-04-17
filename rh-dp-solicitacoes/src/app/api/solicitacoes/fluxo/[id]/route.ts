@@ -5,8 +5,9 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
   listExperienceEvaluators,
+  patchExperienceEvaluationEvaluatorPayload,
   patchExperienceEvaluationEvaluatorFields,
-  resolveExperienceEvaluationAssignedEvaluator,
+  resolveExperienceEvaluationEvaluatorFromDirectory,
 } from '@/lib/experienceEvaluation'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
@@ -91,21 +92,10 @@ function normalizeStringValue(value: unknown) {
 
 function resolveExperienceEvaluatorId(
   campos: Record<string, unknown>,
-  evaluators: Array<{ id: string; fullName: string }>,
+  evaluators: Array<{ id: string; fullName: string; login?: string | null; email?: string | null }>,
 ) {
-  const assigned = resolveExperienceEvaluationAssignedEvaluator({ campos })
-  const byAssignedId = normalizeStringValue(assigned.id)
-  if (byAssignedId && evaluators.some((user) => user.id === byAssignedId)) return byAssignedId
-
-  const byAssignedName = normalizeStringValue(assigned.fullName).toLocaleLowerCase('pt-BR')
-  if (byAssignedName) {
-    const matchedByName = evaluators.find(
-      (user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byAssignedName,
-    )
-    if (matchedByName) return matchedByName.id
-  }
-
-  return ''
+  const resolved = resolveExperienceEvaluationEvaluatorFromDirectory({ campos }, evaluators)
+  return normalizeStringValue(resolved?.id)
 }
 
 function stringifyComparable(value: unknown) {
@@ -440,8 +430,9 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     let resolvedResponsibleId: string | null | undefined = undefined
     let resolvedDepartmentId: string | null | undefined = undefined
     let experienceEvaluatorChanged = false
-      if (hasExperienceEvaluatorField) {
-      const experienceEvaluators = await listExperienceEvaluators()
+    let experienceEvaluators: Array<{ id: string; fullName: string; login?: string | null; email?: string | null }> = []
+    if (hasExperienceEvaluatorField) {
+      experienceEvaluators = await listExperienceEvaluators()
       const previousEvaluatorId = resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
       const evaluatorId = resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
 
@@ -489,6 +480,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       }
 
       if (normalizedField.includes('aprovador') || normalizedField.includes('avaliador')) {
+        if (experienceEvaluatorChanged) continue
         const targetApproverId = resolveUserIdFromValue(afterValue, activeUsers)
         if (targetApproverId && targetApproverId !== solicitation.approverId) {
           resolvedApproverId = targetApproverId
@@ -510,6 +502,16 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       ...currentPayload,
       campos: mergedCampos,
     }
+    const canonicalExperiencePayload =
+      hasExperienceEvaluatorField && isExperienceEvaluation
+        ? patchExperienceEvaluationEvaluatorPayload(
+            updatedPayload,
+            resolveExperienceEvaluationEvaluatorFromDirectory(
+              { campos: mergedCampos },
+              experienceEvaluators,
+            ) ?? null,
+          )
+        : updatedPayload
 
     const updated = await prisma.$transaction(async (tx) => {
       const shouldReopenExperienceEvaluatorStage =
@@ -522,7 +524,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
         data: {
           titulo: typeof body.titulo === 'string' ? body.titulo : solicitation.titulo,
           descricao: typeof body.descricao === 'string' || body.descricao === null ? body.descricao : solicitation.descricao,
-          payload: updatedPayload as any,
+          payload: canonicalExperiencePayload as any,
           ...(resolvedApproverId !== undefined ? { approverId: resolvedApproverId } : {}),
           ...(resolvedResponsibleId !== undefined ? { assumidaPorId: resolvedResponsibleId } : {}),
           ...(resolvedDepartmentId !== undefined ? { departmentId: resolvedDepartmentId } : {}),
