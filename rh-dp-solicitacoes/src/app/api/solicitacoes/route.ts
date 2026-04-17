@@ -226,7 +226,7 @@ export const GET = withModuleLevel(
                   { requiresApproval: true },
                   { approvalStatus: 'PENDENTE' },
                    {
-                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: { in: ['RQ.063', 'RQ.RH.001'] } } }],
+                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: { in: ['RQ.RH.063', 'RQ.063', 'RQ.RH.001'] } } }],
                   },
                 ],
               },
@@ -693,6 +693,17 @@ export const POST = withModuleLevel(
         }
 
         if (isSolicitacaoPessoalTipo) {
+          const previstoContrato = String(campos.previstoContrato ?? '').trim()
+          if (!previstoContrato) {
+            return NextResponse.json(
+              {
+                error:
+                  'Preencha o campo obrigatório "Previsto em contrato (Salários, Benefícios, Carga Horária e outros)".',
+              },
+              { status: 400 },
+            )
+          }
+
           const motivoNormalizado =
             normalizeSolicitacaoPessoalMotivoVaga(campos.motivoVaga) ??
             normalizeSolicitacaoPessoalMotivoVaga(campos.motivoDaVaga) ??
@@ -715,6 +726,7 @@ export const POST = withModuleLevel(
 
           payload.campos = {
             ...(payload.campos ?? {}),
+            previstoContrato,
             motivoVaga: motivoNormalizado,
             motivoDaVaga: motivoNormalizado,
           }
@@ -866,7 +878,7 @@ export const POST = withModuleLevel(
             ...(payload as Record<string, any>),
             sst: {
               categoria: 'SERVIÇOS DE SST',
-              solicitacaoCodigo: 'RQ.092',
+              solicitacaoCodigo: 'RQ.SST.092',
               solicitacaoNome: 'SOLICITAÇÃO DE EXAMES',
               prazoLabel: '1 - DIA(S)',
               prazoDias: 1,
@@ -894,7 +906,7 @@ export const POST = withModuleLevel(
               solicitationId: created.id,
               status: 'AGUARDANDO_ATENDIMENTO',
               message:
-                'Solicitação RQ.092 criada e encaminhada automaticamente para SEGURANÇA DO TRABALHO.',
+                'Solicitação RQ.SST.092 criada e encaminhada automaticamente para SEGURANÇA DO TRABALHO.',
             },
           })
 
@@ -1135,7 +1147,7 @@ export const POST = withModuleLevel(
             ...(payload as Record<string, any>),
             epiUniforme: {
               categoria: 'SERVIÇOS DE LOGÍSTICA',
-              solicitacaoCodigo: 'RQ.043',
+              solicitacaoCodigo: 'RQ.SST.043',
               solicitacaoNome: 'REQUISIÇÃO DE EPI S/UNIFORMES',
               centroResponsavelLabel: sstDepartment.name,
               logisticaDepartmentId: logisticaDepartment?.id ?? null,

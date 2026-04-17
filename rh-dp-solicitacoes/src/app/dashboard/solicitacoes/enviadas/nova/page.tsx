@@ -524,7 +524,7 @@ export default function NovaSolicitacaoPage() {
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
   const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(selectedTipo);
   const isSolicitacaoExamesSst =
-    selectedTipo?.id === 'RQ_092' || ['RQ.092', 'RQ.SST.002'].includes(selectedTipo?.codigo?.toUpperCase() ?? '');
+    selectedTipo?.id === 'RQ_092' || ['RQ.SST.092', 'RQ.092', 'RQ.SST.002'].includes(selectedTipo?.codigo?.toUpperCase() ?? '');
   const isRQ247 = selectedTipo?.id === 'RQ_247';
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
@@ -950,8 +950,16 @@ export default function NovaSolicitacaoPage() {
               ? 'Aumento'
               : null;
 
-        if (!motivoSelecionado) {
+       if (!motivoSelecionado) {
           setSubmitError('Selecione o motivo da vaga (Aumento ou Substituição).');
+          setSubmitting(false);
+          return;
+        }
+
+        if (!String(extras.previstoContrato ?? '').trim()) {
+          setSubmitError(
+            'Preencha o campo obrigatório "Previsto em contrato (Salários, Benefícios, Carga Horária e outros)".',
+          );
           setSubmitting(false);
           return;
         }
@@ -2302,6 +2310,7 @@ useEffect(() => {
                       onChange={(e: TextAreaChange) =>
                         handleExtraChange('previstoContrato', e.target.value)
                       }
+                      required
                     />
                   </div>
                 </section>

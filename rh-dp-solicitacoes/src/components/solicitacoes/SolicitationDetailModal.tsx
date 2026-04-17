@@ -506,6 +506,7 @@ export function SolicitationDetailModal({
   const [savingNadaConsta, setSavingNadaConsta] = useState(false)
   const [activeSector, setActiveSector] =
     useState<NadaConstaSetorKey | null>(null)
+  const [isEditingNadaConstaSetor, setIsEditingNadaConstaSetor] = useState(false)
   const [isNadaConstaSetorOpen, setIsNadaConstaSetorOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [gestorAvaliacaoForm, setGestorAvaliacaoForm] =
@@ -522,6 +523,7 @@ export function SolicitationDetailModal({
   useEffect(() => {
     setDetail(detailProp)
     setActiveSector(null)
+    setIsEditingNadaConstaSetor(false)
   }, [detailProp?.id])
 
 
@@ -887,7 +889,7 @@ export function SolicitationDetailModal({
     Boolean(activeSector) &&
     userCanEditSetor &&
     !isFinalizadaOuCancelada &&
-    !isSetorConcluido
+    (!isSetorConcluido || isEditingNadaConstaSetor)
 
   // pode assumir se não estiver concluída/cancelada;
   // em Nada Consta, apenas DP (ou admin) pode assumir
@@ -1016,6 +1018,7 @@ export function SolicitationDetailModal({
       {},
     )
     setNadaConstaCampos(nextCampos)
+    setIsEditingNadaConstaSetor(false)
   }, [
     camposNadaConstaSetor,
     constaFieldName,
@@ -1304,6 +1307,7 @@ export function SolicitationDetailModal({
       }
 
       await refreshDetailFromServer()
+      setIsEditingNadaConstaSetor(false)
       if (finalizar) {
         setCloseSuccess('Seção finalizada com sucesso.')
       }
@@ -3378,6 +3382,17 @@ async function handleEncaminharAprovacaoComAnexo() {
                             className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
                           >
                             Finalizar setor
+                          </button>
+                        </div>
+                      )}
+                      {camposNadaConstaSetor.length > 0 && userCanEditSetor && !isFinalizadaOuCancelada && isSetorConcluido && !isEditingNadaConstaSetor && (
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingNadaConstaSetor(true)}
+                            className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
+                          >
+                            Editar resposta do setor
                           </button>
                         </div>
                       )}

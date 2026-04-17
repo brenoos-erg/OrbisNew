@@ -7,6 +7,7 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
+import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 
 function canAccessAction(
   action: { createdById: string | null; responsavelId: string | null; nonConformity?: { solicitanteId: string } | null },
@@ -60,23 +61,6 @@ function normalizeEvidenceText(value: unknown) {
     })
     .join('\n')
   return normalized || null
-}
-
-function resolveStatusForPatch(currentStatus: NonConformityActionStatus, nextStatus: unknown) {
-  if (!Object.values(NonConformityActionStatus).includes(nextStatus as NonConformityActionStatus)) return undefined
-
-  const typedStatus = nextStatus as NonConformityActionStatus
-  if (typedStatus === NonConformityActionStatus.CONCLUIDA) return typedStatus
-  if (typedStatus === NonConformityActionStatus.CANCELADA) return typedStatus
-
-  if (typedStatus === NonConformityActionStatus.PENDENTE || typedStatus === NonConformityActionStatus.EM_ANDAMENTO) {
-    if (currentStatus === NonConformityActionStatus.CANCELADA || currentStatus === NonConformityActionStatus.CONCLUIDA) {
-      return NonConformityActionStatus.PENDENTE
-    }
-    return typedStatus
-  }
-
-  return undefined
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ actionId: string }> }) {
@@ -143,7 +127,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
 
-    const desiredStatus = resolveStatusForPatch(current.status, body?.status)
+    const nextPrazo = body?.prazo !== undefined ? (body?.prazo ? new Date(String(body.prazo)) : null) : current.prazo
+    const nextDataInicioPrevista =
+      body?.dataInicioPrevista !== undefined ? toDate(body?.dataInicioPrevista) : current.dataInicioPrevista
+    const nextDataConclusaoRaw =
+      body?.dataConclusao !== undefined ? toDate(body?.dataConclusao) : current.dataConclusao
+    const desiredStatus = resolveAutomaticActionStatus({
+      currentStatus: current.status,
+      requestedStatus: body?.status,
+      prazo: nextPrazo,
+      dataInicioPrevista: nextDataInicioPrevista,
+      dataConclusao: nextDataConclusaoRaw,
+    })
     const observacao = String(body?.observacao || '').trim()
     const shouldSetConclusion = desiredStatus === NonConformityActionStatus.CONCLUIDA
     const shouldClearConclusion = desiredStatus === NonConformityActionStatus.PENDENTE || desiredStatus === NonConformityActionStatus.EM_ANDAMENTO

@@ -49,7 +49,10 @@ export function buildReceivedSolicitationVisibilityWhere(
     return {}
   }
 
-  const regularSolicitationOrFilters: Prisma.SolicitationWhereInput[] = [{ assumidaPorId: input.userId }]
+  const regularSolicitationOrFilters: Prisma.SolicitationWhereInput[] = [
+    { assumidaPorId: input.userId },
+    { solicitanteId: input.userId },
+  ]
 
   if (input.userDepartmentIds.length > 0) {
     regularSolicitationOrFilters.push({
@@ -198,6 +201,7 @@ export function canUserViewSolicitationByDepartment(
   solicitation: SolicitationLike,
 ) {
   if (input.role === 'ADMIN') return true
+  if (solicitation.solicitanteId === input.userId) return true
   if (solicitation.assumidaPorId === input.userId) return true
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&

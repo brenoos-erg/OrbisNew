@@ -48,6 +48,9 @@ export const SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT = 'RQ_089'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
 export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
+export const SOLICITACAO_PESSOAL_CODIGO = 'RQ.RH.063'
+export const SOLICITACAO_EXAMES_SST_CODIGO = 'RQ.SST.092'
+export const SOLICITACAO_EPI_UNIFORME_CODIGO = 'RQ.SST.043'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_TIPO_ID = 'RQ_091'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO = 'RQ.091'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO_LEGADO = 'RQ.RH.003'
@@ -366,14 +369,24 @@ export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EXAMES_SST_TIPO_ID) return true
   const nome = normalizeSolicitacaoName(tipo.nome)
-  return nome.includes('RQ.092') || nome.includes('RQ_092') || nome.includes('SOLICITACAO DE EXAMES')
+  return (
+    nome.includes('RQ.092') ||
+    nome.includes('RQ.SST.092') ||
+    nome.includes('RQ_092') ||
+    nome.includes('SOLICITACAO DE EXAMES')
+  )
 }
 export function isSolicitacaoEpiUniforme(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EPI_UNIFORME_TIPO_ID) return true
    const nome = normalizeSolicitacaoName(tipo.nome)
-  return nome.includes('RQ.043') || nome.includes('RQ_043') || nome.includes('REQUISICAO DE EPI')
+  return (
+    nome.includes('RQ.043') ||
+    nome.includes('RQ.SST.043') ||
+    nome.includes('RQ_043') ||
+    nome.includes('REQUISICAO DE EPI')
+  )
 }
 
 export function isSolicitacaoInclusaoPlanoDependentes(
@@ -409,7 +422,12 @@ export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
   if (id === 'RQ_063') return true
   const nome = normalizeSolicitacaoName(tipo.nome)
   if (nome.includes('DESLIGAMENTO')) return false
-  return nome.includes('RQ_063') || nome.includes('RQ.063') || nome.includes('SOLICITACAO DE PESSOAL')
+  return (
+    nome.includes('RQ_063') ||
+    nome.includes('RQ.063') ||
+    nome.includes('RQ.RH.063') ||
+    nome.includes('SOLICITACAO DE PESSOAL')
+  )
 }
 export function isSolicitacaoAdmissao(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
