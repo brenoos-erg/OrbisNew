@@ -11,5 +11,8 @@ assert.match(fluxoSource, /resolvedApproverId = evaluatorId \|\| null/)
 assert.match(fluxoSource, /resolvedResponsibleId = null/)
 assert.match(fluxoSource, /let experienceEvaluatorChanged = false/)
 assert.match(fluxoSource, /if \(experienceEvaluatorChanged\) continue/)
+assert.match(fluxoSource, /patchExperienceEvaluationEvaluatorFields\(/)
+assert.match(fluxoSource, /const shouldReopenExperienceEvaluatorStage =/)
+assert.match(fluxoSource, /status:\s*EXPERIENCE_EVALUATION_STATUS/)
 
 console.log('✅ experience-evaluation-flow-edit-regression.test passed')

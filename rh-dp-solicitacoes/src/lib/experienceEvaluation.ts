@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { EXPERIENCE_EVALUATOR_GROUP_NAME } from '@/lib/experienceEvaluation.constants'
 import {
   isExperienceEvaluationEvaluator,
+  patchExperienceEvaluationEvaluatorFields,
   resolveExperienceEvaluationAssignedEvaluator,
 } from '@/lib/experienceEvaluation.shared'
 
@@ -19,7 +20,7 @@ export async function listExperienceEvaluators() {
     select: {
       members: {
         select: {
-          user: { select: { id: true, fullName: true } },
+          user: { select: { id: true, fullName: true, login: true, email: true } },
         },
       },
     },
@@ -64,5 +65,6 @@ export async function resolveRhDepartmentForExperienceEvaluation() {
 
 export {
   isExperienceEvaluationEvaluator,
+  patchExperienceEvaluationEvaluatorFields,
   resolveExperienceEvaluationAssignedEvaluator,
 }

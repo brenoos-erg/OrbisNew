@@ -66,7 +66,7 @@ assert.match(
 )
 assert.match(
   enviadasPage,
-  /if \(!sessionData\?\.appUser\) \{\s*setSessionExpired\(true\)\s*[\s\S]*Sua sessão expirou\. Faça login novamente\./s,
+  /if \(!sessionData\?\.appUser\) \{\s*expireSessionLocally\(true\)\s*return\s*\}/s,
   'A tela de enviadas deve expirar sessão e interromper chamadas quando não houver appUser.',
 )
 assert.match(

@@ -10,6 +10,14 @@ const readString = (obj: Dict, key: string): string => {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+const readAnyString = (obj: Dict, keys: string[]): string => {
+  for (const key of keys) {
+    const value = readString(obj, key)
+    if (value) return value
+  }
+  return ''
+}
+
 const normalize = (value: unknown) =>
   String(value ?? '')
     .trim()
@@ -32,22 +40,67 @@ export function resolveExperienceEvaluationAssignedEvaluator(payload: unknown) {
   }
 
   return {
-    id:
-      readString(merged, 'gestorImediatoAvaliadorId') ||
-      readString(merged, 'avaliadorId') ||
-      readString(merged, 'gestorId'),
-    login:
-      readString(merged, 'gestorImediatoAvaliadorLogin') ||
-      readString(merged, 'avaliadorLogin') ||
-      readString(merged, 'gestorLogin'),
-    email:
-      readString(merged, 'gestorImediatoAvaliadorEmail') ||
-      readString(merged, 'avaliadorEmail') ||
-      readString(merged, 'gestorEmail'),
-    fullName:
-      readString(merged, 'gestorImediatoAvaliador') ||
-      readString(merged, 'avaliador') ||
-      readString(merged, 'gestor'),
+    id: readAnyString(merged, ['gestorImediatoAvaliadorId', 'avaliadorId', 'gestorId']),
+    login: readAnyString(merged, [
+      'gestorImediatoAvaliadorLogin',
+      'avaliadorLogin',
+      'gestorLogin',
+    ]),
+    email: readAnyString(merged, [
+      'gestorImediatoAvaliadorEmail',
+      'avaliadorEmail',
+      'gestorEmail',
+    ]),
+    fullName: readAnyString(merged, ['gestorImediatoAvaliador', 'avaliador', 'gestor']),
+  }
+}
+
+export function patchExperienceEvaluationEvaluatorFields(
+  campos: Record<string, unknown>,
+  evaluator: {
+    id: string
+    fullName?: string | null
+    login?: string | null
+    email?: string | null
+  } | null,
+) {
+  const normalizedId = String(evaluator?.id ?? '').trim()
+  const normalizedName = String(evaluator?.fullName ?? '').trim()
+  const normalizedLogin = String(evaluator?.login ?? '').trim()
+  const normalizedEmail = String(evaluator?.email ?? '').trim()
+
+  if (!normalizedId) {
+    return {
+      ...campos,
+      gestorImediatoAvaliadorId: '',
+      gestorImediatoAvaliador: '',
+      gestorImediatoAvaliadorLogin: '',
+      gestorImediatoAvaliadorEmail: '',
+      avaliadorId: '',
+      avaliador: '',
+      avaliadorLogin: '',
+      avaliadorEmail: '',
+      gestorId: '',
+      gestor: '',
+      gestorLogin: '',
+      gestorEmail: '',
+    }
+  }
+
+  return {
+    ...campos,
+    gestorImediatoAvaliadorId: normalizedId,
+    gestorImediatoAvaliador: normalizedName,
+    gestorImediatoAvaliadorLogin: normalizedLogin,
+    gestorImediatoAvaliadorEmail: normalizedEmail,
+    avaliadorId: normalizedId,
+    avaliador: normalizedName,
+    avaliadorLogin: normalizedLogin,
+    avaliadorEmail: normalizedEmail,
+    gestorId: normalizedId,
+    gestor: normalizedName,
+    gestorLogin: normalizedLogin,
+    gestorEmail: normalizedEmail,
   }
 }
 
