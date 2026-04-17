@@ -14,8 +14,16 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 {
   assert.match(
     evaluatorSource,
-    /readString\(merged, 'gestorImediatoAvaliadorId'\)\s*\|\|\s*readString\(merged, 'avaliadorId'\)\s*\|\|\s*readString\(merged, 'gestorId'\)/,
+    /readAnyString\(merged, \['gestorImediatoAvaliadorId', 'avaliadorId', 'gestorId'\]\)/,
     'Campos dedicados vazios devem cair no fallback avaliador/gestor para manter visibilidade.',
+  )
+}
+
+{
+  assert.match(
+    evaluatorSource,
+    /export function patchExperienceEvaluationEvaluatorFields\(/,
+    'A normalização estrutural deve manter id\/nome\/login\/email sincronizados entre frontend e backend.',
   )
 }
 

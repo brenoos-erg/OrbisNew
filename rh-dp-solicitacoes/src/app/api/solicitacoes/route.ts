@@ -33,6 +33,7 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
   listExperienceEvaluators,
+  patchExperienceEvaluationEvaluatorFields,
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
@@ -620,11 +621,7 @@ export const POST = withModuleLevel(
               { status: 400 },
             )
           }
-          payload.campos = {
-            ...(payload.campos ?? {}),
-            gestorImediatoAvaliadorId,
-            gestorImediatoAvaliador: gestorSelecionado.fullName,
-          }
+          payload.campos = patchExperienceEvaluationEvaluatorFields(payload.campos ?? {}, gestorSelecionado)
         }
 
         if (isSolicitacaoInclusaoPlanoDependentes(tipo)) {

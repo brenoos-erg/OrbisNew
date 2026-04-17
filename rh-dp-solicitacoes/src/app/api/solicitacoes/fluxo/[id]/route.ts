@@ -1,7 +1,13 @@
 import { ApprovalStatus, ModuleLevel, SolicitationStatus } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserModuleLevel, withModuleLevel } from '@/lib/access'
-import { EXPERIENCE_EVALUATION_TIPO_ID, listExperienceEvaluators } from '@/lib/experienceEvaluation'
+import {
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+  listExperienceEvaluators,
+  patchExperienceEvaluationEvaluatorFields,
+  resolveExperienceEvaluationAssignedEvaluator,
+} from '@/lib/experienceEvaluation'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
@@ -87,22 +93,19 @@ function resolveExperienceEvaluatorId(
   campos: Record<string, unknown>,
   evaluators: Array<{ id: string; fullName: string }>,
 ) {
-  const byIdKey = normalizeStringValue(campos.gestorImediatoAvaliadorId)
-  if (byIdKey && evaluators.some((user) => user.id === byIdKey)) return byIdKey
+  const assigned = resolveExperienceEvaluationAssignedEvaluator({ campos })
+  const byAssignedId = normalizeStringValue(assigned.id)
+  if (byAssignedId && evaluators.some((user) => user.id === byAssignedId)) return byAssignedId
 
-  const rawGestor = campos.gestorImediatoAvaliador
-  if (rawGestor && typeof rawGestor === 'object' && !Array.isArray(rawGestor)) {
-    const byObjectId = normalizeStringValue((rawGestor as Record<string, unknown>).id)
-    if (byObjectId && evaluators.some((user) => user.id === byObjectId)) return byObjectId
+  const byAssignedName = normalizeStringValue(assigned.fullName).toLocaleLowerCase('pt-BR')
+  if (byAssignedName) {
+    const matchedByName = evaluators.find(
+      (user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byAssignedName,
+    )
+    if (matchedByName) return matchedByName.id
   }
 
-  const byDirectId = normalizeStringValue(rawGestor)
-  if (byDirectId && evaluators.some((user) => user.id === byDirectId)) return byDirectId
-
-  const byName = normalizeStringValue(rawGestor).toLocaleLowerCase('pt-BR')
-  if (!byName) return ''
-
-  return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
+  return ''
 }
 
 function stringifyComparable(value: unknown) {
@@ -444,19 +447,23 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
 
       if (evaluatorId) {
         const evaluator = experienceEvaluators.find((item) => item.id === evaluatorId)
-        mergedCampos.gestorImediatoAvaliadorId = evaluatorId
-        if (evaluator) mergedCampos.gestorImediatoAvaliador = evaluator.fullName
+        Object.assign(
+          mergedCampos,
+          patchExperienceEvaluationEvaluatorFields(mergedCampos, evaluator ?? { id: evaluatorId }),
+        )
       } else {
         const incomingEvaluatorId = normalizeStringValue(incomingCampos.gestorImediatoAvaliadorId)
         const incomingEvaluator = normalizeStringValue(incomingCampos.gestorImediatoAvaliador)
         if (incomingEvaluatorId === '' || incomingEvaluator === '') {
-          mergedCampos.gestorImediatoAvaliadorId = ''
-          mergedCampos.gestorImediatoAvaliador = ''
+          Object.assign(mergedCampos, patchExperienceEvaluationEvaluatorFields(mergedCampos, null))
         }
       }
 
       if (previousEvaluatorId !== evaluatorId) {
         flowChanges.push(`avaliador alterado (${previousEvaluatorId || '—'} → ${evaluatorId || '—'})`)
+        if ((solicitation.status as string) !== EXPERIENCE_EVALUATION_STATUS) {
+          flowChanges.push(`etapa reaberta (${solicitation.status} → ${EXPERIENCE_EVALUATION_STATUS})`)
+        }
         resolvedApproverId = evaluatorId || null
         resolvedResponsibleId = null
         experienceEvaluatorChanged = true
@@ -505,6 +512,11 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const shouldReopenExperienceEvaluatorStage =
+        isExperienceEvaluation &&
+        resolvedApproverId !== undefined &&
+        solicitation.status !== EXPERIENCE_EVALUATION_STATUS
+
       const solicitationUpdated = await tx.solicitation.update({
         where: { id },
         data: {
@@ -514,6 +526,13 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
           ...(resolvedApproverId !== undefined ? { approverId: resolvedApproverId } : {}),
           ...(resolvedResponsibleId !== undefined ? { assumidaPorId: resolvedResponsibleId } : {}),
           ...(resolvedDepartmentId !== undefined ? { departmentId: resolvedDepartmentId } : {}),
+          ...(shouldReopenExperienceEvaluatorStage
+            ? {
+                status: EXPERIENCE_EVALUATION_STATUS,
+                dataFechamento: null,
+                dataCancelamento: null,
+              }
+            : {}),
           // Regra de negócio: manter dataAbertura original e não resetar automaticamente prazos/SLA.
           // O recálculo de SLA deve ser tratado por rotina específica, se necessário.
         },
