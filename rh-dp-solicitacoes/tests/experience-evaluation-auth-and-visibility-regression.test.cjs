@@ -25,6 +25,11 @@ assert.match(
 
 assert.match(
   recebidasPage,
+  /if \(!sessionData\?\.appUser\) \{\s*setSessionExpired\(true\)\s*[\s\S]*Sua sessão expirou\. Faça login novamente\./s,
+  'A tela de recebidas deve expirar a sessão localmente quando sessionData.appUser estiver ausente.',
+)
+assert.match(
+  recebidasPage,
   /const \{ data: sessionData, loading: sessionLoading(?:, refresh: refreshSession)? \} = useSessionMe\(\)/,
   'A tela de recebidas deve respeitar estado de sessão antes de consultar a API.',
 )
@@ -58,6 +63,11 @@ assert.match(
   enviadasPage,
   /if \(sessionLoading\) return/,
   'A tela de enviadas não deve disparar chamadas enquanto a sessão carrega.',
+)
+assert.match(
+  enviadasPage,
+  /if \(!sessionData\?\.appUser\) \{\s*setSessionExpired\(true\)\s*[\s\S]*Sua sessão expirou\. Faça login novamente\./s,
+  'A tela de enviadas deve expirar sessão e interromper chamadas quando não houver appUser.',
 )
 assert.match(
   enviadasPage,

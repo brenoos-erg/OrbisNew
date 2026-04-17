@@ -164,6 +164,16 @@ export default function ReceivedRequestsPage() {
   const [detailMode, setDetailMode] = useState<'default' | 'approval'>('default')
   const [sessionExpired, setSessionExpired] = useState(false)
 
+  useEffect(() => {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (sessionData?.appUser) return
+
+    setSessionExpired(true)
+    setData({ rows: [], total: 0 })
+    setError('Sua sessão expirou. Faça login novamente.')
+  }, [sessionData?.appUser, sessionExpired, sessionLoading])
+
   async function fetchList() {
     if (sessionLoading) return
     if (sessionExpired) return

@@ -20,6 +20,14 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 }
 
 {
+  assert.match(
+    evaluatorSource,
+    /return Boolean\(userId\) && String\(solicitation\.approverId \?\? ''\)\.trim\(\) === userId/,
+    'Quando payload não casar por id/login/email/nome, a checagem deve cair no fallback por approverId.',
+  )
+}
+
+{
   const source = fs.readFileSync('src/lib/solicitationVisibility.ts', 'utf8')
 
   assert.match(
