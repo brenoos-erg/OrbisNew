@@ -26,6 +26,9 @@ export function buildSensitiveHiringTipoWhere(): Prisma.TipoSolicitacaoWhereInpu
 
 export function buildSensitiveHiringVisibilityWhere(input: {
   userId: string
+  userLogin?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
   role?: Role | null
   departmentIds?: string[]
 }) {
@@ -47,6 +50,37 @@ export function buildSensitiveHiringVisibilityWhere(input: {
     participantFilters.push({ id: { not: '' } })
   }
 
+  const normalizedLogin = normalizeParticipantValue(input.userLogin)
+  const normalizedEmail = normalizeParticipantValue(input.userEmail)
+  const normalizedFullName = normalizeParticipantValue(input.userFullName)
+
+  for (const path of EXPERIENCE_EVALUATOR_ID_PATHS) {
+    participantFilters.push({
+      AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: input.userId } }],
+    })
+  }
+  if (normalizedLogin) {
+    for (const path of EXPERIENCE_EVALUATOR_LOGIN_PATHS) {
+      participantFilters.push({
+        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedLogin } }],
+      })
+    }
+  }
+  if (normalizedEmail) {
+    for (const path of EXPERIENCE_EVALUATOR_EMAIL_PATHS) {
+      participantFilters.push({
+        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedEmail } }],
+      })
+    }
+  }
+  if (normalizedFullName) {
+    for (const path of EXPERIENCE_EVALUATOR_NAME_PATHS) {
+      participantFilters.push({
+        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedFullName } }],
+      })
+    }
+  }
+
   return {
     OR: [
       { tipo: { NOT: buildSensitiveHiringTipoWhere() } },
@@ -58,6 +92,70 @@ export function buildSensitiveHiringVisibilityWhere(input: {
       },
     ],
   } satisfies Prisma.SolicitationWhereInput
+}
+
+const EXPERIENCE_EVALUATOR_ID_PATHS = [
+  '$.campos.gestorImediatoAvaliadorId',
+  '$.metadata.gestorImediatoAvaliadorId',
+  '$.requestData.gestorImediatoAvaliadorId',
+  '$.dynamicForm.gestorImediatoAvaliadorId',
+  '$.campos.avaliadorId',
+  '$.metadata.avaliadorId',
+  '$.requestData.avaliadorId',
+  '$.dynamicForm.avaliadorId',
+  '$.campos.gestorId',
+  '$.metadata.gestorId',
+  '$.requestData.gestorId',
+  '$.dynamicForm.gestorId',
+] as const
+
+const EXPERIENCE_EVALUATOR_LOGIN_PATHS = [
+  '$.campos.gestorImediatoAvaliadorLogin',
+  '$.metadata.gestorImediatoAvaliadorLogin',
+  '$.requestData.gestorImediatoAvaliadorLogin',
+  '$.dynamicForm.gestorImediatoAvaliadorLogin',
+  '$.campos.avaliadorLogin',
+  '$.metadata.avaliadorLogin',
+  '$.requestData.avaliadorLogin',
+  '$.dynamicForm.avaliadorLogin',
+  '$.campos.gestorLogin',
+  '$.metadata.gestorLogin',
+  '$.requestData.gestorLogin',
+  '$.dynamicForm.gestorLogin',
+] as const
+
+const EXPERIENCE_EVALUATOR_EMAIL_PATHS = [
+  '$.campos.gestorImediatoAvaliadorEmail',
+  '$.metadata.gestorImediatoAvaliadorEmail',
+  '$.requestData.gestorImediatoAvaliadorEmail',
+  '$.dynamicForm.gestorImediatoAvaliadorEmail',
+  '$.campos.avaliadorEmail',
+  '$.metadata.avaliadorEmail',
+  '$.requestData.avaliadorEmail',
+  '$.dynamicForm.avaliadorEmail',
+  '$.campos.gestorEmail',
+  '$.metadata.gestorEmail',
+  '$.requestData.gestorEmail',
+  '$.dynamicForm.gestorEmail',
+] as const
+
+const EXPERIENCE_EVALUATOR_NAME_PATHS = [
+  '$.campos.gestorImediatoAvaliador',
+  '$.metadata.gestorImediatoAvaliador',
+  '$.requestData.gestorImediatoAvaliador',
+  '$.dynamicForm.gestorImediatoAvaliador',
+  '$.campos.avaliador',
+  '$.metadata.avaliador',
+  '$.requestData.avaliador',
+  '$.dynamicForm.avaliador',
+  '$.campos.gestor',
+  '$.metadata.gestor',
+  '$.requestData.gestor',
+  '$.dynamicForm.gestor',
+] as const
+
+function normalizeParticipantValue(value?: string | null) {
+  return String(value ?? '').trim() || null
 }
 
 export function canViewSensitiveHiringRequest(input: {
