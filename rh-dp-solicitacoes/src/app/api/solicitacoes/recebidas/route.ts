@@ -57,6 +57,9 @@ export async function GET(req: NextRequest) {
       ...(where.AND ?? []),
       buildSensitiveHiringVisibilityWhere({
         userId: me.id,
+        userLogin: me.login,
+        userEmail: me.email,
+        userFullName: me.fullName,
         role: me.role,
         departmentIds: userDepartmentIdsForSensitive,
       }),
