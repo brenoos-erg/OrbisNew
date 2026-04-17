@@ -144,7 +144,7 @@ function buildPaginationItems(
 }
 
 export default function ReceivedRequestsPage() {
-  const { data: sessionData, loading: sessionLoading } = useSessionMe()
+  const { data: sessionData, loading: sessionLoading, refresh: refreshSession } = useSessionMe()
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [formFilters, setFormFilters] = useState<FilterState>(DEFAULT_FILTERS)
 
@@ -162,9 +162,11 @@ export default function ReceivedRequestsPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailMode, setDetailMode] = useState<'default' | 'approval'>('default')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   async function fetchList() {
     if (sessionLoading) return
+    if (sessionExpired) return
     if (!sessionData?.appUser) {
       setData({ rows: [], total: 0 })
       setError('Sua sessão expirou. Faça login novamente.')
@@ -210,6 +212,10 @@ export default function ReceivedRequestsPage() {
       const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`)
       if (!res.ok) {
         const errorPayload = await res.json().catch(() => null)
+        if (res.status === 401) {
+          setSessionExpired(true)
+          await refreshSession({ force: true })
+        }
         throw new Error(
           errorPayload?.error ??
             (res.status === 401
@@ -282,6 +288,7 @@ export default function ReceivedRequestsPage() {
 
   useEffect(() => {
     if (sessionLoading) return
+    if (sessionExpired) return
     if (!sessionData?.appUser) return
 
     fetchList()
@@ -289,7 +296,7 @@ export default function ReceivedRequestsPage() {
 
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, sessionData?.appUser, sessionLoading])
+  }, [filters, sessionData?.appUser, sessionExpired, sessionLoading])
 
   useEffect(() => {
     fetchFilterOptions()

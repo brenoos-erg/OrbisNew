@@ -14,6 +14,7 @@ import { formatCostCenterLabel } from '@/lib/costCenter'
 import { SolicitationStatusBadge } from '@/components/solicitacoes/SolicitationStatusBadge'
 import { TableSkeletonRows } from '@/components/solicitacoes/TableSkeletonRows'
 import { SolicitacoesToastViewport, useSolicitacoesToast } from '@/components/solicitacoes/SolicitacoesToast'
+import { useSessionMe } from '@/components/session/SessionProvider'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,6 +109,7 @@ export default function SentRequestsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { toasts, pushToast, removeToast } = useSolicitacoesToast()
+  const { data: sessionData, loading: sessionLoading, refresh: refreshSession } = useSessionMe()
 
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Row[]>([])
@@ -128,6 +130,7 @@ export default function SentRequestsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   const applyingFromUrlRef = useRef(false)
   const syncedQueryRef = useRef('')
@@ -149,10 +152,27 @@ export default function SentRequestsPage() {
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
 
   const load = useCallback(async (state: SearchState) => {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (!sessionData?.appUser) {
+      setData([])
+      setTotal(0)
+      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+      return
+    }
+
     setLoading(true)
     try {
       const qs = buildQueryFromState(state, true)
       const res = await fetch(`/api/solicitacoes?${qs.toString()}`, { cache: 'no-store' })
+      if (res.status === 401) {
+        setSessionExpired(true)
+        await refreshSession({ force: true })
+        pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+        setData([])
+        setTotal(0)
+        return
+      }
       const json: ApiResponse = await res.json()
       setData(json.rows)
       setTotal(json.total)
@@ -163,7 +183,7 @@ export default function SentRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [pushToast])
+  }, [pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionLoading])
 
   useEffect(() => {
     let active = true
@@ -236,8 +256,11 @@ export default function SentRequestsPage() {
   }, [currentSearchState, pathname, router])
 
   useEffect(() => {
+    if (sessionLoading) return
+    if (sessionExpired) return
+
     load(currentSearchState)
-  }, [currentSearchState, load])
+  }, [currentSearchState, load, sessionExpired, sessionLoading])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
