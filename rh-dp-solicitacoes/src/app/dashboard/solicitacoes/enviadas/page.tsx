@@ -131,6 +131,7 @@ export default function SentRequestsPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [sessionExpiredToastShown, setSessionExpiredToastShown] = useState(false)
 
   const applyingFromUrlRef = useRef(false)
   const syncedQueryRef = useRef('')
@@ -151,6 +152,20 @@ export default function SentRequestsPage() {
 
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
 
+  useEffect(() => {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (sessionData?.appUser) return
+
+    setSessionExpired(true)
+    setData([])
+    setTotal(0)
+    if (!sessionExpiredToastShown) {
+      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+      setSessionExpiredToastShown(true)
+    }
+  }, [pushToast, sessionData?.appUser, sessionExpired, sessionExpiredToastShown, sessionLoading])
+
   const load = useCallback(async (state: SearchState) => {
     if (sessionLoading) return
     if (sessionExpired) return
@@ -158,7 +173,10 @@ export default function SentRequestsPage() {
       setSessionExpired(true)
       setData([])
       setTotal(0)
-      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+      if (!sessionExpiredToastShown) {
+        pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+        setSessionExpiredToastShown(true)
+      }
       return
     }
 
@@ -169,7 +187,10 @@ export default function SentRequestsPage() {
       if (res.status === 401) {
         setSessionExpired(true)
         await refreshSession({ force: true })
-        pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+        if (!sessionExpiredToastShown) {
+          pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+          setSessionExpiredToastShown(true)
+        }
         setData([])
         setTotal(0)
         return
@@ -184,7 +205,7 @@ export default function SentRequestsPage() {
     } finally {
       setLoading(false)
     }
-  }, [pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionLoading])
+  }, [pushToast, refreshSession, sessionData?.appUser, sessionExpired, sessionExpiredToastShown, sessionLoading])
 
   useEffect(() => {
     if (sessionLoading) return
@@ -267,7 +288,6 @@ export default function SentRequestsPage() {
       setSessionExpired(true)
       setData([])
       setTotal(0)
-      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
       return
     }
 
