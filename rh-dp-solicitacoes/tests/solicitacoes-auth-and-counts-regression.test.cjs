@@ -34,4 +34,22 @@ assert.match(
   'A contagem de recebidas deve seguir a mesma política de visibilidade da listagem para avaliação do gestor.',
 )
 
+assert.match(
+  countsRouteSource,
+  /error instanceof Error && error\.message === 'Usuário não autenticado'[\s\S]*status:\s*401/s,
+  'A rota de contagens deve devolver 401 para usuário não autenticado.',
+)
+
+assert.match(
+  countsRouteSource,
+  /error instanceof Error && error\.message === 'Usuário inativo'[\s\S]*status:\s*403/s,
+  'A rota de contagens deve devolver 403 para usuário inativo.',
+)
+
+assert.match(
+  countsRouteSource,
+  /Serviço indisponível\. Não foi possível conectar ao banco de dados\.[\s\S]*status:\s*503/s,
+  'A rota de contagens deve devolver 503 quando o banco estiver indisponível.',
+)
+
 console.log('solicitacoes-auth-and-counts-regression ok')
