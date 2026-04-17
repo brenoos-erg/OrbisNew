@@ -263,9 +263,16 @@ export default function SentRequestsPage() {
   useEffect(() => {
     if (sessionLoading) return
     if (sessionExpired) return
+    if (!sessionData?.appUser) {
+      setSessionExpired(true)
+      setData([])
+      setTotal(0)
+      pushToast('Sua sessão expirou. Faça login novamente.', 'error')
+      return
+    }
 
     load(currentSearchState)
-  }, [currentSearchState, load, sessionExpired, sessionLoading])
+  }, [currentSearchState, load, pushToast, sessionData?.appUser, sessionExpired, sessionLoading])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

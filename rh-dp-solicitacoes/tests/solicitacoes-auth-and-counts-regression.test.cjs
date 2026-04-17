@@ -36,6 +36,12 @@ assert.match(
 
 assert.match(
   countsRouteSource,
+  /status:\s*'AGUARDANDO_FINALIZACAO_AVALIACAO'[\s\S]*AND:\s*\[receivedVisibilityWhere\]/s,
+  'A contagem de finalização de avaliação também deve usar a mesma política de recebidas.',
+)
+
+assert.match(
+  countsRouteSource,
   /error instanceof Error && error\.message === 'Usuário não autenticado'[\s\S]*status:\s*401/s,
   'A rota de contagens deve devolver 401 para usuário não autenticado.',
 )
