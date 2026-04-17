@@ -126,6 +126,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ rows, total })
   } catch (err) {
     console.error('GET /api/solicitacoes/recebidas error', err)
+    if (err instanceof Error && err.message === 'Usuário não autenticado') {
+      return NextResponse.json({ error: err.message }, { status: 401 })
+    }
+    if (err instanceof Error && err.message === 'Usuário inativo') {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
+    if (
+      err instanceof Error &&
+      err.message === 'Serviço indisponível. Não foi possível conectar ao banco de dados.'
+    ) {
+      return NextResponse.json({ error: err.message, dbUnavailable: true }, { status: 503 })
+    }
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === 'P2021' &&

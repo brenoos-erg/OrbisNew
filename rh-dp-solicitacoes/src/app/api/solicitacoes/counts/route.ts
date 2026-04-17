@@ -13,6 +13,9 @@ export async function GET() {
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
       role: me.role,
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
@@ -27,6 +30,9 @@ export async function GET() {
       AND: [
         buildSensitiveHiringVisibilityWhere({
           userId: me.id,
+          userLogin: me.login,
+          userEmail: me.email,
+          userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
         }),
@@ -49,7 +55,7 @@ export async function GET() {
         },
         {
           status: 'AGUARDANDO_AVALIACAO_GESTOR',
-          approverId: me.id,
+          AND: [receivedVisibilityWhere],
         },
         {
           status: 'AGUARDANDO_FINALIZACAO_AVALIACAO',
@@ -62,6 +68,9 @@ export async function GET() {
       AND: [
         buildSensitiveHiringVisibilityWhere({
           userId: me.id,
+          userLogin: me.login,
+          userEmail: me.email,
+          userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
         }),
@@ -82,6 +91,21 @@ export async function GET() {
     return NextResponse.json({ receivedOpenCount, approvalsPendingCount })
   } catch (error) {
     console.error('GET /api/solicitacoes/counts error', error)
+    if (error instanceof Error && error.message === 'Usuário não autenticado') {
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+    if (error instanceof Error && error.message === 'Usuário inativo') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    if (
+      error instanceof Error &&
+      error.message === 'Serviço indisponível. Não foi possível conectar ao banco de dados.'
+    ) {
+      return NextResponse.json(
+        { error: error.message, dbUnavailable: true },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ error: 'Erro ao carregar contagens de solicitações.' }, { status: 500 })
   }
 }

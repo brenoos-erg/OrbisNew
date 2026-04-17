@@ -71,10 +71,25 @@ export function isExperienceEvaluationEvaluator(
   const userEmail = normalize(user.email)
   const userFullName = normalize(user.fullName)
 
-  if (assigned.id) return assigned.id === userId
-  if (assigned.login) return normalize(assigned.login) === userLogin
-  if (assigned.email) return normalize(assigned.email) === userEmail
-  if (assigned.fullName) return normalize(assigned.fullName) === userFullName
+  const matchesByAssignedId = Boolean(assigned.id && userId && assigned.id === userId)
+  const matchesByAssignedLogin = Boolean(
+    assigned.login && userLogin && normalize(assigned.login) === userLogin,
+  )
+  const matchesByAssignedEmail = Boolean(
+    assigned.email && userEmail && normalize(assigned.email) === userEmail,
+  )
+  const matchesByAssignedName = Boolean(
+    assigned.fullName && userFullName && normalize(assigned.fullName) === userFullName,
+  )
+
+  if (
+    matchesByAssignedId ||
+    matchesByAssignedLogin ||
+    matchesByAssignedEmail ||
+    matchesByAssignedName
+  ) {
+    return true
+  }
 
   return Boolean(userId) && String(solicitation.approverId ?? '').trim() === userId
 }

@@ -107,6 +107,33 @@ export function withModuleLevel<
     } catch (err: any) {
       console.error('withModuleLevel error', err)
 
+      if (err instanceof Error && err.message === 'Usuário não autenticado') {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (err instanceof Error && err.message === 'Usuário inativo') {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (
+        err instanceof Error &&
+        err.message === 'Serviço indisponível. Não foi possível conectar ao banco de dados.'
+      ) {
+        return new Response(
+          JSON.stringify({ error: err.message, dbUnavailable: true }),
+          {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
       if (err instanceof Error && err.message.includes('permissão')) {
         return new Response(
           JSON.stringify({ error: err.message }),
