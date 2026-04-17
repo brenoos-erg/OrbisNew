@@ -1,7 +1,7 @@
 import { ApprovalStatus, ModuleLevel, SolicitationStatus } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserModuleLevel, withModuleLevel } from '@/lib/access'
-import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
+import { EXPERIENCE_EVALUATION_TIPO_ID, listExperienceEvaluators } from '@/lib/experienceEvaluation'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
@@ -182,6 +182,21 @@ function normalizeSaudeStatusValue(value: unknown): 'CIENTE' | null {
     .toUpperCase()
   return normalized === 'CIENTE' ? 'CIENTE' : null
 }
+
+const ALWAYS_EDITABLE_FLOW_FIELDS = new Set([
+  'gestorImediatoAvaliador',
+  'gestorImediatoAvaliadorId',
+  'gestorImediatoAvaliadorLogin',
+  'gestorImediatoAvaliadorEmail',
+  'avaliador',
+  'avaliadorId',
+  'avaliadorLogin',
+  'avaliadorEmail',
+  'gestor',
+  'gestorId',
+  'gestorLogin',
+  'gestorEmail',
+])
 
 
 
@@ -386,12 +401,21 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     const currentCampos = ((currentPayload.campos ?? {}) as Record<string, unknown>) ?? {}
     const incomingCampos = body.campos ?? {}
 
+    const isExperienceEvaluation = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID
     const sanitizedCampos = Object.fromEntries(
-      Object.entries(incomingCampos).filter(([key]) => Object.prototype.hasOwnProperty.call(currentCampos, key)),
+      Object.entries(incomingCampos).filter(
+        ([key]) =>
+          Object.prototype.hasOwnProperty.call(currentCampos, key) ||
+          ALWAYS_EDITABLE_FLOW_FIELDS.has(key) ||
+          (isExperienceEvaluation && key.startsWith('gestorImediatoAvaliador')),
+      ),
     )
 
     const mergedCampos = { ...currentCampos, ...sanitizedCampos }
     const hasExperienceEvaluatorField =
+      isExperienceEvaluation ||
+      Object.prototype.hasOwnProperty.call(incomingCampos, 'gestorImediatoAvaliador') ||
+      Object.prototype.hasOwnProperty.call(incomingCampos, 'gestorImediatoAvaliadorId') ||
       Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliador') ||
       Object.prototype.hasOwnProperty.call(mergedCampos, 'gestorImediatoAvaliadorId')
 
@@ -433,6 +457,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       if (previousEvaluatorId !== evaluatorId) {
         flowChanges.push(`avaliador alterado (${previousEvaluatorId || '—'} → ${evaluatorId || '—'})`)
         resolvedApproverId = evaluatorId || null
+        resolvedResponsibleId = null
       }
     }
 
