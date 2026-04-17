@@ -10,6 +10,7 @@ import {
   SolicitationDetailModal,
 } from '@/components/solicitacoes/SolicitationDetailModal'
 import { isSolicitacaoIncentivoEducacao } from '@/lib/solicitationTypes'
+import { useSessionMe } from '@/components/session/SessionProvider'
 
 type FilterState = {
   protocolo: string
@@ -143,6 +144,7 @@ function buildPaginationItems(
 }
 
 export default function ReceivedRequestsPage() {
+  const { data: sessionData, loading: sessionLoading } = useSessionMe()
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [formFilters, setFormFilters] = useState<FilterState>(DEFAULT_FILTERS)
 
@@ -162,6 +164,13 @@ export default function ReceivedRequestsPage() {
   const [detailMode, setDetailMode] = useState<'default' | 'approval'>('default')
 
   async function fetchList() {
+    if (sessionLoading) return
+    if (!sessionData?.appUser) {
+      setData({ rows: [], total: 0 })
+      setError('Sua sessão expirou. Faça login novamente.')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -198,10 +207,15 @@ export default function ReceivedRequestsPage() {
       }
       if (filters.text) params.set('text', filters.text)
 
-        const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`)
+      const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`)
       if (!res.ok) {
         const errorPayload = await res.json().catch(() => null)
-        throw new Error(errorPayload?.error ?? 'Erro ao buscar solicitações recebidas.')
+        throw new Error(
+          errorPayload?.error ??
+            (res.status === 401
+              ? 'Sua sessão expirou. Faça login novamente.'
+              : 'Erro ao buscar solicitações recebidas.'),
+        )
       }
 
       const json = (await res.json()) as ListResponse
@@ -267,12 +281,15 @@ export default function ReceivedRequestsPage() {
 
 
   useEffect(() => {
+    if (sessionLoading) return
+    if (!sessionData?.appUser) return
+
     fetchList()
     const interval = setInterval(fetchList, 5000)
 
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+  }, [filters, sessionData?.appUser, sessionLoading])
 
   useEffect(() => {
     fetchFilterOptions()
