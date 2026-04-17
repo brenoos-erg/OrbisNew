@@ -35,6 +35,11 @@ assert.match(
 )
 assert.match(
   recebidasPage,
+  /if \(!sessionData\?\.appUser\) return/,
+  'A carga de filtros em recebidas também deve aguardar sessão pronta.',
+)
+assert.match(
+  recebidasPage,
   /if \(sessionExpired\) return/,
   'A tela de recebidas deve interromper polling após detectar sessão expirada.',
 )
@@ -53,6 +58,11 @@ assert.match(
   enviadasPage,
   /if \(sessionLoading\) return/,
   'A tela de enviadas não deve disparar chamadas enquanto a sessão carrega.',
+)
+assert.match(
+  enviadasPage,
+  /if \(!sessionData\?\.appUser\) return/,
+  'A carga de filtros em enviadas deve aguardar sessão pronta.',
 )
 assert.match(
   enviadasPage,

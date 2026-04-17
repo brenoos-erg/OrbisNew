@@ -168,6 +168,7 @@ export default function ReceivedRequestsPage() {
     if (sessionLoading) return
     if (sessionExpired) return
     if (!sessionData?.appUser) {
+      setSessionExpired(true)
       setData({ rows: [], total: 0 })
       setError('Sua sessão expirou. Faça login novamente.')
       return
@@ -235,6 +236,10 @@ export default function ReceivedRequestsPage() {
   }
 
   async function fetchFilterOptions() {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (!sessionData?.appUser) return
+
     try {
       const [tiposRes, depRes, ccRes] = await Promise.all([
         fetch('/api/tipos-solicitacao'),
@@ -300,7 +305,8 @@ export default function ReceivedRequestsPage() {
 
   useEffect(() => {
     fetchFilterOptions()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionData?.appUser, sessionExpired, sessionLoading])
 
   useEffect(() => {
     if (!detailOpen || !selectedRow) return
@@ -351,6 +357,14 @@ export default function ReceivedRequestsPage() {
   }
 
   async function exportExcel() {
+    if (sessionLoading) return
+    if (sessionExpired) return
+    if (!sessionData?.appUser) {
+      setSessionExpired(true)
+      setError('Sua sessão expirou. Faça login novamente.')
+      return
+    }
+
     const params = new URLSearchParams()
     params.set('page', '1')
     params.set('pageSize', '1000')
@@ -375,6 +389,12 @@ export default function ReceivedRequestsPage() {
     if (filters.text) params.set('text', filters.text)
     const res = await fetch(`/api/solicitacoes/recebidas?${params.toString()}`)
     if (!res.ok) {
+      if (res.status === 401) {
+        setSessionExpired(true)
+        setError('Sua sessão expirou. Faça login novamente.')
+        await refreshSession({ force: true })
+        return
+      }
       setError('Não foi possível exportar os dados.')
       return
     }
