@@ -92,7 +92,16 @@ export function buildReceivedSolicitationVisibilityWhere(
     {
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
       status: EXPERIENCE_EVALUATION_STATUS,
-      OR: [{ solicitanteId: input.userId }, { approverId: input.userId }, ...evaluatorPayloadFilters],
+      OR: [
+        { solicitanteId: input.userId },
+        { approverId: input.userId },
+        {
+          AND: [
+            { OR: [{ approverId: null }, { approverId: '' }] },
+            ...(evaluatorPayloadFilters.length > 0 ? [{ OR: evaluatorPayloadFilters }] : []),
+          ],
+        },
+      ],
     },
   ]
 

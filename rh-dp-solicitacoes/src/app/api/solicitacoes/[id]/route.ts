@@ -182,10 +182,9 @@ export async function GET(
     })
 
     const payload = (item.payload ?? {}) as Record<string, unknown>
-    const payloadCampos = ((payload.campos as Record<string, unknown> | undefined) ?? {})
     const experienceEvaluators = await listExperienceEvaluators()
     const resolvedEvaluator =
-      resolveExperienceEvaluationEvaluatorFromDirectory({ campos: payloadCampos }, experienceEvaluators) ??
+      resolveExperienceEvaluationEvaluatorFromDirectory(payload, experienceEvaluators) ??
       null
     const normalizedPayload = patchExperienceEvaluationEvaluatorPayload(payload, resolvedEvaluator)
 

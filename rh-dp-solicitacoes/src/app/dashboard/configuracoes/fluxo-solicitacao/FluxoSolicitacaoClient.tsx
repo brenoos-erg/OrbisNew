@@ -197,8 +197,10 @@ export default function FluxoSolicitacaoClient() {
       const evaluatorOptions = data.dataSources.experienceEvaluators ?? []
       const evaluatorId = resolveExperienceEvaluatorId(normalizedFields, evaluatorOptions)
       if (evaluatorId) {
+        const evaluatorName =
+          evaluatorOptions.find((user) => user.id === evaluatorId)?.fullName ?? ''
         normalizedFields.gestorImediatoAvaliadorId = evaluatorId
-        normalizedFields.gestorImediatoAvaliador = evaluatorId
+        normalizedFields.gestorImediatoAvaliador = evaluatorName
       }
     }
     setEditFields(normalizedFields)    
@@ -397,11 +399,12 @@ export default function FluxoSolicitacaoClient() {
               const selectedId = e.target.value
               setEditFields((prev) => {
                 if (!isEvaluatorField) return { ...prev, [field.name]: selectedId }
+                const selectedEvaluator = resolvedOptions.find((option) => option.value === selectedId)
                 return {
                   ...prev,
                   [field.name]: selectedId,
                   gestorImediatoAvaliadorId: selectedId,
-                  gestorImediatoAvaliador: selectedId,
+                  gestorImediatoAvaliador: selectedEvaluator?.label ?? '',
                 }
               })
             }}            className="w-full rounded-md border border-slate-300 px-3 py-2"

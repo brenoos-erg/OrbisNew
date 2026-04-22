@@ -26,7 +26,7 @@ assert.match(
 
 assert.match(
   visibilitySource,
-  /OR:\s*\[\{ solicitanteId: input\.userId \}, \{ approverId: input\.userId \}, \.\.\.evaluatorPayloadFilters\]/,
+  /OR:\s*\[\s*\{ solicitanteId: input\.userId \},\s*\{ approverId: input\.userId \},\s*\{\s*AND:/s,
   'A visibilidade de recebidas da avaliação deve incluir solicitante e avaliador responsável.',
 )
 

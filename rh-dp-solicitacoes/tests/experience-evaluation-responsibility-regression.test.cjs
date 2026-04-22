@@ -6,8 +6,8 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 {
   assert.match(
     evaluatorSource,
-    /normalize\(assigned\.fullName\) === userFullName/,
-    'Quando o nome do avaliador corresponder ao payload, a regra deve liberar mesmo com id legado divergente.',
+    /const canonicalApproverId = String\(solicitation\.approverId \?\? ''\)\.trim\(\)/,
+    'A responsabilidade canônica deve usar approverId quando definido.',
   )
 }
 
@@ -30,8 +30,8 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 {
   assert.match(
     evaluatorSource,
-    /return Boolean\(userId\) && String\(solicitation\.approverId \?\? ''\)\.trim\(\) === userId/,
-    'Quando payload não casar por id/login/email/nome, a checagem deve cair no fallback por approverId.',
+    /if \(canonicalApproverId\) \{\s*return Boolean\(userId\) && canonicalApproverId === userId/s,
+    'Com approverId definido, a checagem não deve aceitar payload legado divergente.',
   )
 }
 
@@ -40,13 +40,19 @@ const evaluatorSource = fs.readFileSync('src/lib/experienceEvaluation.shared.ts'
 
   assert.match(
     source,
-    /tipoId:\s*EXPERIENCE_EVALUATION_TIPO_ID,\s*[\s\S]*status:\s*EXPERIENCE_EVALUATION_STATUS,\s*[\s\S]*OR:\s*\[\{ solicitanteId: input\.userId \}, \{ approverId: input\.userId \}/,
+    /tipoId:\s*EXPERIENCE_EVALUATION_TIPO_ID,\s*[\s\S]*status:\s*EXPERIENCE_EVALUATION_STATUS,\s*[\s\S]*\{ OR: \[\{ approverId: null \}, \{ approverId: '' \}\] \}/,
     'A visibilidade de recebidas da avaliação deve incluir o próprio solicitante.',
   )
 }
 
 {
   const detailSource = fs.readFileSync('src/app/api/solicitacoes/[id]/route.ts', 'utf8')
+
+  assert.match(
+    detailSource,
+    /resolveExperienceEvaluationEvaluatorFromDirectory\(payload,\s*experienceEvaluators\)/,
+    'A API de detalhes deve resolver o avaliador pela estrutura completa do payload.',
+  )
 
   assert.match(
     detailSource,
