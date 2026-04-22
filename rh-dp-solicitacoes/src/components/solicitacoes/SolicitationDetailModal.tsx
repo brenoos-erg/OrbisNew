@@ -259,6 +259,9 @@ export type SolicitationDetail = {
   approvalStatus?: ApprovalStatus | null
   dataAbertura: string
   approverId?: string | null
+  assumidaPorId?: string | null
+  responsavelAtualId?: string | null
+  responsavelAtual?: { fullName: string } | null
   dataPrevista?: string | null
   dataFechamento?: string | null
   dataCancelamento?: string | null
@@ -663,7 +666,8 @@ export function SolicitationDetailModal({
     status: effectiveStatus,
     approvalStatus,
     assumidaPorId:
-      (detail as any)?.assumidaPorId ??
+      detail?.responsavelAtualId ??
+      detail?.assumidaPorId ??
       row?.responsavelId ??
       null,
   })
@@ -672,7 +676,8 @@ export function SolicitationDetailModal({
     status: effectiveStatus,
     approvalStatus,
     assumidaPorId:
-      (detail as any)?.assumidaPorId ??
+      detail?.responsavelAtualId ??
+      detail?.assumidaPorId ??
       row?.responsavelId ??
       null,
   })

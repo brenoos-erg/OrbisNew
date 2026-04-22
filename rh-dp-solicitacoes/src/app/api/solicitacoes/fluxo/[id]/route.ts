@@ -506,7 +506,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       }
     }
 
-    if (isExperienceEvaluation && resolvedApproverId !== undefined) {
+    if (isExperienceEvaluation) {
       resolvedResponsibleId = null
     }
 
@@ -638,17 +638,28 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     const nextStatus = body.status
     if (!nextStatus || !(nextStatus in STATUS_LABEL)) return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
 
+    const isExperienceEvaluation = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+    const resolvedUpdateStatusApproverId =
+      body.responsavelId === null
+        ? null
+        : typeof body.responsavelId === 'string' && body.responsavelId
+          ? body.responsavelId
+          : solicitation.approverId
+
     const updated = await prisma.solicitation.update({
       where: { id },
       data: {
         status: nextStatus,
         departmentId: typeof body.departmentId === 'string' && body.departmentId ? body.departmentId : solicitation.departmentId,
+        ...(isExperienceEvaluation ? { approverId: resolvedUpdateStatusApproverId } : {}),
         assumidaPorId:
-          body.responsavelId === null
+          isExperienceEvaluation
             ? null
-            : typeof body.responsavelId === 'string' && body.responsavelId
-              ? body.responsavelId
-              : solicitation.assumidaPorId,
+            : body.responsavelId === null
+              ? null
+              : typeof body.responsavelId === 'string' && body.responsavelId
+                ? body.responsavelId
+                : solicitation.assumidaPorId,
         dataFechamento: nextStatus === 'CONCLUIDA' ? new Date() : solicitation.dataFechamento,
         dataCancelamento: nextStatus === 'CANCELADA' ? new Date() : solicitation.dataCancelamento,
       },

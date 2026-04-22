@@ -5,6 +5,8 @@ const responsibilitySource = fs.readFileSync('src/lib/solicitationResponsibility
 const listRoute = fs.readFileSync('src/app/api/solicitacoes/route.ts', 'utf8')
 const receivedRoute = fs.readFileSync('src/app/api/solicitacoes/recebidas/route.ts', 'utf8')
 const flowRoute = fs.readFileSync('src/app/api/solicitacoes/fluxo/[id]/route.ts', 'utf8')
+const detailRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/route.ts', 'utf8')
+const detailModal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
 const receivedQuerySource = fs.readFileSync('src/lib/receivedSolicitationsQuery.ts', 'utf8')
 
 assert.match(
@@ -33,14 +35,44 @@ assert.match(
 
 assert.match(
   flowRoute,
-  /if \(isExperienceEvaluation && resolvedApproverId !== undefined\) \{\s*resolvedResponsibleId = null\s*\}/s,
-  'Editar avaliador no fluxo deve limpar assumidaPor para não manter responsável legado.',
+  /if \(isExperienceEvaluation\) \{\s*resolvedResponsibleId = null\s*\}/s,
+  'Fluxo da avaliação deve sempre limpar assumidaPor para não manter responsável legado.',
+)
+
+assert.match(
+  flowRoute,
+  /isExperienceEvaluation \? \{ approverId: resolvedUpdateStatusApproverId \} : \{\}/,
+  'Alteração de status do fluxo deve usar approverId como referência principal para avaliação de experiência.',
+)
+
+assert.match(
+  flowRoute,
+  /assumidaPorId:\s*isExperienceEvaluation\s*\?\s*null/s,
+  'Alteração de status do fluxo não pode regravar assumidaPorId na avaliação de experiência.',
 )
 
 assert.match(
   flowRoute,
   /const primaryResponsible = resolvePrimaryResponsibleForList\(/,
   'O retorno do fluxo deve expor responsável atual já canônico para a UI.',
+)
+
+assert.match(
+  detailRoute,
+  /const primaryResponsible = resolvePrimaryResponsibleForList\(/,
+  'Detalhes da solicitação devem resolver responsável atual com a mesma regra compartilhada.',
+)
+
+assert.match(
+  detailRoute,
+  /responsavelAtualId: primaryResponsible\.responsavelId/,
+  'GET de detalhes deve retornar responsavelAtualId canônico para a UI geral.',
+)
+
+assert.match(
+  detailModal,
+  /detail\?\.responsavelAtualId \?\?\s*detail\?\.assumidaPorId \?\?\s*row\?\.responsavelId/s,
+  'Modal geral deve preferir responsavelAtualId canônico antes de qualquer fallback legado.',
 )
 
 assert.match(
