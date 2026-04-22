@@ -9,6 +9,7 @@ import {
   patchExperienceEvaluationEvaluatorFields,
   resolveExperienceEvaluationEvaluatorFromDirectory,
 } from '@/lib/experienceEvaluation'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import { isModuleLevelAtLeast } from '@/lib/moduleLevel'
 import { prisma } from '@/lib/prisma'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
@@ -312,6 +313,13 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
   })
 
    const currentTimelineStatus = timelinePoints.at(-1)?.status ?? solicitation.status
+  const primaryResponsible = resolvePrimaryResponsibleForList({
+    tipo: solicitation.tipo,
+    assumidaPor: solicitation.assumidaPor,
+    assumidaPorId: solicitation.assumidaPorId,
+    approver: solicitation.approver,
+    approverId: solicitation.approverId,
+  })
 
   return NextResponse.json({
     solicitacao: {
@@ -334,7 +342,7 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
       nome: currentLabel,
       tipo: currentType,
       departamento: solicitation.department?.name ?? null,
-      responsavelAtual: solicitation.assumidaPor?.fullName ?? solicitation.approver?.fullName ?? null,
+      responsavelAtual: primaryResponsible.responsavel?.fullName ?? null,
       status: TIMELINE_DONE.has(currentTimelineStatus) ? 'FINALIZADO' : 'EM ANDAMENTO',
     },
     dadosChamado: { payload: solicitation.payload, secoes: summarizePayloadBlocks(solicitation.payload) },
@@ -363,7 +371,7 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
       solicitanteEmail: solicitation.solicitante?.email ?? null,
       solicitanteLogin: solicitation.solicitante?.login ?? null,
       departamentoAtualId: solicitation.departmentId,
-      responsavelAtualId: solicitation.assumidaPorId,
+      responsavelAtualId: primaryResponsible.responsavelId,
     },
   })
 })
@@ -496,6 +504,10 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
           flowChanges.push(`responsável alterado (${stringifyComparable(beforeValue) || '—'} → ${stringifyComparable(afterValue) || '—'})`)
         }
       }
+    }
+
+    if (isExperienceEvaluation && resolvedApproverId !== undefined) {
+      resolvedResponsibleId = null
     }
 
     const updatedPayload = {

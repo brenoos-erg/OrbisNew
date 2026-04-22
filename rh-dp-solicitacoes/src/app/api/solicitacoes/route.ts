@@ -25,6 +25,7 @@ import {
 } from '@/lib/solicitationTypes'
 import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
@@ -288,6 +289,13 @@ export const GET = withModuleLevel(
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
    const rows = solicitations.map((s) => {
   const finalizadorEvent = s.eventos?.[0] ?? null
+  const responsible = resolvePrimaryResponsibleForList({
+    tipo: s.tipo,
+    assumidaPor: s.assumidaPor,
+    assumidaPorId: s.assumidaPorId,
+    approver: s.approver,
+    approverId: s.approverId,
+  })
 
   return {
   id: s.id,
@@ -298,8 +306,8 @@ export const GET = withModuleLevel(
   updatedAt: s.updatedAt.toISOString(),
   tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
 
-  responsavelId: s.assumidaPor?.id ?? null,
-  responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+  responsavelId: responsible.responsavelId,
+  responsavel: responsible.responsavel,
   finalizadorId: finalizadorEvent?.actor?.id ?? null,
   finalizador: finalizadorEvent?.actor
     ? { fullName: finalizadorEvent.actor.fullName }
