@@ -84,9 +84,15 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   }
 
   if (responsavel) {
-    where.assumidaPor = {
-      fullName: { contains: responsavel },
-    }
+    where.AND = [
+      ...(where.AND ?? []),
+      {
+        OR: [
+          { assumidaPor: { fullName: { contains: responsavel } } },
+          { approver: { fullName: { contains: responsavel } } },
+        ],
+      },
+    ]
   }
 
   if (matricula) {

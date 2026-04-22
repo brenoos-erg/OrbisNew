@@ -10,6 +10,7 @@ import { formatCostCenterLabel } from '@/lib/costCenter'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import { buildListAndCountArgs, buildWhereFromSearchParams } from '@/lib/receivedSolicitationsQuery'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 
 function resolveOrderBy(searchParams: URLSearchParams): Prisma.SolicitationOrderByWithRelationInput[] {
   const sortBy = searchParams.get('sortBy') ?? 'dataAbertura'
@@ -91,6 +92,13 @@ export async function GET(req: NextRequest) {
 
    const rows = solicitations.map((s) => {
       const finalizadorEvent = s.eventos?.[0] ?? null
+      const responsible = resolvePrimaryResponsibleForList({
+        tipo: s.tipo,
+        assumidaPor: s.assumidaPor,
+        assumidaPorId: s.assumidaPorId,
+        approver: s.approver,
+        approverId: s.approverId,
+      })
 
       return {
       id: s.id,
@@ -99,8 +107,8 @@ export async function GET(req: NextRequest) {
       protocolo: s.protocolo,
       createdAt: s.dataAbertura ? s.dataAbertura.toISOString() : null,
       tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
-      responsavelId: s.assumidaPor?.id ?? null,
-      responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+      responsavelId: responsible.responsavelId,
+      responsavel: responsible.responsavel,
       finalizadorId: finalizadorEvent?.actor?.id ?? null,
       finalizador: finalizadorEvent?.actor
         ? { fullName: finalizadorEvent.actor.fullName }
