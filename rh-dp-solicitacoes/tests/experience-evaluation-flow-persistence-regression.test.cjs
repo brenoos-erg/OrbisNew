@@ -10,7 +10,14 @@ assert.match(fluxoRouteSource, /solicitation\.approver\?\.fullName/)
 
 // PATCH precisa resolver o avaliador a partir do payload recebido no form (nome/id novos) antes de fallback no merged.
 assert.match(fluxoRouteSource, /const incomingEvaluatorId = resolveExperienceEvaluatorId\(incomingCampos, experienceEvaluators\)/)
-assert.match(fluxoRouteSource, /const evaluatorId =\s*\n\s*incomingEvaluatorId \|\| resolveExperienceEvaluatorId\(mergedCampos, experienceEvaluators\)/)
+assert.match(
+  fluxoRouteSource,
+  /const hasIncomingEvaluatorValue =\s*\n\s*Object\.prototype\.hasOwnProperty\.call\(incomingCampos, 'gestorImediatoAvaliadorId'\) \|\|\s*\n\s*Object\.prototype\.hasOwnProperty\.call\(incomingCampos, 'gestorImediatoAvaliador'\)/,
+)
+assert.match(
+  fluxoRouteSource,
+  /const evaluatorId = hasIncomingEvaluatorValue\s*\n\s*\? incomingEvaluatorId \|\| resolveExperienceEvaluatorId\(mergedCampos, experienceEvaluators\)\s*\n\s*: previousEvaluatorId/,
+)
 
 // Payload canônico deve acompanhar o approverId final persistido.
 assert.match(fluxoRouteSource, /const persistedApproverId = resolvedApproverId !== undefined \? resolvedApproverId : solicitation\.approverId/)

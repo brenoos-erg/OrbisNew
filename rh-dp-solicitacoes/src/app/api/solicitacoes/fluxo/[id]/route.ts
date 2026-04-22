@@ -447,10 +447,15 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     let experienceEvaluators: Array<{ id: string; fullName: string; login?: string | null; email?: string | null }> = []
     if (hasExperienceEvaluatorField) {
       experienceEvaluators = await listExperienceEvaluators()
-      const previousEvaluatorId = normalizeStringValue(solicitation.approverId) || resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
+      const previousEvaluatorId =
+        normalizeStringValue(solicitation.approverId) || resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
+      const hasIncomingEvaluatorValue =
+        Object.prototype.hasOwnProperty.call(incomingCampos, 'gestorImediatoAvaliadorId') ||
+        Object.prototype.hasOwnProperty.call(incomingCampos, 'gestorImediatoAvaliador')
       const incomingEvaluatorId = resolveExperienceEvaluatorId(incomingCampos, experienceEvaluators)
-      const evaluatorId =
-        incomingEvaluatorId || resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
+      const evaluatorId = hasIncomingEvaluatorValue
+        ? incomingEvaluatorId || resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
+        : previousEvaluatorId
 
       if (evaluatorId) {
         const evaluator = experienceEvaluators.find((item) => item.id === evaluatorId)
@@ -462,7 +467,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       } else {
         const incomingEvaluatorId = normalizeStringValue(incomingCampos.gestorImediatoAvaliadorId)
         const incomingEvaluator = normalizeStringValue(incomingCampos.gestorImediatoAvaliador)
-        if (incomingEvaluatorId === '' || incomingEvaluator === '') {
+        if (hasIncomingEvaluatorValue && (incomingEvaluatorId === '' || incomingEvaluator === '')) {
           Object.assign(mergedCampos, patchExperienceEvaluationEvaluatorFields(mergedCampos, null))
           canonicalEvaluatorForPayload = null
         }
