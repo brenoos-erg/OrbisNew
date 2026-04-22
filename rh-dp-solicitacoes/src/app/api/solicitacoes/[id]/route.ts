@@ -11,6 +11,7 @@ import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 import { canViewSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import {
   listExperienceEvaluators,
   patchExperienceEvaluationEvaluatorPayload,
@@ -30,6 +31,8 @@ export async function GET(
       where: { id: (await params).id },
       include: {
         tipo: true,
+        approver: { select: { id: true, fullName: true } },
+        assumidaPor: { select: { id: true, fullName: true } },
         costCenter: true,
         department: { select: { id: true, name: true, code: true } },
         nonConformity: { select: { id: true, numeroRnc: true, status: true } },
@@ -187,6 +190,13 @@ export async function GET(
       resolveExperienceEvaluationEvaluatorFromDirectory(payload, experienceEvaluators) ??
       null
     const normalizedPayload = patchExperienceEvaluationEvaluatorPayload(payload, resolvedEvaluator)
+    const primaryResponsible = resolvePrimaryResponsibleForList({
+      tipo: item.tipo,
+      assumidaPor: item.assumidaPor,
+      assumidaPorId: item.assumidaPorId,
+      approver: item.approver,
+      approverId: item.approverId,
+    })
 
    // Mapeia para o formato que o front espera
     const result = {
@@ -197,6 +207,9 @@ export async function GET(
 
       status: item.status,
       approverId: item.approverId,
+      assumidaPorId: item.assumidaPorId,
+      responsavelAtualId: primaryResponsible.responsavelId,
+      responsavelAtual: primaryResponsible.responsavel,
       approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
 
       dataAbertura: item.dataAbertura?.toISOString(),
