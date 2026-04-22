@@ -183,8 +183,14 @@ export function isExperienceEvaluationEvaluator(
     fullName?: string | null
   },
 ) {
-  const assigned = resolveExperienceEvaluationAssignedEvaluator(solicitation.payload)
   const userId = String(user.id ?? '').trim()
+  const canonicalApproverId = String(solicitation.approverId ?? '').trim()
+
+  if (canonicalApproverId) {
+    return Boolean(userId) && canonicalApproverId === userId
+  }
+
+  const assigned = resolveExperienceEvaluationAssignedEvaluator(solicitation.payload)
   const userLogin = normalize(user.login)
   const userEmail = normalize(user.email)
   const userFullName = normalize(user.fullName)
@@ -209,5 +215,5 @@ export function isExperienceEvaluationEvaluator(
     return true
   }
 
-  return Boolean(userId) && String(solicitation.approverId ?? '').trim() === userId
+  return false
 }
