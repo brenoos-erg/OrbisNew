@@ -5,9 +5,10 @@ const fluxoSource = fs.readFileSync('src/app/api/solicitacoes/fluxo/[id]/route.t
 
 assert.match(fluxoSource, /const ALWAYS_EDITABLE_FLOW_FIELDS = new Set\(\[/)
 assert.match(fluxoSource, /'gestorImediatoAvaliadorId'/)
-assert.match(fluxoSource, /Object\.prototype\.hasOwnProperty\.call\(incomingCampos, 'gestorImediatoAvaliadorId'\)/)
+assert.match(fluxoSource, /const hasExplicitEvaluatorInput = evaluatorFieldKeys\.some\(\(field\) => hasOwn\(incomingCampos, field\)\)/)
 assert.match(fluxoSource, /const isExperienceEvaluation = solicitation\.tipoId === EXPERIENCE_EVALUATION_TIPO_ID/)
-assert.match(fluxoSource, /resolvedApproverId = evaluatorId \|\| null/)
+assert.match(fluxoSource, /const resolvedEvaluatorForComparison = explicitClearRequested \? '' : evaluatorId/)
+assert.match(fluxoSource, /resolvedApproverId = resolvedEvaluatorForComparison \|\| null/)
 assert.match(fluxoSource, /resolvedResponsibleId = null/)
 assert.match(fluxoSource, /let experienceEvaluatorChanged = false/)
 assert.match(fluxoSource, /if \(experienceEvaluatorChanged\) continue/)
