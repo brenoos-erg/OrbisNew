@@ -95,7 +95,21 @@ function resolveExperienceEvaluatorId(
   campos: Record<string, unknown>,
   evaluators: Array<{ id: string; fullName: string; login?: string | null; email?: string | null }>,
 ) {
-  const resolved = resolveExperienceEvaluationEvaluatorFromDirectory({ campos }, evaluators)
+  const canonicalCampos = { ...campos }
+  if (!canonicalCampos.gestorImediatoAvaliadorId && campos.gestorimediatoavaliadorid) {
+    canonicalCampos.gestorImediatoAvaliadorId = campos.gestorimediatoavaliadorid
+  }
+  if (!canonicalCampos.gestorImediatoAvaliador && campos.gestorimediatoavaliador) {
+    canonicalCampos.gestorImediatoAvaliador = campos.gestorimediatoavaliador
+  }
+  if (!canonicalCampos.avaliadorId && campos.avaliadorid) {
+    canonicalCampos.avaliadorId = campos.avaliadorid
+  }
+  if (!canonicalCampos.avaliador && campos.avaliadornome) {
+    canonicalCampos.avaliador = campos.avaliadornome
+  }
+
+  const resolved = resolveExperienceEvaluationEvaluatorFromDirectory({ campos: canonicalCampos }, evaluators)
   return normalizeStringValue(resolved?.id)
 }
 

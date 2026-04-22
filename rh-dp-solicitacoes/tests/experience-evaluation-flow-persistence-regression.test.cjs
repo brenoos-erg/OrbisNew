@@ -7,6 +7,7 @@ const fluxoRouteSource = fs.readFileSync('src/app/api/solicitacoes/fluxo/[id]/ro
 assert.match(fluxoRouteSource, /const canonicalApproverId = normalizeStringValue\(solicitation\.approverId\)/)
 assert.match(fluxoRouteSource, /const resolvedEvaluatorId = canonicalApproverId \|\| resolveExperienceEvaluatorId\(payloadCampos, experienceEvaluators\)/)
 assert.match(fluxoRouteSource, /solicitation\.approver\?\.fullName/)
+assert.match(fluxoRouteSource, /if \(!canonicalCampos\.gestorImediatoAvaliadorId && campos\.gestorimediatoavaliadorid\)/)
 
 // PATCH precisa distinguir input explícito de avaliador para evitar reprocessamento indevido.
 assert.match(fluxoRouteSource, /const evaluatorFieldKeys = \[/)
