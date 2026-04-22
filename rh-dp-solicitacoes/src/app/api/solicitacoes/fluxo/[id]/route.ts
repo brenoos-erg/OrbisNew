@@ -118,6 +118,22 @@ function hasFieldValueChanged(before: unknown, after: unknown) {
   return stringifyComparable(before) !== stringifyComparable(after)
 }
 
+function pickChangedFields(
+  fieldKeys: readonly string[],
+  currentCampos: Record<string, unknown>,
+  incomingCampos: Record<string, unknown>,
+) {
+  return Object.fromEntries(
+    fieldKeys
+      .filter(
+        (field) =>
+          hasOwn(incomingCampos, field) &&
+          hasFieldValueChanged(currentCampos[field], incomingCampos[field]),
+      )
+      .map((field) => [field, incomingCampos[field]]),
+  )
+}
+
 function resolveUserIdFromValue(value: unknown, users: Array<{ id: string; fullName: string }>) {
   const directId = normalizeStringValue(value)
   if (directId && users.some((user) => user.id === directId)) return directId
@@ -429,6 +445,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     ] as const
     const hasExplicitEvaluatorInput = evaluatorFieldKeys.some((field) => hasOwn(incomingCampos, field))
     const explicitEvaluatorFields = evaluatorFieldKeys.filter((field) => hasOwn(incomingCampos, field))
+    const changedEvaluatorCampos = pickChangedFields(evaluatorFieldKeys, currentCampos, incomingCampos)
 
     const [activeUsers, departments] = await Promise.all([
       prisma.user.findMany({
@@ -457,7 +474,9 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     if (isExperienceEvaluation && hasExplicitEvaluatorInput) {
       experienceEvaluators = await listExperienceEvaluators()
       const previousEvaluatorId = normalizeStringValue(solicitation.approverId) || resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
-      const incomingEvaluatorId = resolveExperienceEvaluatorId(incomingCampos, experienceEvaluators)
+      const evaluatorInputSource =
+        Object.keys(changedEvaluatorCampos).length > 0 ? changedEvaluatorCampos : incomingCampos
+      const incomingEvaluatorId = resolveExperienceEvaluatorId(evaluatorInputSource, experienceEvaluators)
       const allExplicitEvaluatorFieldsAreBlank =
         explicitEvaluatorFields.length > 0 &&
         explicitEvaluatorFields.every((field) => normalizeStringValue(incomingCampos[field]) === '')

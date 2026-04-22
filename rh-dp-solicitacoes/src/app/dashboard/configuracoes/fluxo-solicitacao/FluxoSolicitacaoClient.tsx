@@ -192,6 +192,44 @@ function resolveEvaluatorSelectValue(
   return options.find((option) => option.label.trim().toLocaleLowerCase('pt-BR') === byName)?.value ?? ''
 }
 
+function buildEvaluatorFieldPatch(
+  currentFields: Record<string, unknown>,
+  selectedId: string,
+  selectedName: string,
+  sourceFieldName?: string,
+) {
+  const normalizedId = selectedId.trim()
+  const normalizedName = selectedName.trim()
+  const nextValue = normalizedId ? normalizedId : normalizedName
+  const sourceValue =
+    sourceFieldName === 'gestorImediatoAvaliador'
+      ? normalizedName
+      : sourceFieldName
+        ? nextValue
+        : undefined
+
+  return {
+    ...currentFields,
+    ...(sourceFieldName ? { [sourceFieldName]: sourceValue ?? '' } : {}),
+    gestorImediatoAvaliadorId: normalizedId,
+    gestorImediatoAvaliador: normalizedName,
+    avaliadorId: normalizedId,
+    avaliador: normalizedName,
+    gestorId: normalizedId,
+    gestor: normalizedName,
+  }
+}
+
+function buildCamposPayloadForSubmit(
+  fields: Record<string, unknown>,
+  evaluators: ResponsibleOption[],
+) {
+  const evaluatorId = resolveExperienceEvaluatorId(fields, evaluators)
+  if (!evaluatorId) return fields
+  const evaluatorName = evaluators.find((item) => item.id === evaluatorId)?.fullName ?? normalizeText(fields.gestorImediatoAvaliador)
+  return buildEvaluatorFieldPatch(fields, evaluatorId, evaluatorName)
+}
+
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -296,7 +334,7 @@ export default function FluxoSolicitacaoClient() {
           mode: 'EDIT_FIELDS',
           titulo: editTitle,
           descricao: editDescription || null,
-          campos: editFields,
+          campos: buildCamposPayloadForSubmit(editFields, result.dataSources.experienceEvaluators ?? []),
           reason: editReason || undefined,
         }),
       })
@@ -431,15 +469,12 @@ export default function FluxoSolicitacaoClient() {
               setEditFields((prev) => {
                 if (!isEvaluatorField) return { ...prev, [field.name]: selectedId }
                 const selectedEvaluator = resolvedOptions.find((option) => option.value === selectedId)
-                return {
-                  ...prev,
-                  [field.name]:
-                    field.name === 'gestorImediatoAvaliador'
-                      ? selectedEvaluator?.label ?? ''
-                      : selectedId,
-                  gestorImediatoAvaliadorId: selectedId,
-                  gestorImediatoAvaliador: selectedEvaluator?.label ?? '',
-                }
+                return buildEvaluatorFieldPatch(
+                  prev,
+                  selectedId,
+                  selectedEvaluator?.label ?? '',
+                  field.name,
+                )
               })
             }}            className="w-full rounded-md border border-slate-300 px-3 py-2"
           >
