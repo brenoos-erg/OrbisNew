@@ -11,19 +11,23 @@ assert.match(fluxoRouteSource, /solicitation\.approver\?\.fullName/)
 // PATCH precisa distinguir input explícito de avaliador para evitar reprocessamento indevido.
 assert.match(fluxoRouteSource, /const evaluatorFieldKeys = \[/)
 assert.match(fluxoRouteSource, /const hasExplicitEvaluatorInput = evaluatorFieldKeys\.some\(\(field\) => hasOwn\(incomingCampos, field\)\)/)
+assert.match(fluxoRouteSource, /const explicitEvaluatorFields = evaluatorFieldKeys\.filter\(\(field\) => hasOwn\(incomingCampos, field\)\)/)
 assert.match(fluxoRouteSource, /if \(isExperienceEvaluation && hasExplicitEvaluatorInput\) \{/)
 
 // PATCH precisa resolver novo avaliador explicitamente e permitir limpeza explícita.
 assert.match(fluxoRouteSource, /const incomingEvaluatorId = resolveExperienceEvaluatorId\(incomingCampos, experienceEvaluators\)/)
-assert.match(fluxoRouteSource, /const explicitClearRequested =/)
-assert.match(fluxoRouteSource, /const evaluatorId = explicitClearRequested \? '' : incomingEvaluatorId/)
+assert.match(fluxoRouteSource, /const allExplicitEvaluatorFieldsAreBlank =/)
+assert.match(fluxoRouteSource, /const explicitClearRequested = allExplicitEvaluatorFieldsAreBlank && !incomingEvaluatorId/)
+assert.match(fluxoRouteSource, /const hasExplicitEvaluatorReplacement = Boolean\(incomingEvaluatorId\)/)
+assert.match(fluxoRouteSource, /const evaluatorId = hasExplicitEvaluatorReplacement \? incomingEvaluatorId : ''/)
 assert.match(fluxoRouteSource, /else if \(explicitClearRequested\) \{\s*\n\s*Object\.assign\(mergedCampos, patchExperienceEvaluationEvaluatorFields\(mergedCampos, null\)\)/)
 
 // Payload canônico deve acompanhar o approverId final persistido.
 assert.match(fluxoRouteSource, /const persistedApproverId = resolvedApproverId !== undefined \? resolvedApproverId : solicitation\.approverId/)
 assert.match(fluxoRouteSource, /persistedApproverId === null\s*\? null/)
 assert.match(fluxoRouteSource, /persistedApproverId\s*\?\s*experienceEvaluators\.find\(\(item\) => item\.id === persistedApproverId\) \?\? \{\s*\n\s*id: persistedApproverId,\s*\n\s*\}/)
-assert.match(fluxoRouteSource, /hasExplicitEvaluatorInput && isExperienceEvaluation/)
+assert.match(fluxoRouteSource, /let shouldPatchCanonicalExperiencePayload = false/)
+assert.match(fluxoRouteSource, /shouldPatchCanonicalExperiencePayload && isExperienceEvaluation/)
 
 // Fluxo de avaliação deve limpar responsável assumido para não reaplicar o antigo.
 assert.match(fluxoRouteSource, /if \(isExperienceEvaluation\) \{\s*\n\s*resolvedResponsibleId = null\s*\n\s*\}/)
