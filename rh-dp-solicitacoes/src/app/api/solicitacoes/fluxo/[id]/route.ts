@@ -261,14 +261,12 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
   const payloadCampos = ((solicitation.payload as Record<string, unknown>)?.campos ?? {}) as Record<string, unknown>
   const normalizedCampos = { ...payloadCampos }
   const canonicalApproverId = normalizeStringValue(solicitation.approverId)
-  const resolvedEvaluatorId =
-    (canonicalApproverId && experienceEvaluators.some((item) => item.id === canonicalApproverId)
-      ? canonicalApproverId
-      : '') || resolveExperienceEvaluatorId(payloadCampos, experienceEvaluators)
+  const resolvedEvaluatorId = canonicalApproverId || resolveExperienceEvaluatorId(payloadCampos, experienceEvaluators)
   if (resolvedEvaluatorId) {
     const evaluator = experienceEvaluators.find((item) => item.id === resolvedEvaluatorId)
     normalizedCampos.gestorImediatoAvaliadorId = resolvedEvaluatorId
-    if (evaluator) normalizedCampos.gestorImediatoAvaliador = evaluator.fullName
+    normalizedCampos.gestorImediatoAvaliador =
+      evaluator?.fullName ?? solicitation.approver?.fullName ?? normalizeStringValue(normalizedCampos.gestorImediatoAvaliador)
   }
   const schemaCampos = (((solicitation.tipo?.schemaJson as any)?.camposEspecificos ?? []) as CampoEdicaoSchema[])
     .filter((campo) => campo && typeof campo.name === 'string')
@@ -449,7 +447,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     let experienceEvaluators: Array<{ id: string; fullName: string; login?: string | null; email?: string | null }> = []
     if (hasExperienceEvaluatorField) {
       experienceEvaluators = await listExperienceEvaluators()
-      const previousEvaluatorId = resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
+      const previousEvaluatorId = normalizeStringValue(solicitation.approverId) || resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
       const incomingEvaluatorId = resolveExperienceEvaluatorId(incomingCampos, experienceEvaluators)
       const evaluatorId =
         incomingEvaluatorId || resolveExperienceEvaluatorId(mergedCampos, experienceEvaluators)
@@ -526,15 +524,16 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       ...currentPayload,
       campos: mergedCampos,
     }
+    const persistedApproverId = resolvedApproverId !== undefined ? resolvedApproverId : solicitation.approverId
     const canonicalExperiencePayload =
       hasExperienceEvaluatorField && isExperienceEvaluation
         ? patchExperienceEvaluationEvaluatorPayload(
             updatedPayload,
-            resolvedApproverId === null
+            persistedApproverId === null
               ? null
-              : resolvedApproverId
-                ? experienceEvaluators.find((item) => item.id === resolvedApproverId) ?? {
-                    id: resolvedApproverId,
+              : persistedApproverId
+                ? experienceEvaluators.find((item) => item.id === persistedApproverId) ?? {
+                    id: persistedApproverId,
                   }
                 : canonicalEvaluatorForPayload ??
                   resolveExperienceEvaluationEvaluatorFromDirectory(
