@@ -67,22 +67,21 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
 
   if (status) where.status = status
 
-   if (hasProtocoloFilter) {
+  if (hasProtocoloFilter) {
     where.protocolo = {
       contains: protocolo,
-      mode: 'insensitive',
     }
   }
 
   const solicitanteFilters: Record<string, unknown> = {}
   if (solicitante) {
     solicitanteFilters.OR = [
-      { fullName: { contains: solicitante, mode: 'insensitive' } },
-      { email: { contains: solicitante, mode: 'insensitive' } },
+      { fullName: { contains: solicitante } },
+      { email: { contains: solicitante } },
     ]
   }
   if (solicitanteLogin) {
-    solicitanteFilters.login = { contains: solicitanteLogin, mode: 'insensitive' }
+    solicitanteFilters.login = { contains: solicitanteLogin }
   }
   if (Object.keys(solicitanteFilters).length > 0) {
     where.solicitante = solicitanteFilters
@@ -94,8 +93,8 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
       ...(where.AND ?? []),
       {
          OR: [
-          { titulo: { contains: textValue, mode: 'insensitive' } },
-          { descricao: { contains: textValue, mode: 'insensitive' } },
+          { titulo: { contains: textValue } },
+          { descricao: { contains: textValue } },
           { payload: { path: '$.campos', string_contains: textValue } },
           { payload: { path: '$.formulario', string_contains: textValue } },
           { payload: { path: '$.form', string_contains: textValue } },
