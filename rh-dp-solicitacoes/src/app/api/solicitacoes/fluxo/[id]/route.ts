@@ -428,6 +428,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       'gestor',
     ] as const
     const hasExplicitEvaluatorInput = evaluatorFieldKeys.some((field) => hasOwn(incomingCampos, field))
+    const explicitEvaluatorFields = evaluatorFieldKeys.filter((field) => hasOwn(incomingCampos, field))
 
     const [activeUsers, departments] = await Promise.all([
       prisma.user.findMany({
@@ -447,6 +448,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     let resolvedResponsibleId: string | null | undefined = undefined
     let resolvedDepartmentId: string | null | undefined = undefined
     let experienceEvaluatorChanged = false
+    let shouldPatchCanonicalExperiencePayload = false
     let canonicalEvaluatorForPayload:
       | { id: string; fullName?: string | null; login?: string | null; email?: string | null }
       | null
@@ -456,25 +458,25 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       experienceEvaluators = await listExperienceEvaluators()
       const previousEvaluatorId = normalizeStringValue(solicitation.approverId) || resolveExperienceEvaluatorId(currentCampos, experienceEvaluators)
       const incomingEvaluatorId = resolveExperienceEvaluatorId(incomingCampos, experienceEvaluators)
-      const explicitClearRequested =
-        (hasOwn(incomingCampos, 'gestorImediatoAvaliadorId') && normalizeStringValue(incomingCampos.gestorImediatoAvaliadorId) === '') ||
-        (hasOwn(incomingCampos, 'gestorImediatoAvaliador') && normalizeStringValue(incomingCampos.gestorImediatoAvaliador) === '') ||
-        (hasOwn(incomingCampos, 'avaliadorId') && normalizeStringValue(incomingCampos.avaliadorId) === '') ||
-        (hasOwn(incomingCampos, 'avaliador') && normalizeStringValue(incomingCampos.avaliador) === '') ||
-        (hasOwn(incomingCampos, 'gestorId') && normalizeStringValue(incomingCampos.gestorId) === '') ||
-        (hasOwn(incomingCampos, 'gestor') && normalizeStringValue(incomingCampos.gestor) === '')
-      const evaluatorId = explicitClearRequested ? '' : incomingEvaluatorId
+      const allExplicitEvaluatorFieldsAreBlank =
+        explicitEvaluatorFields.length > 0 &&
+        explicitEvaluatorFields.every((field) => normalizeStringValue(incomingCampos[field]) === '')
+      const explicitClearRequested = allExplicitEvaluatorFieldsAreBlank && !incomingEvaluatorId
+      const hasExplicitEvaluatorReplacement = Boolean(incomingEvaluatorId)
+      const evaluatorId = hasExplicitEvaluatorReplacement ? incomingEvaluatorId : ''
 
-      if (evaluatorId) {
+      if (hasExplicitEvaluatorReplacement && evaluatorId) {
         const evaluator = experienceEvaluators.find((item) => item.id === evaluatorId)
         Object.assign(
           mergedCampos,
           patchExperienceEvaluationEvaluatorFields(mergedCampos, evaluator ?? { id: evaluatorId }),
         )
         canonicalEvaluatorForPayload = evaluator ?? { id: evaluatorId }
+        shouldPatchCanonicalExperiencePayload = true
       } else if (explicitClearRequested) {
         Object.assign(mergedCampos, patchExperienceEvaluationEvaluatorFields(mergedCampos, null))
         canonicalEvaluatorForPayload = null
+        shouldPatchCanonicalExperiencePayload = true
       }
 
       const resolvedEvaluatorForComparison = explicitClearRequested ? '' : evaluatorId
@@ -536,7 +538,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
     }
     const persistedApproverId = resolvedApproverId !== undefined ? resolvedApproverId : solicitation.approverId
     const canonicalExperiencePayload =
-      hasExplicitEvaluatorInput && isExperienceEvaluation
+      shouldPatchCanonicalExperiencePayload && isExperienceEvaluation
         ? patchExperienceEvaluationEvaluatorPayload(
             updatedPayload,
             persistedApproverId === null
