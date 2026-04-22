@@ -165,6 +165,33 @@ function resolveExperienceEvaluatorId(
   return evaluators.find((user) => user.fullName.trim().toLocaleLowerCase('pt-BR') === byName)?.id ?? ''
 }
 
+function resolveEvaluatorSelectValue(
+  fieldName: string,
+  fieldValue: unknown,
+  editFields: Record<string, unknown>,
+  options: Array<{ value: string; label: string }>,
+) {
+  const fromEvaluatorIdField = normalizeText(editFields.gestorImediatoAvaliadorId)
+  const fromCurrentField = normalizeText(fieldValue)
+  const fromNameField = normalizeText(editFields.gestorImediatoAvaliador)
+
+  if (fromEvaluatorIdField && options.some((option) => option.value === fromEvaluatorIdField)) {
+    return fromEvaluatorIdField
+  }
+
+  if (fieldName === 'gestorImediatoAvaliadorId' && fromCurrentField && options.some((option) => option.value === fromCurrentField)) {
+    return fromCurrentField
+  }
+
+  if (fromCurrentField && options.some((option) => option.value === fromCurrentField)) {
+    return fromCurrentField
+  }
+
+  if (!fromNameField) return ''
+  const byName = fromNameField.toLocaleLowerCase('pt-BR')
+  return options.find((option) => option.label.trim().toLocaleLowerCase('pt-BR') === byName)?.value ?? ''
+}
+
 export default function FluxoSolicitacaoClient() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -386,8 +413,12 @@ export default function FluxoSolicitacaoClient() {
     }
 
      if ((isEvaluatorField || fieldType === 'select' || fieldType === 'cost_center' || fieldType === 'autocomplete') && resolvedOptions.length > 0) {
-      const selectedValue = fieldValue == null ? '' : String(fieldValue)
-      const selected = resolvedOptions.some((option) => option.value === selectedValue) ? selectedValue : ''
+      const selected = isEvaluatorField
+        ? resolveEvaluatorSelectValue(field.name, fieldValue, editFields, resolvedOptions)
+        : (() => {
+            const selectedValue = fieldValue == null ? '' : String(fieldValue)
+            return resolvedOptions.some((option) => option.value === selectedValue) ? selectedValue : ''
+          })()
       return (
         <label key={field.name} className="block text-sm">
           <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
@@ -402,7 +433,10 @@ export default function FluxoSolicitacaoClient() {
                 const selectedEvaluator = resolvedOptions.find((option) => option.value === selectedId)
                 return {
                   ...prev,
-                  [field.name]: selectedId,
+                  [field.name]:
+                    field.name === 'gestorImediatoAvaliador'
+                      ? selectedEvaluator?.label ?? ''
+                      : selectedId,
                   gestorImediatoAvaliadorId: selectedId,
                   gestorImediatoAvaliador: selectedEvaluator?.label ?? '',
                 }
