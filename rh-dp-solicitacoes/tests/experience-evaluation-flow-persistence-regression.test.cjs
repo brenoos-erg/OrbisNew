@@ -12,10 +12,12 @@ assert.match(fluxoRouteSource, /solicitation\.approver\?\.fullName/)
 assert.match(fluxoRouteSource, /const evaluatorFieldKeys = \[/)
 assert.match(fluxoRouteSource, /const hasExplicitEvaluatorInput = evaluatorFieldKeys\.some\(\(field\) => hasOwn\(incomingCampos, field\)\)/)
 assert.match(fluxoRouteSource, /const explicitEvaluatorFields = evaluatorFieldKeys\.filter\(\(field\) => hasOwn\(incomingCampos, field\)\)/)
+assert.match(fluxoRouteSource, /const changedEvaluatorCampos = pickChangedFields\(evaluatorFieldKeys, currentCampos, incomingCampos\)/)
 assert.match(fluxoRouteSource, /if \(isExperienceEvaluation && hasExplicitEvaluatorInput\) \{/)
 
 // PATCH precisa resolver novo avaliador explicitamente e permitir limpeza explícita.
-assert.match(fluxoRouteSource, /const incomingEvaluatorId = resolveExperienceEvaluatorId\(incomingCampos, experienceEvaluators\)/)
+assert.match(fluxoRouteSource, /const evaluatorInputSource =\s*\n\s*Object\.keys\(changedEvaluatorCampos\)\.length > 0 \? changedEvaluatorCampos : incomingCampos/)
+assert.match(fluxoRouteSource, /const incomingEvaluatorId = resolveExperienceEvaluatorId\(evaluatorInputSource, experienceEvaluators\)/)
 assert.match(fluxoRouteSource, /const allExplicitEvaluatorFieldsAreBlank =/)
 assert.match(fluxoRouteSource, /const explicitClearRequested = allExplicitEvaluatorFieldsAreBlank && !incomingEvaluatorId/)
 assert.match(fluxoRouteSource, /const hasExplicitEvaluatorReplacement = Boolean\(incomingEvaluatorId\)/)
