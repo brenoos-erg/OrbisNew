@@ -40,6 +40,7 @@ import {
 } from '@/lib/experienceEvaluation'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
+import { isExternalAdmissionCandidateType, patchExternalAdmissionPayloadSeed } from '@/lib/externalAdmission'
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -600,7 +601,10 @@ export const POST = withModuleLevel(
               }
             : null,
         })
-         const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+        const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+        if (isExternalAdmissionCandidateType(tipo)) {
+          Object.assign(payload, patchExternalAdmissionPayloadSeed(payload))
+        }
 
         if (isAvaliacaoExperiencia) {
           const gestorImediatoAvaliadorId =

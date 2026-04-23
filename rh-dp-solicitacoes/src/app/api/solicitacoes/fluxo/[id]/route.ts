@@ -113,6 +113,26 @@ function resolveExperienceEvaluatorId(
   return normalizeStringValue(resolved?.id)
 }
 
+function normalizeIncomingExperienceEvaluatorAliases(campos: Record<string, unknown>) {
+  const normalized = { ...campos }
+  const aliases: Array<[string, string]> = [
+    ['gestorimediatoavaliadorid', 'gestorImediatoAvaliadorId'],
+    ['gestorimediatoavaliador', 'gestorImediatoAvaliador'],
+    ['avaliadorid', 'avaliadorId'],
+    ['avaliadornome', 'avaliador'],
+    ['gestorid', 'gestorId'],
+    ['gestornome', 'gestor'],
+  ]
+
+  for (const [from, to] of aliases) {
+    if (!hasOwn(normalized, to) && hasOwn(campos, from)) {
+      normalized[to] = campos[from]
+    }
+  }
+
+  return normalized
+}
+
 function hasOwn(obj: Record<string, unknown>, key: string) {
   return Object.prototype.hasOwnProperty.call(obj, key)
 }
@@ -436,7 +456,7 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
 
      const currentPayload = (solicitation.payload as Record<string, unknown>) ?? {}
     const currentCampos = ((currentPayload.campos ?? {}) as Record<string, unknown>) ?? {}
-    const incomingCampos = body.campos ?? {}
+    const incomingCampos = normalizeIncomingExperienceEvaluatorAliases(body.campos ?? {})
 
     const isExperienceEvaluation = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID
     const sanitizedCampos = Object.fromEntries(
@@ -456,6 +476,12 @@ export const PATCH = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async
       'avaliador',
       'gestorId',
       'gestor',
+      'gestorimediatoavaliadorid',
+      'gestorimediatoavaliador',
+      'avaliadorid',
+      'avaliadornome',
+      'gestorid',
+      'gestornome',
     ] as const
     const hasExplicitEvaluatorInput = evaluatorFieldKeys.some((field) => hasOwn(incomingCampos, field))
     const explicitEvaluatorFields = evaluatorFieldKeys.filter((field) => hasOwn(incomingCampos, field))

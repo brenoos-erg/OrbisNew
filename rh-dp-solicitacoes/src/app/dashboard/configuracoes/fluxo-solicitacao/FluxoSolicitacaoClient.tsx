@@ -224,8 +224,23 @@ function buildCamposPayloadForSubmit(
   fields: Record<string, unknown>,
   evaluators: ResponsibleOption[],
 ) {
+  const hasExplicitEvaluatorKeys = [
+    'gestorImediatoAvaliadorId',
+    'gestorImediatoAvaliador',
+    'avaliadorId',
+    'avaliador',
+    'gestorId',
+    'gestor',
+    'gestorimediatoavaliadorid',
+    'gestorimediatoavaliador',
+    'avaliadorid',
+    'avaliadornome',
+  ].some((key) => Object.prototype.hasOwnProperty.call(fields, key))
   const evaluatorId = resolveExperienceEvaluatorId(fields, evaluators)
-  if (!evaluatorId) return fields
+  if (!evaluatorId) {
+    if (!hasExplicitEvaluatorKeys) return fields
+    return buildEvaluatorFieldPatch(fields, '', '')
+  }
   const evaluatorName = evaluators.find((item) => item.id === evaluatorId)?.fullName ?? normalizeText(fields.gestorImediatoAvaliador)
   return buildEvaluatorFieldPatch(fields, evaluatorId, evaluatorName)
 }
