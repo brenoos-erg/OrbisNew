@@ -81,3 +81,48 @@ export function resolveChecklistItem(key: string) {
 export function isAllRequiredChecklistDone(checklistStatus: Record<string, boolean>) {
   return EXTERNAL_ADMISSION_CHECKLIST.filter((item) => item.required).every((item) => checklistStatus[item.key] === true)
 }
+
+type TipoLike = { codigo?: string | null; nome?: string | null }
+
+function normalizeText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+export function isExternalAdmissionCandidateType(tipo: TipoLike | null | undefined) {
+  const codigo = normalizeText(tipo?.codigo)
+  const nome = normalizeText(tipo?.nome)
+  return codigo.includes('admiss') || nome.includes('admissao') || nome.includes('pre-admiss')
+}
+
+export function patchExternalAdmissionPayloadSeed(payload: Record<string, unknown>) {
+  const current = payload.externalAdmission
+  if (current && typeof current === 'object' && !Array.isArray(current)) {
+    return payload
+  }
+
+  return {
+    ...payload,
+    externalAdmission: {
+      candidateAccess: {
+        mode: 'TOKEN_LINK',
+        status: 'PENDING_LINK',
+        tokenId: null,
+        linkSentAt: null,
+        submittedAt: null,
+      },
+      checklist: {
+        status: 'PENDING',
+        requiredDocuments: [],
+        reviewedAt: null,
+        reviewedById: null,
+      },
+      triage: {
+        status: 'PENDING_RH',
+        notes: '',
+      },
+    },
+  }
+}
