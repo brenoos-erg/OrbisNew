@@ -12,7 +12,7 @@ import {
   EXTERNAL_ADMISSION_TYPE_NAME,
   toTokenHash,
 } from '@/lib/externalAdmission'
-import { getSiteUrl } from '@/lib/site-url'
+import { composePublicUrl, resolveAppBaseUrl } from '@/lib/site-url'
 
 async function ensureAdmissionType() {
   return prisma.tipoSolicitacao.upsert({
@@ -130,8 +130,15 @@ export const POST = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (
     select: { id: true, protocolo: true },
   })
 
-  const baseUrl = getSiteUrl() || 'http://localhost:3000'
-  const externalUrl = `${baseUrl}/solicitacoes/externo/admissao/${token}`
+  const baseUrl = resolveAppBaseUrl({ context: 'external-admission-link' })
+  if (!baseUrl) {
+    return NextResponse.json(
+      { error: 'Base pública da aplicação não configurada para gerar link externo.' },
+      { status: 500 },
+    )
+  }
+
+  const externalUrl = composePublicUrl(baseUrl, `/solicitacoes/externo/admissao/${token}`)
 
   return NextResponse.json({ ...created, externalUrl }, { status: 201 })
 })
