@@ -4,7 +4,8 @@ function normalizeUrl(url: string) {
   if (!url) return ''
   const trimmed = url.trim()
   if (!trimmed) return ''
-  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
+  const withProtocol = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`
+  return withProtocol.endsWith('/') ? withProtocol.slice(0, -1) : withProtocol
 }
 
 function looksLocalhost(url: string) {
@@ -83,4 +84,11 @@ export function resolveAppBaseUrl(options?: ResolveOptions) {
 
   console.error(`[${context}] URL base não configurada em produção. Defina APP_BASE_URL, APP_URL, NEXT_PUBLIC_APP_URL ou NEXT_PUBLIC_SITE_URL.`)
   return ''
+}
+
+export function composePublicUrl(baseUrl: string, path: string) {
+  const normalizedBase = normalizeUrl(baseUrl)
+  if (!normalizedBase) return ''
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${normalizedBase}${normalizedPath}`
 }
