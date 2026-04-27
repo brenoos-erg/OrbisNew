@@ -15,6 +15,7 @@ import { SolicitationStatusBadge } from '@/components/solicitacoes/SolicitationS
 import { TableSkeletonRows } from '@/components/solicitacoes/TableSkeletonRows'
 import { SolicitacoesToastViewport, useSolicitacoesToast } from '@/components/solicitacoes/SolicitacoesToast'
 import { useSessionMe } from '@/components/session/SessionProvider'
+import { getStatusPresentation } from '@/lib/solicitationStatusPresentation'
 
 export const dynamic = 'force-dynamic'
 
@@ -143,12 +144,10 @@ export default function SentRequestsPage() {
   const categorias = useMemo(() => [{ id: '', nome: 'Selecione uma opção' }, { id: 'padrao', nome: 'Padrão' }], [])
   const statuses = useMemo(() => [
     { id: '', nome: 'Todos' },
-    { id: 'ABERTA', nome: 'ABERTA' },
-    { id: 'AGUARDANDO_APROVACAO', nome: 'AGUARDANDO_APROVACAO' },
-    { id: 'EM_ATENDIMENTO', nome: 'EM_ATENDIMENTO' },
-    { id: 'AGUARDANDO_TERMO', nome: 'AGUARDANDO_TERMO' },
-    { id: 'CONCLUIDA', nome: 'CONCLUIDA' },
-    { id: 'CANCELADA', nome: 'CANCELADA' },
+    ...['ABERTA', 'AGUARDANDO_APROVACAO', 'EM_ATENDIMENTO', 'AGUARDANDO_TERMO', 'CONCLUIDA', 'CANCELADA'].map((status) => ({
+      id: status,
+      nome: getStatusPresentation(status).label,
+    })),
   ], [])
 
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
@@ -356,7 +355,7 @@ export default function SentRequestsPage() {
           : (r.responsavel?.fullName ?? '')
 
       return [
-        r.status ?? '',
+        getStatusPresentation(r.status).label,
         r.protocolo ?? '',
         r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '',
         r.titulo ?? r.tipo?.nome ?? '',

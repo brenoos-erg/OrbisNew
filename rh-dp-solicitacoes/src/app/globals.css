@@ -1,12 +1,13 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ========================
    VARIÁVEIS DE TEMA
    ======================== */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #020617;
 
   --card: #ffffff;
   --card-soft: #f8fafc;
@@ -14,13 +15,15 @@
   --border-subtle: #e2e8f0;
 }
 
-/* Dark mode (quando html[data-theme='dark']) */
-:root {
-  /* cores fixas para modo claro */
-  --background: #f8fafc;    /* parecido com bg-slate-50 */
-  --foreground: #020617;    /* parecido com text-slate-950 */
-}
+:root[data-theme='dark'] {
+  --background: #020617;
+  --foreground: #e5e7eb;
 
+  --card: #0f172a;
+  --card-soft: #111827;
+  --card-border: rgba(148, 163, 184, 0.45);
+  --border-subtle: rgba(148, 163, 184, 0.4);
+}
 
 /* fallback se a pessoa tiver prefers-color-scheme=dark e nenhum tema salvo */
 @media (prefers-color-scheme: dark) {
@@ -108,10 +111,25 @@ body {
   box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
 }
 
+
 .input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Cobertura global de contraste para formulários/tabelas em modo escuro */
+input,
+select,
+textarea {
+  color: var(--foreground);
+  background-color: var(--card);
+  border-color: var(--border-subtle);
+}
+
+::selection {
+  background: rgba(249, 115, 22, 0.35);
+}
+
 
 /* ========================
    TABELAS

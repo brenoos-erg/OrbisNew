@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { clearSessionMeCache } from '@/lib/session-cache'
 import { ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme/ThemeToggle'
 
 type Props = {
   collapsed?: boolean
@@ -82,6 +83,10 @@ export default function UserMenu({ collapsed, user }: Props) {
 
 
         
+
+          <div className="my-2 h-px bg-white/10" />
+
+          <ThemeToggle />
 
           <div className="my-2 h-px bg-white/10" />
 
