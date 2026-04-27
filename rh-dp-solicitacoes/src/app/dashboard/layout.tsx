@@ -10,6 +10,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { SessionProvider } from '@/components/session/SessionProvider'
 import { canAccessApprovalDocuments, canAccessQualityReviewDocuments, isAdmin } from '@/lib/documentApprovalControl'
+import { userHasRhAccess } from '@/lib/rhAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,6 +109,7 @@ export default async function DashboardLayout({
   let showDocumentControl = false
   let canAccessDocumentApprovalTab2 = false
   let canAccessDocumentApprovalTab3 = false
+  let canAccessExternalAdmissions = false
   let userIsAdmin = false
   let configFeatures = {
     painel: false,
@@ -156,6 +158,7 @@ export default async function DashboardLayout({
      try {
       const levels = appUser.moduleLevels ?? {}
       userIsAdmin = isAdmin(appUser)
+      canAccessExternalAdmissions = await userHasRhAccess(appUser)
       const hasStructure = await userHasDepartmentOrCostCenter(
         appUser.id,
         appUser.costCenterId,
@@ -390,9 +393,10 @@ export default async function DashboardLayout({
           canAccessDocumentApprovalTab3={canAccessDocumentApprovalTab3}
           isAdmin={userIsAdmin}
           canApprove={canApprove}
-          canReviewRefusal={canReviewRefusal}
-          canAccessRefusalPanel={canAccessRefusalPanel}
-          configFeatures={configFeatures}
+              canReviewRefusal={canReviewRefusal}
+              canAccessRefusalPanel={canAccessRefusalPanel}
+              canAccessExternalAdmissions={canAccessExternalAdmissions}
+              configFeatures={configFeatures}
           solicitacaoFeatures={solicitacaoFeatures}
           fleetFeatures={fleetFeatures}
           refusalFeatures={refusalFeatures}

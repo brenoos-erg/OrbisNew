@@ -32,9 +32,16 @@ export default function ExternalAdmissionDashboardPage() {
   const [candidateEmail, setCandidateEmail] = useState('')
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [accessDenied, setAccessDenied] = useState(false)
 
   async function load() {
+    setAccessDenied(false)
     const res = await fetch('/api/solicitacoes/externas/admissao', { cache: 'no-store' })
+    if (res.status === 403) {
+      setAccessDenied(true)
+      setRows([])
+      return
+    }
     if (!res.ok) return
     const payload = await res.json()
     setRows(payload.rows ?? [])
@@ -53,6 +60,9 @@ export default function ExternalAdmissionDashboardPage() {
     })
     const payload = await res.json()
     if (!res.ok) {
+      if (res.status === 403) {
+        setAccessDenied(true)
+      }
       setFeedback(payload.error ?? 'Não foi possível criar o processo.')
       return
     }
@@ -65,11 +75,16 @@ export default function ExternalAdmissionDashboardPage() {
   }
 
   async function updateStatus(id: string, status: string) {
-    await fetch(`/api/solicitacoes/externas/admissao/${id}`, {
+    const res = await fetch(`/api/solicitacoes/externas/admissao/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
+    if (res.status === 403) {
+      setAccessDenied(true)
+      setFeedback('Apenas usuários de RH podem alterar solicitações externas.')
+      return
+    }
     await load()
   }
 
@@ -78,6 +93,9 @@ export default function ExternalAdmissionDashboardPage() {
     const payload = await res.json().catch(() => null)
 
     if (!res.ok) {
+      if (res.status === 403) {
+        setAccessDenied(true)
+      }
       setFeedback(payload?.error ?? 'Falha ao reenviar e-mail.')
       return
     }
@@ -90,6 +108,35 @@ export default function ExternalAdmissionDashboardPage() {
     if (!url) return
     await navigator.clipboard.writeText(url)
     setFeedback('Link copiado para a área de transferência.')
+  }
+
+  async function deleteProcess(id: string) {
+    const confirmed = window.confirm('Confirma a exclusão desta solicitação externa? Essa ação irá cancelar o processo.')
+    if (!confirmed) return
+
+    const res = await fetch(`/api/solicitacoes/externas/admissao/${id}`, { method: 'DELETE' })
+    const payload = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        setAccessDenied(true)
+      }
+      setFeedback(payload?.error ?? 'Falha ao excluir solicitação externa.')
+      return
+    }
+
+    setFeedback('Solicitação externa excluída com sucesso.')
+    await load()
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="p-6">
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Acesso negado. Apenas usuários vinculados ao RH podem acessar solicitações externas de admissão.
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -154,6 +201,7 @@ export default function ExternalAdmissionDashboardPage() {
                 <td className="space-y-2 px-3 py-2">
                   <button type="button" className="block rounded border px-2 py-1 text-xs" onClick={() => copyLink(row.externalUrl)}>Copiar link</button>
                   <button type="button" className="block rounded border px-2 py-1 text-xs" onClick={() => resendEmail(row.id)}>Reenviar e-mail</button>
+                  <button type="button" className="block rounded border border-red-300 px-2 py-1 text-xs text-red-700" onClick={() => deleteProcess(row.id)}>Excluir</button>
                   {row.externalUrl && (
                     <a className="block text-xs text-blue-700 underline" href={row.externalUrl} target="_blank" rel="noreferrer">Abrir checklist</a>
                   )}

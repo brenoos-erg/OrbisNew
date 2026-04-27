@@ -45,6 +45,7 @@ type Props = {
   canApprove: boolean
   canReviewRefusal: boolean
   canAccessRefusalPanel?: boolean
+  canAccessExternalAdmissions?: boolean
   configFeatures: {
     painel: boolean
     usuarios: boolean
@@ -104,6 +105,7 @@ export default function Sidebar({
   canApprove,
   canReviewRefusal,
   canAccessRefusalPanel = false,
+  canAccessExternalAdmissions = false,
   configFeatures,
   solicitacaoFeatures,
   fleetFeatures,
@@ -867,17 +869,19 @@ export default function Sidebar({
                     </Link>
                   )}
 
-                  <Link
-                    href="/dashboard/solicitacoes/externas-admissao"
-                    className={`${submenuItemBase}
-                      ${
-                        pathname === '/dashboard/solicitacoes/externas-admissao'
-                          ? 'bg-orange-500/90 text-white'
-                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                      }`}
-                  >
-                    <ClipboardList size={16} /> <span className={labelBase}>Solicitações Externas</span>
-                  </Link>
+                  {canAccessExternalAdmissions && (
+                    <Link
+                      href="/dashboard/solicitacoes/externas-admissao"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname === '/dashboard/solicitacoes/externas-admissao'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <ClipboardList size={16} /> <span className={labelBase}>Solicitações Externas</span>
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

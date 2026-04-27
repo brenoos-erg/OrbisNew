@@ -14,6 +14,7 @@ import {
 } from '@/lib/externalAdmission'
 import { sendExternalAdmissionEmail } from '@/lib/externalAdmissionEmail'
 import { composePublicUrl, resolveAppBaseUrl } from '@/lib/site-url'
+import { userHasRhAccess } from '@/lib/rhAccess'
 
 async function ensureAdmissionType() {
   return prisma.tipoSolicitacao.upsert({
@@ -49,11 +50,15 @@ async function resolveRhDepartmentId() {
 
 export const GET = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (_req, ctx) => {
   const { me } = ctx
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem acessar solicitações externas de admissão.' }, { status: 403 })
+  }
   await ensureAdmissionType()
 
   const rows = await prisma.solicitation.findMany({
     where: {
       tipoId: EXTERNAL_ADMISSION_TYPE_ID,
+      status: { not: SolicitationStatus.CANCELADA },
       OR: me.role === 'ADMIN' ? undefined : [{ departmentId: me.departmentId ?? undefined }, { approverId: me.id }],
     },
     orderBy: [{ updatedAt: 'desc' }],
@@ -88,11 +93,16 @@ export const GET = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (_
     }
   })
 
-  return NextResponse.json({ rows: parsed })
+  const visibleRows = parsed.filter((row) => row.status !== 'EXCLUIDA')
+
+  return NextResponse.json({ rows: visibleRows })
 })
 
 export const POST = withModuleLevel('solicitacoes', ModuleLevel.NIVEL_1, async (req, ctx) => {
   const { me } = ctx
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem criar solicitações externas de admissão.' }, { status: 403 })
+  }
   await ensureAdmissionType()
 
   const body = await req.json().catch(() => null)
