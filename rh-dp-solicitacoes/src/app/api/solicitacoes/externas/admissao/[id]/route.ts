@@ -5,6 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { assertUserMinLevel } from '@/lib/access'
 import { EXTERNAL_ADMISSION_STATUS, EXTERNAL_ADMISSION_TYPE_ID } from '@/lib/externalAdmission'
 import { sendExternalAdmissionEmail } from '@/lib/externalAdmissionEmail'
+import { userHasRhAccess } from '@/lib/rhAccess'
 
 async function assertAccess(userId: string) {
   await assertUserMinLevel(userId, 'solicitacoes', ModuleLevel.NIVEL_1)
@@ -13,6 +14,9 @@ async function assertAccess(userId: string) {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   await assertAccess(me.id)
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem acessar detalhes internos de admissões externas.' }, { status: 403 })
+  }
 
   const id = (await params).id
   const solicitation = await prisma.solicitation.findFirst({
@@ -51,6 +55,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   await assertAccess(me.id)
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem atualizar admissões externas.' }, { status: 403 })
+  }
 
   const id = (await params).id
   const body = await req.json().catch(() => null)
@@ -80,6 +87,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   await assertAccess(me.id)
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem reenviar e-mail de admissões externas.' }, { status: 403 })
+  }
 
   const id = (await params).id
   const solicitation = await prisma.solicitation.findFirst({ where: { id, tipoId: EXTERNAL_ADMISSION_TYPE_ID } })
@@ -130,4 +140,42 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json({ ok: true, emailSent: result.sent, emailError: result.error ?? null, emailResentAt: sentAt })
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const me = await requireActiveUser()
+  await assertAccess(me.id)
+  if (!(await userHasRhAccess(me))) {
+    return NextResponse.json({ error: 'Apenas usuários de RH podem excluir admissões externas.' }, { status: 403 })
+  }
+
+  const id = (await params).id
+  const solicitation = await prisma.solicitation.findFirst({ where: { id, tipoId: EXTERNAL_ADMISSION_TYPE_ID } })
+  if (!solicitation) return NextResponse.json({ error: 'Processo não encontrado.' }, { status: 404 })
+
+  const admission = ((solicitation.payload as any)?.externalAdmission ?? {}) as Record<string, any>
+  const currentStatus = String(admission.status ?? '')
+  if (solicitation.status === 'CANCELADA' || currentStatus === 'EXCLUIDA') {
+    return NextResponse.json({ ok: true, alreadyDeleted: true })
+  }
+
+  await prisma.solicitation.update({
+    where: { id },
+    data: {
+      status: 'CANCELADA',
+      dataCancelamento: new Date(),
+      payload: {
+        ...(solicitation.payload as Record<string, unknown>),
+        externalAdmission: {
+          ...admission,
+          status: 'EXCLUIDA',
+          deletedAt: new Date().toISOString(),
+          deletedById: me.id,
+          deletionMode: 'SOFT_DELETE',
+        },
+      },
+    },
+  })
+
+  return NextResponse.json({ ok: true })
 }

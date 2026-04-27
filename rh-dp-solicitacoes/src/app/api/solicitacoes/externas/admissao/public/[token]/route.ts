@@ -29,6 +29,7 @@ async function findSolicitationByToken(token: string): Promise<any> {
   return prisma.solicitation.findFirst({
     where: {
       tipoId: EXTERNAL_ADMISSION_TYPE_ID,
+      status: { not: 'CANCELADA' },
       payload: {
         path: '$.externalAdmission.tokenHash',
         equals: toTokenHash(token),
@@ -56,6 +57,11 @@ async function findSolicitationByToken(token: string): Promise<any> {
 
 function getAdmissionPayload(payload: any) {
   return (payload?.externalAdmission ?? {}) as Record<string, any>
+}
+
+function isDeletedAdmission(payload: any) {
+  const admission = getAdmissionPayload(payload)
+  return String(admission.status ?? '').toUpperCase() === 'EXCLUIDA'
 }
 
 function normalizeUploadedFileName(fileName: string) {
@@ -133,6 +139,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
   if (!solicitation) {
     return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
   }
+  if (isDeletedAdmission(solicitation.payload)) {
+    return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
+  }
 
   const admission = getAdmissionPayload(solicitation.payload)
   const checklistStatus = (admission.checklistStatus ?? {}) as Record<string, boolean>
@@ -198,6 +207,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const solicitation = await findSolicitationByToken(token)
 
   if (!solicitation) {
+    return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
+  }
+  if (isDeletedAdmission(solicitation.payload)) {
     return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
   }
 
@@ -288,6 +300,9 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ t
   const solicitation = await findSolicitationByToken(token)
 
   if (!solicitation) {
+    return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
+  }
+  if (isDeletedAdmission(solicitation.payload)) {
     return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 404 })
   }
 
