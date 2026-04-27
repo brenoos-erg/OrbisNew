@@ -1331,6 +1331,29 @@ async function main() {
     console.log(
       `✅ Tipo de solicitação criado/atualizado: ${solicitacaoEquipamentos.codigo} - ${solicitacaoEquipamentos.nome}`,
     )
+
+    const tipoEquipamentoTi = await prisma.tipoSolicitacao.findUnique({
+      where: { id: 'RQ_089' },
+      select: { id: true },
+    })
+
+    if (tipoEquipamentoTi) {
+      await prisma.tipoSolicitacaoApprover.upsert({
+        where: {
+          tipoId_userId: {
+            tipoId: tipoEquipamentoTi.id,
+            userId: superAdminUser.id,
+          },
+        },
+        update: { role: 'APPROVER' },
+        create: {
+          tipoId: tipoEquipamentoTi.id,
+          userId: superAdminUser.id,
+          role: 'APPROVER',
+        },
+      })
+      console.log('✅ Fallback de aprovador para RQ_089 configurado no seed (ambiente local/dev).')
+    }
   }
 
   /* =========================

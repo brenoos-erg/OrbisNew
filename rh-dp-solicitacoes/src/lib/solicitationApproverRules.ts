@@ -8,3 +8,9 @@ export function resolveApprovalRecipientId(params: {
 }): string | null {
   return params.solicitationApproverId ?? params.fallbackTipoApproverId ?? null
 }
+
+export function resolveEquipmentApprovalMode(params: {
+  approverId?: string | null
+}): 'APPROVAL' | 'TI_QUEUE' {
+  return params.approverId ? 'APPROVAL' : 'TI_QUEUE'
+}

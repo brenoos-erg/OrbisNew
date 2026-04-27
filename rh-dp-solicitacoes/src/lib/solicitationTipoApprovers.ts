@@ -47,3 +47,42 @@ export async function resolveTipoApproverId(tipoId: string): Promise<string | nu
   const ids = await resolveTipoApproverIds(tipoId)
   return pickEligibleTipoApproverId(ids)
 }
+
+export async function resolveNivel3TiApproverId(): Promise<string | null> {
+  const users = await prisma.user.findMany({
+    where: {
+      status: 'ATIVO',
+      moduleAccesses: {
+        some: {
+          level: ModuleLevel.NIVEL_3,
+          module: { key: MODULE_KEYS.SOLICITACOES },
+        },
+      },
+      OR: [
+        { department: { code: '20' } },
+        { userDepartments: { some: { department: { code: '20' } } } },
+      ],
+    },
+    orderBy: [{ fullName: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  })
+
+  return users[0]?.id ?? null
+}
+
+export async function resolveTipoApproverIdWithFallback(tipoId: string): Promise<{
+  approverId: string | null
+  source: 'TIPO' | 'NIVEL_3_TI' | 'NONE'
+}> {
+  const tipoApproverId = await resolveTipoApproverId(tipoId)
+  if (tipoApproverId) {
+    return { approverId: tipoApproverId, source: 'TIPO' }
+  }
+
+  const fallbackLevel3TiApproverId = await resolveNivel3TiApproverId()
+  if (fallbackLevel3TiApproverId) {
+    return { approverId: fallbackLevel3TiApproverId, source: 'NIVEL_3_TI' }
+  }
+
+  return { approverId: null, source: 'NONE' }
+}
