@@ -177,10 +177,10 @@ export default function ApprovalsPage() {
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800">
+          <h1 className="text-lg font-semibold text-[var(--foreground)]">
             Painel de Aprovação
           </h1>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[var(--muted-foreground)]">
             Solicitações pendentes de aprovação para você.
           </p>
         </div>
@@ -201,10 +201,10 @@ export default function ApprovalsPage() {
         <p className="mb-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{deepLinkMessage}</p>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
+      <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] text-sm">
         <table className="min-w-full border-collapse">
           <thead>
-            <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr className="bg-[var(--card-muted)] text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
               <th className="px-3 py-2 text-left">Protocolo</th>
               <th className="px-3 py-2 text-left">Data</th>
               <th className="px-3 py-2 text-left">Tipo</th>
@@ -219,7 +219,7 @@ export default function ApprovalsPage() {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-3 py-4 text-center text-xs text-slate-500"
+                  className="px-3 py-4 text-center text-xs text-[var(--muted-foreground)]"
                 >
                   Carregando...
                 </td>
@@ -228,7 +228,7 @@ export default function ApprovalsPage() {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-3 py-4 text-center text-xs text-slate-500"
+                  className="px-3 py-4 text-center text-xs text-[var(--muted-foreground)]"
                 >
                   Nenhuma solicitação pendente de aprovação.
                 </td>
@@ -240,7 +240,7 @@ export default function ApprovalsPage() {
                 <tr
                    key={row.id}
                   onClick={() => handleOpenPreview(row)}
-                  className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                  className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--card-muted)]"
                 >
                   <td className="px-3 py-2 text-xs">
                     {row.protocolo ?? '—'}
@@ -264,7 +264,7 @@ export default function ApprovalsPage() {
                         e.stopPropagation()
                         window.open(`/solicitacoes/impressao/${row.id}`, '_blank', 'noopener,noreferrer')
                       }}
-                      className="mr-2 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                      className="mr-2 rounded border border-[var(--input-border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)]"
                     >
                       <span className="inline-flex items-center gap-1"><Printer size={12} />Imprimir</span>
                     </button>

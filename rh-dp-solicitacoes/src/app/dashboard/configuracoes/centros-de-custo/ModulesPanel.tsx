@@ -48,7 +48,7 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
   const available = allModules.filter((m) => !enabled.find((e) => e.id === m.id))
 
   return (
-    <div className="border rounded-lg p-3 bg-white/70">
+    <div className="border rounded-lg p-3 bg-[var(--card)]/70">
       <div className="font-semibold mb-2">Módulos do Centro de Custo</div>
 
       <div className="flex gap-2 mb-3">
@@ -66,7 +66,7 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
         </select>
         <button
           onClick={add}
-          className="border px-3 py-2 rounded text-sm hover:bg-slate-50 disabled:opacity-50"
+          className="border px-3 py-2 rounded text-sm hover:bg-[var(--card-muted)] disabled:opacity-50"
           disabled={!selectKey}
         >
           Adicionar
@@ -74,21 +74,21 @@ export default function ModulesPanel({ costCenterId }: { costCenterId: string })
       </div>
 
       {enabled.length === 0 ? (
-        <div className="text-sm text-slate-500">Nenhum módulo vinculado a este centro de custo.</div>
+        <div className="text-sm text-[var(--muted-foreground)]">Nenhum módulo vinculado a este centro de custo.</div>
       ) : (
         <ul className="space-y-2">
           {enabled.map((m) => (
             <li
               key={m.id}
-              className="flex items-center justify-between border rounded px-3 py-2 bg-white"
+              className="flex items-center justify-between border rounded px-3 py-2 bg-[var(--card)]"
             >
               <div className="text-sm">
                 <div className="font-medium">{m.name}</div>
-                <div className="text-xs text-slate-500">{m.key}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">{m.key}</div>
               </div>
               <button
                 onClick={() => remove(m.key)}
-                className="text-red-600 border px-2 py-1 rounded text-sm hover:bg-slate-50"
+                className="text-red-600 border px-2 py-1 rounded text-sm hover:bg-[var(--card-muted)]"
               >
                 Remover
               </button>

@@ -105,7 +105,7 @@ const filteredUsers = useMemo(() => {
         ))}
       </select>
 
-      <div className="rounded border bg-slate-50 p-3 text-sm text-slate-700">
+      <div className="rounded border bg-[var(--card-muted)] p-3 text-sm text-[var(--foreground)]">
         Defina por usuário se ele atua como <strong>Aprovador</strong>, <strong>Finalizador</strong> ou{' '}
         <strong>Visualizador (Nível 1)</strong>.
       </div>
@@ -128,7 +128,7 @@ const filteredUsers = useMemo(() => {
               return (
                 <div key={u.id} className="space-y-2 rounded border p-3">
                   <span>
-                    {u.fullName} <span className="text-xs text-slate-500">({u.email})</span>
+                    {u.fullName} <span className="text-xs text-[var(--muted-foreground)]">({u.email})</span>
                   </span>
                   <div className="flex gap-4 text-sm">
                     <label className="flex items-center gap-2">
@@ -167,17 +167,17 @@ const filteredUsers = useMemo(() => {
           </div>
 
           {filteredUsers.length === 0 && (
-            <div className="rounded border border-dashed p-4 text-sm text-slate-500">
+            <div className="rounded border border-dashed p-4 text-sm text-[var(--muted-foreground)]">
               Nenhum usuário encontrado para a busca informada.
              </div>
           )}
         </div>
 
         <div className="h-fit rounded border p-3">
-          <h2 className="mb-2 text-sm font-semibold text-slate-700">Com permissão no tipo selecionado</h2>
+          <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">Com permissão no tipo selecionado</h2>
           <div className="overflow-hidden rounded border">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+              <thead className="bg-[var(--card-muted)] text-left text-xs uppercase text-[var(--muted-foreground)]">
                 <tr>
                   <th className="px-3 py-2">Usuário</th>
                   <th className="px-3 py-2">Permissão</th>
@@ -192,7 +192,7 @@ const filteredUsers = useMemo(() => {
                 ))}
                 {selectedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-3 text-center text-slate-500">
+                    <td colSpan={2} className="px-3 py-3 text-center text-[var(--muted-foreground)]">
                       Nenhum usuário com permissão.
                     </td>
                   </tr>

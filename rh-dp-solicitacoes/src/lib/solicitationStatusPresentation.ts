@@ -101,7 +101,7 @@ export function getStatusPresentation(status?: string | null): SolicitationStatu
       description: 'Sem status informado.',
       icon: AlertCircle,
       className:
-        'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700',
+        'bg-[var(--card-muted)] text-[var(--muted-foreground)] border-[var(--border-subtle)]',
     }
   }
 
@@ -111,7 +111,7 @@ export function getStatusPresentation(status?: string | null): SolicitationStatu
       description: 'Status não mapeado.',
       icon: AlertCircle,
       className:
-        'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700',
+        'bg-[var(--card-muted)] text-[var(--foreground)] border-[var(--border-subtle)]',
     }
   )
 }

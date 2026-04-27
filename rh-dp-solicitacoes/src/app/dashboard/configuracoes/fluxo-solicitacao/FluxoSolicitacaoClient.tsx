@@ -87,7 +87,7 @@ type FluxoResponse = {
 
 type TabId = 'fluxo' | 'dados' | 'editar' | 'status'
 
-const card = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
+const card = 'rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 shadow-sm'
 
 function statusClass(status: string) {
   if (status.includes('FINALIZADO') || status.includes('APPROVED') || status.includes('CONCLUID')) return 'bg-green-100 text-green-700'
@@ -96,7 +96,7 @@ function statusClass(status: string) {
   }
   if (status.includes('PENDENTE') || status.includes('PENDING') || status.includes('AGUARDANDO')) return 'bg-amber-100 text-amber-700'
   if (status.includes('REJECTED') || status.includes('REPROV') || status.includes('CANCEL')) return 'bg-red-100 text-red-700'
-  return 'bg-slate-100 text-slate-700'
+  return 'bg-slate-100 text-[var(--foreground)]'
 }
 
 function fmtDate(value: string | null) {
@@ -402,14 +402,14 @@ export default function FluxoSolicitacaoClient() {
 
     if (fieldType === 'checkbox' || fieldType === 'boolean') {
       return (
-        <label key={field.name} className="flex items-start gap-2 rounded-md border border-slate-200 p-2 text-sm">
+        <label key={field.name} className="flex items-start gap-2 rounded-md border border-[var(--border-subtle)] p-2 text-sm">
           <input
             type="checkbox"
             checked={Boolean(fieldValue)}
             disabled={disabled || readOnly}
             onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.checked }))}
           />
-          <span className="text-slate-700">
+          <span className="text-[var(--foreground)]">
             {label}
             {required ? <span className="ml-1 text-red-500">*</span> : null}
           </span>
@@ -421,7 +421,7 @@ export default function FluxoSolicitacaoClient() {
       const current = typeof fieldValue === 'string' ? fieldValue : ''
       return (
         <div key={field.name} className="block text-sm">
-          <span className="mb-1 block text-slate-700">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <span className="mb-1 block text-[var(--foreground)]">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
           <div className="flex flex-wrap gap-3">
             {resolvedOptions.map((option) => (
               <label key={option.value} className="inline-flex items-center gap-2">
@@ -445,7 +445,7 @@ export default function FluxoSolicitacaoClient() {
       const values = Array.isArray(fieldValue) ? fieldValue.map(String) : []
       return (
         <label key={field.name} className="block text-sm">
-          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <span className="mb-1 block text-[var(--muted-foreground)]">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
           <select
             multiple
             value={values}
@@ -455,7 +455,7 @@ export default function FluxoSolicitacaoClient() {
               const next = Array.from(e.target.selectedOptions).map((option) => option.value)
               setEditFields((prev) => ({ ...prev, [field.name]: next }))
             }}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
           >
             {resolvedOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -474,7 +474,7 @@ export default function FluxoSolicitacaoClient() {
           })()
       return (
         <label key={field.name} className="block text-sm">
-          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <span className="mb-1 block text-[var(--muted-foreground)]">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
           <select
             value={selected}
             required={required}
@@ -491,7 +491,7 @@ export default function FluxoSolicitacaoClient() {
                   field.name,
                 )
               })
-            }}            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            }}            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
           >
             <option value="">Selecione...</option>
             {resolvedOptions.map((option) => (
@@ -505,14 +505,14 @@ export default function FluxoSolicitacaoClient() {
     if (fieldType === 'textarea') {
       return (
         <label key={field.name} className="block text-sm sm:col-span-2">
-          <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+          <span className="mb-1 block text-[var(--muted-foreground)]">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
           <textarea
             value={typeof fieldValue === 'string' ? fieldValue : String(fieldValue ?? '')}
             placeholder={placeholder}
             required={required}
             disabled={disabled || readOnly}
             onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
             rows={4}
           />
         </label>
@@ -529,7 +529,7 @@ export default function FluxoSolicitacaoClient() {
 
     return (
       <label key={field.name} className="block text-sm">
-        <span className="mb-1 block text-slate-600">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
+        <span className="mb-1 block text-[var(--muted-foreground)]">{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span>
         <input
           type={inputType}
           value={normalizedValue}
@@ -543,7 +543,7 @@ export default function FluxoSolicitacaoClient() {
               [field.name]: inputType === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value,
             }))
           }
-          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
         />
       </label>
     )
@@ -587,8 +587,8 @@ export default function FluxoSolicitacaoClient() {
   return (
     <div className="max-w-6xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Central do Chamado - Fluxo da Solicitação</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">Central do Chamado - Fluxo da Solicitação</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">
           Busque por protocolo, id, nome do solicitante, matrícula ou tipo da solicitação para acompanhar, consultar e manter o chamado.
         </p>
       </div>
@@ -598,7 +598,7 @@ export default function FluxoSolicitacaoClient() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Protocolo, ID, solicitante, matrícula ou tipo"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
+          className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
         />
         <button
           type="submit"
@@ -614,7 +614,7 @@ export default function FluxoSolicitacaoClient() {
 
       {result && (
         <div className="space-y-4">
-          <section className="rounded-xl border border-slate-200 bg-gradient-to-r from-white to-slate-50 p-4 shadow-sm">
+          <section className="rounded-xl border border-[var(--border-subtle)] bg-gradient-to-r from-white to-slate-50 p-4 shadow-sm">
             <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <p><b>Protocolo:</b> {result.solicitacao.protocolo}</p>
               <p><b>Tipo:</b> {result.solicitacao.tipo}</p>
@@ -628,7 +628,7 @@ export default function FluxoSolicitacaoClient() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-2 shadow-sm">
             <div className="flex flex-wrap gap-2">
               {tabs.map((tab) => (
                 <button
@@ -639,7 +639,7 @@ export default function FluxoSolicitacaoClient() {
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                     activeTab === tab.id
                       ? 'bg-orange-500 text-white shadow'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      : 'bg-slate-100 text-[var(--foreground)] hover:bg-slate-200'
                   } disabled:cursor-not-allowed disabled:opacity-40`}
                 >
                   {tab.label}
@@ -651,7 +651,7 @@ export default function FluxoSolicitacaoClient() {
           {activeTab === 'fluxo' && (
             <div className="space-y-4">
               <section className={card}>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Fluxo / Andamento Completo</h2>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Fluxo / Andamento Completo</h2>
                 <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                   <p><b>Setor responsável atual:</b> {result.etapaAtual.departamento ?? '—'}</p>
                   <p><b>Etapa atual:</b> {result.etapaAtual.nome}</p>
@@ -664,32 +664,32 @@ export default function FluxoSolicitacaoClient() {
               </section>
 
               <section className={card}>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Linha do Tempo das Etapas</h2>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Linha do Tempo das Etapas</h2>
                 <div className="space-y-2">
                   {result.historico.map((item, index) => (
-                    <div key={`${item.etapa}-${index}`} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                    <div key={`${item.etapa}-${index}`} className="rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="font-medium text-slate-800">{item.etapa}</p>
+                        <p className="font-medium text-[var(--foreground)]">{item.etapa}</p>
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
                       </div>
-                      <p className="text-slate-600">Tipo: {item.tipo}</p>
-                      <p className="text-slate-600">Início: {fmtDate(item.dataInicio)}</p>
-                      <p className="text-slate-600">Fim: {fmtDate(item.dataFim)}</p>
+                      <p className="text-[var(--muted-foreground)]">Tipo: {item.tipo}</p>
+                      <p className="text-[var(--muted-foreground)]">Início: {fmtDate(item.dataInicio)}</p>
+                      <p className="text-[var(--muted-foreground)]">Fim: {fmtDate(item.dataFim)}</p>
                     </div>
                   ))}
                 </div>
               </section>
 
               <section className={card}>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Histórico de Movimentações / Tratativas</h2>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Histórico de Movimentações / Tratativas</h2>
                 <div className="space-y-2">
                   {result.movimentacoes.map((item) => (
-                    <div key={item.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                    <div key={item.id} className="rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm">
                       <div className="flex items-center justify-between gap-3">
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
-                        <span className="text-xs text-slate-500">{fmtDate(item.data)}</span>
+                        <span className="text-xs text-[var(--muted-foreground)]">{fmtDate(item.data)}</span>
                       </div>
-                      <p className="mt-1 text-slate-700">{item.mensagem ?? 'Sem mensagem.'}</p>
+                      <p className="mt-1 text-[var(--foreground)]">{item.mensagem ?? 'Sem mensagem.'}</p>
                     </div>
                   ))}
                 </div>
@@ -699,11 +699,11 @@ export default function FluxoSolicitacaoClient() {
 
           {activeTab === 'dados' && (
             <section className={card}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Dados preenchidos do chamado</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Dados preenchidos do chamado</h2>
               <div className="space-y-4">
                 {result.dadosChamado.secoes.map((secao) => (
-                  <article key={secao.secao} className="rounded-md border border-slate-200 p-3">
-                    <h3 className="mb-2 text-sm font-semibold text-slate-700">{secao.secao}</h3>
+                  <article key={secao.secao} className="rounded-md border border-[var(--border-subtle)] p-3">
+                    <h3 className="mb-2 text-sm font-semibold text-[var(--foreground)]">{secao.secao}</h3>
                     <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                       {secao.campos.map((campo) => (
                         <p key={`${secao.secao}-${campo.chave}`}>
@@ -719,41 +719,41 @@ export default function FluxoSolicitacaoClient() {
 
           {activeTab === 'editar' && (
             <section className={card}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Editar chamado</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Editar chamado</h2>
               {!result.permissions.canEdit ? (
                 <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">Seu perfil não possui permissão para editar os dados do chamado.</p>
               ) : (
                 <div className="space-y-3">
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-slate-700">Título</span>
-                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                    <span className="mb-1 block font-medium text-[var(--foreground)]">Título</span>
+                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
                   </label>
 
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-slate-700">Descrição</span>
-                    <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                    <span className="mb-1 block font-medium text-[var(--foreground)]">Descrição</span>
+                    <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
                   </label>
 
-                  <div className="rounded-md border border-slate-200 p-3">
-                    <h3 className="mb-2 text-sm font-semibold text-slate-700">Campos do formulário</h3>
+                  <div className="rounded-md border border-[var(--border-subtle)] p-3">
+                    <h3 className="mb-2 text-sm font-semibold text-[var(--foreground)]">Campos do formulário</h3>
                      <div className="grid gap-3 sm:grid-cols-2">
                       {result.formSchema.length > 0
                         ? result.formSchema.map(renderEditField)
                         : Object.entries(editFields).map(([key, value]) => (
                             <label key={key} className="block text-sm">
-                              <span className="mb-1 block text-slate-600">{key}</span>
+                              <span className="mb-1 block text-[var(--muted-foreground)]">{key}</span>
                               <input
                                 value={String(value ?? '')}
                                 onChange={(e) => setEditFields((prev) => ({ ...prev, [key]: e.target.value }))}
-                                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                                className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
                               />
                             </label>
                           ))}
                     </div>
                   </div>
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-slate-700">Motivo da alteração (opcional)</span>
-                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                    <span className="mb-1 block font-medium text-[var(--foreground)]">Motivo da alteração (opcional)</span>
+                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
                   </label>
 
                   <button
@@ -771,19 +771,19 @@ export default function FluxoSolicitacaoClient() {
 
           {activeTab === 'status' && (
             <section className={card}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">Status / Tramitação</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Status / Tramitação</h2>
               {!result.permissions.canChangeStatus ? (
                 <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">Seu perfil não possui permissão para alterar status/tramitação.</p>
               ) : (
                 <div className="space-y-3">
-                  <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <p className="rounded-md bg-[var(--card-muted)] px-3 py-2 text-sm text-[var(--foreground)]">
                     <b>Status anterior:</b> {result.solicitacao.status} | <b>Novo status:</b> {statusValue || '—'}
                   </p>
 
                   <div className="grid gap-3 sm:grid-cols-3">
                     <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-slate-700">Novo status</span>
-                      <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                      <span className="mb-1 block font-medium text-[var(--foreground)]">Novo status</span>
+                      <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
                         {result.statusOptions.map((opt) => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
@@ -791,8 +791,8 @@ export default function FluxoSolicitacaoClient() {
                     </label>
 
                     <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-slate-700">Setor responsável</span>
-                      <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                      <span className="mb-1 block font-medium text-[var(--foreground)]">Setor responsável</span>
+                      <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
                         <option value="">Manter atual</option>
                         {result.departamentos.map((dept) => (
                           <option key={dept.id} value={dept.id}>{dept.name}</option>
@@ -801,8 +801,8 @@ export default function FluxoSolicitacaoClient() {
                     </label>
 
                     <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-slate-700">Responsável atual</span>
-                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2">
+                      <span className="mb-1 block font-medium text-[var(--foreground)]">Responsável atual</span>
+                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
                         <option value="">Sem responsável definido</option>
                         {result.responsaveis.map((resp) => (
                           <option key={resp.id} value={resp.id}>{resp.fullName}</option>
@@ -812,8 +812,8 @@ export default function FluxoSolicitacaoClient() {
                   </div>
 
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-slate-700">Motivo / justificativa</span>
-                    <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                    <span className="mb-1 block font-medium text-[var(--foreground)]">Motivo / justificativa</span>
+                    <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} rows={3} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
                   </label>
 
                   <button

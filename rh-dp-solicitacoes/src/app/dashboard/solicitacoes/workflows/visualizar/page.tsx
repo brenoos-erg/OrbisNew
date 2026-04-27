@@ -61,11 +61,11 @@ export default function VisualizarWorkflowPage() {
   const sortedSteps = useMemo(() => (selected ? [...selected.steps].sort((a, b) => a.order - b.order) : []), [selected])
 
   return (
-    <div className="space-y-4 rounded-xl border bg-white p-4">
+    <div className="space-y-4 rounded-xl border bg-[var(--card)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Visualizar Fluxo de Solicitação</h1>
-          <p className="text-sm text-slate-600">Selecione tipo e departamento para ver o workflow configurado.</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Selecione tipo e departamento para ver o workflow configurado.</p>
         </div>
         <Link className="rounded border px-3 py-2 text-sm" href="/dashboard/solicitacoes/fluxos">Voltar ao editor</Link>
       </div>
@@ -81,16 +81,16 @@ export default function VisualizarWorkflowPage() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-slate-500">Carregando workflows...</div>
+        <div className="rounded-xl border border-dashed p-8 text-center text-[var(--muted-foreground)]">Carregando workflows...</div>
       ) : !tipoId ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-slate-500">Selecione um Tipo de Solicitação para visualizar o fluxo.</div>
+        <div className="rounded-xl border border-dashed p-8 text-center text-[var(--muted-foreground)]">Selecione um Tipo de Solicitação para visualizar o fluxo.</div>
       ) : !selected ? (
-        <div className="rounded-xl border border-dashed p-8 text-center text-slate-500">
+        <div className="rounded-xl border border-dashed p-8 text-center text-[var(--muted-foreground)]">
           Nenhum workflow encontrado para esse filtro. Crie um workflow no editor.
         </div>
       ) : (
         <>
-          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+          <div className="rounded-lg bg-[var(--card-muted)] p-3 text-sm text-[var(--foreground)]">
             <strong>{selected.name}</strong> • Tipo: {selected.tipo?.nome ?? '-'} • Departamento: {selected.department?.name ?? 'Fallback geral'}
           </div>
           <WorkflowDiagram workflow={selected} />
@@ -100,7 +100,7 @@ export default function VisualizarWorkflowPage() {
               {sortedSteps.map((step) => (
                 <li key={step.stepKey} className="rounded border p-2 text-sm">
                   <div className="font-medium">{step.order}. {step.label}</div>
-                  <div className="text-xs text-slate-600">{step.stepKey} • {step.kind}</div>
+                  <div className="text-xs text-[var(--muted-foreground)]">{step.stepKey} • {step.kind}</div>
                   {step.approverUser?.fullName && <div className="text-xs">Aprovador: {step.approverUser.fullName}</div>}
                   {Array.isArray((step as any).notificationEmails) && (step as any).notificationEmails.length > 0 && (
                     <div className="text-xs">E-mails notificados: {(step as any).notificationEmails.join(', ')}</div>

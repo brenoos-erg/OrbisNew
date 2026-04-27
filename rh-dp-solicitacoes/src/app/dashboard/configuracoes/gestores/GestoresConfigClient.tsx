@@ -29,12 +29,12 @@ export default function GestoresConfigClient() {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h1 className="text-xl font-semibold text-slate-900">Configuração de Gestores</h1>
-      <p className="mt-1 text-sm text-slate-600">Defina os gestores exibidos no campo de responsáveis do Plano de Ação Avulso.</p>
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm">
+      <h1 className="text-xl font-semibold text-[var(--foreground)]">Configuração de Gestores</h1>
+      <p className="mt-1 text-sm text-[var(--muted-foreground)]">Defina os gestores exibidos no campo de responsáveis do Plano de Ação Avulso.</p>
       <div className="mt-4 grid gap-2">
         {users.map((user) => (
-          <label key={user.id} className="inline-flex items-center gap-2 text-sm text-slate-700">
+          <label key={user.id} className="inline-flex items-center gap-2 text-sm text-[var(--foreground)]">
             <input
               type="checkbox"
               checked={selected.includes(user.id)}

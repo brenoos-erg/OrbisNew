@@ -223,7 +223,7 @@ export default function FluxosSolicitacoesPage() {
 
 
   return (
-    <div className="space-y-4 rounded-xl border bg-white p-4">
+    <div className="space-y-4 rounded-xl border bg-[var(--card)] p-4">
       <h1 className="text-xl font-semibold">Fluxo de Solicitações</h1>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -234,7 +234,7 @@ export default function FluxosSolicitacoesPage() {
         </select>
         </div>
 
-      <div className="rounded-xl border border-slate-200 p-3">
+      <div className="rounded-xl border border-[var(--border-subtle)] p-3">
         <p className="mb-2 text-sm font-medium">Aprovadores e e-mails por etapa (regra padrão de disparo)</p>
         <div className="space-y-3">
           {nodes.map((step, idx) => (
@@ -264,8 +264,8 @@ export default function FluxosSolicitacoesPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="mb-3 text-sm font-medium text-slate-700">Pré-visualização do fluxo</p>
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card-muted)] p-4">
+        <p className="mb-3 text-sm font-medium text-[var(--foreground)]">Pré-visualização do fluxo</p>
         <svg width="100%" height="180" viewBox="0 0 980 180" className="overflow-visible">
           {nodes.map((step, idx) => {
             const x = 20 + idx * 300
@@ -302,7 +302,7 @@ export default function FluxosSolicitacoesPage() {
         <div className="border-b px-3 py-2 text-sm font-medium">Workflows cadastrados</div>
         <div className="divide-y">
           {workflows.map((wf) => (
-            <button key={wf.id} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => setDraft(wf)}>
+            <button key={wf.id} className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--card-muted)]" onClick={() => setDraft(wf)}>
               {wf.name} • {tipos.find((t) => t.id === wf.tipoId)?.nome ?? wf.tipoId}
             </button>
           ))}

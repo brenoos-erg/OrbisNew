@@ -118,17 +118,17 @@ export default function DepartamentosCentrosDeCustoPage() {
   return (
     <main className="mx-auto w-full max-w-5xl space-y-4">
       <header>
-        <h1 className="text-xl font-semibold text-slate-800">Departamentos x Centros de custo</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">Departamentos x Centros de custo</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">
           Vincule múltiplos centros de custo para o mesmo departamento.
         </p>
       </header>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-        <label className="block text-sm font-medium text-slate-700">
+      <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 shadow-sm space-y-4">
+        <label className="block text-sm font-medium text-[var(--foreground)]">
           Departamento
           <select
-            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm"
             value={selectedDepartmentId}
             onChange={(e) => {
               setSelectedDepartmentId(e.target.value)
@@ -145,8 +145,8 @@ export default function DepartamentosCentrosDeCustoPage() {
         </label>
 
         <div>
-          <p className="text-sm font-medium text-slate-700">Centros de custo vinculados</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-medium text-[var(--foreground)]">Centros de custo vinculados</p>
+          <p className="text-xs text-[var(--muted-foreground)]">
             Tudo que os centros de custo receberem, quem for do departamento vai ver.
           </p>
 
@@ -156,7 +156,7 @@ export default function DepartamentosCentrosDeCustoPage() {
               return (
                 <label
                   key={center.id}
-                  className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                  className="flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--card-muted)] px-3 py-2 text-sm text-[var(--foreground)]"
                 >
                   <input
                     type="checkbox"
@@ -174,7 +174,7 @@ export default function DepartamentosCentrosDeCustoPage() {
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-[var(--muted-foreground)]">
             Departamento selecionado: <strong>{selectedDepartmentName || '—'}</strong>
           </p>
           <button

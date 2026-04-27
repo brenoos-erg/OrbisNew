@@ -19,13 +19,13 @@ export default function AtalhoTiPage() {
 
       {shortcutOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-6xl rounded-2xl bg-slate-50 p-6 shadow-2xl">
+          <div className="w-full max-w-6xl rounded-2xl bg-[var(--card-muted)] p-6 shadow-2xl">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold text-slate-800">
+                <h1 className="text-2xl font-semibold text-[var(--foreground)]">
                   Atalho de controle TI
                 </h1>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-[var(--muted-foreground)]">
                   Atalho rápido para buscar equipamentos pelo patrimônio.
                 </p>
               </div>

@@ -139,7 +139,7 @@ export default function NovoCargoPage() {
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="border rounded-lg bg-white shadow-sm p-4 space-y-4"
+          className="border rounded-lg bg-[var(--card)] shadow-sm p-4 space-y-4"
         >
           {error && (
             <p className="text-xs text-red-500 mb-2">{error}</p>

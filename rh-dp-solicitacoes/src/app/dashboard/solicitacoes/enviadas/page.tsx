@@ -423,25 +423,25 @@ export default function SentRequestsPage() {
 
 
   return (
-    <div className="space-y-4">
+    <div className="app-page">
       <SolicitacoesToastViewport toasts={toasts} onClose={removeToast} />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="app-page-header justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">Solicitações Enviadas</h1>
-          <p className="text-sm text-slate-500">Acompanhe o andamento das solicitações que você abriu.</p>
+          <h1 className="app-title text-xl md:text-2xl">Solicitações Enviadas</h1>
+          <p className="app-subtitle">Acompanhe o andamento das solicitações que você abriu.</p>
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-          <button onClick={onSearch} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto">
+          <button onClick={onSearch} className="app-button-secondary w-full sm:w-auto">
             <Filter size={16} /> Pesquisar
           </button>
 
-          <button onClick={onClear} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto">
+          <button onClick={onClear} className="app-button-secondary w-full sm:w-auto">
             <Eraser size={16} /> Limpar
           </button>
 
-          <button onClick={() => router.push('/dashboard/solicitacoes/enviadas/nova')} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-orange-600 px-3 py-2 text-sm text-white hover:bg-orange-500 sm:w-auto">
+          <button onClick={() => router.push('/dashboard/solicitacoes/enviadas/nova')} className="app-button-primary w-full sm:w-auto">
             <Plus size={16} /> Nova Solicitação
           </button>
 
@@ -453,14 +453,14 @@ export default function SentRequestsPage() {
                }
               openDetail(selectedRow)
             }}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
+            className="app-button-secondary w-full sm:w-auto"
           >
             <Info size={16} /> Detalhes
           </button>
 
           <button
             onClick={onPrint}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto"
+            className="app-button-secondary w-full sm:w-auto"
           >
             <Printer size={16} /> Imprimir
           </button>
@@ -468,108 +468,108 @@ export default function SentRequestsPage() {
           <button
             disabled
             title="Disponível apenas para a equipe responsável"
-            className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-400 sm:w-auto"
+            className="app-button-danger w-full sm:w-auto"
           >
             Cancelar
           </button>
 
-          <button onClick={exportCsv} className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 sm:w-auto">
+          <button onClick={exportCsv} className="app-button-secondary w-full sm:w-auto">
             <Download size={16} /> Excel
           </button>
 
-          <button onClick={() => load(currentSearchState)} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 sm:w-auto">
+          <button onClick={() => load(currentSearchState)} className="app-button-primary w-full sm:w-auto">
             <RefreshCcw size={16} /> Atualizar
 
           </button>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+          <label className="inline-flex items-center gap-2 text-xs app-muted-text">
             <input type="checkbox" checked={isAutoRefreshEnabled} onChange={(e) => setIsAutoRefreshEnabled(e.target.checked)} />
             Auto-atualizar (60s)
           </label>
 
-          <span className="text-xs text-slate-500">
+          <span className="text-xs app-muted-text">
             {lastUpdatedAt ? `Atualizado agora (${format(lastUpdatedAt, 'HH:mm:ss')})` : 'Ainda não atualizado'}
           </span>
          </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="app-filter-bar">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Departamento</label>
-            <select value={formFilters.departmentId} onChange={(e) => setFormFilters((prev) => ({ ...prev, departmentId: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
+            <label className="app-label">Departamento</label>
+            <select value={formFilters.departmentId} onChange={(e) => setFormFilters((prev) => ({ ...prev, departmentId: e.target.value }))} className="app-select mt-1 py-2.5 text-[15px]">
               {departmentsLabel.map((d) => <option key={d.id} value={d.id}>{d.description ? `${d.description} - ${d.label}` : d.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Centro de Custo</label>
-            <select value={formFilters.costCenterId} onChange={(e) => setFormFilters((prev) => ({ ...prev, costCenterId: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
+            <label className="app-label">Centro de Custo</label>
+            <select value={formFilters.costCenterId} onChange={(e) => setFormFilters((prev) => ({ ...prev, costCenterId: e.target.value }))} className="app-select mt-1 py-2.5 text-[15px]">
               {costCentersLabel.map((c) => <option key={c.id} value={c.id}>{formatCostCenterLabel(c)}</option>)}
 
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Data Inicial</label>
-            <input type="date" value={formFilters.dateStart} onChange={(e) => setFormFilters((prev) => ({ ...prev, dateStart: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]" />
+            <label className="app-label">Data Inicial</label>
+            <input type="date" value={formFilters.dateStart} onChange={(e) => setFormFilters((prev) => ({ ...prev, dateStart: e.target.value }))} className="app-input mt-1 py-2.5 text-[15px]" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Data Final</label>
-            <input type="date" value={formFilters.dateEnd} onChange={(e) => setFormFilters((prev) => ({ ...prev, dateEnd: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]" />
+            <label className="app-label">Data Final</label>
+            <input type="date" value={formFilters.dateEnd} onChange={(e) => setFormFilters((prev) => ({ ...prev, dateEnd: e.target.value }))} className="app-input mt-1 py-2.5 text-[15px]" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Solicitação</label>
-            <select value={formFilters.tipoId} onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
+            <label className="app-label">Solicitação</label>
+            <select value={formFilters.tipoId} onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))} className="app-select mt-1 py-2.5 text-[15px]">
               {tiposLabel.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Categoria</label>
-            <select value={formFilters.categoriaId} onChange={(e) => setFormFilters((prev) => ({ ...prev, categoriaId: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
+            <label className="app-label">Categoria</label>
+            <select value={formFilters.categoriaId} onChange={(e) => setFormFilters((prev) => ({ ...prev, categoriaId: e.target.value }))} className="app-select mt-1 py-2.5 text-[15px]">
               {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Protocolo</label>
-            <input value={formFilters.protocolo} onChange={(e) => setFormFilters((prev) => ({ ...prev, protocolo: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]" placeholder="Código do protocolo" />
+            <label className="app-label">Protocolo</label>
+            <input value={formFilters.protocolo} onChange={(e) => setFormFilters((prev) => ({ ...prev, protocolo: e.target.value }))} className="app-input mt-1 py-2.5 text-[15px]" placeholder="Código do protocolo" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Solicitante</label>
-            <input value={formFilters.solicitante} onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitante: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]" placeholder="nome ou e-mail" />
+            <label className="app-label">Solicitante</label>
+            <input value={formFilters.solicitante} onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitante: e.target.value }))} className="app-input mt-1 py-2.5 text-[15px]" placeholder="nome ou e-mail" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-black tracking-wide">Status</label>
-            <select value={formFilters.status} onChange={(e) => setFormFilters((prev) => ({ ...prev, status: e.target.value }))} className="mt-1 w-full rounded-md border border-blue-600 py-2.5 text-[15px]">
+            <label className="app-label">Status</label>
+            <select value={formFilters.status} onChange={(e) => setFormFilters((prev) => ({ ...prev, status: e.target.value }))} className="app-select mt-1 py-2.5 text-[15px]">
               {statuses.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
             </select>
           </div>
           <div className="sm:col-span-2 lg:col-span-3">
-            <label className="block text-xs font-semibold text-black tracking-wide">Texto no Formulário</label>
+            <label className="app-label">Texto no Formulário</label>
             <div className="relative mt-1">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input value={formFilters.text} onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))} placeholder="Buscar por texto..." className="w-full rounded-md border-slate-300 pl-9 text-sm" />
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 app-muted-text" />
+              <input value={formFilters.text} onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))} placeholder="Buscar por texto..." className="app-input pl-9 text-sm" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="app-table-wrapper">
         <div className="overflow-x-auto">
           <div className="max-h-[60vh] overflow-y-auto">
             <table className="min-w-full text-sm">
-              <thead className="sticky top-0 bg-slate-50 text-slate-600">
+              <thead className="app-table-header sticky top-0">
                 <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left">
                  <th>Status</th><th>Protocolo</th><th>Data Abertura</th><th>Solicitação</th><th>SLA</th><th>Departamento responsável</th><th>Atendente</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {loading && <TableSkeletonRows columns={7} rows={5} />}
-                {!loading && data.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">Nenhuma solicitação encontrada</td></tr>}
+                {!loading && data.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center app-muted-text">Nenhuma solicitação encontrada</td></tr>}
                 {!loading && data.map((r) => (
-                  <tr key={r.id} className={`cursor-pointer hover:bg-slate-50 ${selectedRow?.id === r.id ? 'bg-slate-50' : ''}`} onClick={() => openDetail(r)}>
+                  <tr key={r.id} className={`app-table-row cursor-pointer ${selectedRow?.id === r.id ? 'app-table-row-selected' : ''}`} onClick={() => openDetail(r)}>
                     <td className="px-3 py-2"><SolicitationStatusBadge status={r.status} /></td>
                     <td className="px-3 py-2">
                       <div className="inline-flex items-center gap-1">
                         <span>{r.protocolo ?? '-'}</span>
-                        {r.protocolo && <button type="button" onClick={(e) => { e.stopPropagation(); onCopyProtocol(r.protocolo) }} className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"><Copy size={13} /></button>}
+                        {r.protocolo && <button type="button" onClick={(e) => { e.stopPropagation(); onCopyProtocol(r.protocolo) }} className="app-button-ghost rounded p-1"><Copy size={13} /></button>}
                       </div>
                     </td>
                     <td className="px-3 py-2">{r.createdAt ? formatDateDDMMYYYY(r.createdAt) : '-'}</td>
@@ -588,19 +588,19 @@ export default function SentRequestsPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 p-3 text-sm">
+        <div className="flex items-center justify-between border-t border-[var(--border-subtle)] p-3 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-slate-600">Mostrar</span>
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }} className="rounded-md border-slate-300">
+            <span className="app-muted-text">Mostrar</span>
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }} className="app-select !w-auto py-1">
               {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
-            <span className="text-slate-600">linhas</span>
+            <span className="app-muted-text">linhas</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-40">Anterior</button>
-            <span className="min-w-[60px] text-center text-slate-600">{page} / {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-40">Seguinte</button>
+            <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="app-button-secondary px-3 py-1.5">Anterior</button>
+            <span className="min-w-[60px] text-center app-muted-text">{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="app-button-secondary px-3 py-1.5">Seguinte</button>
           </div>
         </div>
       </div>

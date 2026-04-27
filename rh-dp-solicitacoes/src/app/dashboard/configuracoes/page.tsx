@@ -3,15 +3,15 @@ import Link from 'next/link'
 export default function ConfiguracoesPage() {
   return (
     <div className="max-w-5xl">
-      <h1 className="text-xl font-semibold text-slate-800">Configurações</h1>
-      <p className="text-sm text-slate-500 mt-1">
+      <h1 className="text-xl font-semibold text-[var(--foreground)]">Configurações</h1>
+      <p className="text-sm text-[var(--muted-foreground)] mt-1">
         Ajuste preferências do sistema e permissões dos módulos.
       </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 p-4">
-          <h2 className="font-medium text-slate-700">Departamentos x Centros de custo</h2>
-          <p className="text-sm text-slate-500 mt-1">
+        <section className="rounded-lg border border-[var(--border-subtle)] p-4">
+          <h2 className="font-medium text-[var(--foreground)]">Departamentos x Centros de custo</h2>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             Vincule centros de custo para controle de visibilidade por departamento.
           </p>
           <Link
@@ -22,16 +22,16 @@ export default function ConfiguracoesPage() {
           </Link>
         </section>
 
-        <section className="rounded-lg border border-slate-200 p-4">
-          <h2 className="font-medium text-slate-700">Preferências</h2>
-          <p className="text-sm text-slate-500 mt-1">
+        <section className="rounded-lg border border-[var(--border-subtle)] p-4">
+          <h2 className="font-medium text-[var(--foreground)]">Preferências</h2>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             Tema, linguagem, histórico, notificações…
           </p>
         </section>
 
-        <section className="rounded-lg border border-slate-200 p-4">
-          <h2 className="font-medium text-slate-700">Acessos</h2>
-          <p className="text-sm text-slate-500 mt-1">
+        <section className="rounded-lg border border-[var(--border-subtle)] p-4">
+          <h2 className="font-medium text-[var(--foreground)]">Acessos</h2>
+          <p className="text-sm text-[var(--muted-foreground)] mt-1">
             Perfis de usuário, papéis e permissões (em breve).
           </p>
         </section>
