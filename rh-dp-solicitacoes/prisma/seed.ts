@@ -3221,6 +3221,36 @@ async function main() {
     select: { id: true, schemaJson: true },
   })
 
+  const externalAdmissionType = await prisma.tipoSolicitacao.findFirst({
+    where: {
+      OR: [
+        { id: 'RQ_RH_ADMISSAO_EXTERNA' },
+        { codigo: 'RQ.RH.ADMISSAO.EXTERNA' },
+      ],
+    },
+    select: { id: true, schemaJson: true },
+  })
+
+  if (externalAdmissionType) {
+    const schema = (externalAdmissionType.schemaJson ?? {}) as Record<string, any>
+    const currentMeta = (schema.meta ?? {}) as Record<string, any>
+
+    await prisma.tipoSolicitacao.update({
+      where: { id: externalAdmissionType.id },
+      data: {
+        schemaJson: {
+          ...schema,
+          meta: {
+            ...currentMeta,
+            internalOnly: true,
+            hiddenFromCreate: true,
+            hiddenFromManualOpening: true,
+          },
+        },
+      },
+    })
+  }
+
   for (const tipo of tiposToNormalize) {
     const schema = (tipo.schemaJson ?? {}) as Record<string, any>
     const campos = Array.isArray(schema.camposEspecificos)
