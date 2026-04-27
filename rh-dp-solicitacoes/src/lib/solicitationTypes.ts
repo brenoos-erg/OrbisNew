@@ -46,6 +46,7 @@ export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT = 'RQ_089'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
+export const TI_CATALOG_PREFIX = 'RQ.TI.'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
 export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
 export const SOLICITACAO_PESSOAL_CODIGO = 'RQ.RH.063'
@@ -360,8 +361,18 @@ export function isSolicitacaoEquipamento(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === SOLICITACAO_EQUIPAMENTO_TIPO_ID || id === SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT) return true
+  const codigo = tipo.codigo?.trim().toUpperCase()
+  if (codigo === 'RQ.TI.003') return true
   const nome = normalizeSolicitacaoName(tipo.nome)
-  return nome === normalizeSolicitacaoName(SOLICITACAO_EQUIPAMENTO_TIPO_NOME)
+  return (
+    nome === normalizeSolicitacaoName(SOLICITACAO_EQUIPAMENTO_TIPO_NOME) ||
+    nome.includes('EQUIPAMENTOS, TELEFONIA E RECURSOS DE TI')
+  )
+}
+
+export function isTiCatalogSolicitation(tipo?: TipoSolicitacaoLike | null) {
+  const codigo = tipo?.codigo?.trim().toUpperCase()
+  return Boolean(codigo && codigo.startsWith(TI_CATALOG_PREFIX))
 }
 
 export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {

@@ -41,6 +41,7 @@ import {
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
 import { isExternalAdmissionCandidateType, patchExternalAdmissionPayloadSeed } from '@/lib/externalAdmission'
+import { computeTiDueDate, isTiCatalogCode, resolveTiRequiresApprovalByPayload } from '@/lib/tiSolicitations'
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -550,11 +551,25 @@ export const POST = withModuleLevel(
             defaultDescricaoSolicitacao?: string
             prazoPadraoDias?: number
             departamentos?: string[]
+            requiresApproval?: boolean
           }
         } | null)?.meta
         const descricao = tipoMeta?.defaultDescricaoSolicitacao ?? null
-        const prioridade = tipoMeta?.defaultPrioridade
-        const dataPrevista =
+        let prioridade = tipoMeta?.defaultPrioridade
+        const prioridadeSolicitadaRaw = String(campos.prioridadeSolicitada ?? '').trim().toUpperCase()
+        const prioridadeByForm: Record<string, SolicitationPriority> = {
+          BAIXA: 'BAIXA',
+          MEDIA: 'MEDIA',
+          'MÉDIA': 'MEDIA',
+          ALTA: 'ALTA',
+          CRITICA: 'URGENTE',
+          'CRÍTICA': 'URGENTE',
+          URGENTE: 'URGENTE',
+        }
+        if (prioridadeSolicitadaRaw && prioridadeByForm[prioridadeSolicitadaRaw]) {
+          prioridade = prioridadeByForm[prioridadeSolicitadaRaw]
+        }
+        let dataPrevista =
           typeof tipoMeta?.prazoPadraoDias === 'number' &&
           Number.isFinite(tipoMeta.prazoPadraoDias)
             ? new Date(Date.now() + tipoMeta.prazoPadraoDias * 24 * 60 * 60 * 1000)
@@ -562,6 +577,10 @@ export const POST = withModuleLevel(
                 Number.isFinite(tipoMeta.defaultSlaHours)
               ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
               : undefined
+        if (isTiCatalogCode(tipo.codigo)) {
+          const tiDueDate = computeTiDueDate(prioridade ?? null, new Date())
+          if (tiDueDate) dataPrevista = tiDueDate
+        }
         const routing = await resolveResponsibleDepartmentsByTipo(tipoId)
         const metaDepartmentId = Array.isArray(tipoMeta?.departamentos)
           ? tipoMeta.departamentos[0]
@@ -763,6 +782,21 @@ export const POST = withModuleLevel(
             payload,
             idempotencyKey,
             nonConformityId: isGestaoMudancas ? nonConformityId : null,
+            requiresApproval: (() => {
+              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
+              if (tiDecision !== null) return tiDecision
+              return Boolean(tipoMeta?.requiresApproval)
+            })(),
+            approvalStatus: (() => {
+              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
+              if (tiDecision === true) return 'PENDENTE'
+              return 'NAO_PRECISA'
+            })(),
+            status: (() => {
+              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
+              if (tiDecision === true) return 'AGUARDANDO_APROVACAO'
+              return 'ABERTA'
+            })(),
           },
         })
 
@@ -778,8 +812,8 @@ export const POST = withModuleLevel(
         await prisma.solicitationTimeline.create({
           data: {
             solicitationId: created.id,
-            status: 'ABERTA',
-            message: 'Solicitação criada pelo solicitante.',
+            status: created.status === 'AGUARDANDO_APROVACAO' ? 'AGUARDANDO_APROVACAO' : 'ABERTA',
+            message: created.status === 'AGUARDANDO_APROVACAO' ? 'Solicitação criada e enviada para aprovação.' : 'Solicitação criada pelo solicitante.',
           },
         })
 

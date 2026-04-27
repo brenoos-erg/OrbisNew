@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const source = fs.readFileSync('src/lib/tiSolicitations.ts', 'utf8')
+assert.match(source, /TI_DEPARTMENT_CODE\s*=\s*'20'/)
+assert.match(source, /RQ\.TI\.007/)
+assert.match(source, /resolveTiRequiresApprovalByPayload/)
+assert.match(source, /'NOVO RECURSO'/)
+assert.match(source, /'ERRO\/BUG'/)
+assert.match(source, /TI_SLA_HOURS_BY_PRIORITY/)
+assert.match(source, /URGENTE:\s*4/)
+assert.match(source, /ALTA:\s*8/)
+assert.match(source, /MEDIA:\s*16/)
+assert.match(source, /BAIXA:\s*40/)
+assert.match(source, /canAccessTiOperationalPanel/)
+
+console.log('✅ ti-solicitations-rules.test passed')

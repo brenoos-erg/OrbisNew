@@ -869,6 +869,22 @@ export default function Sidebar({
                     </Link>
                   )}
 
+
+                  {solicitacaoFeatures.recebidas && (
+                    <Link
+                      href="/dashboard/solicitacoes/ti"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname === '/dashboard/solicitacoes/ti'
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <Monitor size={16} />
+                      <span className={labelBase}>Painel TI</span>
+                    </Link>
+                  )}
+
                   {canAccessExternalAdmissions && (
                     <Link
                       href="/dashboard/solicitacoes/externas-admissao"
