@@ -39,9 +39,9 @@ type Props = {
 }
 
 const statusLabels: Record<RefusalStatus, { label: string; color: string }> = {
-  PENDENTE: { label: 'Pendente', color: 'bg-amber-100 text-amber-800' },
-  APROVADA: { label: 'Procede', color: 'bg-emerald-100 text-emerald-800' },
-  REJEITADA: { label: 'Não procede', color: 'bg-rose-100 text-rose-800' },
+  PENDENTE: { label: 'Pendente', color: 'app-status-badge app-status-badge--pending' },
+  APROVADA: { label: 'Procede', color: 'app-status-badge app-status-badge--success' },
+  REJEITADA: { label: 'Não procede', color: 'app-status-badge app-status-badge--danger' },
 }
 
 export default function RefusalDetailClient({ reportId, canReview }: Props) {
@@ -112,7 +112,7 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-slate-600">
+      <div className="flex items-center gap-2 app-muted-text">
         <Loader2 className="animate-spin" size={18} />
         Carregando
       </div>
@@ -121,7 +121,7 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
 
   if (error) {
     return (
-      <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+      <div className="rounded-md border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
         {error}
       </div>
     )
@@ -132,20 +132,20 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
   const badge = statusLabels[report.status]
 
   return (
-    <div className="space-y-6">
+    <div className="app-page">
       <div className="flex flex-wrap items-start gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase text-slate-500">Direito de Recusa</p>
-          <h1 className="text-2xl font-bold text-slate-900">Situação de risco</h1>
-          <p className="text-sm text-slate-600">Aberto em {format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm')}</p>
+          <p className="app-muted-text text-sm font-semibold uppercase">Direito de Recusa</p>
+          <h1 className="app-title">Situação de risco</h1>
+          <p className="text-sm app-muted-text">Aberto em {format(new Date(report.createdAt), 'dd/MM/yyyy HH:mm')}</p>
         </div>
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${badge.color}`}>
+        <span className={badge.color}>
           {badge.label}
         </span>
         <div className="ml-auto">
           <Link
             href="/dashboard/direito-de-recusa"
-            className="text-sm font-medium text-orange-600 hover:text-orange-700"
+            className="text-sm font-semibold text-orange-500 hover:text-orange-400"
           >
             Voltar para lista
           </Link>
@@ -153,14 +153,14 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
       </div>
 
       {success ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className="rounded-md border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           {success}
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900">Dados principais</h2>
+        <div className="app-card space-y-3">
+          <h2 className="text-lg font-semibold">Dados principais</h2>
           <InfoRow label="Colaborador" value={report.employeeName} />
           <InfoRow label="Setor / Contrato" value={report.sectorOrContract} />
           <InfoRow label="Situação de risco" value={report.riskSituation} />
@@ -169,13 +169,13 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
           <InfoRow label="Coordenador / SST" value={report.generalCoordinatorName || 'Não informado'} />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900">Descrição detalhada</h2>
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{report.detailedCondition}</p>
+        <div className="app-card space-y-3">
+          <h2 className="text-lg font-semibold">Descrição detalhada</h2>
+          <p className="whitespace-pre-wrap text-sm app-muted-text">{report.detailedCondition}</p>
           <div>
-            <h3 className="text-sm font-semibold text-slate-800">Anexos</h3>
+            <h3 className="text-sm font-semibold">Anexos</h3>
             {report.attachments?.length ? (
-              <ul className="mt-1 space-y-1 text-sm text-orange-700">
+              <ul className="mt-1 space-y-1 text-sm text-orange-400">
                 {report.attachments.map((a) => (
                   <li key={a.id}>
                     <a href={a.url} target="_blank" rel="noreferrer" className="hover:underline">
@@ -185,35 +185,35 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">Nenhum anexo enviado.</p>
+              <p className="text-sm app-muted-text">Nenhum anexo enviado.</p>
             )}
           </div>
         </div>
       </div>
 
       {report.status !== 'PENDENTE' ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-2">
-          <h2 className="text-lg font-semibold text-slate-900">Parecer</h2>
-          <p className="text-sm text-slate-700">
+        <div className="app-card space-y-2">
+          <h2 className="text-lg font-semibold">Parecer</h2>
+          <p className="text-sm app-muted-text">
             Situação {report.decision ? 'procede' : 'não procede'} ·{' '}
             {report.decidedAt ? format(new Date(report.decidedAt), 'dd/MM/yyyy HH:mm') : 'Data não informada'}
           </p>
           {report.decisionComment ? (
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">{report.decisionComment}</p>
+            <p className="text-sm app-muted-text whitespace-pre-wrap">{report.decisionComment}</p>
           ) : (
-            <p className="text-sm text-slate-500">Sem comentários adicionais.</p>
+            <p className="text-sm app-muted-text">Sem comentários adicionais.</p>
           )}
         </div>
       ) : canReview ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Parecer do gestor / SST</h2>
+        <div className="app-card space-y-4">
+          <h2 className="text-lg font-semibold">Parecer do gestor / SST</h2>
           <div className="flex gap-3">
             <button
               type="button"
               className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${
                 decision === 'SIM'
                   ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                  : 'border-slate-200 text-slate-700 hover:border-emerald-400'
+                  : 'border-[var(--border-subtle)] app-muted-text hover:border-emerald-400'
               }`}
               onClick={() => setDecision('SIM')}
             >
@@ -224,7 +224,7 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
               className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${
                 decision === 'NAO'
                   ? 'border-rose-500 bg-rose-50 text-rose-800'
-                  : 'border-slate-200 text-slate-700 hover:border-rose-400'
+                  : 'border-[var(--border-subtle)] app-muted-text hover:border-rose-400'
               }`}
               onClick={() => setDecision('NAO')}
             >
@@ -232,9 +232,9 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
             </button>
           </div>
           <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Comentário</label>
+            <label className="text-sm font-medium app-muted-text">Comentário</label>
             <textarea
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              className="app-textarea"
               rows={4}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -242,7 +242,7 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
             />
           </div>
           {error ? (
-            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+            <div className="rounded-md border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
               {error}
             </div>
           ) : null}
@@ -266,8 +266,8 @@ export default function RefusalDetailClient({ reportId, canReview }: Props) {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="text-sm text-slate-800">{value}</p>
+      <p className="text-xs uppercase tracking-wide app-muted-text">{label}</p>
+      <p className="text-sm">{value}</p>
     </div>
   )
 }

@@ -4,18 +4,25 @@ import NaoConformidadesClient from '@/app/dashboard/sst/nao-conformidades/NaoCon
 
 export default function NaoConformidadesPage() {
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="rounded-full bg-orange-50 p-3 text-orange-700">
+    <div className="app-page">
+      <header className="app-page-header">
+        <div className="rounded-full bg-orange-100 p-3 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
           <ShieldAlert size={20} />
         </div>
         <div className="space-y-1">
-          <p className="text-sm font-semibold uppercase text-slate-500">Não Conformidades</p>
-          <h1 className="text-3xl font-bold text-slate-900">Não Conformidades</h1>
-          <p className="max-w-3xl text-slate-600">Gerencie o ciclo completo de identificação, tratativa e verificação de eficácia.</p>
+          <p className="app-muted-text text-sm font-semibold uppercase">SGI • Qualidade</p>
+          <h1 className="app-title">Não Conformidades</h1>
+          <p className="app-subtitle max-w-3xl">
+            Gerencie o ciclo completo de identificação, tratativa e verificação de eficácia.
+          </p>
         </div>
-        <div className="ml-auto">
-          <Link href="/dashboard/sgi/qualidade/nao-conformidades/nova" className="inline-flex items-center rounded-md bg-orange-500 px-4 py-2 text-white hover:bg-orange-600">Nova não conformidade</Link>
+        <div className="ml-auto w-full sm:w-auto">
+          <Link
+            href="/dashboard/sgi/qualidade/nao-conformidades/nova"
+            className="app-button-primary w-full sm:w-auto"
+          >
+            Nova não conformidade
+          </Link>
         </div>
       </header>
       <NaoConformidadesClient />
