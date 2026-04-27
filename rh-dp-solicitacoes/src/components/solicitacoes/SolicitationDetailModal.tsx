@@ -1536,13 +1536,23 @@ export function SolicitationDetailModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'SEM_ESTOQUE' }),
       })
+      const json = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
         throw new Error(json?.error ?? 'Não foi possível encaminhar para aprovação.')
       }
 
-      setCloseSuccess('Sem estoque: solicitação encaminhada para aprovação nível 3.')
+      if (json?.mode === 'TI_QUEUE') {
+        setCloseSuccess(
+          json?.message ??
+            'Sem estoque no momento. O chamado permanece com TI para tratativa.',
+        )
+      } else {
+        setCloseSuccess(
+          json?.message ??
+            'Sem estoque: solicitação encaminhada para aprovação nível 3.',
+        )
+      }
       await refreshDetailFromServer()
     } catch (err: any) {
       console.error('Erro ao encaminhar solicitação sem estoque', err)

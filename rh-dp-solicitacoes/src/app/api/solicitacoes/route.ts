@@ -169,6 +169,32 @@ async function resolveRhRoutingTarget() {
   return { rhDepartmentId: rhDepartment.id, rhCostCenter }
 }
 
+async function resolveTiRoutingTarget() {
+  const tiDepartment = await prisma.department.findFirst({
+    where: {
+      OR: [{ code: '20' }, { sigla: { contains: 'TI' } }, { name: { contains: 'Tecnologia da Informação' } }],
+    },
+    select: { id: true },
+  })
+
+  if (!tiDepartment) return null
+
+  const tiCostCenter = await prisma.costCenter.findFirst({
+    where: {
+      OR: [
+        { departmentId: tiDepartment.id },
+        { description: { contains: 'Tecnologia da Informação' } },
+        { abbreviation: { contains: 'TI' } },
+        { code: { contains: 'TI' } },
+      ],
+    },
+    orderBy: [{ departmentId: 'desc' }, { description: 'asc' }],
+    select: { id: true, departmentId: true },
+  })
+
+  return { tiDepartmentId: tiDepartment.id, tiCostCenter }
+}
+
 /**
  * GET /api/solicitacoes
  */
@@ -1026,19 +1052,19 @@ export const POST = withModuleLevel(
            2.6) Solicitação de Equipamento (encaminha obrigatoriamente para TI)
            ===================================================================== */
         if (isSolicitacaoEquipamentoTi) {
-           const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
+          const tiRouting = await resolveTiRoutingTarget()
+          const equipmentDepartmentId = tiRouting?.tiDepartmentId ?? resolvedDepartmentId
+          const equipmentCostCenterId =
+            tiRouting?.tiCostCenter?.id ?? resolvedCostCenterId
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              departmentId: resolvedDepartmentId,
-              costCenterId: resolvedCostCenterId,
+              departmentId: equipmentDepartmentId,
+              costCenterId: equipmentCostCenterId,
               requiresApproval: false,
               approvalStatus: 'NAO_PRECISA',
-              approverId,
+              approverId: null,
               status: 'ABERTA',
             },
           })

@@ -8,7 +8,8 @@ import { requireActiveUser } from '@/lib/auth'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import crypto from 'crypto'
 import { isSolicitacaoEquipamento } from '@/lib/solicitationTypes'
-import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
+import { resolveTipoApproverIdWithFallback } from '@/lib/solicitationTipoApprovers'
+import { resolveEquipmentApprovalMode } from '@/lib/solicitationApproverRules'
 import { PdfGenerationError, generatePdfFromHtml } from '@/lib/pdf/generatePdfFromHtml'
 import { DEFAULT_TERMO_CLAUSES } from '@/lib/documents/termoResponsabilidade'
 import { uploadGeneratedFile } from '@/lib/storage/uploadGeneratedFile'
@@ -62,9 +63,48 @@ export async function POST(
     }
 
     if (action === 'SEM_ESTOQUE') {
-    const approverId = await resolveTipoApproverId(solicitation.tipoId)
-      if (!approverId) {
-        return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
+      const approvalTarget = await resolveTipoApproverIdWithFallback(solicitation.tipoId)
+      const approvalMode = resolveEquipmentApprovalMode({
+        approverId: approvalTarget.approverId,
+      })
+
+      if (approvalMode === 'TI_QUEUE') {
+        const updated = await prisma.solicitation.update({
+          where: { id: solicitation.id },
+          data: {
+            requiresApproval: false,
+            approvalStatus: 'NAO_PRECISA',
+            approverId: null,
+            status: 'EM_ATENDIMENTO',
+          },
+        })
+
+        const timelineMessage =
+          'Sem estoque disponível. Nenhum aprovador configurado para compra/exceção; chamado permanece com TI para tratativa.'
+
+        await prisma.solicitationTimeline.create({
+          data: {
+            solicitationId: solicitation.id,
+            status: 'EM_ATENDIMENTO',
+            message: timelineMessage,
+          },
+        })
+
+        await prisma.event.create({
+          data: {
+            id: crypto.randomUUID(),
+            solicitationId: solicitation.id,
+            actorId: me.id,
+            tipo: 'SEM_ESTOQUE_SEM_APROVADOR',
+          },
+        })
+
+        return NextResponse.json({
+          solicitation: updated,
+          mode: approvalMode,
+          message:
+            'Sem estoque no momento. Nenhum aprovador está configurado para compra/exceção; o chamado seguirá com TI para tratativa.',
+        })
       }
 
       const updated = await prisma.solicitation.update({
@@ -72,7 +112,7 @@ export async function POST(
         data: {
           requiresApproval: true,
           approvalStatus: 'PENDENTE',
-          approverId,
+          approverId: approvalTarget.approverId,
           status: 'AGUARDANDO_APROVACAO',
         },
       })
@@ -81,8 +121,9 @@ export async function POST(
         data: {
           solicitationId: solicitation.id,
           status: 'AGUARDANDO_APROVACAO',
-          message:
-            'Solicitação de equipamento sem estoque disponível. Encaminhada para aprovação.',
+          message: approvalTarget.source === 'TIPO'
+            ? 'Solicitação de equipamento sem estoque disponível. Encaminhada para aprovação.'
+            : 'Solicitação de equipamento sem estoque disponível. Encaminhada para aprovação com aprovador fallback nível 3 de Solicitações/TI.',
         },
       })
 
@@ -95,7 +136,11 @@ export async function POST(
         },
       })
 
-      return NextResponse.json(updated)
+      return NextResponse.json({
+        solicitation: updated,
+        mode: approvalMode,
+        message: 'Sem estoque: solicitação encaminhada para aprovação.',
+      })
     }
 
     if (!body.equipmentId) {
