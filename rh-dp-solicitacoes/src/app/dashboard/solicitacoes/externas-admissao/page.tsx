@@ -16,6 +16,13 @@ type Row = {
   status: string
   candidateName: string
   candidateEmail: string
+  externalUrl: string | null
+  emailDeliveryStatus: string
+  emailSentAt: string | null
+  emailResentAt: string | null
+  emailError: string | null
+  sentDocuments: number
+  totalDocuments: number
   updatedAt: string
 }
 
@@ -24,6 +31,7 @@ export default function ExternalAdmissionDashboardPage() {
   const [candidateName, setCandidateName] = useState('')
   const [candidateEmail, setCandidateEmail] = useState('')
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<string | null>(null)
 
   async function load() {
     const res = await fetch('/api/solicitacoes/externas/admissao', { cache: 'no-store' })
@@ -37,16 +45,22 @@ export default function ExternalAdmissionDashboardPage() {
   }, [])
 
   async function createProcess() {
+    setFeedback(null)
     const res = await fetch('/api/solicitacoes/externas/admissao', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ candidateName, candidateEmail }),
     })
     const payload = await res.json()
-    if (!res.ok) return
+    if (!res.ok) {
+      setFeedback(payload.error ?? 'Não foi possível criar o processo.')
+      return
+    }
+
     setGeneratedLink(payload.externalUrl)
     setCandidateName('')
     setCandidateEmail('')
+    setFeedback(payload.emailSent ? 'Processo criado e e-mail enviado ao candidato.' : `Processo criado sem envio de e-mail. Erro: ${payload.emailError ?? 'desconhecido'}`)
     await load()
   }
 
@@ -59,6 +73,25 @@ export default function ExternalAdmissionDashboardPage() {
     await load()
   }
 
+  async function resendEmail(id: string) {
+    const res = await fetch(`/api/solicitacoes/externas/admissao/${id}`, { method: 'POST' })
+    const payload = await res.json().catch(() => null)
+
+    if (!res.ok) {
+      setFeedback(payload?.error ?? 'Falha ao reenviar e-mail.')
+      return
+    }
+
+    setFeedback(payload.emailSent ? 'E-mail reenviado com sucesso.' : `Reenvio falhou: ${payload.emailError ?? 'erro não informado'}`)
+    await load()
+  }
+
+  async function copyLink(url: string | null) {
+    if (!url) return
+    await navigator.clipboard.writeText(url)
+    setFeedback('Link copiado para a área de transferência.')
+  }
+
   return (
     <div className="space-y-4 p-6">
       <h1 className="text-xl font-semibold">Solicitações Externas — Admissão</h1>
@@ -69,7 +102,7 @@ export default function ExternalAdmissionDashboardPage() {
           <input className="rounded border px-3 py-2" placeholder="Nome do candidato" value={candidateName} onChange={(e) => setCandidateName(e.target.value)} />
           <input className="rounded border px-3 py-2" placeholder="E-mail do candidato" value={candidateEmail} onChange={(e) => setCandidateEmail(e.target.value)} />
           <button type="button" className="rounded bg-orange-500 px-3 py-2 font-semibold text-white" onClick={createProcess}>
-            Gerar link seguro
+            Criar processo e enviar e-mail
           </button>
         </div>
         {generatedLink && (
@@ -77,37 +110,59 @@ export default function ExternalAdmissionDashboardPage() {
             Link gerado: <a className="text-blue-700 underline" href={generatedLink} target="_blank" rel="noreferrer">{generatedLink}</a>
           </p>
         )}
+        {feedback && <p className="mt-2 text-sm text-slate-700">{feedback}</p>}
       </section>
 
-      <section className="overflow-hidden rounded border bg-white">
+      <section className="overflow-x-auto rounded border bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
             <tr>
               <th className="px-3 py-2">Protocolo</th>
               <th className="px-3 py-2">Candidato</th>
+              <th className="px-3 py-2">Checklist</th>
+              <th className="px-3 py-2">E-mail</th>
               <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Atualizado</th>
               <th className="px-3 py-2">Ações</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-t">
+              <tr key={row.id} className="border-t align-top">
                 <td className="px-3 py-2">{row.protocolo}</td>
-                <td className="px-3 py-2">{row.candidateName}<br /><span className="text-xs text-slate-500">{row.candidateEmail}</span></td>
-                <td className="px-3 py-2">{row.status}</td>
-                <td className="px-3 py-2">{new Date(row.updatedAt).toLocaleString('pt-BR')}</td>
+                <td className="px-3 py-2">
+                  {row.candidateName}
+                  <br />
+                  <span className="text-xs text-slate-500">{row.candidateEmail}</span>
+                </td>
+                <td className="px-3 py-2 text-xs text-slate-700">
+                  {row.sentDocuments}/{row.totalDocuments} arquivo(s)
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  <p className={row.emailDeliveryStatus === 'FAILED' ? 'text-red-700' : 'text-emerald-700'}>{row.emailDeliveryStatus}</p>
+                  {row.emailSentAt && <p className="text-slate-500">enviado: {new Date(row.emailSentAt).toLocaleString('pt-BR')}</p>}
+                  {row.emailResentAt && <p className="text-slate-500">reenviado: {new Date(row.emailResentAt).toLocaleString('pt-BR')}</p>}
+                  {row.emailError && <p className="text-red-700">erro: {row.emailError}</p>}
+                </td>
                 <td className="px-3 py-2">
                   <select className="rounded border px-2 py-1" value={row.status} onChange={(e) => updateStatus(row.id, e.target.value)}>
                     {STATUS_OPTIONS.map((status) => (
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
+                  <p className="mt-2 text-xs text-slate-500">Atualizado: {new Date(row.updatedAt).toLocaleString('pt-BR')}</p>
+                </td>
+                <td className="space-y-2 px-3 py-2">
+                  <button type="button" className="block rounded border px-2 py-1 text-xs" onClick={() => copyLink(row.externalUrl)}>Copiar link</button>
+                  <button type="button" className="block rounded border px-2 py-1 text-xs" onClick={() => resendEmail(row.id)}>Reenviar e-mail</button>
+                  {row.externalUrl && (
+                    <a className="block text-xs text-blue-700 underline" href={row.externalUrl} target="_blank" rel="noreferrer">Abrir checklist</a>
+                  )}
+                  <a className="block text-xs text-blue-700 underline" href={`/api/solicitacoes/externas/admissao/${row.id}`} target="_blank" rel="noreferrer">Abrir detalhes</a>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Nenhum processo criado.</td></tr>
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-500">Nenhum processo criado.</td></tr>
             )}
           </tbody>
         </table>
