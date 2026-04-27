@@ -89,7 +89,7 @@ export default function CoordenadoresAvaliacaoExperienciaClient() {
   return (
     <div className="max-w-5xl space-y-4">
       <h1 className="text-xl font-semibold">Coordenadores da Avaliação do Período de Experiência</h1>
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-[var(--muted-foreground)]">
         Selecione os usuários que poderão realizar a avaliação do gestor imediato no período de
         experiência.
       </p>
@@ -117,7 +117,7 @@ export default function CoordenadoresAvaliacaoExperienciaClient() {
           />
 
           {loading ? (
-            <p className="text-sm text-slate-500">Carregando usuários...</p>
+            <p className="text-sm text-[var(--muted-foreground)]">Carregando usuários...</p>
           ) : (
             <div className="grid gap-2 md:grid-cols-2">
               {filteredUsers.map((user) => (
@@ -131,7 +131,7 @@ export default function CoordenadoresAvaliacaoExperienciaClient() {
                     />
                     <span>
                       <strong className="font-medium">{user.fullName}</strong>
-                      <span className="block text-xs text-slate-500">{user.email}</span>
+                      <span className="block text-xs text-[var(--muted-foreground)]">{user.email}</span>
                     </span>
                   </span>
                 </label>
@@ -140,24 +140,24 @@ export default function CoordenadoresAvaliacaoExperienciaClient() {
           )}
 
           {!loading && filteredUsers.length === 0 && (
-            <div className="rounded border border-dashed p-4 text-sm text-slate-500">
+            <div className="rounded border border-dashed p-4 text-sm text-[var(--muted-foreground)]">
               Nenhum usuário encontrado para a busca informada.
             </div>
           )}
         </div>
 
         <div className="h-fit rounded border p-4">
-          <h2 className="text-sm font-semibold text-slate-700">Selecionados</h2>
-          <p className="mt-1 text-xs text-slate-500">{selectedUsers.length} coordenador(es)</p>
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Selecionados</h2>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">{selectedUsers.length} coordenador(es)</p>
 
           <ul className="mt-3 space-y-2 text-sm">
             {selectedUsers.map((user) => (
-              <li key={user.id} className="rounded bg-slate-50 px-2 py-1.5">
+              <li key={user.id} className="rounded bg-[var(--card-muted)] px-2 py-1.5">
                 {user.fullName}
               </li>
             ))}
             {selectedUsers.length === 0 && (
-              <li className="text-slate-500">Nenhum coordenador selecionado.</li>
+              <li className="text-[var(--muted-foreground)]">Nenhum coordenador selecionado.</li>
             )}
           </ul>
         </div>

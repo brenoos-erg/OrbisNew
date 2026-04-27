@@ -421,25 +421,25 @@ export default function ReceivedRequestsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4 bg-slate-50 p-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="app-page p-6">
       <div>
-          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Solicitações Recebidas</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="app-title text-xl md:text-2xl">Solicitações Recebidas</h1>
+        <p className="app-subtitle">
           Visualize e trate as solicitações destinadas aos centros de custo em que você está vinculado.
         </p>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="app-filter-bar">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">Filtros avançados</h2>
-          <span className="text-xs text-slate-500">Filtros ativos: {filterCount}</span>
+          <h2 className="text-sm font-semibold">Filtros avançados</h2>
+          <span className="text-xs app-muted-text">Filtros ativos: {filterCount}</span>
        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Protocolo</label>
+            <label className="app-label">Protocolo</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Código do protocolo"
               value={formFilters.protocolo}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, protocolo: e.target.value }))}
@@ -447,9 +447,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Nome do solicitante</label>
+            <label className="app-label">Nome do solicitante</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Nome"
               value={formFilters.solicitanteNome}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitanteNome: e.target.value }))}
@@ -457,9 +457,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Login do solicitante</label>
+            <label className="app-label">Login do solicitante</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Login"
               value={formFilters.solicitanteLogin}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitanteLogin: e.target.value }))}
@@ -467,9 +467,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Matrícula</label>
+            <label className="app-label">Matrícula</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Matrícula"
               value={formFilters.matricula}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, matricula: e.target.value }))}
@@ -477,9 +477,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Tipo de solicitação</label>
+            <label className="app-label">Tipo de solicitação</label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-select mt-1"
               value={formFilters.tipoId}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))}
             >
@@ -493,9 +493,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Setor responsável</label>
+            <label className="app-label">Setor responsável</label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-select mt-1"
               value={formFilters.departmentId}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, departmentId: e.target.value }))}
             >
@@ -509,9 +509,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Centro de custo</label>
+            <label className="app-label">Centro de custo</label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-select mt-1"
               value={formFilters.costCenterId}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, costCenterId: e.target.value }))}
             >
@@ -525,9 +525,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Responsável atual / atendente</label>
+            <label className="app-label">Responsável atual / atendente</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Nome do atendente"
               value={formFilters.responsavel}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, responsavel: e.target.value }))}
@@ -535,9 +535,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Status do chamado</label>
+            <label className="app-label">Status do chamado</label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-select mt-1"
               value={formFilters.status}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, status: e.target.value }))}
             >
@@ -550,9 +550,9 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Situação</label>
+            <label className="app-label">Situação</label>
             <select
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-select mt-1"
               value={formFilters.situacao}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, situacao: e.target.value }))}
             >
@@ -565,10 +565,10 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Data de abertura</label>
+            <label className="app-label">Data de abertura</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.openedDate}
               onChange={(e) =>
                 setFormFilters((prev) => ({
@@ -582,30 +582,30 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Período abertura (inicial)</label>
+            <label className="app-label">Período abertura (inicial)</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.openedStart}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, openedStart: e.target.value, openedDate: '' }))}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Período abertura (final)</label>
+            <label className="app-label">Período abertura (final)</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.openedEnd}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, openedEnd: e.target.value, openedDate: '' }))}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Data de fechamento</label>
+            <label className="app-label">Data de fechamento</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.closedDate}
               onChange={(e) =>
                 setFormFilters((prev) => ({
@@ -619,29 +619,29 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Período fechamento (inicial)</label>
+            <label className="app-label">Período fechamento (inicial)</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.closedStart}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, closedStart: e.target.value, closedDate: '' }))}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Período fechamento (final)</label>
+            <label className="app-label">Período fechamento (final)</label>
             <input
               type="date"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               value={formFilters.closedEnd}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, closedEnd: e.target.value, closedDate: '' }))}
             />
           </div>
 
           <div className="sm:col-span-2 lg:col-span-4">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">Texto no formulário</label>
+            <label className="app-label">Texto no formulário</label>
             <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              className="app-input mt-1"
               placeholder="Buscar por texto..."
               value={formFilters.text}
               onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))}
@@ -652,7 +652,7 @@ export default function ReceivedRequestsPage() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+            className="app-button-primary disabled:opacity-50"
             disabled={loading}
             onClick={() => setFilters((prev) => ({ ...formFilters, page: 1, pageSize: prev.pageSize }))}
           >
@@ -661,7 +661,7 @@ export default function ReceivedRequestsPage() {
 
              <button
             type="button"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:bg-slate-800/50"
+            className="app-button-secondary"
             disabled={loading}
             onClick={() => {
               const reset = { ...DEFAULT_FILTERS, pageSize: filters.pageSize }
@@ -673,7 +673,7 @@ export default function ReceivedRequestsPage() {
           </button>
           <button
             type="button"
-            className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+            className="app-button-secondary"
             onClick={exportExcel}
           >
             Exportar Excel
@@ -681,28 +681,28 @@ export default function ReceivedRequestsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-md border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <div className="app-table-wrapper flex-1 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 text-xs font-semibold uppercase tracking-wide app-muted-text">
           <span>Solicitações Recebidas</span>
           <div className="flex items-center gap-2">
-            {loading && <span className="text-[11px] text-slate-400">Carregando...</span>}
+            {loading && <span className="text-[11px] app-muted-text">Carregando...</span>}
             <button
               type="button"
               onClick={() => selectedRow?.id && window.open(`/solicitacoes/impressao/${selectedRow.id}`, '_blank', 'noopener,noreferrer')}
               disabled={!selectedRow?.id}
-              className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="app-button-secondary px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Printer size={12} /> Imprimir selecionado
             </button>
           </div>
         </div>
 
-          {error && <div className="p-4 text-sm text-red-600">{error}</div>}
+          {error && <div className="p-4 text-sm text-[var(--danger)]">{error}</div>}
 
         <div className="overflow-x-auto">
           <div className="max-h-[60vh] overflow-y-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+              <thead className="app-table-header text-xs uppercase">
                 <tr>
                   <th className="px-4 py-2">
                     <button type="button" onClick={() => handleSort('status')}>Status {sortIndicator('status')}</button>
@@ -729,7 +729,7 @@ export default function ReceivedRequestsPage() {
               <tbody>
                 {rows.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <td colSpan={8} className="px-4 py-4 text-center app-subtitle">
                       Nenhuma solicitação recebida encontrada.
                     </td>
                   </tr>
@@ -737,7 +737,7 @@ export default function ReceivedRequestsPage() {
     {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="cursor-pointer border-t border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    className="app-table-row cursor-pointer"
                     onClick={() => fetchDetail(row)}
                   >
                     <td className="px-4 py-2 text-xs font-semibold"><SolicitationStatusBadge status={row.status} /></td>
@@ -767,13 +767,13 @@ export default function ReceivedRequestsPage() {
           </div>
         </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] px-4 py-2 text-xs app-muted-text">
           <span>
             Mostrando {rangeStart}-{rangeEnd} de {total} solicitações
           </span>
 
           <div className="flex items-center gap-2">
-            <label htmlFor="page-size" className="text-xs text-slate-500">
+            <label htmlFor="page-size" className="text-xs app-muted-text">
               Itens por página
             </label>
             <select
@@ -792,7 +792,7 @@ export default function ReceivedRequestsPage() {
                   page: 1,
                 }))
               }}
-              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+              className="app-select !w-auto px-2 py-1 text-xs"
               disabled={loading}
             >
               {[10, 20, 50].map((size) => (
@@ -804,7 +804,7 @@ export default function ReceivedRequestsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600">
+            <span className="text-xs font-semibold app-muted-text">
               Página {page}/{totalPages}
             </span>
 
@@ -815,7 +815,7 @@ export default function ReceivedRequestsPage() {
                   setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))
                 }
                 disabled={loading || page <= 1}
-                className="rounded border border-slate-300 px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-button-secondary px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Anterior
               </button>
@@ -823,7 +823,7 @@ export default function ReceivedRequestsPage() {
               {paginationItems.map((item, index) => {
                 if (item === 'ellipsis') {
                   return (
-                    <span key={`ellipsis-${index}`} className="px-2 text-xs text-slate-400">
+                    <span key={`ellipsis-${index}`} className="px-2 text-xs app-muted-text">
                       ...
                     </span>
                   )
@@ -838,7 +838,7 @@ export default function ReceivedRequestsPage() {
                     className={`rounded border px-3 py-1 text-xs ${
                       item === page
                         ? 'border-orange-500 bg-orange-500 text-white'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        : 'border-[var(--input-border)] text-[var(--foreground)] hover:bg-[var(--table-row-hover)]'
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {item}
@@ -855,7 +855,7 @@ export default function ReceivedRequestsPage() {
                   }))
                 }
                 disabled={loading || page >= totalPages}
-                className="rounded border border-slate-300 px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                className="app-button-secondary px-3 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Próxima
               </button>

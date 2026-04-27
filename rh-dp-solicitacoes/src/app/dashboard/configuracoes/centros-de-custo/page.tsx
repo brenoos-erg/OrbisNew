@@ -265,24 +265,24 @@ export default function CostCentersPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="text-sm text-slate-400 mb-6">Sistema de Gestão Integrada</div>
+      <div className="text-sm text-[var(--muted-foreground)] mb-6">Sistema de Gestão Integrada</div>
 
       <div className="flex items-center justify-between mb-2">
         {/* AQUI: título mais escuro */}
-        <h1 className="text-2xl font-semibold text-slate-900">
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
           Centros de Custo
         </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={exportCsv}
-            className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-white/5"
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--card)]/5"
             title="Exportar CSV"
           >
             <Download size={16} /> Excel
           </button>
            <button
             onClick={() => setBulkOpen(true)}
-            className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-white/5"
+            className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--card)]/5"
           >
             <FileSpreadsheet size={16} /> Cadastro em massa
           </button>
@@ -340,7 +340,7 @@ export default function CostCentersPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="table-header sticky top-0">
-              <tr className="text-left text-slate-400">
+              <tr className="text-left text-[var(--muted-foreground)]">
                 <th className="py-2 px-4 w-[30%]">Descrição</th>
                 <th className="py-2 px-4">Código</th>
                 <th className="py-2 px-4">Cód. Externo</th>
@@ -354,7 +354,7 @@ export default function CostCentersPage() {
               {loading ? (
                 <tr>
                   <td
-                    className="py-6 px-4 text-slate-500"
+                    className="py-6 px-4 text-[var(--muted-foreground)]"
                     colSpan={7}
                   >
                     Carregando…
@@ -363,7 +363,7 @@ export default function CostCentersPage() {
               ) : rows.length === 0 ? (
                 <tr>
                   <td
-                    className="py-6 px-4 text-slate-500"
+                    className="py-6 px-4 text-[var(--muted-foreground)]"
                     colSpan={7}
                   >
                     Nenhum centro de custo encontrado.
@@ -373,7 +373,7 @@ export default function CostCentersPage() {
                 rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="table-row hover:bg-white/5"
+                    className="table-row hover:bg-[var(--card)]/5"
                   >
                     <td className="py-2 px-4">{r.description}</td>
                     <td className="py-2 px-4">{r.code || '—'}</td>
@@ -414,7 +414,7 @@ export default function CostCentersPage() {
 
         {/* paginação */}
         <div className="table-footer flex items-center justify-between p-3 text-sm">
-          <div className="text-slate-400">
+          <div className="text-[var(--muted-foreground)]">
             Exibindo {rows.length ? (page - 1) * pageSize + 1 : 0}–
             {Math.min(page * pageSize, total)} de {total}
           </div>
@@ -450,7 +450,7 @@ export default function CostCentersPage() {
               </h3>
               <button
                 onClick={() => setCreating(false)}
-                className="rounded-md p-1 hover:bg-white/5"
+                className="rounded-md p-1 hover:bg-[var(--card)]/5"
               >
                 <X size={18} />
               </button>
@@ -598,18 +598,18 @@ export default function CostCentersPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold">Cadastro em massa</h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">
                   Informe uma linha por centro de custo, separando campos com ponto e vírgula.
                 </p>
               </div>
-              <button onClick={() => setBulkOpen(false)} className="rounded-md p-1 hover:bg-white/5">
+              <button onClick={() => setBulkOpen(false)} className="rounded-md p-1 hover:bg-[var(--card)]/5">
                 <X size={18} />
               </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-1 space-y-2 text-sm text-slate-600">
-                <p className="font-semibold text-slate-800">Formato esperado</p>
+              <div className="lg:col-span-1 space-y-2 text-sm text-[var(--muted-foreground)]">
+                <p className="font-semibold text-[var(--foreground)]">Formato esperado</p>
                 <ul className="list-disc list-inside space-y-1">
                   <li>
                     <span className="font-semibold">Campos:</span>{' '}
@@ -631,7 +631,7 @@ export default function CostCentersPage() {
                         ].join('\n'),
                       )
                     }
-                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-white/5"
+                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card)]/5"
                     type="button"
                   >
                     Preencher exemplo
@@ -641,7 +641,7 @@ export default function CostCentersPage() {
                       setBulkText('')
                       setBulkResults([])
                     }}
-                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-white/5"
+                    className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card)]/5"
                     type="button"
                   >
                     Limpar
@@ -651,7 +651,7 @@ export default function CostCentersPage() {
 
               <div className="lg:col-span-2 space-y-3">
                 <textarea
-                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-white/80 p-3 text-sm text-slate-800 shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-3 text-sm text-[var(--foreground)] shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
                   rows={8}
                   placeholder="Descrição; Código; Cód. Externo; Sigla; Área; Tipo de Gestão; Grupo; Status; Observações"
                   value={bulkText}
@@ -659,8 +659,8 @@ export default function CostCentersPage() {
                 />
 
                 {bulkResults.length > 0 && (
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-white/60 p-3 text-xs text-slate-700">
-                    <p className="font-semibold text-slate-800">Resultados do processamento:</p>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/60 p-3 text-xs text-[var(--foreground)]">
+                    <p className="font-semibold text-[var(--foreground)]">Resultados do processamento:</p>
                     <ul className="mt-2 space-y-1">
                       {bulkResults.map((r) => (
                         <li key={r.line} className="flex items-center justify-between gap-2">

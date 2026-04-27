@@ -92,35 +92,35 @@ export default function TiSolicitacoesDashboardPage() {
     <main className="space-y-4 p-4">
       <header>
         <h1 className="text-2xl font-semibold">Painel operacional TI</h1>
-        <p className="text-sm text-slate-600">/dashboard/solicitacoes/ti · catálogo RQ.TI.* · total: {total}</p>
+        <p className="text-sm text-[var(--muted-foreground)]">/dashboard/solicitacoes/ti · catálogo RQ.TI.* · total: {total}</p>
       </header>
 
       <section className="grid gap-3 md:grid-cols-4">
         {cards.map(([label, value]) => (
-          <article key={label} className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
+          <article key={label} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+            <p className="text-xs uppercase tracking-wide text-[var(--muted-foreground)]">{label}</p>
+            <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{value}</p>
           </article>
         ))}
       </section>
 
-      <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-6">
-        <input className="rounded border border-slate-200 px-2 py-1 text-sm" placeholder="Protocolo" value={filters.protocolo} onChange={(event) => setFilters((prev) => ({ ...prev, protocolo: event.target.value }))} />
-        <input className="rounded border border-slate-200 px-2 py-1 text-sm" placeholder="Categoria" value={filters.categoria} onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))} />
-        <input className="rounded border border-slate-200 px-2 py-1 text-sm" placeholder="Status" value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))} />
-        <select className="rounded border border-slate-200 px-2 py-1 text-sm" value={filters.prioridade} onChange={(event) => setFilters((prev) => ({ ...prev, prioridade: event.target.value }))}>
+      <section className="grid gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3 md:grid-cols-6">
+        <input className="rounded border border-[var(--border-subtle)] px-2 py-1 text-sm" placeholder="Protocolo" value={filters.protocolo} onChange={(event) => setFilters((prev) => ({ ...prev, protocolo: event.target.value }))} />
+        <input className="rounded border border-[var(--border-subtle)] px-2 py-1 text-sm" placeholder="Categoria" value={filters.categoria} onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))} />
+        <input className="rounded border border-[var(--border-subtle)] px-2 py-1 text-sm" placeholder="Status" value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))} />
+        <select className="rounded border border-[var(--border-subtle)] px-2 py-1 text-sm" value={filters.prioridade} onChange={(event) => setFilters((prev) => ({ ...prev, prioridade: event.target.value }))}>
           {PRIORIDADE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
-        <input className="rounded border border-slate-200 px-2 py-1 text-sm" placeholder="Solicitante" value={filters.solicitante} onChange={(event) => setFilters((prev) => ({ ...prev, solicitante: event.target.value }))} />
+        <input className="rounded border border-[var(--border-subtle)] px-2 py-1 text-sm" placeholder="Solicitante" value={filters.solicitante} onChange={(event) => setFilters((prev) => ({ ...prev, solicitante: event.target.value }))} />
         <button onClick={load} className="rounded bg-slate-900 px-3 py-1 text-sm font-medium text-white">Aplicar filtros</button>
       </section>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-600">Carregando chamados TI...</p> : null}
+      {loading ? <p className="text-sm text-[var(--muted-foreground)]">Carregando chamados TI...</p> : null}
 
-      <section className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <section className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-600">
+          <thead className="bg-[var(--card-muted)] text-left text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
             <tr>
               <th className="px-3 py-2">Protocolo</th>
               <th className="px-3 py-2">Tipo</th>
@@ -134,33 +134,33 @@ export default function TiSolicitacoesDashboardPage() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 font-medium text-slate-900">{row.protocolo}</td>
+              <tr key={row.id} className="border-t border-[var(--border-subtle)]">
+                <td className="px-3 py-2 font-medium text-[var(--foreground)]">{row.protocolo}</td>
                 <td className="px-3 py-2">
                   <p className="font-medium">{row.tipo.codigo}</p>
-                  <p className="text-xs text-slate-600">{row.tipo.nome}</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">{row.tipo.nome}</p>
                 </td>
                 <td className="px-3 py-2">{row.solicitante?.fullName}</td>
                 <td className="px-3 py-2">{row.tiStatus ?? row.status}</td>
                 <td className="px-3 py-2">{row.prioridade ?? '-'}</td>
                 <td className="px-3 py-2">
                   <p>{row.dataPrevista ? new Date(row.dataPrevista).toLocaleString('pt-BR') : '-'}</p>
-                  <p className={`text-xs ${row.slaState === 'VENCIDO' ? 'text-red-600' : 'text-slate-500'}`}>{row.slaState}</p>
+                  <p className={`text-xs ${row.slaState === 'VENCIDO' ? 'text-red-600' : 'text-[var(--muted-foreground)]'}`}>{row.slaState}</p>
                 </td>
                 <td className="px-3 py-2">{row.anexos.map((anexo) => anexo.filename).join(', ') || '-'}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    <button onClick={() => quickAction(row.id, 'assumir')} className="rounded border border-slate-300 px-2 py-1 text-xs">Assumir</button>
-                    <button onClick={() => quickAction(row.id, 'status', { status: 'EM_ATENDIMENTO' })} className="rounded border border-slate-300 px-2 py-1 text-xs">Atender</button>
-                    <button onClick={() => quickAction(row.id, 'status', { status: 'CONCLUIDA' })} className="rounded border border-slate-300 px-2 py-1 text-xs">Concluir</button>
-                    <button onClick={() => quickAction(row.id, 'status', { status: 'ABERTA' })} className="rounded border border-slate-300 px-2 py-1 text-xs">Reabrir</button>
+                    <button onClick={() => quickAction(row.id, 'assumir')} className="rounded border border-[var(--input-border)] px-2 py-1 text-xs">Assumir</button>
+                    <button onClick={() => quickAction(row.id, 'status', { status: 'EM_ATENDIMENTO' })} className="rounded border border-[var(--input-border)] px-2 py-1 text-xs">Atender</button>
+                    <button onClick={() => quickAction(row.id, 'status', { status: 'CONCLUIDA' })} className="rounded border border-[var(--input-border)] px-2 py-1 text-xs">Concluir</button>
+                    <button onClick={() => quickAction(row.id, 'status', { status: 'ABERTA' })} className="rounded border border-[var(--input-border)] px-2 py-1 text-xs">Reabrir</button>
                   </div>
                 </td>
               </tr>
             ))}
             {!rows.length && !loading ? (
               <tr>
-                <td className="px-3 py-6 text-center text-slate-500" colSpan={8}>Nenhum chamado TI encontrado com os filtros atuais.</td>
+                <td className="px-3 py-6 text-center text-[var(--muted-foreground)]" colSpan={8}>Nenhum chamado TI encontrado com os filtros atuais.</td>
               </tr>
             ) : null}
           </tbody>

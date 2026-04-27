@@ -111,7 +111,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="text-sm text-slate-400 mb-2">Sistema de Gestão Integrada</div>
+      <div className="text-sm text-[var(--muted-foreground)] mb-2">Sistema de Gestão Integrada</div>
       <h1 className="text-xl font-semibold mb-6 text-[var(--foreground)]">
         Perfil do Usuário
       </h1>
@@ -121,7 +121,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
         <div className="col-span-12 lg:col-span-5">
           <div className="card p-4 flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="h-24 w-24 rounded-full bg-slate-200 flex items-center justify-center text-base font-semibold text-slate-700">
+              <div className="h-24 w-24 rounded-full bg-slate-200 flex items-center justify-center text-base font-semibold text-[var(--foreground)]">
 
                 {user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -150,7 +150,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
                 className={`px-3 py-2 rounded text-sm border transition-colors ${
                   status === 'ATIVO'
                     ? 'bg-green-600 text-white border-green-700'
-                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-white/5'
+                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-[var(--card)]/5'
                 }`}
               >
                 Ativo
@@ -161,7 +161,7 @@ export default function UserProfilePageClient({ userId, initialData }: Props) {
                 className={`px-3 py-2 rounded text-sm border transition-colors ${
                   status === 'INATIVO'
                     ? 'bg-red-600 text-white border-red-700'
-                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-white/5'
+                    : 'bg-[var(--card)] border-[var(--border-subtle)] text-[var(--foreground)] hover:bg-[var(--card)]/5'
                 }`}
               >
                 Inativo

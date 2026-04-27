@@ -128,17 +128,17 @@ export default function PoderesDeAcessoClient() {
   return (
     <div className="max-w-3xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Poderes de Acesso</h1>
-        <p className="mt-1 text-sm text-slate-500">Ajuste departamento padrão e nível por módulo para usuários específicos.</p>
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">Poderes de Acesso</h1>
+        <p className="mt-1 text-sm text-[var(--muted-foreground)]">Ajuste departamento padrão e nível por módulo para usuários específicos.</p>
       </div>
 
-      <form onSubmit={onSearch} className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
-        <label className="text-sm font-medium text-slate-700">Buscar por nome ou e-mail</label>
+      <form onSubmit={onSearch} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 space-y-3">
+        <label className="text-sm font-medium text-[var(--foreground)]">Buscar por nome ou e-mail</label>
         <div className="flex gap-2">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-500"
             placeholder="ex.: maria@empresa.com"
           />
           <button
@@ -155,15 +155,15 @@ export default function PoderesDeAcessoClient() {
       {success && <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>}
 
       {data?.user && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 space-y-4">
           <div>
-            <h2 className="font-medium text-slate-800">{data.user.fullName}</h2>
-            <p className="text-sm text-slate-500">{data.user.email}</p>
+            <h2 className="font-medium text-[var(--foreground)]">{data.user.fullName}</h2>
+            <p className="text-sm text-[var(--muted-foreground)]">{data.user.email}</p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Departamento padrão</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">Departamento padrão</label>
               <select
                 value={data.user.departmentId ?? ''}
                 disabled={saving}
@@ -173,7 +173,7 @@ export default function PoderesDeAcessoClient() {
                     'Departamento atualizado com sucesso.',
                   )
                 }}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+                className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-500"
               >
                 <option value="">Sem departamento</option>
                 {data.departments.map((department) => (
@@ -185,11 +185,11 @@ export default function PoderesDeAcessoClient() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Módulo</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">Módulo</label>
               <select
                 value={selectedModuleId}
                 onChange={(event) => setSelectedModuleId(event.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+                className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-500"
               >
                 {data.modules.map((module) => (
                   <option key={module.id} value={module.id}>{module.name}</option>
@@ -199,7 +199,7 @@ export default function PoderesDeAcessoClient() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Nível no módulo</label>
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">Nível no módulo</label>
               <select
                 value={selectedLevel}
                 disabled={!selectedModuleId || saving}
@@ -210,7 +210,7 @@ export default function PoderesDeAcessoClient() {
                     'Nível de acesso atualizado com sucesso.',
                   )
                 }}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-orange-500"
+                className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-500"
               >
                 {LEVEL_OPTIONS.map((option) => (
                   <option key={option.label} value={option.value}>{option.label}</option>
@@ -218,9 +218,9 @@ export default function PoderesDeAcessoClient() {
               </select>
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Copiar permissões de outro usuário</label>
+              <label className="block text-sm font-medium text-[var(--foreground)]">Copiar permissões de outro usuário</label>
               <div className="flex gap-2">
-                <input className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} placeholder="Nome ou e-mail" />
+                <input className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} placeholder="Nome ou e-mail" />
                 <button type="button" onClick={() => void copyPermissions()} className="rounded-md bg-slate-700 px-3 py-2 text-sm text-white">Copiar</button>
               </div>
               <button type="button" onClick={() => void resetDepartmentDefault()} className="rounded-md bg-slate-100 px-3 py-2 text-sm">Resetar padrão do departamento</button>
@@ -228,9 +228,9 @@ export default function PoderesDeAcessoClient() {
           </div>
 
           <div>
-             <p className="mb-2 text-sm font-medium text-slate-700">Módulo → Nível atual</p>
+             <p className="mb-2 text-sm font-medium text-[var(--foreground)]">Módulo → Nível atual</p>
             <table className="w-full text-sm border">
-              <thead><tr className="bg-slate-50"><th className="text-left p-2 border">Módulo</th><th className="text-left p-2 border">Nível atual</th></tr></thead>
+              <thead><tr className="bg-[var(--card-muted)]"><th className="text-left p-2 border">Módulo</th><th className="text-left p-2 border">Nível atual</th></tr></thead>
               <tbody>
                 {data.modules.map((m) => {
                   const level = data.access.find((a) => a.moduleId === m.id)?.level ?? 'Sem acesso'
@@ -243,7 +243,7 @@ export default function PoderesDeAcessoClient() {
       )}
 
       {data && !data.user && (
-        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">Nenhum usuário encontrado para esse termo.</p>
+        <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--card-muted)] px-3 py-2 text-sm text-[var(--muted-foreground)]">Nenhum usuário encontrado para esse termo.</p>
       )}
     </div>
   )

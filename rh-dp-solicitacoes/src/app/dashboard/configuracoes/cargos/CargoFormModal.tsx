@@ -4,7 +4,7 @@ import * as React from 'react'
 
 
 const INPUT =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
+  'mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
 
 export type Position = {
   id?: string
@@ -118,14 +118,14 @@ export function CargoFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-5xl rounded-2xl bg-[var(--card)] p-6 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">
             {isEdit ? 'Editar cargo' : 'Novo cargo'}
           </h3>
           <button
             onClick={onClose}
-            className="rounded-md p-1 hover:bg-slate-100"
+            className="rounded-md p-1 hover:bg-[var(--table-row-hover)]"
           >
             ✕
           </button>
@@ -368,7 +368,7 @@ export function CargoFormTrigger({ row }: { row?: PositionRow }) {
         onClick={() => setOpen(true)}
         className={
           row
-            ? 'text-xs rounded-md border px-2 py-1 hover:bg-slate-50'
+            ? 'text-xs rounded-md border px-2 py-1 hover:bg-[var(--card-muted)]'
             : 'rounded-md bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-950'
         }
       >

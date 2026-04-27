@@ -38,9 +38,9 @@ import {
 
 
 const LABEL_RO =
-   'block text-xs font-bold text-slate-800 uppercase tracking-wide'
+   'block text-xs font-bold text-[var(--foreground)] uppercase tracking-wide'
 const INPUT_RO =
-  'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
+  'mt-1 w-full rounded-lg border border-[var(--input-border)] bg-[var(--card)] px-3 py-3 text-base font-medium text-[var(--foreground)] shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
 const isBooleanLikeType = (campoType?: string) => {
   const normalizedType = (campoType ?? '').trim().toLowerCase()
   return normalizedType === 'boolean' || normalizedType === 'checkbox'
@@ -1326,7 +1326,7 @@ export function SolicitationDetailModal({
  const renderNadaConstaCampo = (campo: CampoEspecifico) => {
     const value = nadaConstaCampos[campo.name] ?? ''
     const baseClass =
-      'w-full rounded-md border border-slate-200 bg-white px-3 py-3 text-base lg:text-sm'
+      'w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3 text-base lg:text-sm'
       const isDisabled = !canEditNadaConstaSetor
     const isConstaField = campo.name === constaFieldName
     const isSaudeConstaField = (activeSector === 'SAUDE' || activeSector === 'SST') && isConstaField
@@ -1335,7 +1335,7 @@ export function SolicitationDetailModal({
       if (isSaudeConstaField) {
         const normalizedValue = normalizeSaudeStatusValue(value)
         return (
-          <div key={campo.name} className="space-y-2 text-xs text-slate-700">
+          <div key={campo.name} className="space-y-2 text-xs text-[var(--foreground)]">
             <span className="font-semibold">{campo.label}</span>
             <div className="flex flex-wrap gap-4">
               {SAUDE_STATUS_OPTIONS.map((option) => (
@@ -1361,7 +1361,7 @@ export function SolicitationDetailModal({
         { value: 'NADA_CONSTA' as ConstaFlag, label: 'Nada Consta' },
       ] as const
       return (
-        <div key={campo.name} className="space-y-2 text-xs text-slate-700">
+        <div key={campo.name} className="space-y-2 text-xs text-[var(--foreground)]">
           <span className="font-semibold">{campo.label}</span>
           <div className="flex flex-wrap gap-4">
             {options.map((option) => (
@@ -1388,7 +1388,7 @@ export function SolicitationDetailModal({
       return (
         <label
           key={campo.name}
-          className="flex items-start gap-2 text-xs text-slate-700"
+          className="flex items-start gap-2 text-xs text-[var(--foreground)]"
         >
           <input
             type="checkbox"
@@ -1409,7 +1409,7 @@ export function SolicitationDetailModal({
 
     if (campo.type === 'textarea') {
       return (
-        <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+        <label key={campo.name} className="space-y-1 text-xs text-[var(--foreground)]">
           <span className="font-semibold">{campo.label}</span>
           <textarea
             className={`${baseClass} min-h-[90px]`}
@@ -1423,7 +1423,7 @@ export function SolicitationDetailModal({
 
     if (campo.type === 'select') {
       return (
-        <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+        <label key={campo.name} className="space-y-1 text-xs text-[var(--foreground)]">
           <span className="font-semibold">{campo.label}</span>
           <select
             className={baseClass}
@@ -1443,7 +1443,7 @@ export function SolicitationDetailModal({
     }
 
     return (
-      <label key={campo.name} className="space-y-1 text-xs text-slate-700">
+      <label key={campo.name} className="space-y-1 text-xs text-[var(--foreground)]">
         <span className="font-semibold">{campo.label}</span>
         <input
           className={baseClass}
@@ -2125,40 +2125,37 @@ async function handleEncaminharAprovacaoComAnexo() {
   if (!isOpen || !row) return null
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="app-modal-overlay z-50">
       <button
         type="button"
         aria-label="Fechar tudo"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0"
         onClick={onClose}
       />
 
-      <div className="relative z-10 flex h-full flex-col p-3 lg:p-6">
-        <div className="mb-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+      <div className="relative z-10 flex h-full w-full max-w-[1850px] flex-col">
+        <div className="app-surface mb-3 flex items-center justify-between px-4 py-3 shadow-lg backdrop-blur">
           <div>
-          <h2 className="text-lg font-semibold text-slate-800">Detalhes da Solicitação</h2>
-            <p className="text-xs text-slate-500">Protocolo {detail?.protocolo ?? row.protocolo ?? '-'}</p>
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Detalhes da Solicitação</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">Protocolo {detail?.protocolo ?? row.protocolo ?? '-'}</p>
            </div>
-          <button
-            onClick={onClose}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
+          <button onClick={onClose} className="app-button-secondary">
             Fechar tudo
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(720px,1fr)_380px]">
+        <div className="app-modal-panel grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden p-3 md:p-4 lg:grid-cols-[320px_minmax(720px,1fr)_380px]">
           {showLeftPanel && (
-            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
-              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-800">Dados do solicitante</h3>
-                <button onClick={() => setShowLeftPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+            <section className="app-card min-h-0 shadow-xl">
+              <header className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Dados do solicitante</h3>
+                <button onClick={() => setShowLeftPanel(false)} className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Fechar</button>
               </header>
               <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
-                {loading && <p className="text-xs text-slate-500">Carregando detalhes...</p>}
+                {loading && <p className="text-xs text-[var(--muted-foreground)]">Carregando detalhes...</p>}
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 {detail && (
-                  <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-sky-50/40 p-4 shadow-sm">
+                  <div className="app-card-muted rounded-xl p-4 shadow-sm">
                     <div className="space-y-3 text-xs">
                       <div>
                         <label className={LABEL_RO}>Nome completo</label>
@@ -2200,14 +2197,14 @@ async function handleEncaminharAprovacaoComAnexo() {
           )}
 
           {showCenterPanel && (
-            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
-              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-800">Formulário / Detalhes da Solicitação</h3>
-                <button onClick={() => setShowCenterPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+            <section className="min-h-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl">
+              <header className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Formulário / Detalhes da Solicitação</h3>
+                <button onClick={() => setShowCenterPanel(false)} className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Fechar</button>
               </header>
               <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
          {loading && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[var(--muted-foreground)]">
               Carregando detalhes...
             </p>
           )}
@@ -2222,8 +2219,8 @@ async function handleEncaminharAprovacaoComAnexo() {
           {detail && (
             <>
               {/* Informações principais */}
-              <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm">
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                   Dados gerais do chamado
                 </p>
                 <div className="mb-5 overflow-x-auto pb-1">
@@ -2236,7 +2233,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         ? 'text-orange-600'
                         : isDone
                           ? 'text-emerald-600'
-                          : 'text-slate-500'
+                          : 'text-[var(--muted-foreground)]'
 
                       const lineClass = isCurrent
                         ? 'bg-orange-500'
@@ -2276,7 +2273,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                 {detail.nonConformity ? (
                   <div>
                      <label className={LABEL_RO}>NC de origem</label>
-                    <div className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-800 shadow-sm ring-1 ring-amber-100/80">
+                    <div className="mt-1 rounded-lg border border-[var(--input-border)] bg-[var(--card)] px-3 py-3 text-sm font-medium text-[var(--foreground)] shadow-sm ring-1 ring-amber-100/80">
                       <a className="text-orange-700 hover:underline" href={`/dashboard/sgi/qualidade/nao-conformidades/${detail.nonConformity.id}`}>
                         {detail.nonConformity.numeroRnc}
                       </a>
@@ -2357,7 +2354,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   <label className={LABEL_RO}>
                     Anexo(s) da Solicitação
                   </label>
-                  <div className="mt-2 space-y-1 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                  <div className="mt-2 space-y-1 rounded border border-[var(--border-subtle)] bg-[var(--card-muted)] px-3 py-2 text-xs">
                     {detail.anexos.map((a) => (
                       <div
                         key={a.id}
@@ -2383,8 +2380,8 @@ async function handleEncaminharAprovacaoComAnexo() {
 
               {/* Formulário do tipo de solicitação */}
                {isNadaConsta ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Nada Consta
                   </p>
 
@@ -2395,12 +2392,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                   )}
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                        Dados do colaborador
                       </p>
                       {camposNadaConstaSolicitante.length > 0 ? (
-                        <div className="space-y-2 text-xs text-slate-700">
+                        <div className="space-y-2 text-xs text-[var(--foreground)]">
                           {camposNadaConstaSolicitante.map((campo) => (
                             <div key={campo.name}>
                               <label className={LABEL_RO}>
@@ -2415,14 +2412,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[var(--muted-foreground)]">
                           Nenhum dado informado pelo solicitante.
                         </p>
                       )}
                     </div>
 
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                         Setores responsáveis
                       </p>
                        {visibleSetoresNadaConsta.length > 0 ? (
@@ -2443,14 +2440,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                                 badgeClass =
                                   saudeStatus === 'Ciente'
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                                    : 'border-[var(--border-subtle)] bg-[var(--card-muted)] text-[var(--foreground)]'
                               } else {
                                 badgeClass =
                                   constaFlag === 'CONSTA'
                                     ? 'border-red-200 bg-red-50 text-red-700'
                                     : constaFlag === 'NADA_CONSTA'
                                       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                                      : 'border-[var(--border-subtle)] bg-[var(--card-muted)] text-[var(--foreground)]'
                               }
                             }
                             return (
@@ -2462,7 +2459,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                                 className={`flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-xs font-semibold ${badgeClass} ${
                                   isCurrent
                                     ? 'cursor-default opacity-90 ring-2 ring-sky-400 ring-offset-1'
-                                    : 'hover:bg-white'
+                                    : 'hover:bg-[var(--card)]'
                                 }`}
                                 aria-pressed={isCurrent}
                               >
@@ -2485,13 +2482,13 @@ async function handleEncaminharAprovacaoComAnexo() {
                           })}
                         </div>
                       ) : (
-                        <div className="text-xs text-slate-700">
+                        <div className="text-xs text-[var(--foreground)]">
                           {selectedSetorLabel ? (
                             <p className="font-semibold">
                               {selectedSetorLabel}
                             </p>
                           ) : (
-                            <p className="text-slate-500">
+                            <p className="text-[var(--muted-foreground)]">
                               Nenhum setor vinculado encontrado.
                             </p>
                           )}
@@ -2502,8 +2499,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </div>
 
                   {!showManagementActions && (
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="text-xs text-slate-500">
+                    <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+                      <p className="text-xs text-[var(--muted-foreground)]">
                         Tratativas do Nada Consta disponíveis apenas no painel de atendimento.
                       </p>
 
@@ -2533,8 +2530,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                 />
               ) : (
                 camposSchema.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                       Formulário do tipo de solicitação
                     </p>
 
@@ -2574,8 +2571,8 @@ async function handleEncaminharAprovacaoComAnexo() {
               )}
                
               {isAvaliacaoExperiencia && (
-                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Formulário estruturado — Avaliação do Período de Experiência
                   </p>
                   <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
@@ -2601,11 +2598,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                     <div className="md:col-span-2">
                       <label className={LABEL_RO}>Competências / notas</label>
-                      <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                      <div className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-2">
                         {experienceData.notas.map((item) => (
-                          <div key={item.key} className="flex items-center justify-between border-b border-slate-200 py-2 text-xs last:border-b-0">
-                            <span className="font-medium text-slate-700">{item.label}</span>
-                            <span className="font-semibold text-slate-900">{item.value || '-'}</span>
+                          <div key={item.key} className="flex items-center justify-between border-b border-[var(--border-subtle)] py-2 text-xs last:border-b-0">
+                            <span className="font-medium text-[var(--foreground)]">{item.label}</span>
+                            <span className="font-semibold text-[var(--foreground)]">{item.value || '-'}</span>
                            </div>
                         ))}
                       </div>
@@ -2633,29 +2630,29 @@ async function handleEncaminharAprovacaoComAnexo() {
               )}
                
                 {isAvaliacaoExperiencia && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card-muted)]/70 p-4">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Avaliação do gestor imediato
                   </p>
-                  <p className="mb-4 text-xs text-slate-600">
+                  <p className="mb-4 text-xs text-[var(--muted-foreground)]">
                     Competências comportamentais e técnicas
                   </p>
 
-                  <div className="mb-4 rounded-lg border border-slate-200 bg-white/80 p-3">
-                    <p className="text-xs leading-5 text-slate-700">
+                  <div className="mb-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-3">
+                    <p className="text-xs leading-5 text-[var(--foreground)]">
                       1 - Avalie o colaborador nas questões conforme a legenda abaixo e utilize como parâmetro as competências mapeadas para o seu cargo no Gesto.Com.
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     {EXPERIENCE_EVALUATION_COMPETENCIES.map((competency) => (
-                      <div key={competency.key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div key={competency.key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0 flex-1">
-                            <label className="text-xs font-bold uppercase tracking-wide text-slate-800">
+                            <label className="text-xs font-bold uppercase tracking-wide text-[var(--foreground)]">
                               {competency.label}
                             </label>
-                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-slate-600">
+                            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-[var(--muted-foreground)]">
                               {competency.description}
                             </p>
                           </div>
@@ -2663,7 +2660,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <div className="w-full lg:w-56 lg:flex-none">
                             <label className={LABEL_RO}>Nota</label>
                             <select
-                              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+                              className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)]"
                               value={gestorAvaliacaoForm[competency.key]}
                               onChange={(e) => {
                                 const value = e.target.value
@@ -2696,10 +2693,10 @@ async function handleEncaminharAprovacaoComAnexo() {
                     ))}
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm">
                     <label className={LABEL_RO}>Deseja realizar algum comentário sobre o colaborador em questão?</label>
                     <textarea
-                      className="mt-1 min-h-[160px] w-full rounded-md border border-slate-300 px-3 py-3 text-sm"
+                      className="mt-1 min-h-[160px] w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-sm"
                       value={gestorAvaliacaoForm.comentarioFinal}
                       onChange={(e) => {
                         const value = e.target.value
@@ -2751,7 +2748,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Nome completo</label>
                       <input
-                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                       className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={candidatoNome}
                         onChange={(e) => setCandidatoNome(e.target.value)}
                         placeholder="Nome do contratado"
@@ -2761,7 +2758,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Documento (CPF)</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={candidatoDocumento}
                         onChange={(e) =>
                           setCandidatoDocumento(e.target.value)
@@ -2776,7 +2773,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </label>
                       <input
                         type="date"
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={dataAdmissaoPrevista}
                         onChange={(e) =>
                           setDataAdmissaoPrevista(e.target.value)
@@ -2787,7 +2784,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Cargo</label>
                       <input
-                         className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                         className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={cargo}
                         onChange={(e) => setCargo(e.target.value)}
                         placeholder="Cargo do contratado"
@@ -2797,7 +2794,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Salário</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={salario}
                         onChange={(e) => setSalario(e.target.value)}
                         placeholder="Ex: 3500,00"
@@ -2806,7 +2803,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                      <div>
                       <label className={LABEL_RO}>CBO</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={cbo}
                         onChange={(e) => setCbo(e.target.value)}
                         placeholder="Código CBO"
@@ -2816,7 +2813,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div className="md:col-span-2">
                       <label className={LABEL_RO}>Benefícios</label>
                       <textarea
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={beneficios}
                         onChange={(e) => setBeneficios(e.target.value)}
                         placeholder="Descreva os benefícios"
@@ -2827,7 +2824,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div className="md:col-span-2">
                       <label className={LABEL_RO}>Observação</label>
                       <textarea
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={observacao}
                         onChange={(e) => setObservacao(e.target.value)}
                         placeholder="Observações adicionais"
@@ -2841,7 +2838,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         type="file"
                         multiple
                         onChange={(e) => setFilesToUpload(e.target.files)}
-                        className="mt-1 block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                        className="mt-1 block w-full text-xs text-[var(--foreground)] file:mr-3 file:rounded-md file:border file:border-[var(--input-border)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[var(--foreground)] hover:file:bg-[var(--card-muted)]"
                       />
 
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -2881,7 +2878,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         Nome do colaborador/aluno
                       </label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={candidatoNome}
                         onChange={(e) => setCandidatoNome(e.target.value)}
                         placeholder="Nome completo"
@@ -2893,7 +2890,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         Duração do curso (meses)
                       </label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={duracaoCursoMeses}
                         onChange={(e) => setDuracaoCursoMeses(e.target.value)}
                         placeholder="Ex.: 12"
@@ -2903,14 +2900,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <div>
                       <label className={LABEL_RO}>Valor mensal (R$)</label>
                       <input
-                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                        className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                         value={valorMensalCurso}
                         onChange={(e) => setValorMensalCurso(e.target.value)}
                         placeholder="Ex.: 500,00"
                       />
                     </div>
 
-                    <div className="flex flex-col justify-end text-[12px] text-slate-700">
+                    <div className="flex flex-col justify-end text-[12px] text-[var(--foreground)]">
                       <span className="font-semibold">Valor total estimado</span>
                       <span className="text-sm text-emerald-700">
                         {valorTotalCurso !== null
@@ -2927,8 +2924,8 @@ async function handleEncaminharAprovacaoComAnexo() {
 
               {/* Chamados vinculados (filhos) */}
               {detail.children && detail.children.length > 0 && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Chamados vinculados
                   </p>
 
@@ -2936,18 +2933,18 @@ async function handleEncaminharAprovacaoComAnexo() {
                     {detail.children.map((child) => (
                       <div
                         key={child.id}
-                        className="flex flex-col rounded border border-slate-200 bg-white px-3 py-2"
+                        className="flex flex-col rounded border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-800">
+                          <span className="font-semibold text-[var(--foreground)]">
                             {child.protocolo} — {child.titulo}
                           </span>
-                          <span className="text-[11px] uppercase tracking-wide text-slate-500">
+                          <span className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
                             {child.tipo?.nome ?? '—'}
                           </span>
                         </div>
 
-                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-slate-600">
+                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-[var(--muted-foreground)]">
                           <span>
                             <span className="font-semibold">Status:</span>{' '}
                             {child.status}
@@ -2979,10 +2976,10 @@ async function handleEncaminharAprovacaoComAnexo() {
                   <label className={LABEL_RO}>
                     Histórico de Atendimento
                   </label>
-                  <div className="mt-2 space-y-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                  <div className="mt-2 space-y-2 rounded border border-[var(--border-subtle)] bg-[var(--card-muted)] px-3 py-2 text-xs">
                     {detail.comentarios.map((c) => (
                       <div key={c.id}>
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-[10px] text-[var(--muted-foreground)]">
                           {formatDate(c.createdAt)} -{' '}
                           {c.autor?.fullName ?? '—'}
                         </div>
@@ -2999,10 +2996,10 @@ async function handleEncaminharAprovacaoComAnexo() {
           )}
 
           {showRightPanel && (
-            <section className="min-h-0 rounded-2xl border border-slate-200 bg-white shadow-xl">
-              <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-800">Ações / Tratativas</h3>
-                <button onClick={() => setShowRightPanel(false)} className="text-xs text-slate-600 hover:text-slate-900">Fechar</button>
+            <section className="min-h-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl">
+              <header className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">Ações / Tratativas</h3>
+                <button onClick={() => setShowRightPanel(false)} className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Fechar</button>
               </header>
               <div className="h-[calc(100%-53px)] overflow-y-auto p-4 text-sm">
                 {canShowApprovalActions && (
@@ -3025,25 +3022,25 @@ async function handleEncaminharAprovacaoComAnexo() {
                 )}
 
                 {canShowApprovalActions && approvalAction && (
-                  <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-3">
                     <label className={LABEL_RO}>Comentário {approvalAction === 'REPROVAR' && '(obrigatório)'}</label>
                     <textarea
-                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 lg:text-sm"
+                      className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 lg:text-sm"
                       rows={3}
                       value={approvalComment}
                       onChange={(e) => setApprovalComment(e.target.value)}
                     />
                     <div className="mt-2 flex gap-2">
                       <button onClick={handleConfirmApprovalAction} disabled={closing} className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Confirmar</button>
-                      <button onClick={handleCancelApprovalAction} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Cancelar</button>
+                      <button onClick={handleCancelApprovalAction} className="rounded-md border border-[var(--input-border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">Cancelar</button>
                     </div>
                   </div>
                 )}
 
                 {showManagementActions && detail && (
                   <aside className="w-full">
-                    <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                    <div className="space-y-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Painel de Tratativas
                   </p>
                   {!isFinalizadaOuCancelada && (
@@ -3057,7 +3054,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           type="file"
                           multiple
                           onChange={(e) => setFilesToUpload(e.target.files)}
-                          className="mt-1 block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-50"
+                          className="mt-1 block w-full text-xs text-[var(--foreground)] file:mr-3 file:rounded-md file:border file:border-[var(--input-border)] file:bg-[var(--card)] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[var(--foreground)] hover:file:bg-[var(--card-muted)]"
                         />
 
                         <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -3083,7 +3080,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                    {!isDpDestino && canFinalizarRh && isSolicitacaoPessoalTipo && (
                     <button
                       onClick={() => setShowContratadoForm((v) => !v)}
-                      className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 lg:w-auto lg:text-sm"
+                      className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-slate-200 lg:w-auto lg:text-sm"
                     >
                        {showContratadoForm
                         ? 'Ocultar dados do contratado'
@@ -3116,7 +3113,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       <button
                         type="button"
                         onClick={() => setShowCancelarVagaForm((prev) => !prev)}
-                        className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
+                        className="w-full rounded-md border border-rose-300 bg-[var(--card)] px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
                       >
                         {showCancelarVagaForm ? 'Ocultar cancelamento de vaga' : 'Cancelamento de vaga'}
                       </button>
@@ -3159,7 +3156,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       <button
                         type="button"
                         onClick={() => setShowRecusaDpForm((prev) => !prev)}
-                        className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
+                        className="w-full rounded-md border border-rose-300 bg-[var(--card)] px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:w-auto lg:text-sm"
                       >
                         {showRecusaDpForm ? 'Ocultar recusa da solicitação' : 'Recusar solicitação (DP)'}
                       </button>
@@ -3222,7 +3219,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Tipo Resposta</label>
                           {canEditSstResposta ? (
                             <select
-                               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                               className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                               value={tipoRespostaSst}
                               onChange={(e) => setTipoRespostaSst(e.target.value)}
                             >
@@ -3240,7 +3237,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Descrição da Solução</label>
                           {canEditSstResposta ? (
                             <textarea
-                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                               value={descricaoSolucaoSst}
                               onChange={(e) => setDescricaoSolucaoSst(e.target.value)}
                             />
@@ -3253,7 +3250,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Adicionar Observação</label>
                           {canEditSstResposta ? (
                             <textarea
-                              className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                              className="mt-1 min-h-[90px] w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                               value={observacaoSst1}
                               onChange={(e) => setObservacaoSst1(e.target.value)}
                             />
@@ -3266,7 +3263,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <label className={LABEL_RO}>Adicionar Observação</label>
                           {canEditSstResposta ? (
                             <textarea
-                             className="mt-1 min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                             className="mt-1 min-h-[90px] w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                               value={observacaoSst2}
                               onChange={(e) => setObservacaoSst2(e.target.value)}
                             />
@@ -3284,10 +3281,10 @@ async function handleEncaminharAprovacaoComAnexo() {
                       </p>
 
                       <div className="space-y-3">
-                        <label className="space-y-1 text-xs text-slate-700">
+                        <label className="space-y-1 text-xs text-[var(--foreground)]">
                           <span className="font-semibold">Existe Termo para anexar?</span>
                           <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                            className="w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                             value={existeTermoParaAnexar}
                             onChange={(e) => setExisteTermoParaAnexar(e.target.value as 'SIM' | 'NAO' | '')}
                             disabled={isFinalizadaOuCancelada}
@@ -3296,12 +3293,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                             <option value="SIM">SIM</option>
                             <option value="NAO">NÃO</option>
                           </select>
-                        </label>                        <label className="space-y-1 text-xs text-slate-700">
+                        </label>                        <label className="space-y-1 text-xs text-[var(--foreground)]">
                           <span className="font-semibold">
                             Equipamento disponível (IN_STOCK)
                           </span>
                           <select
-                            className="w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                            className="w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                             value={selectedEquipmentId}
                             onChange={(e) => setSelectedEquipmentId(e.target.value)}
                             disabled={loadingTiInventory || closing || isFinalizadaOuCancelada}
@@ -3361,8 +3358,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                   )}
 
                   {isNadaConsta && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                         Tratativa do setor
                       </p>
 
@@ -3371,11 +3368,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                       )}
 
                       {camposNadaConstaSetor.length > 0 ? (
-                        <div className="space-y-3 text-xs text-slate-700">
+                        <div className="space-y-3 text-xs text-[var(--foreground)]">
                           {camposNadaConstaSetor.map(renderNadaConstaCampo)}
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[var(--muted-foreground)]">
                           Selecione um setor para preencher os dados.
                         </p>
                       )}
@@ -3386,7 +3383,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={() => handleSalvarNadaConsta(false)}
                             disabled={savingNadaConsta}
-                          className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)] disabled:opacity-60 lg:w-auto lg:text-sm"
                           >
                             {savingNadaConsta ? 'Salvando...' : 'Salvar'}
                           </button>
@@ -3405,7 +3402,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <button
                             type="button"
                             onClick={() => setIsEditingNadaConstaSetor(true)}
-                            className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50 lg:w-auto lg:text-sm"
+                            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)] lg:w-auto lg:text-sm"
                           >
                             Editar resposta do setor
                           </button>
@@ -3417,14 +3414,14 @@ async function handleEncaminharAprovacaoComAnexo() {
               </aside>
             )}
             {showManagementActions && !isFinalizadaOuCancelada && (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
             <label className={LABEL_RO}>Observação do atendimento</label>
             <textarea
               value={novoComentario}
               onChange={(event) => setNovoComentario(event.target.value)}
               rows={3}
               placeholder="Registre comentários ou informações adicionais"
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm"
             />
             <button
               type="button"
@@ -3436,7 +3433,7 @@ async function handleEncaminharAprovacaoComAnexo() {
             </button>
           </div>
         )}
-        <div className="mt-4 border-t border-slate-200 pt-3">
+        <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
               <div className="text-xs">
               {closeError && <p className="text-red-600">{closeError}</p>}
               {closeSuccess && (
@@ -3449,7 +3446,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <button
                 onClick={handleAssumirChamado}
                 disabled={assumindo || isFinalizadaOuCancelada}
-                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-60 lg:text-sm"
+                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-slate-200 disabled:opacity-60 lg:text-sm"
               >
                 {assumindo ? 'Assumindo...' : 'Assumir chamado'}
               </button>
@@ -3472,7 +3469,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                 <button
                   type="button"
                   onClick={() => setShowAdminCancelForm((prev) => !prev)}
-                  className="w-full rounded-md border border-rose-300 bg-white px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:text-sm"
+                  className="w-full rounded-md border border-rose-300 bg-[var(--card)] px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:text-sm"
                 >
                   {showAdminCancelForm ? 'Ocultar cancelamento administrativo' : 'Cancelar solicitação (Admin)'}
                 </button>
@@ -3502,7 +3499,7 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
             <button
               onClick={onClose}
-              className="w-full rounded-md border border-slate-300 px-4 py-3 text-base text-slate-700 hover:bg-slate-50 lg:text-sm"
+              className="w-full rounded-md border border-[var(--input-border)] px-4 py-3 text-base text-[var(--foreground)] hover:bg-[var(--card-muted)] lg:text-sm"
             >
               Fechar
             </button>
@@ -3596,11 +3593,11 @@ function RQ063ResumoCampos({
     `rounded-md border px-3 py-1.5 text-xs font-medium transition ${
       activeTab === tab
         ? 'border-orange-300 bg-orange-50 text-orange-700'
-        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+        : 'border-[var(--border-subtle)] bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--card-muted)]'
     }`
    return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
         RQ_063 - Solicitação de Pessoal / Admissão
       </p>
 
@@ -3804,22 +3801,22 @@ function RQ247ResumoCampos({
     : get('dpConsideracoes')
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
         RQ.247 Solicitação de Desligamento de Pessoal
       </p>
 
       <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+        <p className="mb-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
          Gestor solicitante
         </p>
-        <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-xs text-[var(--foreground)]">
           {get('gestorSolicitanteInfo') || 'Identificação do gestor vinculada automaticamente ao solicitante autenticado.'}
         </div>
       </section>
 
       <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+        <p className="mb-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
           Motivo do desligamento
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -3851,7 +3848,7 @@ function RQ247ResumoCampos({
       </section>
 
       <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+        <p className="mb-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
           Dados do funcionário
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -3915,7 +3912,7 @@ function RQ247ResumoCampos({
       </section>
 
       <section className="mb-4">
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+        <p className="mb-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
           Informações gerais RH (preenchimento RH)
         </p>
          <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -3924,7 +3921,7 @@ function RQ247ResumoCampos({
             {rhEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                 value={rhDataExameValue}
                 onChange={(e) =>
                   onRhDataExameDemissionalChange(e.target.value)
@@ -3939,7 +3936,7 @@ function RQ247ResumoCampos({
             {rhEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                 value={rhDataLiberacaoValue}
                 onChange={(e) => onRhDataLiberacaoPppChange(e.target.value)}
               />
@@ -3955,7 +3952,7 @@ function RQ247ResumoCampos({
             <label className={LABEL_RO}>Considerações</label>
             {rhEditable ? (
               <textarea
-               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm min-h-[70px]"
+               className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm min-h-[70px]"
                 value={rhConsideracoesValue}
                 onChange={(e) => onRhConsideracoesChange(e.target.value)}
               />
@@ -3971,7 +3968,7 @@ function RQ247ResumoCampos({
       </section>
 
       <section>
-        <p className="mb-1 text-[11px] font-semibold text-slate-600">
+        <p className="mb-1 text-[11px] font-semibold text-[var(--muted-foreground)]">
           Informações gerais DP (preenchimento DP)
         </p>
         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -3980,7 +3977,7 @@ function RQ247ResumoCampos({
             {dpEditable ? (
               <input
                 type="date"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                 value={dpDataDemissaoValue}
                 onChange={(e) => onDpDataDemissaoChange(e.target.value)}
               />
@@ -3993,7 +3990,7 @@ function RQ247ResumoCampos({
             {dpEditable ? (
               <input
                 type="date"
-                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm"
+                 className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm"
                 value={dpDataPrevistaValue}
                 onChange={(e) => onDpDataPrevistaAcertoChange(e.target.value)}
               />
@@ -4009,7 +4006,7 @@ function RQ247ResumoCampos({
             <label className={LABEL_RO}>Considerações</label>
             {dpEditable ? (
               <textarea
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-3 text-base lg:text-sm min-h-[70px]"
+                className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-base lg:text-sm min-h-[70px]"
                 value={dpConsideracoesValue}
                 onChange={(e) => onDpConsideracoesChange(e.target.value)}
               />

@@ -38,7 +38,7 @@ type DepartmentOption = {
 
 // labels mais escuros para melhor leitura no fundo claro
 const LABEL =
-  'block text-xs font-semibold uppercase tracking-wide text-slate-700'
+  'block text-xs font-semibold uppercase tracking-wide text-[var(--foreground)]'
 
 const INPUT =
   'mt-1 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] text-[var(--foreground)] px-3 py-2.5 text-[15px] shadow-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300 transition-colors'
@@ -107,12 +107,12 @@ function DepartmentCombo({
       />
 
       {open && options.length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow">
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow">
           {options.map((dept) => (
             <button
               key={dept.id}
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-100"
+              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--table-row-hover)]"
               onMouseDown={(e) => {
                 e.preventDefault()
                 handleSelect(dept)
@@ -187,12 +187,12 @@ function CostCenterCombo({
       />
 
       {open && options.length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow">
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow">
           {options.map((cc) => (
             <button
               key={cc.id}
               type="button"
-              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-100"
+              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-[var(--table-row-hover)]"
               onMouseDown={(e) => {
                 e.preventDefault() // evita perder o foco antes de selecionar
                 handleSelect(cc)
@@ -693,14 +693,14 @@ export default function Page() {
 
   return (
     <div className="max-w-7xl mx-auto w-full">
-      <div className="text-sm text-slate-400 mb-6">
+      <div className="text-sm text-[var(--muted-foreground)] mb-6">
         Sistema de Gestão Integrada
       </div>
 
-      <h1 className="text-2xl font-semibold text-slate-900 mb-1">
+      <h1 className="text-2xl font-semibold text-[var(--foreground)] mb-1">
         Configurações
       </h1>
-      <p className="text-sm text-slate-500 mb-6">
+      <p className="text-sm text-[var(--muted-foreground)] mb-6">
         Cadastro e manutenção de usuários.
       </p>
 
@@ -787,7 +787,7 @@ export default function Page() {
               onChange={(e) => setLogin(e.target.value)}
               placeholder="breno.sousa"
             />
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
               Padrão: primeiro nome + último sobrenome (sem acento), ex.:{' '}
               <b>breno.sousa</b>.
             </p>
@@ -795,7 +795,7 @@ export default function Page() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
                 Senha (opcional)
               </label>
               <input
@@ -846,7 +846,7 @@ export default function Page() {
               type="button"
               onClick={loadUsers}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm hover:bg-slate-50 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-md border border-[var(--input-border)] px-4 py-2.5 text-sm hover:bg-[var(--card-muted)] disabled:opacity-60"
             >
               <PlusCircle className="h-4 w-4" />
               {loading ? 'Recarregando…' : 'Recarregar'}
@@ -861,10 +861,10 @@ export default function Page() {
             {/* Cabeçalho da lista */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
                   Últimos usuários
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[var(--muted-foreground)]">
                   Visualize, filtre e gerencie os usuários já cadastrados.
                 </p>
               </div>
@@ -872,7 +872,7 @@ export default function Page() {
               <div className="flex items-center gap-2">
                 <input
                   type="search"
-                  className="w-full sm:w-64 rounded-full border border-slate-300 bg-white/90 px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                  className="w-full sm:w-64 rounded-full border border-[var(--input-border)] bg-[var(--card)]/90 px-3 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                   placeholder="Buscar por nome, login, e-mail..."
                   value={search}
                   onChange={(e) => {
@@ -891,9 +891,9 @@ export default function Page() {
               </div>
             </div>
             
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--card-muted)] px-4 py-3 text-sm text-[var(--foreground)]">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-[var(--foreground)]">
                   Selecionados: {selectedCount}
                 </span>
                 {selectedCount > 0 && (
@@ -911,7 +911,7 @@ export default function Page() {
                 <div className="flex items-center gap-2">
                   <input
                     type="password"
-                    className="w-48 rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-48 rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-1 text-xs text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="Nova senha em massa"
                     value={bulkPassword}
                     onChange={(e) => setBulkPassword(e.target.value)}
@@ -938,16 +938,16 @@ export default function Page() {
             </div>
 
             {/* Tabela */}
-<div className="mt-3 rounded-xl border border-slate-100 overflow-x-auto">
+<div className="mt-3 rounded-xl border border-[var(--border-subtle)] overflow-x-auto">
   <table className="w-full min-w-[1200px] text-sm table-fixed">
-    <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+    <thead className="bg-[var(--card-muted)] text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
       <tr>
          <th className="px-4 py-2 w-10 text-left">
           <input
             type="checkbox"
             checked={pageFullySelected}
             onChange={toggleSelectAllPage}
-            className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+            className="h-4 w-4 rounded border-[var(--input-border)] text-orange-600 focus:ring-orange-400"
           />
         </th>
         <th className="px-4 py-2 w-[19%] text-left">Nome</th>
@@ -958,16 +958,16 @@ export default function Page() {
       </tr>
     </thead>
 
-    <tbody className="divide-y divide-slate-100">
+    <tbody className="divide-y divide-[var(--border-subtle)]">
       {loading ? (
         <tr>
-          <td className="px-4 py-6 text-center text-slate-500" colSpan={5}>
+          <td className="px-4 py-6 text-center text-[var(--muted-foreground)]" colSpan={5}>
             Carregando…
           </td>
         </tr>
        ) : rows.length === 0 ? (
         <tr>
-          <td className="px-4 py-6 text-center text-slate-500" colSpan={5}>
+          <td className="px-4 py-6 text-center text-[var(--muted-foreground)]" colSpan={5}>
             Nenhum usuário encontrado.
           </td>
         </tr>
@@ -977,7 +977,7 @@ export default function Page() {
           return (
           <tr
             key={u.id || u.email}
-            className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${
+            className={`hover:bg-[var(--card-muted)]/80 cursor-pointer transition-colors ${
               isSelected ? 'bg-orange-50/70' : ''
             }`}
             onClick={() => {
@@ -987,7 +987,7 @@ export default function Page() {
             <td className="px-4 py-2 align-top">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+                className="h-4 w-4 rounded border-[var(--input-border)] text-orange-600 focus:ring-orange-400"
                 checked={isSelected}
                 onClick={(e) => e.stopPropagation()}
                 onChange={() => toggleSelection(u.id)}
@@ -995,25 +995,25 @@ export default function Page() {
               />
             </td>
             <td className="px-4 py-2 align-top">
-              <div className="font-medium text-slate-900 truncate" title={u.fullName}>
+              <div className="font-medium text-[var(--foreground)] truncate" title={u.fullName}>
                 {u.fullName}
               </div>
-              <div className="text-[11px] text-slate-500 whitespace-nowrap">
+              <div className="text-[11px] text-[var(--muted-foreground)] whitespace-nowrap">
                 criado recentemente
               </div>
             </td>
 
-            <td className="px-4 py-2 text-slate-700 truncate" title={u.login}>
+            <td className="px-4 py-2 text-[var(--foreground)] truncate" title={u.login}>
               {u.login}
             </td>
 
-            <td className="px-4 py-2 text-slate-700 truncate" title={u.email}>
+            <td className="px-4 py-2 text-[var(--foreground)] truncate" title={u.email}>
               {u.email}
             </td>
 
             <td className="px-4 py-2">
               <span
-                className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-700 max-w-[11rem] truncate"
+                className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-[var(--foreground)] max-w-[11rem] truncate"
                 title={u.costCenterName || '—'}
               >
                 {u.costCenterName || '—'}
@@ -1029,7 +1029,7 @@ export default function Page() {
                     e.stopPropagation()
                     if (u.id) router.push(`/dashboard/configuracoes/usuarios/${u.id}`)
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--input-border)] px-2.5 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--table-row-hover)] disabled:opacity-50 whitespace-nowrap"
                   disabled={!u.id}
                 >
                   <Eye size={14} /> Ver
@@ -1042,7 +1042,7 @@ export default function Page() {
                     e.stopPropagation()
                     openEdit(u)
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--input-border)] px-2.5 py-1 text-[10px] font-medium text-[var(--foreground)] hover:bg-[var(--table-row-hover)] disabled:opacity-50 whitespace-nowrap"
                   disabled={!u.id}
                   title="Editar"
                 >
@@ -1073,7 +1073,7 @@ export default function Page() {
 </div>
 
 {totalUsers > 0 && (
-  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card-muted)] px-4 py-3 text-sm text-[var(--foreground)]">
     <p className="font-medium">
       Exibindo {userPageStart}-{userPageEnd} de {totalUsers} usuário(s)
     </p>
@@ -1083,12 +1083,12 @@ export default function Page() {
       type="button"
         onClick={() => setUserPage((prev) => Math.max(1, prev - 1))}
         disabled={safeUserPage === 1}
-        className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+        className="inline-flex items-center rounded-md border border-[var(--input-border)] px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--table-row-hover)] disabled:opacity-50"
       >
         Anterior
       </button>
 
-      <span className="text-xs uppercase text-slate-500">
+      <span className="text-xs uppercase text-[var(--muted-foreground)]">
         Página {safeUserPage} / {totalUserPages}
       </span>
 
@@ -1096,7 +1096,7 @@ export default function Page() {
       type="button"
         onClick={() => setUserPage((prev) => Math.min(totalUserPages, prev + 1))}
         disabled={safeUserPage === totalUserPages}
-        className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+        className="inline-flex items-center rounded-md border border-[var(--input-border)] px-3 py-1.5 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--table-row-hover)] disabled:opacity-50"
       >
         Próxima
       </button>
@@ -1104,7 +1104,7 @@ export default function Page() {
   </div>
 )}
 
-<p className="mt-3 text-[11px] text-slate-500">
+<p className="mt-3 text-[11px] text-[var(--muted-foreground)]">
 Dica: após criar, você pode usar esse usuário como solicitante nas telas.
         </p>
 
@@ -1114,11 +1114,11 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
           <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] shadow-sm p-4 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Cadastro em massa</h2>
-                <p className="text-xs text-slate-500">
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">Cadastro em massa</h2>
+                <p className="text-xs text-[var(--muted-foreground)]">
                   Cole várias linhas usando ponto e vírgula como separador e cadastre tudo de uma só vez.
                 </p>
-               <p className="mt-1 text-[11px] text-slate-500">
+               <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Formato: Nome completo; email; telefone (opcional); senha (opcional); login (opcional).
                   Se o login estiver vazio, usamos o padrão gerado pelo nome (primeiro e último).
                 </p>
@@ -1131,7 +1131,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                   onChangeId={setBulkCostCenterId}
                   centers={costCenters}
                 />
-                <p className="-mt-1 text-[11px] text-slate-500">
+                <p className="-mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Aplicado a todos os usuários criados nesta lista.
                 </p>
 
@@ -1141,14 +1141,14 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                   onChangeId={setBulkDepartmentId}
                   departments={departments}
                 />
-                <p className="-mt-1 text-[11px] text-slate-500">
+                <p className="-mt-1 text-[11px] text-[var(--muted-foreground)]">
                   Aplicado a todos os usuários criados nesta lista.
                 </p>
 
-                <label className="flex items-center gap-2 text-xs text-slate-700">
+                <label className="flex items-center gap-2 text-xs text-[var(--foreground)]">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+                    className="h-4 w-4 rounded border-[var(--input-border)] text-orange-600 focus:ring-orange-400"
                     checked={bulkCreateFirstAccess}
                     onChange={(e) => setBulkCreateFirstAccess(e.target.checked)}
                   />
@@ -1157,7 +1157,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    className="inline-flex items-center rounded-md border border-[var(--input-border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--table-row-hover)]"
                   onClick={() =>
                     setBulkText(
                         'Maria Silva; maria.silva@empresa.com; (31) 99999-0000; ; maria.silva\n' +
@@ -1180,7 +1180,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
             </div>
 
             <textarea
-              className="w-full rounded-lg border border-slate-200 bg-white/80 p-3 text-sm text-slate-800 shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-3 text-sm text-[var(--foreground)] shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-300"
               rows={4}
               placeholder={
                 'Exemplo:\nMaria Silva; maria.silva@empresa.com; (31) 99999-0000; ; maria.silva\nJoão Souza; joao.souza@empresa.com; ; SenhaSegura123; joao.souza'
@@ -1190,8 +1190,8 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
             />
 
             {bulkResults.length > 0 && (
-              <div className="rounded-lg border border-slate-200 bg-white/60 p-3 text-xs text-slate-700">
-                <p className="font-semibold text-slate-800">Resultados do processamento:</p>
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/60 p-3 text-xs text-[var(--foreground)]">
+                <p className="font-semibold text-[var(--foreground)]">Resultados do processamento:</p>
                 <ul className="mt-2 space-y-1">
                   {bulkResults.map((r) => (
                     <li key={r.line} className="flex items-center justify-between gap-2">
@@ -1221,7 +1221,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
       {/* MODAL DE EDIÇÃO */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 grid place-items-center z-50">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl bg-[var(--card)] p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
                 Editar usuário
@@ -1229,7 +1229,7 @@ Dica: após criar, você pode usar esse usuário como solicitante nas telas.
               <button
                 onClick={closeEdit}
                 type="button"
-                className="rounded-md p-1 hover:bg-slate-100"
+                className="rounded-md p-1 hover:bg-[var(--table-row-hover)]"
               >
                 <X size={18} />
               </button>

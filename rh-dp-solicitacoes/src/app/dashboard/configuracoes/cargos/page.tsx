@@ -61,7 +61,7 @@ export default function CargosPage() {
         />
       </div>
 
-      <div className="border rounded bg-white">
+      <div className="border rounded bg-[var(--card)]">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100 border-b">
             <tr>

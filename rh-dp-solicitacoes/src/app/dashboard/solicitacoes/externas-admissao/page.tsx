@@ -74,16 +74,16 @@ const EMAIL_META: Record<string, StatusMeta> = {
   },
   NOT_SENT: {
     label: 'Não enviado',
-    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    badgeClass: 'bg-slate-100 text-[var(--foreground)] border-[var(--border-subtle)]',
   },
 }
 
 function getStatusMeta(status: string): StatusMeta {
-  return STATUS_META[status] ?? { label: status, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' }
+  return STATUS_META[status] ?? { label: status, badgeClass: 'bg-slate-100 text-[var(--foreground)] border-[var(--border-subtle)]' }
 }
 
 function getEmailMeta(status: string): StatusMeta {
-  return EMAIL_META[status] ?? { label: status, badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' }
+  return EMAIL_META[status] ?? { label: status, badgeClass: 'bg-slate-100 text-[var(--foreground)] border-[var(--border-subtle)]' }
 }
 
 function formatDate(value: string | null) {
@@ -342,39 +342,39 @@ export default function ExternalAdmissionDashboardPage() {
 
   return (
     <div className="space-y-5 p-4 md:p-6">
-      <header className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">Solicitações Externas — Admissão</h1>
-        <p className="text-sm text-slate-600">
+      <header className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm">
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">Solicitações Externas — Admissão</h1>
+        <p className="text-sm text-[var(--muted-foreground)]">
           Gere links externos para candidatos enviarem documentos de admissão, acompanhe o progresso e gerencie o envio de e-mails.
         </p>
-        {isReloading && <p className="text-xs text-slate-500">Atualizando dados...</p>}
+        {isReloading && <p className="text-xs text-[var(--muted-foreground)]">Atualizando dados...</p>}
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {[
-          { label: 'Total de processos', value: summary.total, accent: 'text-slate-900' },
+          { label: 'Total de processos', value: summary.total, accent: 'text-[var(--foreground)]' },
           { label: 'Aguardando envio', value: summary.aguardandoEnvio, accent: 'text-amber-700' },
           { label: 'Enviado pelo candidato', value: summary.enviadoPeloCandidato, accent: 'text-sky-700' },
           { label: 'Em conferência', value: summary.emConferencia, accent: 'text-violet-700' },
           { label: 'Concluídos', value: summary.concluido, accent: 'text-emerald-700' },
           { label: 'Falhas de e-mail', value: summary.falhaEmail, accent: 'text-red-700' },
         ].map((card) => (
-          <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
+          <article key={card.label} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">{card.label}</p>
             <p className={`mt-2 text-2xl font-semibold ${card.accent}`}>{card.value}</p>
           </article>
         ))}
       </section>
 
       <section className="rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-white p-4 shadow-sm md:p-5">
-        <h2 className="text-base font-semibold text-slate-900">Novo processo externo</h2>
-        <p className="mt-1 text-sm text-slate-600">Preencha os dados do candidato para gerar o link e enviar o e-mail de acesso.</p>
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Novo processo externo</h2>
+        <p className="mt-1 text-sm text-[var(--muted-foreground)]">Preencha os dados do candidato para gerar o link e enviar o e-mail de acesso.</p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Nome do candidato</span>
+            <span className="font-medium text-[var(--foreground)]">Nome do candidato</span>
             <input
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
               placeholder="Ex.: Maria Aparecida Silva"
               value={candidateName}
               onChange={(e) => setCandidateName(e.target.value)}
@@ -382,9 +382,9 @@ export default function ExternalAdmissionDashboardPage() {
           </label>
 
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">E-mail do candidato</span>
+            <span className="font-medium text-[var(--foreground)]">E-mail do candidato</span>
             <input
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
               placeholder="nome.sobrenome@exemplo.com"
               value={candidateEmail}
               onChange={(e) => setCandidateEmail(e.target.value)}
@@ -412,7 +412,7 @@ export default function ExternalAdmissionDashboardPage() {
               </a>
               <button
                 type="button"
-                className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100"
+                className="rounded border border-sky-300 bg-[var(--card)] px-3 py-1.5 text-xs font-semibold text-sky-800 hover:bg-sky-100"
                 onClick={() => copyLink(generatedLink)}
               >
                 Copiar link
@@ -424,24 +424,24 @@ export default function ExternalAdmissionDashboardPage() {
 
       {feedback && <div className={`rounded-lg border px-4 py-3 text-sm ${feedbackClass(feedback.type)}`}>{feedback.message}</div>}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+      <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 shadow-sm md:p-5">
         <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Buscar por candidato, e-mail ou protocolo</span>
+            <span className="font-medium text-[var(--foreground)]">Buscar por candidato, e-mail ou protocolo</span>
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Digite para filtrar"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-[var(--input-border)] px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             />
           </label>
 
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Status do processo</span>
+            <span className="font-medium text-[var(--foreground)]">Status do processo</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-[var(--input-border)] px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             >
               <option value="ALL">Todos</option>
               {STATUS_OPTIONS.map((status) => (
@@ -453,11 +453,11 @@ export default function ExternalAdmissionDashboardPage() {
           </label>
 
           <label className="space-y-1 text-sm">
-            <span className="font-medium text-slate-700">Status do e-mail</span>
+            <span className="font-medium text-[var(--foreground)]">Status do e-mail</span>
             <select
               value={emailStatusFilter}
               onChange={(e) => setEmailStatusFilter(e.target.value as (typeof EMAIL_STATUS_OPTIONS)[number])}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              className="w-full rounded-lg border border-[var(--input-border)] px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
             >
               <option value="ALL">Todos</option>
               {EMAIL_STATUS_OPTIONS.filter((status) => status !== 'ALL').map((status) => (
@@ -472,14 +472,14 @@ export default function ExternalAdmissionDashboardPage() {
         {loadingError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadingError}</div>}
 
         {isLoading ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Carregando processos...</div>
+          <div className="rounded-lg border border-dashed border-[var(--input-border)] p-8 text-center text-sm text-[var(--muted-foreground)]">Carregando processos...</div>
         ) : filteredRows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Nenhum processo encontrado para os filtros aplicados.</div>
+          <div className="rounded-lg border border-dashed border-[var(--input-border)] p-8 text-center text-sm text-[var(--muted-foreground)]">Nenhum processo encontrado para os filtros aplicados.</div>
         ) : (
           <>
             <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                <thead className="bg-[var(--card-muted)] text-left text-xs uppercase text-[var(--muted-foreground)]">
                   <tr>
                     <th className="px-3 py-2">Protocolo / Candidato</th>
                     <th className="px-3 py-2">Checklist</th>
@@ -498,19 +498,19 @@ export default function ExternalAdmissionDashboardPage() {
                     return (
                       <tr key={row.id} className="border-t align-top">
                         <td className="px-3 py-3">
-                          <p className="font-medium text-slate-900">{row.protocolo}</p>
-                          <p className="text-slate-700">{row.candidateName}</p>
-                          <p className="text-xs text-slate-500">{row.candidateEmail}</p>
+                          <p className="font-medium text-[var(--foreground)]">{row.protocolo}</p>
+                          <p className="text-[var(--foreground)]">{row.candidateName}</p>
+                          <p className="text-xs text-[var(--muted-foreground)]">{row.candidateEmail}</p>
                         </td>
                         <td className="px-3 py-3">
                           <div className="space-y-2">
-                            <p className="text-xs font-medium text-slate-700">
+                            <p className="text-xs font-medium text-[var(--foreground)]">
                               {row.sentDocuments}/{row.totalDocuments} documento(s)
                             </p>
                             <div className="h-2 w-44 overflow-hidden rounded-full bg-slate-100">
                               <div className="h-full rounded-full bg-orange-500" style={{ width: `${progress}%` }} />
                             </div>
-                            <p className="text-xs text-slate-500">{progress}% concluído</p>
+                            <p className="text-xs text-[var(--muted-foreground)]">{progress}% concluído</p>
                           </div>
                         </td>
                         <td className="px-3 py-3">
@@ -519,7 +519,7 @@ export default function ExternalAdmissionDashboardPage() {
                           </span>
                           <div className="mt-2">
                             <select
-                              className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                              className="rounded-lg border border-[var(--input-border)] px-2 py-1 text-xs"
                               value={row.status}
                               onChange={(e) => updateStatus(row.id, e.target.value)}
                               disabled={updatingStatusId === row.id}
@@ -534,7 +534,7 @@ export default function ExternalAdmissionDashboardPage() {
                         </td>
                         <td className="px-3 py-3 text-xs">
                           <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${emailMeta.badgeClass}`}>{emailMeta.label}</span>
-                          <div className="mt-2 space-y-1 text-slate-500">
+                          <div className="mt-2 space-y-1 text-[var(--muted-foreground)]">
                             {row.emailSentAt && <p>Enviado: {formatDate(row.emailSentAt)}</p>}
                             {row.emailResentAt && <p>Reenviado: {formatDate(row.emailResentAt)}</p>}
                             {row.emailError && (
@@ -544,21 +544,21 @@ export default function ExternalAdmissionDashboardPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-xs text-slate-500">
+                        <td className="px-3 py-3 text-xs text-[var(--muted-foreground)]">
                           <p>Atualizado: {formatDate(row.updatedAt)}</p>
                         </td>
                         <td className="px-3 py-3">
                           <div className="grid gap-2">
                             <button
                               type="button"
-                              className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              className="rounded-lg border border-[var(--input-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)]"
                               onClick={() => copyLink(row.externalUrl)}
                             >
                               Copiar link
                             </button>
                             <button
                               type="button"
-                              className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                              className="rounded-lg border border-[var(--input-border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)] disabled:opacity-60"
                               onClick={() => resendEmail(row.id)}
                               disabled={resendingId === row.id}
                             >
@@ -566,7 +566,7 @@ export default function ExternalAdmissionDashboardPage() {
                             </button>
                             {row.externalUrl && (
                               <a
-                                className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                className="rounded-lg border border-[var(--input-border)] px-2.5 py-1.5 text-center text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)]"
                                 href={row.externalUrl}
                                 target="_blank"
                                 rel="noreferrer"
@@ -575,7 +575,7 @@ export default function ExternalAdmissionDashboardPage() {
                               </a>
                             )}
                             <a
-                              className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              className="rounded-lg border border-[var(--input-border)] px-2.5 py-1.5 text-center text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)]"
                               href={`/api/solicitacoes/externas/admissao/${row.id}`}
                               target="_blank"
                               rel="noreferrer"
@@ -605,12 +605,12 @@ export default function ExternalAdmissionDashboardPage() {
                 const emailMeta = getEmailMeta(row.emailDeliveryStatus)
                 const progress = getProgress(row.sentDocuments, row.totalDocuments)
                 return (
-                  <article key={row.id} className="rounded-xl border border-slate-200 p-4 shadow-sm">
+                  <article key={row.id} className="rounded-xl border border-[var(--border-subtle)] p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{row.protocolo}</p>
-                        <p className="text-sm text-slate-700">{row.candidateName}</p>
-                        <p className="text-xs text-slate-500">{row.candidateEmail}</p>
+                        <p className="text-sm font-semibold text-[var(--foreground)]">{row.protocolo}</p>
+                        <p className="text-sm text-[var(--foreground)]">{row.candidateName}</p>
+                        <p className="text-xs text-[var(--muted-foreground)]">{row.candidateEmail}</p>
                       </div>
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusMeta.badgeClass}`}>
                         {statusMeta.label}
@@ -618,20 +618,20 @@ export default function ExternalAdmissionDashboardPage() {
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs font-medium text-slate-700">
+                      <p className="text-xs font-medium text-[var(--foreground)]">
                         Checklist: {row.sentDocuments}/{row.totalDocuments} documento(s)
                       </p>
                       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                         <div className="h-full rounded-full bg-orange-500" style={{ width: `${progress}%` }} />
                       </div>
-                      <p className="text-xs text-slate-500">{progress}% concluído</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">{progress}% concluído</p>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                       <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${emailMeta.badgeClass}`}>{emailMeta.label}</span>
-                      <span className="text-slate-500">Atualizado: {formatDate(row.updatedAt)}</span>
+                      <span className="text-[var(--muted-foreground)]">Atualizado: {formatDate(row.updatedAt)}</span>
                     </div>
-                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                    <div className="mt-2 space-y-1 text-xs text-[var(--muted-foreground)]">
                       {row.emailSentAt && <p>Enviado: {formatDate(row.emailSentAt)}</p>}
                       {row.emailResentAt && <p>Reenviado: {formatDate(row.emailResentAt)}</p>}
                       {row.emailError && (
@@ -671,13 +671,13 @@ export default function ExternalAdmissionDashboardPage() {
                           Abrir checklist
                         </a>
                       ) : (
-                        <span className="rounded-lg border border-dashed px-2.5 py-1.5 text-center text-xs text-slate-400">Sem checklist</span>
+                        <span className="rounded-lg border border-dashed px-2.5 py-1.5 text-center text-xs text-[var(--muted-foreground)]">Sem checklist</span>
                       )}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <select
-                        className="flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                        className="flex-1 rounded-lg border border-[var(--input-border)] px-2 py-1 text-xs"
                         value={row.status}
                         onChange={(e) => updateStatus(row.id, e.target.value)}
                         disabled={updatingStatusId === row.id}

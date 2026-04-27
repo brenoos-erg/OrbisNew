@@ -171,12 +171,12 @@ export function UserDepartmentPanel({ userId }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white/80 p-4">
-      <h2 className="mb-2 text-sm font-semibold text-slate-800">Departamentos vinculados</h2>
+    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-4">
+      <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">Departamentos vinculados</h2>
 
       <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center">
         <select
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="flex-1 rounded-md border border-[var(--input-border)] px-3 py-2 text-sm"
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
           disabled={loadingAll || saving || allDepartments.length === 0}
@@ -195,7 +195,7 @@ export function UserDepartmentPanel({ userId }: Props) {
           ))}
         </select>
 
-        <label className="flex items-center gap-2 text-xs text-slate-700">
+        <label className="flex items-center gap-2 text-xs text-[var(--foreground)]">
           <input
             type="checkbox"
             checked={setPrimary}
@@ -216,15 +216,15 @@ export function UserDepartmentPanel({ userId }: Props) {
       </div>
 
       {loadingUser ? (
-        <p className="text-xs text-slate-500">Carregando departamentos vinculados...</p>
+        <p className="text-xs text-[var(--muted-foreground)]">Carregando departamentos vinculados...</p>
       ) : links.length === 0 ? (
-        <p className="text-xs text-slate-500">Nenhum departamento vinculado.</p>
+        <p className="text-xs text-[var(--muted-foreground)]">Nenhum departamento vinculado.</p>
       ) : (
         <ul className="space-y-1">
           {links.map((link) => (
             <li
               key={link.departmentId}
-              className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-1.5 text-xs"
+              className="flex items-center justify-between rounded-md bg-[var(--card-muted)] px-3 py-1.5 text-xs"
             >
               <div className="flex items-center gap-2">
                 <span className="font-medium">{link.label}</span>
@@ -256,7 +256,7 @@ export function UserDepartmentPanel({ userId }: Props) {
                     remover
                   </button>
                 ) : (
-                  <span className="text-[11px] text-slate-500">Principal</span>
+                  <span className="text-[11px] text-[var(--muted-foreground)]">Principal</span>
                 )}
               </div>
             </li>

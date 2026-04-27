@@ -12,10 +12,13 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   --card-elevated: #ffffff;
+  --card-muted: #f8fafc;
   --border-subtle: #dbe3ee;
+  --border-strong: #94a3b8;
 
   --input: #ffffff;
   --input-border: #cbd5e1;
+  --table-background: #ffffff;
   --table-header: #f1f5f9;
   --table-row-hover: #f8fafc;
 
@@ -38,10 +41,13 @@
   --card: rgba(15, 23, 42, 0.9);
   --card-foreground: #e2e8f0;
   --card-elevated: #111827;
+  --card-muted: #172033;
   --border-subtle: #1f2937;
+  --border-strong: #334155;
 
   --input: #0f172a;
   --input-border: #334155;
+  --table-background: #0f172a;
   --table-header: rgba(30, 41, 59, 0.85);
   --table-row-hover: rgba(51, 65, 85, 0.45);
 
@@ -64,9 +70,12 @@
     --card: rgba(15, 23, 42, 0.9);
     --card-foreground: #e2e8f0;
     --card-elevated: #111827;
+    --card-muted: #172033;
     --border-subtle: #1f2937;
+    --border-strong: #334155;
     --input: #0f172a;
     --input-border: #334155;
+    --table-background: #0f172a;
     --table-header: rgba(30, 41, 59, 0.85);
     --table-row-hover: rgba(51, 65, 85, 0.45);
     --primary: #fb923c;
@@ -123,7 +132,13 @@ body {
 
 .app-card-muted {
   @apply rounded-lg border p-3;
-  background: color-mix(in oklab, var(--card-elevated) 88%, var(--muted));
+  background: var(--card-muted);
+  border-color: var(--border-subtle);
+}
+
+.app-surface {
+  @apply rounded-xl border p-4;
+  background: var(--card-elevated);
   border-color: var(--border-subtle);
 }
 
@@ -163,6 +178,17 @@ body {
   cursor: not-allowed;
 }
 
+.app-label {
+  @apply block text-xs font-semibold uppercase tracking-wide;
+  color: var(--foreground);
+}
+
+.app-table-wrapper {
+  @apply overflow-hidden rounded-xl border;
+  border-color: var(--border-subtle);
+  background: var(--table-background);
+}
+
 .app-table {
   @apply overflow-auto rounded-xl border;
   border-color: var(--border-subtle);
@@ -184,6 +210,10 @@ body {
 
 .app-table tbody .app-table-row:hover {
   background: var(--table-row-hover);
+}
+
+.app-table-row-selected {
+  background: color-mix(in oklab, var(--primary) 12%, var(--table-background));
 }
 
 .app-button-primary,
@@ -221,6 +251,26 @@ body {
 
 .app-button-ghost {
   color: var(--muted-foreground);
+}
+
+.app-button-primary:disabled,
+.app-button-secondary:disabled,
+.app-button-danger:disabled,
+.app-button-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.app-modal-overlay {
+  @apply fixed inset-0 z-40 flex items-center justify-center p-3 md:p-6;
+  background: rgba(2, 6, 23, 0.65);
+}
+
+.app-modal-panel {
+  @apply relative max-h-[94vh] w-full rounded-2xl border shadow-2xl;
+  background: var(--card-elevated);
+  border-color: var(--border-subtle);
+  color: var(--foreground);
 }
 
 .app-status-badge {

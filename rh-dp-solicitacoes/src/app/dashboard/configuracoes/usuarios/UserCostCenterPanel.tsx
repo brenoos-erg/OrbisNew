@@ -179,14 +179,14 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
   }
 
   return (
-    <div className="mt-6 rounded-lg border border-slate-200 bg-white/80 p-4">
-      <h2 className="text-sm font-semibold text-slate-800 mb-2">
+    <div className="mt-6 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-4">
+      <h2 className="text-sm font-semibold text-[var(--foreground)] mb-2">
         Centros de Custo vinculados
       </h2>
 
       <div className="flex gap-2 items-center mb-3">
         <select
-          className="flex-1 rounded-md border border-slate-300 text-sm px-3 py-2"
+          className="flex-1 rounded-md border border-[var(--input-border)] text-sm px-3 py-2"
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
           disabled={loadingAll || saving || todosCC.length === 0}
@@ -216,9 +216,9 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
       </div>
 
       {loadingUser ? (
-        <p className="text-xs text-slate-500">Carregando vínculos...</p>
+        <p className="text-xs text-[var(--muted-foreground)]">Carregando vínculos...</p>
       ) : vinculados.length === 0 ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--muted-foreground)]">
           Nenhum centro de custo vinculado.
         </p>
       ) : (
@@ -226,7 +226,7 @@ export function UserCostCenterPanel({ userId }: UserCostCenterPanelProps) {
           {vinculados.map((cc) => (
             <li
               key={cc.id}
-              className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-1.5 text-xs"
+              className="flex items-center justify-between rounded-md bg-[var(--card-muted)] px-3 py-1.5 text-xs"
             >
               <span>{cc.nome}</span>
               <button

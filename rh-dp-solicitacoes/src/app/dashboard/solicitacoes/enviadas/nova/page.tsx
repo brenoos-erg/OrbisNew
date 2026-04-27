@@ -139,11 +139,11 @@ const RQ247_MOTIVO_FIELDS = [
 ================================================================ */
 
 const labelClass =
-  'block text-xs font-semibold text-slate-600 mb-1 tracking-wide';
+  'block text-xs font-semibold text-[var(--muted-foreground)] mb-1 tracking-wide';
 const inputClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
+  'w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
 const textareaClass =
-  'w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
+  'w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-sm shadow-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-orange-500/70 focus:border-orange-500/70 transition';
 const selectClass = inputClass;
 const ACRONYM_TOKENS = ['DP', 'RH', 'TI', 'SST', 'LOG'];
 
@@ -1363,7 +1363,7 @@ useEffect(() => {
    RENDER
   ============================================================ */
   return (
-    <main className="min-h-screen bg-slate-50 py-8">
+    <main className="min-h-screen bg-[var(--card-muted)] py-8">
       <SolicitacoesToastViewport toasts={toasts} onClose={removeToast} />
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 lg:px-0">
         <form
@@ -1381,21 +1381,21 @@ useEffect(() => {
         >
            {previewFile && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-              <div className="w-full max-w-xl rounded-xl bg-white p-4 shadow-2xl">
+              <div className="w-full max-w-xl rounded-xl bg-[var(--card)] p-4 shadow-2xl">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-semibold text-slate-800">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">
                     Pré-visualização: {previewFile.name}
                   </p>
                   <button
                     type="button"
                     onClick={closePreview}
-                    className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--card-muted)]"
                   >
                     Fechar
                   </button>
                 </div>
 
-                <div className="h-[340px] overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <div className="h-[340px] overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]">
                   {previewFile.type.startsWith('image/') ? (
                     <img
                       src={previewFile.url}
@@ -1414,23 +1414,23 @@ useEffect(() => {
             </div>
           )}
           {/* HEADER */}
-          <div className="rounded-2xl border border-slate-200 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)]/80 px-5 py-4 shadow-sm backdrop-blur">
             <div className="space-y-4">
               <div>
-                <h1 className="text-xl font-semibold text-slate-900">
+                <h1 className="text-xl font-semibold text-[var(--foreground)]">
                   Nova Solicitação
                 </h1>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                   Preencha os dados abaixo para registrar uma nova solicitação.
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
                 <span className={`h-2.5 w-2.5 rounded-full ${step === 1 ? 'bg-orange-500' : 'bg-slate-300'}`} />
-                <span className="text-xs font-semibold text-slate-700">Passo 1: Dados da solicitação</span>
+                <span className="text-xs font-semibold text-[var(--foreground)]">Passo 1: Dados da solicitação</span>
                 <span className="text-slate-300">•</span>
                 <span className={`h-2.5 w-2.5 rounded-full ${step === 2 ? 'bg-orange-500' : 'bg-slate-300'}`} />
-                <span className="text-xs font-semibold text-slate-700">Passo 2: Campos específicos</span>
+                <span className="text-xs font-semibold text-[var(--foreground)]">Passo 2: Campos específicos</span>
               </div>
             </div>
 
@@ -1445,8 +1445,8 @@ useEffect(() => {
           {/* TOPO: CABEÇALHO + SOLICITANTE */}
           <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
              {/* ESQUERDA – Depto / Tipo */}
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
-              <h2 className="mb-2 text-sm font-semibold text-slate-800">
+            <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)]/80 p-5 shadow-sm backdrop-blur">
+              <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">
                 Dados da solicitação
               </h2>
 
@@ -1465,13 +1465,13 @@ useEffect(() => {
                   >
                    <Select.Trigger
                       title={selectedDepartamento}
-                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
-                      <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-slate-900">
+                      <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-[var(--foreground)]">
                         <Select.Value placeholder="Selecione..." />
                       </span>
                       <Select.Icon>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
                       </Select.Icon>
                     </Select.Trigger>
 
@@ -1479,14 +1479,14 @@ useEffect(() => {
                       <Select.Content
                         position="popper"
                         sideOffset={4}
-                        className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
+                        className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
                         <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {departamentos.map((d) => (
                             <Select.Item
                               key={d.id}
                               value={d.id}
-                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
                             >
                               <Select.ItemText>
                                 <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
@@ -1521,13 +1521,13 @@ useEffect(() => {
                     <Select.Root value={tipoId} onValueChange={setTipoId} disabled={!departamentoId}>
                     <Select.Trigger
                       title={selectedTipoLabel}
-                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-[var(--muted-foreground)]"
                     >
                      <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         <Select.Value placeholder="Selecione..." />
                       </span>
                       <Select.Icon>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted-foreground)]" />
                       </Select.Icon>
                     </Select.Trigger>
 
@@ -1535,14 +1535,14 @@ useEffect(() => {
                       <Select.Content
                         position="popper"
                         sideOffset={4}
-                      className="z-20 min-w-[420px] max-w-[700px] rounded-md border border-slate-200 bg-white shadow-xl"
+                      className="z-20 min-w-[420px] max-w-[700px] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
                         <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {tipos.map((t) => (
                             <Select.Item
                               key={t.id}
                               value={t.id}
-                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-slate-900 outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
                             >
                               <Select.ItemText>
                                 <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
@@ -1573,13 +1573,13 @@ useEffect(() => {
             </div>
 
             {/* DIREITA – Dados do Solicitante */}
-            <aside className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur">
-              <h2 className="text-sm font-semibold text-slate-800">
+            <aside className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)]/80 p-5 shadow-sm backdrop-blur">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">
                 Dados do Solicitante
               </h2>
 
               {meLoading && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-[var(--muted-foreground)]">
                   Carregando dados do solicitante...
                 </p>
               )}
@@ -1590,10 +1590,10 @@ useEffect(() => {
 
               {me && (
                 <div className="mt-3 space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                      className="h-4 w-4 rounded border-[var(--input-border)] text-orange-600 focus:ring-orange-500"
                       checked={solicitarParaOutroColaborador}
                       onChange={(event) => setSolicitarParaOutroColaborador(event.target.checked)}
                     />
@@ -1736,9 +1736,9 @@ useEffect(() => {
           
 
           {/* PARTE DE BAIXO – FORMULÁRIO DO TIPO SELECIONADO */}
-          <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur space-y-5">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)]/80 p-5 shadow-sm backdrop-blur space-y-5">
             {!selectedTipo && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[var(--muted-foreground)]">
                 Selecione um tipo de solicitação para exibir os campos
                 específicos.
               </p>
@@ -1747,13 +1747,13 @@ useEffect(() => {
             {/* =================== FORM RQ_063 =================== */}
             {selectedTipo && isRQ063 && (
               <>
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
                   {selectedTipo.nome}
                 </h2>
 
                 {/* =================== INFORMAÇÕES BÁSICAS =================== */}
                 <section className="space-y-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Informações básicas
                   </h3>
 
@@ -1908,8 +1908,8 @@ useEffect(() => {
                 </section>
 
                   {/* =================== MOTIVO DA VAGA =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Motivo da Vaga <span className="text-red-500">*</span>
                   </h3>
                   <div className="flex flex-wrap gap-4 text-xs">
@@ -1941,8 +1941,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== CONTRATAÇÃO =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Contratação
                   </h3>
                   <div className="flex flex-wrap gap-4 text-xs">
@@ -1992,8 +1992,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== ATIVIDADES =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Atividades
                   </h3>
 
@@ -2033,8 +2033,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== REQUISITOS ACADÊMICOS =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Requisitos acadêmicos
                   </h3>
 
@@ -2109,8 +2109,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== REQUISITOS / COMPETÊNCIAS =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Requisitos e conhecimentos
                   </h3>
 
@@ -2152,8 +2152,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== SOLICITAÇÕES PARA O NOVO FUNCIONÁRIO =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Solicitações para o novo funcionário
                   </h3>
 
@@ -2202,7 +2202,7 @@ useEffect(() => {
                       </label>
 
                       <div>
-                        <span className="block text-[11px] font-semibold text-slate-600">
+                        <span className="block text-[11px] font-semibold text-[var(--muted-foreground)]">
                           Outros
                         </span>
                         <input
@@ -2265,8 +2265,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== ESCRITÓRIO DE PROJETOS =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Preenchimento do setor Escritório de Projetos
                   </h3>
 
@@ -2316,8 +2316,8 @@ useEffect(() => {
                 </section>
 
                 {/* =================== RH =================== */}
-                <section className="space-y-3 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Preenchimento do setor Recursos Humanos
                   </h3>
 
@@ -2365,12 +2365,12 @@ useEffect(() => {
             {/* =================== FORM ABONO EDUCACIONAL =================== */}
             {selectedTipo && isAbonoEducacional && (
               <>
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-[var(--foreground)]">
                   {selectedTipo.nome}
                 </h2>
 
                 <section className="space-y-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Dados do colaborador
                   </h3>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -2577,8 +2577,8 @@ useEffect(() => {
                   </div>
                 </section>
 
-                <section className="space-y-4 border-t border-slate-100 pt-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <section className="space-y-4 border-t border-[var(--border-subtle)] pt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Requisitos de RH
                   </h3>
                   <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
@@ -2743,7 +2743,7 @@ useEffect(() => {
                               {getDisplayLabel(campo)} <span className="text-red-500">*</span>
                             </span>
                             <select
-                                className="w-full border rounded px-3 py-2 text-sm bg-white"
+                                className="w-full border rounded px-3 py-2 text-sm bg-[var(--card)]"
                               value={extras.gestorImediatoAvaliadorId ?? ''}
                               onChange={(e: SelectChange) => {
                                 const selectedId = e.target.value;
@@ -2787,7 +2787,7 @@ useEffect(() => {
                             <label className="space-y-1 text-sm block">
                               <span className="block text-xs font-semibold text-gray-700">Abono</span>
                               <select
-                                className="w-full border rounded px-3 py-2 text-sm bg-white"
+                                className="w-full border rounded px-3 py-2 text-sm bg-[var(--card)]"
                                 value={hasAbono ? 'Sim' : 'Não'}
                                 onChange={(e: SelectChange) =>
                                   handleExtraChange('abonoPecuniarioSim', e.target.value === 'Sim' ? 'true' : 'false')
@@ -2841,7 +2841,7 @@ useEffect(() => {
                           | SelectChange,
                       ) => handleExtraChange(campo.name, e.target.value),
                       className:
-                        'w-full border rounded px-3 py-2 text-sm bg-white',
+                        'w-full border rounded px-3 py-2 text-sm bg-[var(--card)]',
                       readOnly: isAutoFilled,
                       disabled: isAutoFilled || campo.disabled,
                     };
@@ -2903,7 +2903,7 @@ useEffect(() => {
                                 type="file"
                                 multiple
                                onChange={(e: InputChange) => handleFileChange(campo.name, e.target.files)}
-                                className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                                className="w-full rounded-md border border-orange-200 bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
                               />
                               {campo.name === 'anexoPedidoDemissao' && shouldRequireAnexoPedidoDemissao && (
                                 <p className="mt-2 text-xs font-semibold text-red-600">
@@ -2918,9 +2918,9 @@ useEffect(() => {
                                   {extraFiles[campo.name].map((file) => (
                                     <div
                                       key={`${campo.name}-${file.name}-${file.lastModified}`}
-                                      className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1"
+                                      className="flex items-center justify-between gap-2 rounded-md bg-[var(--card)]/80 px-2 py-1"
                                     >
-                                      <span className="truncate text-xs text-slate-700">{file.name}</span>
+                                      <span className="truncate text-xs text-[var(--foreground)]">{file.name}</span>
                                       <button
                                         type="button"
                                         onClick={() => handlePreviewFile(file)}
@@ -2990,21 +2990,21 @@ useEffect(() => {
                       )}
                       {isIncentivoEducacaoTipo && !camposSolicitanteComTi.some((campo) => campo.type === 'file') && (
                         <section className="space-y-2">
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Anexos</h3>
-                          <p className="text-xs text-slate-600">Anexe o Termo de Compromisso assinado, Comprovante de Matrícula, Comprovante de Pagamento da Mensalidade e Boleto.</p>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Anexos</h3>
+                          <p className="text-xs text-[var(--muted-foreground)]">Anexe o Termo de Compromisso assinado, Comprovante de Matrícula, Comprovante de Pagamento da Mensalidade e Boleto.</p>
                           <input
                             id="anexosComprobatoriosEducacao"
                             name="anexosComprobatoriosEducacao"
                             type="file"
                             multiple
                             onChange={(e: InputChange) => handleFileChange('anexosComprobatoriosEducacao', e.target.files)}
-                            className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                            className="w-full rounded-md border border-orange-200 bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
                           />
                         </section>
                       )}
                       {Object.entries(grouped).map(([section, campos]) => (
                         <section key={section} className="space-y-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                             {section}
                           </h3>
                           <div className="grid gap-4 md:grid-cols-2">
@@ -3017,10 +3017,10 @@ useEffect(() => {
                 })()}
                 {isSolicitacaoEpi && (
                   <section className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--foreground)]">
                       Anexos da solicitação
                     </h3>
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-[var(--muted-foreground)]">
                       Anexe documentos de apoio já na abertura do chamado (ex.: lista de itens, requisição assinada).
                     </p>
                     <input
@@ -3029,16 +3029,16 @@ useEffect(() => {
                       type="file"
                       multiple
                       onChange={(e: InputChange) => handleFileChange('anexosSolicitante', e.target.files)}
-                      className="w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
+                      className="w-full rounded-md border border-orange-200 bg-[var(--card)] px-3 py-2 text-sm text-[var(--foreground)] file:mr-3 file:rounded-md file:border-0 file:bg-orange-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-orange-600"
                     />
                     {(extraFiles.anexosSolicitante?.length ?? 0) > 0 && (
                       <div className="space-y-1">
                         {extraFiles.anexosSolicitante.map((file) => (
                           <div
                             key={`anexo-solicitante-${file.name}-${file.lastModified}`}
-                            className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1"
+                            className="flex items-center justify-between gap-2 rounded-md bg-[var(--card)]/80 px-2 py-1"
                           >
-                            <span className="truncate text-xs text-slate-700">{file.name}</span>
+                            <span className="truncate text-xs text-[var(--foreground)]">{file.name}</span>
                             <button
                               type="button"
                               onClick={() => handlePreviewFile(file)}
@@ -3063,7 +3063,7 @@ useEffect(() => {
               type="button"
               onClick={() => setStep(1)}
               disabled={step === 1 || submitting}
-              className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 enabled:hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-md border border-[var(--input-border)] bg-[var(--card)] px-4 py-2 text-sm text-[var(--foreground)] enabled:hover:bg-[var(--card-muted)] disabled:opacity-50"
             >
               Voltar
             </button>

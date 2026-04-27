@@ -32,7 +32,7 @@ export default async function SolicitacoesCadastrosPage() {
   return (
     <div className="space-y-4">
      <h1 className="text-xl font-semibold">Controle de Emails</h1>
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-[var(--muted-foreground)]">
         Configure as mensagens enviadas para departamentos e aprovadores em cada etapa/ação.
       </p>
 
