@@ -22,15 +22,16 @@ type Item = {
   centroQueOriginou: { description: string }
 }
 
-const STATUS_META: Record<Status, { label: string; className: string }> = {
-  ABERTA: { label: 'Aberta', className: 'bg-amber-100 text-amber-800' },
-  AGUARDANDO_APROVACAO_QUALIDADE: { label: 'Aguardando aprovação', className: 'bg-orange-100 text-orange-800' },
-  APROVADA_QUALIDADE: { label: 'Aprovada pela qualidade', className: 'bg-teal-100 text-teal-800' },
-  EM_TRATATIVA: { label: 'Em tratativa', className: 'bg-sky-100 text-sky-800' },
-  AGUARDANDO_VERIFICACAO: { label: 'Aguardando verificação', className: 'bg-violet-100 text-violet-800' },
-  ENCERRADA: { label: 'Encerrada', className: 'bg-emerald-100 text-emerald-800' },
-  CANCELADA: { label: 'Cancelada', className: 'bg-rose-100 text-rose-800' },
+const STATUS_META: Record<Status, { label: string; badgeClass: string }> = {
+  ABERTA: { label: 'Aberta', badgeClass: 'app-status-badge app-status-badge--pending' },
+  AGUARDANDO_APROVACAO_QUALIDADE: { label: 'Aguardando aprovação', badgeClass: 'app-status-badge app-status-badge--pending' },
+  APROVADA_QUALIDADE: { label: 'Aprovada pela qualidade', badgeClass: 'app-status-badge app-status-badge--success' },
+  EM_TRATATIVA: { label: 'Em tratativa', badgeClass: 'app-status-badge app-status-badge--pending' },
+  AGUARDANDO_VERIFICACAO: { label: 'Aguardando verificação', badgeClass: 'app-status-badge app-status-badge--pending' },
+  ENCERRADA: { label: 'Encerrada', badgeClass: 'app-status-badge app-status-badge--success' },
+  CANCELADA: { label: 'Cancelada', badgeClass: 'app-status-badge app-status-badge--danger' },
 }
+
 export default function NaoConformidadesClient() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
@@ -50,7 +51,6 @@ export default function NaoConformidadesClient() {
     if (centroQueOriginouId) query.set('centroQueOriginouId', centroQueOriginouId)
     return query.toString()
   }, [centroQueDetectouId, centroQueOriginouId, q, status])
-
 
   async function loadCostCenters() {
     try {
@@ -99,57 +99,63 @@ export default function NaoConformidadesClient() {
   useEffect(() => {
     load()
   }, [qs])
+
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por número, descrição ou evidência" className="min-w-[240px] flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm" />
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
-           <option value="">Todos os status</option>
+    <section className="app-card space-y-4">
+      <div className="app-filter-bar">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por número, descrição ou evidência"
+          className="app-input min-w-[240px] flex-1"
+        />
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="app-select w-full sm:w-auto">
+          <option value="">Todos os status</option>
           {Object.entries(STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
         </select>
-        <select value={centroQueDetectouId} onChange={(e) => setCentroQueDetectouId(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+        <select value={centroQueDetectouId} onChange={(e) => setCentroQueDetectouId(e.target.value)} className="app-select w-full sm:w-auto">
           <option value="">Centro que detectou</option>
           {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code ? `${cc.code} - ` : ''}{cc.description}</option>)}
         </select>
-        <select value={centroQueOriginouId} onChange={(e) => setCentroQueOriginouId(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+        <select value={centroQueOriginouId} onChange={(e) => setCentroQueOriginouId(e.target.value)} className="app-select w-full sm:w-auto">
           <option value="">Centro que originou</option>
           {costCenters.map((cc) => <option key={cc.id} value={cc.id}>{cc.code ? `${cc.code} - ` : ''}{cc.description}</option>)}
         </select>
-        <button type="button" onClick={clearFilters} className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Limpar filtros</button>
-        <button type="button" onClick={load} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><RefreshCcw size={14} />Atualizar</button>
+        <button type="button" onClick={clearFilters} className="app-button-secondary">Limpar filtros</button>
+        <button type="button" onClick={load} className="app-button-secondary"><RefreshCcw size={14} />Atualizar</button>
         {isAdmin ? (
-         <Link href="/dashboard/sgi/qualidade/nao-conformidades/alertas" className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+          <Link href="/dashboard/sgi/qualidade/nao-conformidades/alertas" className="app-button-secondary">
             Alertas de NC (Admin)
           </Link>
         ) : null}
       </div>
 
-      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</div> : null}
+      {error ? <div className="rounded-md border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-300 dark:text-rose-200">{error}</div> : null}
 
-      <div className="overflow-auto">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
+      <div className="app-table">
+        <table>
+          <thead className="app-table-header text-left text-xs uppercase">
             <tr>
               <th className="px-3 py-2">RNC</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Prazo</th><th className="px-3 py-2">Detectou</th><th className="px-3 py-2">Originou</th><th className="px-3 py-2">Solicitante</th><th className="px-3 py-2" />
             </tr>
-           </thead>
-          <tbody className="divide-y divide-slate-100">
+          </thead>
+          <tbody>
             {items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-3 py-2 font-semibold text-slate-800">{item.numeroRnc}</td>
-                <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${STATUS_META[item.status].className}`}>{STATUS_META[item.status].label}</span></td>
-                  <td className="px-3 py-2">{nonConformityTypeLabel[item.tipoNc as keyof typeof nonConformityTypeLabel] || item.tipoNc}</td>
+              <tr key={item.id} className="app-table-row">
+                <td className="px-3 py-2 font-semibold">{item.numeroRnc}</td>
+                <td className="px-3 py-2"><span className={STATUS_META[item.status].badgeClass}>{STATUS_META[item.status].label}</span></td>
+                <td className="px-3 py-2">{nonConformityTypeLabel[item.tipoNc as keyof typeof nonConformityTypeLabel] || item.tipoNc}</td>
                 <td className="px-3 py-2">{new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')}</td>
-                <td className="px-3 py-2">{item.centroQueDetectou?.description || '-'}</td>
-                <td className="px-3 py-2">{item.centroQueOriginou?.description || '-'}</td>
-                <td className="px-3 py-2">{item.solicitanteNome}</td>
-                <td className="px-3 py-2 text-right"><Link href={`/dashboard/sgi/qualidade/nao-conformidades/${item.id}`} className="text-orange-600 hover:text-orange-700">Detalhes</Link></td>
+                <td className="px-3 py-2 app-muted-text">{item.centroQueDetectou?.description || '-'}</td>
+                <td className="px-3 py-2 app-muted-text">{item.centroQueOriginou?.description || '-'}</td>
+                <td className="px-3 py-2 app-muted-text">{item.solicitanteNome}</td>
+                <td className="px-3 py-2 text-right"><Link href={`/dashboard/sgi/qualidade/nao-conformidades/${item.id}`} className="font-semibold text-orange-500 hover:text-orange-400">Detalhes</Link></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {!loading && items.length === 0 ? <p className="px-3 py-8 text-center text-sm text-slate-500">Nenhuma não conformidade encontrada.</p> : null}
+        {!loading && items.length === 0 ? <p className="px-3 py-8 text-center text-sm app-muted-text">Nenhuma não conformidade encontrada.</p> : null}
       </div>
-    </div>
+    </section>
   )
 }

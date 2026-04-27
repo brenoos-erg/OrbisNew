@@ -28,25 +28,25 @@ export default async function DashboardLayout({
 }) {
   const { appUser, dbUnavailable, session } = await getCurrentAppUser()
   const renderServiceUnavailable = (requestId?: string) => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--background)] px-6 text-center text-[var(--foreground)]">
       <p className="text-xl font-semibold">Serviço temporariamente indisponível</p>
-      <p className="max-w-xl text-sm text-slate-600">
+      <p className="max-w-xl text-sm text-[var(--muted-foreground)]">
         Não foi possível acessar o banco de dados para carregar seus dados. Tente novamente em alguns minutos
         ou contate o suporte se o problema persistir.
       </p>
       {requestId ? (
-        <p className="text-xs text-slate-500">ID da requisição: {requestId}</p>
+        <p className="text-xs text-[var(--muted-foreground)]">ID da requisição: {requestId}</p>
       ) : null}
       <div className="flex items-center gap-3">
         <a
           href="/login?logout=1"
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-950"
+          className="app-button-primary"
         >
           Sair e tentar novamente
         </a>
         <a
           href="/dashboard"
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
+          className="app-button-secondary"
         >
           Recarregar
         </a>
@@ -55,17 +55,17 @@ export default async function DashboardLayout({
   )
 
   const renderDashboardError = (requestId: string) => (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center text-slate-800">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--background)] px-6 text-center text-[var(--foreground)]">
       <p className="text-xl font-semibold">Não foi possível carregar o dashboard</p>
-      <p className="max-w-xl text-sm text-slate-600">
+      <p className="max-w-xl text-sm text-[var(--muted-foreground)]">
         Ocorreu um erro inesperado ao preparar os seus dados. Tente novamente ou contate o suporte se o problema
         persistir.
       </p>
-      <p className="text-xs text-slate-500">ID da requisição: {requestId}</p>
+      <p className="text-xs text-[var(--muted-foreground)]">ID da requisição: {requestId}</p>
       <div className="flex items-center gap-3">
         <a
           href="/dashboard"
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white"
+          className="app-button-secondary"
         >
           Recarregar
         </a>
@@ -379,7 +379,7 @@ export default async function DashboardLayout({
 
   return (
     <SessionProvider>
-      <div className="dashboard-shell min-h-screen flex">
+      <div className="dashboard-shell flex min-h-screen bg-[var(--panel)]">
         <Sidebar
           showSolic={showSolic}
           showConfig={showConfig}
@@ -406,11 +406,11 @@ export default async function DashboardLayout({
         />
 
         {/* conteúdo */}
-        <main className="flex-1 flex flex-col">
-          <div className="h-16 border-b border-slate-200 flex items-center px-6 text-sm text-slate-600">
+        <main className="flex min-h-screen flex-1 flex-col bg-[var(--background)]">
+          <div className="flex h-16 items-center border-b border-[var(--border-subtle)] bg-[color-mix(in_oklab,var(--card)_90%,transparent)] px-4 text-sm text-[var(--muted-foreground)] md:px-6">
             Sistema de Gestão Integrada
           </div>
-          <div className="p-6 flex-1 overflow-auto">{children}</div>
+          <div className="flex-1 overflow-auto p-4 md:p-6">{children}</div>
         </main>
       </div>
     </SessionProvider>

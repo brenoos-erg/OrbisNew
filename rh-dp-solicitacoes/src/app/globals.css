@@ -1,44 +1,83 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ========================
-   VARIÁVEIS DE TEMA
-   ======================== */
-
 :root {
-  --background: #f8fafc;
-  --foreground: #020617;
+  --background: #f3f6fb;
+  --foreground: #0f172a;
+  --muted: #e2e8f0;
+  --muted-foreground: #475569;
+  --disabled-foreground: #94a3b8;
 
+  --panel: #eef2f8;
   --card: #ffffff;
-  --card-soft: #f8fafc;
-  --card-border: #e2e8f0;
-  --border-subtle: #e2e8f0;
+  --card-foreground: #0f172a;
+  --card-elevated: #ffffff;
+  --border-subtle: #dbe3ee;
+
+  --input: #ffffff;
+  --input-border: #cbd5e1;
+  --table-header: #f1f5f9;
+  --table-row-hover: #f8fafc;
+
+  --primary: #f97316;
+  --primary-foreground: #ffffff;
+  --danger: #dc2626;
+  --success: #059669;
+  --warning: #d97706;
+  --focus-ring: rgba(249, 115, 22, 0.35);
 }
 
 :root[data-theme='dark'] {
   --background: #020617;
-  --foreground: #e5e7eb;
+  --foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --disabled-foreground: #64748b;
 
-  --card: #0f172a;
-  --card-soft: #111827;
-  --card-border: rgba(148, 163, 184, 0.45);
-  --border-subtle: rgba(148, 163, 184, 0.4);
+  --panel: #020617;
+  --card: rgba(15, 23, 42, 0.9);
+  --card-foreground: #e2e8f0;
+  --card-elevated: #111827;
+  --border-subtle: #1f2937;
+
+  --input: #0f172a;
+  --input-border: #334155;
+  --table-header: rgba(30, 41, 59, 0.85);
+  --table-row-hover: rgba(51, 65, 85, 0.45);
+
+  --primary: #fb923c;
+  --primary-foreground: #111827;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #f59e0b;
+  --focus-ring: rgba(251, 146, 60, 0.42);
 }
 
-/* fallback se a pessoa tiver prefers-color-scheme=dark e nenhum tema salvo */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     --background: #020617;
-    --foreground: #e5e7eb;
-
-    --card: #020617;
-    --card-soft: #020617;
-    --card-border: rgba(148, 163, 184, 0.6);
-    --border-subtle: rgba(148, 163, 184, 0.5);
+    --foreground: #e2e8f0;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --disabled-foreground: #64748b;
+    --panel: #020617;
+    --card: rgba(15, 23, 42, 0.9);
+    --card-foreground: #e2e8f0;
+    --card-elevated: #111827;
+    --border-subtle: #1f2937;
+    --input: #0f172a;
+    --input-border: #334155;
+    --table-header: rgba(30, 41, 59, 0.85);
+    --table-row-hover: rgba(51, 65, 85, 0.45);
+    --primary: #fb923c;
+    --primary-foreground: #111827;
+    --danger: #f87171;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --focus-ring: rgba(251, 146, 60, 0.42);
   }
 }
 
-/* integração com o Tailwind @theme */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -46,138 +85,192 @@
   --font-mono: var(--font-geist-mono);
 }
 
-
-/* ========================
-   BASE
-   ======================== */
-/* ❌ NÃO tem mais @media (prefers-color-scheme: dark) */
-/* Sempre modo claro, independente do tema do sistema */
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ========================
-   HELPERS DE LAYOUT
-   ======================== */
-
-/* Card padrão (painéis, box de formulário, etc.) */
-.card {
-  background: var(--card);
-  border-radius: 0.75rem;
-  border: 1px solid var(--card-border);
-}
-
-/* Label de formulário */
-.form-label {
-  font-size: 0.75rem;          /* text-xs */
-  font-weight: 600;            /* font-semibold */
-  text-transform: uppercase;
-  letter-spacing: 0.08em;      /* tracking-wide */
+.app-page {
+  @apply flex h-full flex-col gap-6;
   color: var(--foreground);
-  opacity: 0.9;
 }
 
-:root[data-theme='dark'] .form-label {
-  opacity: 0.85;
+.app-page-header {
+  @apply flex flex-wrap items-start gap-4;
 }
 
-/* Input / select / textarea padrão */
-.input {
-  width: 100%;
-  margin-top: 4px;
-  padding: 10px 12px;
-  border-radius: 0.5rem;
-  background: var(--card);
-  border: 1px solid var(--border-subtle);
+.app-title {
+  @apply text-2xl font-bold md:text-3xl;
   color: var(--foreground);
-  font-size: 0.875rem;
+}
+
+.app-subtitle {
+  @apply text-sm md:text-base;
+  color: var(--muted-foreground);
+}
+
+.app-muted-text {
+  color: var(--muted-foreground);
+}
+
+.app-card {
+  @apply rounded-xl border p-4 shadow-sm md:p-5;
+  background: var(--card);
+  border-color: var(--border-subtle);
+  color: var(--card-foreground);
+}
+
+.app-card-muted {
+  @apply rounded-lg border p-3;
+  background: color-mix(in oklab, var(--card-elevated) 88%, var(--muted));
+  border-color: var(--border-subtle);
+}
+
+.app-filter-bar {
+  @apply flex flex-wrap items-end gap-2 rounded-xl border p-3 md:p-4;
+  background: var(--card-elevated);
+  border-color: var(--border-subtle);
+}
+
+.app-input,
+.app-select,
+.app-textarea {
+  @apply w-full rounded-md border px-3 py-2 text-sm transition;
+  background: var(--input);
+  border-color: var(--input-border);
+  color: var(--foreground);
+}
+
+.app-input::placeholder,
+.app-textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+.app-input:focus,
+.app-select:focus,
+.app-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
   outline: none;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease,
-    color 120ms ease;
 }
 
-.input::placeholder {
-  color: rgba(148, 163, 184, 0.8);
-}
-
-.input:focus {
-  border-color: #f97316; /* laranja */
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
-}
-
-
-.input:disabled {
-  opacity: 0.55;
+.app-input:disabled,
+.app-select:disabled,
+.app-textarea:disabled {
+  color: var(--disabled-foreground);
+  opacity: 0.75;
   cursor: not-allowed;
 }
 
-/* Cobertura global de contraste para formulários/tabelas em modo escuro */
+.app-table {
+  @apply overflow-auto rounded-xl border;
+  border-color: var(--border-subtle);
+  background: var(--card);
+}
+
+.app-table table {
+  @apply min-w-full text-sm;
+}
+
+.app-table-header {
+  background: var(--table-header);
+  color: var(--muted-foreground);
+}
+
+.app-table-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.app-table tbody .app-table-row:hover {
+  background: var(--table-row-hover);
+}
+
+.app-button-primary,
+.app-button-secondary,
+.app-button-danger,
+.app-button-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition;
+}
+
+.app-button-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.app-button-primary:hover {
+  filter: brightness(0.95);
+}
+
+.app-button-secondary {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--card-elevated) 85%, transparent);
+  color: var(--foreground);
+}
+
+.app-button-secondary:hover,
+.app-button-ghost:hover {
+  background: var(--table-row-hover);
+}
+
+.app-button-danger {
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+}
+
+.app-button-ghost {
+  color: var(--muted-foreground);
+}
+
+.app-status-badge {
+  @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+}
+
+.app-status-badge--pending {
+  color: #92400e;
+  border-color: #fcd34d;
+  background: #fef3c7;
+}
+
+.app-status-badge--success {
+  color: #065f46;
+  border-color: #6ee7b7;
+  background: #d1fae5;
+}
+
+.app-status-badge--danger {
+  color: #9f1239;
+  border-color: #fda4af;
+  background: #ffe4e6;
+}
+
+:root[data-theme='dark'] .app-status-badge--pending {
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(146, 64, 14, 0.35);
+}
+
+:root[data-theme='dark'] .app-status-badge--success {
+  color: #86efac;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(6, 95, 70, 0.35);
+}
+
+:root[data-theme='dark'] .app-status-badge--danger {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(136, 19, 55, 0.35);
+}
+
 input,
 select,
 textarea {
   color: var(--foreground);
-  background-color: var(--card);
-  border-color: var(--border-subtle);
+  background-color: var(--input);
+  border-color: var(--input-border);
 }
 
 ::selection {
-  background: rgba(249, 115, 22, 0.35);
-}
-
-
-/* ========================
-   TABELAS
-   ======================== */
-
-.table-header {
-  background: var(--card-soft);
-}
-
-.table-row {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.table-footer {
-  border-top: 1px solid var(--border-subtle);
-  background: var(--card-soft);
-}
-
-/* Botões de ação em tabela ("Editar", "Excluir") */
-.btn-table {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  border-radius: 9999px;
-  border: 1px solid var(--border-subtle);
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-
-.btn-table:hover {
-  background: rgba(148, 163, 184, 0.12);
-}
-
-/* Versão "perigo" – bem visível no fundo claro */
-.btn-table-danger {
-  border-color: #dc2626;
-  background: #fee2e2;   /* fundo rosado */
-  color: #b91c1c;        /* texto vermelho forte */
-}
-
-.btn-table-danger:hover {
-  background: #fecaca;   /* um pouco mais escuro no hover */
+  background: color-mix(in oklab, var(--primary) 35%, transparent);
 }

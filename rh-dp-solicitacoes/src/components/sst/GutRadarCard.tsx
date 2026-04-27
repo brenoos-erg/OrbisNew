@@ -34,32 +34,32 @@ export default function GutRadarCard({ gravidade, urgencia, tendencia }: Props) 
     .join(' ')
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-      <h3 className="text-base font-semibold text-slate-900">Análise GUT</h3>
+    <section className="app-card space-y-3">
+      <h3 className="text-base font-semibold">Análise GUT</h3>
       <svg viewBox="0 0 220 220" className="mx-auto h-56 w-56">
         {[1, 2, 3, 4, 5].map((ring) => {
           const p = [0, 1, 2]
             .map((axis) => pointForAxis(axis, ring, cx, cy, radius, 3))
             .map((pt) => `${pt.x},${pt.y}`)
             .join(' ')
-          return <polygon key={ring} points={p} fill="none" stroke="#e2e8f0" strokeWidth="1" />
+          return <polygon key={ring} points={p} fill="none" stroke="var(--border-subtle)" strokeWidth="1" />
         })}
         {[0, 1, 2].map((axis) => {
           const pt = pointForAxis(axis, 5, cx, cy, radius, 3)
-          return <line key={axis} x1={cx} y1={cy} x2={pt.x} y2={pt.y} stroke="#cbd5e1" strokeWidth="1" />
+          return <line key={axis} x1={cx} y1={cy} x2={pt.x} y2={pt.y} stroke="var(--input-border)" strokeWidth="1" />
         })}
         <polygon points={polygonPoints} fill="rgba(249,115,22,0.25)" stroke="#f97316" strokeWidth="2" />
         {[0, 1, 2].map((axis) => {
           const outer = pointForAxis(axis, 5.5, cx, cy, radius, 3)
           return (
-            <text key={axis} x={outer.x} y={outer.y} textAnchor="middle" className="fill-slate-600 text-[10px] font-medium">
+            <text key={axis} x={outer.x} y={outer.y} textAnchor="middle" className="text-[10px] font-medium" fill="var(--muted-foreground)">
               {labels[axis]}
             </text>
           )
         })}
       </svg>
-      <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-        <p className="font-semibold text-slate-900">GUT - {nivel}</p>
+      <div className="app-card-muted text-sm">
+        <p className="font-semibold">GUT - {nivel}</p>
         <p>{gravidade} × {urgencia} × {tendencia} = <span className="font-semibold">{score}</span></p>
       </div>
     </section>
