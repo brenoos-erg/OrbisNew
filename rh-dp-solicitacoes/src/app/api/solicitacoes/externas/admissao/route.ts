@@ -22,6 +22,15 @@ async function ensureAdmissionType() {
     update: {
       codigo: EXTERNAL_ADMISSION_TYPE_CODE,
       nome: EXTERNAL_ADMISSION_TYPE_NAME,
+      schemaJson: {
+        meta: {
+          flow: 'external-admission',
+          external: true,
+          internalOnly: true,
+          hiddenFromCreate: true,
+          hiddenFromManualOpening: true,
+        },
+      },
     },
     create: {
       id: EXTERNAL_ADMISSION_TYPE_ID,
@@ -32,6 +41,9 @@ async function ensureAdmissionType() {
         meta: {
           flow: 'external-admission',
           external: true,
+          internalOnly: true,
+          hiddenFromCreate: true,
+          hiddenFromManualOpening: true,
         },
       },
     },

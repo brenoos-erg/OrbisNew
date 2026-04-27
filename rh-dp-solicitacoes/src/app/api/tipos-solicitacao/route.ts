@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { EXTERNAL_ADMISSION_TYPE_CODE, EXTERNAL_ADMISSION_TYPE_ID } from '@/lib/externalAdmission'
 
 type CampoEspecifico = {
   name: string
@@ -29,6 +30,8 @@ type TipoMeta = {
   templateDownload?: string
   requiresAttachment?: boolean
   hiddenFromCreate?: boolean
+  internalOnly?: boolean
+  hiddenFromManualOpening?: boolean
   destinos?: TipoDestino[]
 }
 
@@ -64,10 +67,14 @@ const normalizeCampo = (campo: CampoEspecifico): CampoEspecifico => {
 }
 
 const shouldIncludeTipo = ({
+  tipoId,
+  tipoCodigo,
   schema,
   centroCustoId,
   departamentoId,
 }: {
+  tipoId: string
+  tipoCodigo: string
   schema: SchemaJson | null
   centroCustoId: string | null
   departamentoId: string | null
@@ -85,7 +92,17 @@ const shouldIncludeTipo = ({
     departamentosPermitidos.length === 0 ||
     departamentosPermitidos.includes(departamentoId)
 
-  return centroPermitido && departamentoPermitido && schema?.meta?.hiddenFromCreate !== true
+  const isTechnicalExternalAdmissionType =
+    tipoCodigo === EXTERNAL_ADMISSION_TYPE_CODE || tipoId === EXTERNAL_ADMISSION_TYPE_ID
+
+  if (isTechnicalExternalAdmissionType) return false
+
+  const hiddenFromManualOpening =
+    schema?.meta?.hiddenFromCreate === true ||
+    schema?.meta?.internalOnly === true ||
+    schema?.meta?.hiddenFromManualOpening === true
+
+  return centroPermitido && departamentoPermitido && !hiddenFromManualOpening
 }
 export async function GET(request: Request) {
   try {
@@ -122,6 +139,8 @@ export async function GET(request: Request) {
      const resposta = tipos
       .filter((tipo) =>
         shouldIncludeTipo({
+          tipoId: tipo.id,
+          tipoCodigo: tipo.codigo,
           schema: tipo.schemaJson as SchemaJson,
           centroCustoId,
           departamentoId,
