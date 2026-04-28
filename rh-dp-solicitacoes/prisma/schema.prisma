@@ -644,7 +644,7 @@ model DocumentNotificationLog {
   ruleId         String?
   recipientEmail String
   recipientUserId String?
-  recipientOrigin DocumentNotificationRecipientOrigin
+  recipientSource DocumentNotificationRecipientSource
   status         DocumentNotificationStatus
   error          String?                    @db.LongText
   sentAt         DateTime?
@@ -1408,7 +1408,7 @@ enum DocumentNotificationEvent {
   DOCUMENT_EXPIRED
 }
 
-enum DocumentNotificationRecipientOrigin {
+enum DocumentNotificationRecipientSource {
   author
   approverGroup
   qualityReviewers
