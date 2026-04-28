@@ -12,6 +12,15 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
   DOCUMENT_SUBMITTED_FOR_APPROVAL: 'Aguardando aprovação',
   DOCUMENT_QUALITY_REVIEW: 'Revisão da qualidade',
 }
+const ORIGIN_LABELS: Record<string, string> = {
+  author: 'Elaborador',
+  approverGroup: 'Grupo aprovador',
+  qualityReviewers: 'Revisão da qualidade',
+  ownerDepartment: 'Departamento responsável',
+  ownerCostCenter: 'Centro de custo responsável',
+  distributionTargets: 'Distribuição',
+  fixedEmails: 'E-mails fixos',
+}
 
 const TAB_OPTIONS = [
   { key: 'destinatarios', label: 'Destinatários', icon: Settings2 },
@@ -48,7 +57,7 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
   const onSave = async () => {
     if (!editing) return
     setSaving(true)
-    await fetch(`/api/documents/notifications/rules/${editing.id}`, {
+    await fetch('/api/documents/notifications', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(editing),
@@ -152,6 +161,38 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
           ))}
         </div>
       </div>
+      <div className="rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900">
+        <h3 className="mb-3 text-base font-semibold">Alertas de configuração</h3>
+        <div className="space-y-2 text-sm">
+          {(data?.rules ?? [])
+            .filter(
+              (rule: any) =>
+                !rule.notifyAuthor &&
+                !rule.notifyApproverGroup &&
+                !rule.notifyQualityReviewers &&
+                !rule.notifyOwnerDepartment &&
+                !rule.notifyOwnerCostCenter &&
+                !rule.notifyDistributionTargets &&
+                (!Array.isArray(rule.fixedEmailsJson) || rule.fixedEmailsJson.length === 0),
+            )
+            .map((rule: any) => (
+              <div key={`alert-${rule.id}`} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                Regra sem destinatários ativos: {eventLabel(rule.event)} · {rule.documentType?.description ?? 'Todos os tipos'} ·{' '}
+                {rule.flowItem ? `Etapa ${rule.flowItem.order}` : 'Todas as etapas'}
+              </div>
+            ))}
+          {!data?.rules?.some(
+            (rule: any) =>
+              !rule.notifyAuthor &&
+              !rule.notifyApproverGroup &&
+              !rule.notifyQualityReviewers &&
+              !rule.notifyOwnerDepartment &&
+              !rule.notifyOwnerCostCenter &&
+              !rule.notifyDistributionTargets &&
+              (!Array.isArray(rule.fixedEmailsJson) || rule.fixedEmailsJson.length === 0),
+          ) && <p className="text-xs text-emerald-700">Sem alertas de configuração no momento.</p>}
+        </div>
+      </div>
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900">
         <h3 className="mb-3 text-base font-semibold">Histórico geral</h3>
@@ -223,18 +264,18 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
                   <button
                     className="rounded border px-3 py-2 text-sm"
                     onClick={async () => {
-                      const response = await fetch('/api/documents/notifications/preview', {
+                      const response = await fetch('/api/documents/notifications', {
                         method: 'POST', headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({ event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
+                        body: JSON.stringify({ mode: 'preview', event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
                       })
                       const payload = await response.json()
                       setPreviewResult(payload)
                     }}
                   >Prévia</button>
                   <button className="inline-flex items-center gap-1 rounded border px-3 py-2 text-sm" onClick={async () => {
-                    const response = await fetch('/api/documents/notifications/test', {
+                    const response = await fetch('/api/documents/notifications', {
                       method: 'POST', headers: { 'content-type': 'application/json' },
-                      body: JSON.stringify({ event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
+                      body: JSON.stringify({ mode: 'test', event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
                     })
                     const payload = await response.json()
                     setTestResult(payload.ok ? 'Envio de teste realizado.' : `Falha: ${payload.error ?? 'erro no envio'}`)
@@ -248,6 +289,14 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
                     <p><strong>Assunto:</strong> {previewResult.subject ?? '-'}</p>
                     <p className="mt-1 whitespace-pre-wrap"><strong>Corpo:</strong> {previewResult.body ?? '-'}</p>
                     <p className="mt-1"><strong>Destinatários:</strong> {(previewResult?.recipients?.recipients ?? []).map((item: any) => item.email).join(', ') || '-'}</p>
+                    <div className="mt-2 grid gap-1">
+                      {Object.entries(previewResult?.recipients?.byOrigin ?? {}).map(([origin, recipients]: [string, any]) => (
+                        <p key={origin}>
+                          <strong>{ORIGIN_LABELS[origin] ?? origin}:</strong>{' '}
+                          {(recipients ?? []).map((item: any) => item.email).join(', ') || '-'}
+                        </p>
+                      ))}
+                    </div>
                     <p className="mt-1"><strong>Alertas:</strong> {(previewResult?.recipients?.warnings ?? []).join(' | ') || 'Sem alertas'}</p>
                   </div>
                 )}

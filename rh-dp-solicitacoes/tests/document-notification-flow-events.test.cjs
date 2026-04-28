@@ -1,0 +1,20 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const documentsRoute = fs.readFileSync('src/app/api/documents/route.ts', 'utf8')
+const startPublishRoute = fs.readFileSync('src/app/api/documents/[id]/start-publish-process/route.ts', 'utf8')
+const approveRoute = fs.readFileSync('src/app/api/documents/versions/[versionId]/approve/route.ts', 'utf8')
+const rejectRoute = fs.readFileSync('src/app/api/documents/versions/[versionId]/reject/route.ts', 'utf8')
+
+assert.match(documentsRoute, /sendDocumentNotification\('DOCUMENT_CREATED'/)
+assert.match(documentsRoute, /sendDocumentNotification\('DOCUMENT_SUBMITTED_FOR_APPROVAL'/)
+assert.match(startPublishRoute, /sendDocumentNotification\('DOCUMENT_SUBMITTED_FOR_APPROVAL'/)
+assert.match(startPublishRoute, /sendDocumentNotification\('DOCUMENT_QUALITY_REVIEW'/)
+assert.match(approveRoute, /sendDocumentNotification\('DOCUMENT_APPROVED'/)
+assert.match(approveRoute, /sendDocumentNotification\('DOCUMENT_QUALITY_REVIEW'/)
+assert.match(approveRoute, /sendDocumentNotification\('DOCUMENT_PUBLISHED'/)
+assert.match(rejectRoute, /sendDocumentNotification\('DOCUMENT_REJECTED'/)
+assert.match(documentsRoute, /\.catch\(\(error\) => console\.error\('DOCUMENT_CREATED notification failed', error\)\)/)
+assert.match(approveRoute, /\.catch\(\(error\) => console\.error\('DOCUMENT_PUBLISHED notification failed', error\)\)/)
+
+console.info('document-notification-flow-events.test.cjs: ok')
