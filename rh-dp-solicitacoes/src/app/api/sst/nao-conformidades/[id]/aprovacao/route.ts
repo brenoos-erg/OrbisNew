@@ -9,6 +9,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { canApproveNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,6 +69,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       return row
     })
+
+
+    const notificationResult = await notifyNonConformityStakeholders({
+      nonConformityId: id,
+      actorId: me.id,
+      event: aprovado ? 'NC_APPROVED_BY_QUALITY' : 'NC_REJECTED_BY_QUALITY',
+    })
+    if (!notificationResult.sent) {
+      console.warn('NC quality approval notification not sent', {
+        nonConformityId: id,
+        reason: notificationResult.reason,
+      })
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

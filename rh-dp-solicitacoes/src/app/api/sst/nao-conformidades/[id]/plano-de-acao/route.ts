@@ -11,6 +11,7 @@ import { canManageAllNc } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
+import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
 
 async function assertEditable(id: string, userId: string, level: ModuleLevel | undefined) {
   const nc = await prisma.nonConformity.findUnique({
@@ -136,6 +137,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return created
     })
 
+    const createNotification = await notifyNonConformityStakeholders({
+      nonConformityId: id,
+      actorId: me.id,
+      event: 'ACTION_PLAN_CREATED',
+      actionItemId: row.id,
+    })
+    if (!createNotification.sent) {
+      console.warn('NC action plan creation notification not sent', {
+        nonConformityId: id,
+        actionItemId: row.id,
+        reason: createNotification.reason,
+      })
+    }
+
+    if (row.responsavelId) {
+      const assignedNotification = await notifyNonConformityStakeholders({
+        nonConformityId: id,
+        actorId: me.id,
+        event: 'ACTION_ITEM_ASSIGNED',
+        actionItemId: row.id,
+      })
+      if (!assignedNotification.sent) {
+        console.warn('NC action assignment notification not sent', {
+          nonConformityId: id,
+          actionItemId: row.id,
+          reason: assignedNotification.reason,
+        })
+      }
+    }
+
     return NextResponse.json(row, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao salvar plano de ação.', detail: devErrorDetail(error) }, { status: 500 })
@@ -170,6 +201,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         prazo: true,
         dataInicioPrevista: true,
         dataConclusao: true,
+        responsavelId: true,
       },
     })
     if (!existing || existing.nonConformityId !== id) {
@@ -241,6 +273,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
       return updated
     })
+
+    const shouldNotifyAssigned = row.responsavelId && row.responsavelId !== existing.responsavelId
+    if (shouldNotifyAssigned) {
+      const assignedNotification = await notifyNonConformityStakeholders({
+        nonConformityId: id,
+        actorId: me.id,
+        event: 'ACTION_ITEM_ASSIGNED',
+        actionItemId: row.id,
+      })
+      if (!assignedNotification.sent) {
+        console.warn('NC action assignment notification not sent', {
+          nonConformityId: id,
+          actionItemId: row.id,
+          reason: assignedNotification.reason,
+        })
+      }
+    }
+
+    if (existing.status !== row.status && row.status === NonConformityActionStatus.CONCLUIDA) {
+      const completedNotification = await notifyNonConformityStakeholders({
+        nonConformityId: id,
+        actorId: me.id,
+        event: 'ACTION_ITEM_COMPLETED',
+        actionItemId: row.id,
+      })
+      if (!completedNotification.sent) {
+        console.warn('NC action completion notification not sent', {
+          nonConformityId: id,
+          actionItemId: row.id,
+          reason: completedNotification.reason,
+        })
+      }
+    }
 
     return NextResponse.json(row)
   } catch (error) {

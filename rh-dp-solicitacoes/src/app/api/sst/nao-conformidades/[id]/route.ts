@@ -11,6 +11,7 @@ import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/l
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
+import { type NonConformityNotificationEvent } from '@/lib/sst/nonConformityAlertRules'
 import { canEditFirstScreen } from '@/lib/sst/nonConformityPermissions'
 
 export const dynamic = 'force-dynamic'
@@ -229,16 +230,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return item
     })
 
-    if (touchedFields.length > 0) {
+    let eventToNotify: NonConformityNotificationEvent | null = null
+    if (nextStatus && nextStatus !== current.status) {
+      if (isReopen) eventToNotify = 'NC_REOPENED'
+      else if (nextStatus === NonConformityStatus.CANCELADA) eventToNotify = 'NC_CANCELLED'
+      else if (nextStatus === NonConformityStatus.ENCERRADA) eventToNotify = 'NC_CLOSED'
+      else if (nextStatus === NonConformityStatus.AGUARDANDO_APROVACAO_QUALIDADE) eventToNotify = 'NC_UPDATED'
+    }
+
+    if (eventToNotify) {
       const notificationResult = await notifyNonConformityStakeholders({
         nonConformityId: id,
         actorId: me.id,
-        trigger: 'updated',
+        event: eventToNotify,
       })
       if (!notificationResult.sent) {
         console.warn('NC update notification not sent', {
           nonConformityId: id,
           reason: notificationResult.reason,
+          event: eventToNotify,
         })
       }
     }

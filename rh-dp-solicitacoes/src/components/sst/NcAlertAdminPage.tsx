@@ -66,7 +66,7 @@ export default function NcAlertAdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Alertas de NC (Admin)</h1>
-          <p className="text-sm text-slate-600">Configure destinatários, assunto e mensagem de e-mail para abertura/atualização de NC.</p>
+          <p className="text-sm text-slate-600">Configure destinatários, assunto e mensagem de e-mail por evento da NC/plano de ação.</p>
         </div>
         <Link href="/dashboard/sgi/qualidade/nao-conformidades" className="rounded-md border border-slate-200 px-3 py-2 text-sm">Voltar</Link>
       </div>
@@ -76,8 +76,8 @@ export default function NcAlertAdminPage() {
 
       {!loading ? (
         <form onSubmit={submit} className="space-y-3">
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={eventCreatedEnabled} onChange={(e) => setEventCreatedEnabled(e.target.checked)} /> Alertar na abertura de NC</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={eventUpdatedEnabled} onChange={(e) => setEventUpdatedEnabled(e.target.checked)} /> Alertar em atualizações de NC</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={eventCreatedEnabled} onChange={(e) => setEventCreatedEnabled(e.target.checked)} /> Ao abrir RNC → notificar Qualidade</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={eventUpdatedEnabled} onChange={(e) => setEventUpdatedEnabled(e.target.checked)} /> Após aprovação/atualização relevante → notificar envolvidos conforme regra</label>
           <label className="block text-sm font-medium">Destinatários (1 e-mail por linha)
             <textarea value={recipientText} onChange={(e) => setRecipientText(e.target.value)} className="mt-1 min-h-28 w-full rounded-md border border-slate-300 p-2 text-sm" />
           </label>
