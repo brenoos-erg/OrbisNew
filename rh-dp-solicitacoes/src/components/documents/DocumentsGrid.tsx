@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
+import { AlertCircle, Check, Download, Eye, Filter, Plus, Printer, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CostCenterSelect, { formatCostCenterOption, type CostCenterOption } from '@/components/solicitacoes/CostCenterSelect'
@@ -71,7 +71,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [canManageDocuments, setCanManageDocuments] = useState(false)
   const [actionInFlight, setActionInFlight] = useState<'cancel' | 'delete' | null>(null)
   const [targetRow, setTargetRow] = useState<GridRow | null>(null)
-
+  const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'csv' | 'pdf' | null>(null)
+  const [exportMessage, setExportMessage] = useState<{ type: 'error' | 'warning'; text: string } | null>(null)
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
   const [pendingAction, setPendingAction] = useState<{ versionId: string; intent: 'view' | 'download' | 'print' } | null>(null)
@@ -190,7 +191,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     if (body) return body
     return fallback
   }
-  const buildQuery = (format?: 'csv' | 'pdf') => {
+  const buildQuery = (format?: 'csv' | 'pdf' | 'xlsx') => {
     const params = new URLSearchParams()
     params.set('page', String(page))
     params.set('pageSize', String(pageSize))
@@ -203,6 +204,47 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     })
 
     return params.toString()
+  }
+
+
+  const handleExport = async (format: 'xlsx' | 'csv' | 'pdf') => {
+    if (loading) return
+
+    if (total === 0) {
+      setExportMessage({ type: 'warning', text: 'Não há registros para exportar com os filtros atuais.' })
+      return
+    }
+
+    setExportingFormat(format)
+    setExportMessage(null)
+
+    try {
+      const res = await fetch(`/api/documents/export?${buildQuery(format)}`, { method: 'GET' })
+      if (!res.ok) {
+        const message = await parseApiErrorMessage(res, 'Falha ao exportar os documentos.')
+        throw new Error(message)
+      }
+
+      const blob = await res.blob()
+      const fileUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const contentDisposition = res.headers.get('content-disposition')
+      const filename = contentDisposition?.match(/filename="?([^";]+)"?/)?.[1]
+
+      link.href = fileUrl
+      link.download = filename ?? `documentos-publicados.${format}`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(fileUrl)
+    } catch (error) {
+      setExportMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Não foi possível concluir a exportação. Tente novamente.',
+      })
+    } finally {
+      setExportingFormat(null)
+    }
   }
 
   const load = async () => {
@@ -598,11 +640,20 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
               }}
             ><Plus size={16} />Novo documento</button>
           ) : null}
-          <a className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700" href={`/api/documents/export?${buildQuery('csv')}`}><Download size={15} />Exportar CSV</a>
-          <a className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800" href={`/api/documents/export?${buildQuery('pdf')}`}><Download size={15} />Exportar PDF</a>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => handleExport('xlsx')} disabled={Boolean(exportingFormat)}><Download size={15} />{exportingFormat === 'xlsx' ? 'Exportando Excel...' : 'Exportar Excel'}</button>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => handleExport('csv')} disabled={Boolean(exportingFormat)}><Download size={15} />{exportingFormat === 'csv' ? 'Exportando CSV...' : 'Exportar CSV'}</button>
+          <button className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60" onClick={() => handleExport('pdf')} disabled={Boolean(exportingFormat)}><Download size={15} />{exportingFormat === 'pdf' ? 'Exportando PDF...' : 'Exportar PDF'}</button>
         </div>
         {loading ? <span className="text-sm text-slate-500">Atualizando listagem...</span> : null}
       </div>
+
+
+      {exportMessage ? (
+        <div className={`flex items-center gap-2 rounded-xl border p-3 text-sm ${exportMessage.type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+          <AlertCircle size={16} />
+          <span>{exportMessage.text}</span>
+        </div>
+      ) : null}
 
       <div className="hidden rounded-xl border border-slate-200 bg-slate-50/80 p-4 md:block">
         <p className="mb-3 text-sm font-medium text-slate-800">Filtros da listagem</p>

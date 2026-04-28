@@ -2,19 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 import { buildVersionWhere, parseGridParams } from '@/lib/iso-documents'
 import { prisma } from '@/lib/prisma'
-
-function toCsv(rows: string[][]) {
-  return rows
-    .map((line) =>
-      line
-        .map((value) => {
-          const escaped = value.replaceAll('"', '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        .join(','),
-    )
-    .join('\n')
-}
+import {
+  buildDocumentsExportFilename,
+  buildExcelFriendlyCsv,
+  buildPublishedDocumentRows,
+  buildPublishedDocumentsXlsx,
+  DOCUMENT_PUBLISHED_HEADERS,
+} from '@/lib/documents/exportDocuments'
 
 export async function GET(req: NextRequest) {
   await requireActiveUser()
@@ -27,23 +21,21 @@ export async function GET(req: NextRequest) {
     orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
   })
 
-  const tableRows = [
-    ['DataPublicacao', 'Codigo', 'NrRevisao', 'Titulo', 'CentroResponsavel', 'Elaborador', 'Vencimento', 'Status'],
-    ...rows.map((r) => [
-      r.publishedAt?.toISOString() ?? '',
-      r.document.code,
-      String(r.revisionNumber),
-      r.document.title,
-      [r.document.ownerCostCenter?.code, r.document.ownerCostCenter?.description].filter(Boolean).join(' - ') || '-',
-      r.document.author.fullName,
-      r.expiresAt?.toISOString() ?? '',
-      r.status,
-    ]),
-  ]
-
+  const tableRows = buildPublishedDocumentRows(
+    rows.map((row) => ({
+      publishedAt: row.publishedAt,
+      code: row.document.code,
+      revisionNumber: row.revisionNumber,
+      title: row.document.title,
+      ownerCostCenter: [row.document.ownerCostCenter?.code, row.document.ownerCostCenter?.description].filter(Boolean).join(' - ') || '-',
+      author: row.document.author.fullName,
+      expiresAt: row.expiresAt,
+      status: row.status,
+    })),
+  )
 
   if (format === 'pdf') {
-    const text = tableRows.map((row) => row.join(' | ')).join('\n')
+    const text = [Array.from(DOCUMENT_PUBLISHED_HEADERS), ...tableRows].map((row) => row.join(' | ')).join('\n')
     return new NextResponse(text, {
       headers: {
         'content-type': 'application/pdf',
@@ -52,11 +44,21 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  const csv = toCsv(tableRows)
+  if (format === 'xlsx') {
+    const xlsx = await buildPublishedDocumentsXlsx(DOCUMENT_PUBLISHED_HEADERS, tableRows)
+    return new NextResponse(Buffer.from(xlsx), {
+      headers: {
+        'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'content-disposition': `attachment; filename="${buildDocumentsExportFilename('xlsx')}"`,
+      },
+    })
+  }
+
+  const csv = buildExcelFriendlyCsv(DOCUMENT_PUBLISHED_HEADERS, tableRows)
   return new NextResponse(csv, {
     headers: {
-      'content-type': 'text/csv; charset=utf-8',
-      'content-disposition': `attachment; filename="documentos-${Date.now()}.csv"`,
+      'content-type': 'text/csv;charset=utf-8',
+      'content-disposition': `attachment; filename="${buildDocumentsExportFilename('csv')}"`,
     },
   })
 }
