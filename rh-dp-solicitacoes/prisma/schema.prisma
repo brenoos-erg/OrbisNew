@@ -371,6 +371,7 @@ model User {
   isoReadReceipts                            ReadReceipt[]
   isoPrintCopiesIssued                       PrintCopy[]                  @relation("IsoPrintCopyIssuedBy")
   documentApprovalControls                   DocumentApprovalControl[]
+  isoDocumentNotificationLogs                DocumentNotificationLog[]
 
   @@map("User")
 }
@@ -385,6 +386,7 @@ model DocumentTypeCatalog {
   updatedAt          DateTime                   @updatedAt
   documents          IsoDocument[]
   approvalFlowItems  DocumentTypeApprovalFlow[]
+  notificationRules  DocumentNotificationRule[]
 }
 
 model ApproverGroup {
@@ -420,6 +422,7 @@ model DocumentTypeApprovalFlow {
   documentType    DocumentTypeCatalog  @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
   approverGroup   ApproverGroup        @relation(fields: [approverGroupId], references: [id])
   approvals       DocumentApproval[]
+  notificationRules DocumentNotificationRule[]
 
   @@unique([documentTypeId, order])
 }
@@ -448,6 +451,7 @@ model IsoDocument {
   auditLogs          DocumentAuditLog[]
   distributions      Distribution[]
   printCopies        PrintCopy[]
+  notificationLogs   DocumentNotificationLog[]
 
   @@index([ownerDepartmentId])
   @@index([ownerCostCenterId])
@@ -475,6 +479,7 @@ model DocumentVersion {
   readReceipts          ReadReceipt[]
   printCopies           PrintCopy[]
   distributions         Distribution[]
+  notificationLogs      DocumentNotificationLog[]
 
   @@unique([documentId, revisionNumber])
   @@index([status, publishedAt])
@@ -603,6 +608,55 @@ model Distribution {
   version     DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
   createdBy   User                @relation("IsoDistributionCreatedBy", fields: [createdById], references: [id])
   targets     DistributionTarget[]
+}
+
+model DocumentNotificationRule {
+  id                        String                    @id @default(uuid())
+  event                     DocumentNotificationEvent
+  documentTypeId            String?
+  flowItemId                String?
+  enabled                   Boolean                   @default(true)
+  notifyAuthor              Boolean                   @default(true)
+  notifyApproverGroup       Boolean                   @default(false)
+  notifyQualityReviewers    Boolean                   @default(false)
+  notifyOwnerDepartment     Boolean                   @default(false)
+  notifyOwnerCostCenter     Boolean                   @default(false)
+  notifyDistributionTargets Boolean                   @default(false)
+  fixedEmailsJson           Json?
+  ccEmailsJson              Json?
+  subjectTemplate           String
+  bodyTemplate              String                    @db.LongText
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+  documentType              DocumentTypeCatalog?      @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+  flowItem                  DocumentTypeApprovalFlow? @relation(fields: [flowItemId], references: [id], onDelete: SetNull)
+  logs                      DocumentNotificationLog[]
+
+  @@index([event, enabled])
+  @@index([documentTypeId, flowItemId])
+}
+
+model DocumentNotificationLog {
+  id             String                     @id @default(uuid())
+  documentId     String
+  versionId      String?
+  event          DocumentNotificationEvent
+  ruleId         String?
+  recipientEmail String
+  recipientUserId String?
+  recipientOrigin DocumentNotificationRecipientOrigin
+  status         DocumentNotificationStatus
+  error          String?                    @db.LongText
+  sentAt         DateTime?
+  createdAt      DateTime                   @default(now())
+  document       IsoDocument                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version        DocumentVersion?           @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  rule           DocumentNotificationRule?  @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  recipientUser  User?                      @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([documentId, createdAt])
+  @@index([versionId, createdAt])
+  @@index([event, status, createdAt])
 }
 
 model DistributionTarget {
@@ -1340,6 +1394,34 @@ enum DocumentApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum DocumentNotificationEvent {
+  DOCUMENT_CREATED
+  DOCUMENT_SUBMITTED_FOR_APPROVAL
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  DOCUMENT_QUALITY_REVIEW
+  DOCUMENT_PUBLISHED
+  DOCUMENT_DISTRIBUTED
+  DOCUMENT_EXPIRING
+  DOCUMENT_EXPIRED
+}
+
+enum DocumentNotificationRecipientOrigin {
+  author
+  approverGroup
+  qualityReviewers
+  ownerDepartment
+  ownerCostCenter
+  distributionTargets
+  fixedEmails
+}
+
+enum DocumentNotificationStatus {
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum DocumentAuditAction {
