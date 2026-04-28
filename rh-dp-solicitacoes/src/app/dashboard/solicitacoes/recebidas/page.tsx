@@ -754,11 +754,11 @@ export default function ReceivedRequestsPage() {
                           : (row.responsavel?.fullName ?? '-')}
                     </td>
                     <td className="px-4 py-2 text-xs font-semibold">
-                      {row.nadaConstaStatus === 'PREENCHIDO'
-                        ? '✅ Preenchido'
-                        : row.nadaConstaStatus === 'PENDENTE'
-                          ? '⏳ Pendente'
-                          : '-'}
+                      {row.nadaConstaStatus === 'PREENCHIDO' ? (
+                        <span className="app-alert-success inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">Preenchido</span>
+                      ) : row.nadaConstaStatus === 'PENDENTE' ? (
+                        <span className="app-alert-warning inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold">Pendente</span>
+                      ) : '-'}
                     </td>
                   </tr>
                 ))}

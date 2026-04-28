@@ -14,8 +14,8 @@ export function ThemeToggle() {
 
   return (
     <div className="px-3 py-2">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tema</p>
-      <div className="grid grid-cols-3 gap-1 rounded-lg border border-slate-700 bg-slate-900/70 p-1">
+      <p className="app-label mb-2 text-[11px]">Tema</p>
+      <div className="app-surface grid grid-cols-3 gap-1 p-1">
         {OPTIONS.map(({ value, label, Icon }) => {
           const active = theme === value
           return (
@@ -23,9 +23,7 @@ export function ThemeToggle() {
               key={value}
               type="button"
               onClick={() => setTheme(value)}
-              className={`inline-flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition ${
-                active ? 'bg-slate-700 text-slate-100' : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
-              }`}
+              className={active ? 'app-button-primary px-2 py-1.5 text-[11px]' : 'app-button-secondary px-2 py-1.5 text-[11px]'}
               aria-pressed={active}
             >
               <Icon size={12} />

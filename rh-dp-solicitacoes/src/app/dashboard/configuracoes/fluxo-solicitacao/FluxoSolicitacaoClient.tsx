@@ -87,16 +87,16 @@ type FluxoResponse = {
 
 type TabId = 'fluxo' | 'dados' | 'editar' | 'status'
 
-const card = 'rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-4 shadow-sm'
+const card = 'app-card'
 
 function statusClass(status: string) {
-  if (status.includes('FINALIZADO') || status.includes('APPROVED') || status.includes('CONCLUID')) return 'bg-green-100 text-green-700'
+  if (status.includes('FINALIZADO') || status.includes('APPROVED') || status.includes('CONCLUID')) return 'app-alert-success'
   if (status.includes('ANDAMENTO') || status.includes('APROV') || status.includes('EM ') || status.includes('ATENDIMENTO')) {
-    return 'bg-blue-100 text-blue-700'
+    return 'app-alert-info'
   }
-  if (status.includes('PENDENTE') || status.includes('PENDING') || status.includes('AGUARDANDO')) return 'bg-amber-100 text-amber-700'
-  if (status.includes('REJECTED') || status.includes('REPROV') || status.includes('CANCEL')) return 'bg-red-100 text-red-700'
-  return 'bg-slate-100 text-[var(--foreground)]'
+  if (status.includes('PENDENTE') || status.includes('PENDING') || status.includes('AGUARDANDO')) return 'app-alert-warning'
+  if (status.includes('REJECTED') || status.includes('REPROV') || status.includes('CANCEL')) return 'app-alert-error'
+  return 'app-card-muted text-[var(--foreground)]'
 }
 
 function fmtDate(value: string | null) {
@@ -455,7 +455,7 @@ export default function FluxoSolicitacaoClient() {
               const next = Array.from(e.target.selectedOptions).map((option) => option.value)
               setEditFields((prev) => ({ ...prev, [field.name]: next }))
             }}
-            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
+            className="app-input"
           >
             {resolvedOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -491,7 +491,7 @@ export default function FluxoSolicitacaoClient() {
                   field.name,
                 )
               })
-            }}            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
+            }}            className="app-input"
           >
             <option value="">Selecione...</option>
             {resolvedOptions.map((option) => (
@@ -512,7 +512,7 @@ export default function FluxoSolicitacaoClient() {
             required={required}
             disabled={disabled || readOnly}
             onChange={(e) => setEditFields((prev) => ({ ...prev, [field.name]: e.target.value }))}
-            className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
+            className="app-input"
             rows={4}
           />
         </label>
@@ -543,7 +543,7 @@ export default function FluxoSolicitacaoClient() {
               [field.name]: inputType === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value,
             }))
           }
-          className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
+          className="app-input"
         />
       </label>
     )
@@ -598,23 +598,23 @@ export default function FluxoSolicitacaoClient() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Protocolo, ID, solicitante, matrícula ou tipo"
-          className="w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
+          className="app-input"
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+          className="app-button-primary"
         >
           {loading ? 'Buscando...' : 'Buscar'}
         </button>
       </form>
 
-      {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-      {success && <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>}
+      {error && <div className="app-alert-error">{error}</div>}
+      {success && <div className="app-alert-success">{success}</div>}
 
       {result && (
         <div className="space-y-4">
-          <section className="rounded-xl border border-[var(--border-subtle)] bg-gradient-to-r from-white to-slate-50 p-4 shadow-sm">
+          <section className="app-surface">
             <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <p><b>Protocolo:</b> {result.solicitacao.protocolo}</p>
               <p><b>Tipo:</b> {result.solicitacao.tipo}</p>
@@ -639,7 +639,7 @@ export default function FluxoSolicitacaoClient() {
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                     activeTab === tab.id
                       ? 'bg-orange-500 text-white shadow'
-                      : 'bg-slate-100 text-[var(--foreground)] hover:bg-slate-200'
+                      : 'app-button-secondary'
                   } disabled:cursor-not-allowed disabled:opacity-40`}
                 >
                   {tab.label}
@@ -726,12 +726,12 @@ export default function FluxoSolicitacaoClient() {
                 <div className="space-y-3">
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium text-[var(--foreground)]">Título</span>
-                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
+                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="app-input" />
                   </label>
 
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium text-[var(--foreground)]">Descrição</span>
-                    <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
+                    <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3} className="app-input" />
                   </label>
 
                   <div className="rounded-md border border-[var(--border-subtle)] p-3">
@@ -745,7 +745,7 @@ export default function FluxoSolicitacaoClient() {
                               <input
                                 value={String(value ?? '')}
                                 onChange={(e) => setEditFields((prev) => ({ ...prev, [key]: e.target.value }))}
-                                className="w-full rounded-md border border-[var(--input-border)] px-3 py-2"
+                                className="app-input"
                               />
                             </label>
                           ))}
@@ -753,14 +753,14 @@ export default function FluxoSolicitacaoClient() {
                   </div>
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium text-[var(--foreground)]">Motivo da alteração (opcional)</span>
-                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
+                    <input value={editReason} onChange={(e) => setEditReason(e.target.value)} className="app-input" />
                   </label>
 
                   <button
                     type="button"
                     disabled={saving}
                     onClick={saveEditFields}
-                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                    className="app-button-primary"
                   >
                     {saving ? 'Salvando...' : 'Salvar alterações'}
                   </button>
@@ -783,7 +783,7 @@ export default function FluxoSolicitacaoClient() {
                   <div className="grid gap-3 sm:grid-cols-3">
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-[var(--foreground)]">Novo status</span>
-                      <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
+                      <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)} className="app-input">
                         {result.statusOptions.map((opt) => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
@@ -792,7 +792,7 @@ export default function FluxoSolicitacaoClient() {
 
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-[var(--foreground)]">Setor responsável</span>
-                      <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
+                      <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} className="app-input">
                         <option value="">Manter atual</option>
                         {result.departamentos.map((dept) => (
                           <option key={dept.id} value={dept.id}>{dept.name}</option>
@@ -802,7 +802,7 @@ export default function FluxoSolicitacaoClient() {
 
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-[var(--foreground)]">Responsável atual</span>
-                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2">
+                      <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="app-input">
                         <option value="">Sem responsável definido</option>
                         {result.responsaveis.map((resp) => (
                           <option key={resp.id} value={resp.id}>{resp.fullName}</option>
@@ -813,14 +813,14 @@ export default function FluxoSolicitacaoClient() {
 
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium text-[var(--foreground)]">Motivo / justificativa</span>
-                    <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} rows={3} className="w-full rounded-md border border-[var(--input-border)] px-3 py-2" />
+                    <textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} rows={3} className="app-input" />
                   </label>
 
                   <button
                     type="button"
                     disabled={saving || !statusValue}
                     onClick={saveStatus}
-                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                    className="app-button-warning"
                   >
                     {saving ? 'Aplicando...' : 'Aplicar nova tramitação'}
                   </button>

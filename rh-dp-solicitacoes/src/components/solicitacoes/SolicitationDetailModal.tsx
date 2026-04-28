@@ -37,10 +37,8 @@ import {
 
 
 
-const LABEL_RO =
-   'block text-xs font-bold text-[var(--foreground)] uppercase tracking-wide'
-const INPUT_RO =
-  'mt-1 w-full rounded-lg border border-[var(--input-border)] bg-[var(--card)] px-3 py-3 text-base font-medium text-[var(--foreground)] shadow-sm ring-1 ring-amber-100/80 focus:outline-none cursor-default lg:text-sm'
+const LABEL_RO = 'app-label'
+const INPUT_RO = 'app-readonly-card'
 const isBooleanLikeType = (campoType?: string) => {
   const normalizedType = (campoType ?? '').trim().toLowerCase()
   return normalizedType === 'boolean' || normalizedType === 'checkbox'
@@ -2219,7 +2217,7 @@ async function handleEncaminharAprovacaoComAnexo() {
           {detail && (
             <>
               {/* Informações principais */}
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-gradient-to-br from-white to-amber-50/40 p-4 shadow-sm">
+              <div className="app-card">
                 <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                   Dados gerais do chamado
                 </p>
@@ -2739,7 +2737,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                  {/* DADOS DO CONTRATADO (formulário extra) */}
               {showContratadoForm && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="app-alert-success">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
                     Dados do contratado
                   </p>
@@ -2846,7 +2844,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           type="button"
                           onClick={handleUploadAnexos}
                           disabled={uploading}
-                          className="w-full rounded-md bg-blue-600 px-4 py-3 text-base text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                          className="app-button-info w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                         >
                           {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
                         </button>
@@ -2867,7 +2865,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
               {/* Bloco de incentivo / educação */}
               {isSolicitacaoIncentivo && !showManagementActions && (
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                <div className="app-alert-info">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">
                     Informações para incentivo à educação
                   </p>
@@ -3007,14 +3005,14 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => handleStartApproval('APROVAR')}
                       disabled={closing}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:text-sm"
+                      className="app-button-primary w-full py-3 text-base lg:text-sm"
                     >
                       Aprovar
                     </button>
                     <button
                       onClick={() => handleStartApproval('REPROVAR')}
                       disabled={closing}
-                      className="w-full rounded-md bg-red-600 px-4 py-3 text-base font-semibold text-white hover:bg-red-500 disabled:opacity-60 lg:text-sm"
+                      className="app-button-danger w-full py-3 text-base lg:text-sm"
                     >
                       Reprovar
                     </button>
@@ -3031,8 +3029,8 @@ async function handleEncaminharAprovacaoComAnexo() {
                       onChange={(e) => setApprovalComment(e.target.value)}
                     />
                     <div className="mt-2 flex gap-2">
-                      <button onClick={handleConfirmApprovalAction} disabled={closing} className="rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Confirmar</button>
-                      <button onClick={handleCancelApprovalAction} className="rounded-md border border-[var(--input-border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">Cancelar</button>
+                      <button onClick={handleConfirmApprovalAction} disabled={closing} className="app-button-primary px-3 py-2 text-xs">Confirmar</button>
+                      <button onClick={handleCancelApprovalAction} className="app-button-secondary px-3 py-2 text-xs">Cancelar</button>
                     </div>
                   </div>
                 )}
@@ -3044,7 +3042,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     Painel de Tratativas
                   </p>
                   {!isFinalizadaOuCancelada && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                    <div className="app-card-muted p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
                         Anexar documento para tratativa/aprovação
                       </p>
@@ -3062,7 +3060,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={handleUploadAnexos}
                             disabled={uploading}
-                            className="w-full rounded-md bg-blue-600 px-4 py-3 text-base text-white hover:bg-blue-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                            className="app-button-info w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                           >
                             {uploading ? 'Enviando...' : 'Enviar arquivo(s)'}
                           </button>
@@ -3102,7 +3100,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={() => (isSolicitacaoExames ? handleSalvarOuFinalizarSst(true) : handleFinalizarRh('ENCAMINHAR_DP'))}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                      className="app-button-primary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : finalizarLabel}
                     </button>
@@ -3127,7 +3125,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             value={cancelamentoVagaMotivo}
                             onChange={(event) => setCancelamentoVagaMotivo(event.target.value)}
                             placeholder="Descreva o motivo do cancelamento da vaga"
-                            className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                            className="app-textarea min-h-[90px]"
                           />
                           <button
                             type="button"
@@ -3146,7 +3144,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={handleFinalizarUltimaEtapa}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                      className="app-button-primary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Enviando...' : 'Finalizar chamado'}
                     </button>
@@ -3169,7 +3167,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                           <textarea
                             value={recusaDpMotivo}
                             onChange={(event) => setRecusaDpMotivo(event.target.value)}
-                            className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                            className="app-textarea min-h-[90px]"
                             placeholder="Descreva o motivo da recusa"
                           />
                           <button
@@ -3204,7 +3202,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <button
                       onClick={handleFinalizarUltimaEtapa}
                       disabled={closing || isFinalizadaOuCancelada}
-                      className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                      className="app-button-primary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Finalizando...' : 'Finalizar avaliação (RH)'}
                     </button>
@@ -3275,7 +3273,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                   )}
  {isSolicitacaoEquipamentoTi && (
-                      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                      <div className="app-card-muted p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
                         Inventário TI e decisão de atendimento
                       </p>
@@ -3383,7 +3381,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={() => handleSalvarNadaConsta(false)}
                             disabled={savingNadaConsta}
-                          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)] disabled:opacity-60 lg:w-auto lg:text-sm"
+                          className="app-button-secondary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                           >
                             {savingNadaConsta ? 'Salvando...' : 'Salvar'}
                           </button>
@@ -3391,7 +3389,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                             type="button"
                             onClick={() => handleSalvarNadaConsta(true)}
                             disabled={savingNadaConsta}
-                            className="w-full rounded-md bg-emerald-600 px-4 py-3 text-base font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 lg:w-auto lg:text-sm"
+                            className="app-button-primary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
                           >
                             Finalizar setor
                           </button>
@@ -3421,13 +3419,13 @@ async function handleEncaminharAprovacaoComAnexo() {
               onChange={(event) => setNovoComentario(event.target.value)}
               rows={3}
               placeholder="Registre comentários ou informações adicionais"
-              className="mt-1 w-full rounded-md border border-[var(--input-border)] px-3 py-2 text-sm"
+              className="mt-1 app-textarea"
             />
             <button
               type="button"
               onClick={handleAdicionarComentario}
               disabled={salvandoComentario || !novoComentario.trim()}
-              className="mt-2 w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
+              className="mt-2 app-button-secondary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
             >
               {salvandoComentario ? 'Salvando observação...' : 'Adicionar observação'}
             </button>
@@ -3446,7 +3444,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <button
                 onClick={handleAssumirChamado}
                 disabled={assumindo || isFinalizadaOuCancelada}
-                className="w-full rounded-md bg-slate-100 px-4 py-3 text-base font-semibold text-[var(--foreground)] hover:bg-slate-200 disabled:opacity-60 lg:text-sm"
+                className="app-button-secondary w-full px-4 py-3 text-base lg:text-sm"
               >
                 {assumindo ? 'Assumindo...' : 'Assumir chamado'}
               </button>
@@ -3456,7 +3454,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               <button
                 onClick={handleEncaminharAprovacaoComAnexo}
                 disabled={encaminhandoAprovacao}
-                className="w-full rounded-md bg-amber-500 px-4 py-3 text-base font-semibold text-white hover:bg-amber-400 disabled:opacity-60 lg:text-sm"
+                className="app-button-warning w-full px-4 py-3 text-base lg:text-sm"
               >
                 {encaminhandoAprovacao
                   ? 'Encaminhando...'
@@ -3465,11 +3463,11 @@ async function handleEncaminharAprovacaoComAnexo() {
             )}
 
             {showManagementActions && userIsAdmin && !isFinalizadaOuCancelada && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+              <div className="app-alert-error">
                 <button
                   type="button"
                   onClick={() => setShowAdminCancelForm((prev) => !prev)}
-                  className="w-full rounded-md border border-rose-300 bg-[var(--card)] px-4 py-3 text-base font-semibold text-rose-700 hover:bg-rose-100 lg:text-sm"
+                  className="app-button-danger w-full px-4 py-3 text-base lg:text-sm"
                 >
                   {showAdminCancelForm ? 'Ocultar cancelamento administrativo' : 'Cancelar solicitação (Admin)'}
                 </button>
@@ -3482,7 +3480,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     <textarea
                       value={adminCancelReason}
                       onChange={(event) => setAdminCancelReason(event.target.value)}
-                      className="min-h-[90px] w-full rounded-md border border-rose-300 px-3 py-2 text-sm"
+                      className="app-textarea min-h-[90px]"
                       placeholder="Descreva o motivo do cancelamento"
                     />
                     <button
