@@ -95,11 +95,23 @@ async function buildTemplateVariables(context: NotificationContext, event: Docum
   }
 }
 
+async function getDocumentTypeId(context: NotificationContext) {
+  if (context.versionId) {
+    const version = await prisma.documentVersion.findUnique({
+      where: { id: context.versionId },
+      select: { document: { select: { documentTypeId: true } } },
+    })
+    return version?.document.documentTypeId ?? null
+  }
+  const document = await prisma.isoDocument.findUnique({
+    where: { id: context.documentId },
+    select: { documentTypeId: true },
+  })
+  return document?.documentTypeId ?? null
+}
+
 export async function previewDocumentNotification(event: DocumentNotificationEvent, context: NotificationContext) {
-  const version = context.versionId
-    ? await prisma.documentVersion.findUnique({ where: { id: context.versionId }, select: { document: { select: { documentTypeId: true } } } })
-    : null
-  const docTypeId = version?.document.documentTypeId ?? null
+  const docTypeId = await getDocumentTypeId(context)
   const rule = await getRule(event, docTypeId, context.flowItemId)
   const vars = await buildTemplateVariables(context, event)
   if (!vars) return { error: 'Documento não encontrado.' }
@@ -120,11 +132,13 @@ export async function previewDocumentNotification(event: DocumentNotificationEve
     notifyDistributionTargets: rule?.notifyDistributionTargets ?? false,
     fixedEmails: (rule?.fixedEmailsJson as string[] | null) ?? [],
   })
+  const ccEmails = Array.isArray(rule?.ccEmailsJson) ? (rule?.ccEmailsJson as string[]) : []
 
   return {
     event,
     rule,
     recipients,
+    ccEmails,
     subject: renderDocumentNotificationTemplate(template.subject, vars.values),
     body: renderDocumentNotificationTemplate(template.body, vars.values),
   }
@@ -136,7 +150,9 @@ export async function sendDocumentNotification(event: DocumentNotificationEvent,
     if ('error' in preview) return { ok: false, error: preview.error }
 
     const to = preview.recipients.recipients.map((item) => item.email)
-    if (to.length === 0) {
+    const cc = preview.ccEmails ?? []
+    const finalRecipients = [...to, ...cc]
+    if (finalRecipients.length === 0) {
       await prisma.documentNotificationLog.create({
         data: {
           documentId: context.documentId,
@@ -145,7 +161,7 @@ export async function sendDocumentNotification(event: DocumentNotificationEvent,
           ruleId: preview.rule?.id ?? null,
           recipientEmail: '-',
           recipientUserId: null,
-          recipientOrigin: 'fixedEmails',
+          recipientSource: 'fixedEmails',
           status: 'SKIPPED',
           error: 'Sem destinatários finais para envio.',
         },
@@ -153,17 +169,17 @@ export async function sendDocumentNotification(event: DocumentNotificationEvent,
       return { ok: false, skipped: true }
     }
 
-    const result = await sendMail({ to, subject: preview.subject, text: preview.body }, 'NOTIFICATIONS')
+    const result = await sendMail({ to: finalRecipients, subject: preview.subject, text: preview.body }, 'NOTIFICATIONS')
 
     await prisma.documentNotificationLog.createMany({
-      data: preview.recipients.recipients.map((recipient) => ({
+      data: [...preview.recipients.recipients, ...cc.map((email) => ({ email, userId: null, origin: 'fixedEmails' as const }))].map((recipient) => ({
         documentId: context.documentId,
         versionId: context.versionId ?? null,
         event,
         ruleId: preview.rule?.id ?? null,
         recipientEmail: recipient.email,
-        recipientUserId: recipient.userId,
-        recipientOrigin: recipient.origin,
+        recipientUserId: recipient.userId ?? null,
+        recipientSource: recipient.origin,
         status: result.sent ? 'SENT' : 'FAILED',
         error: result.sent ? null : result.error ?? 'Falha desconhecida',
         sentAt: result.sent ? new Date() : null,
@@ -173,6 +189,19 @@ export async function sendDocumentNotification(event: DocumentNotificationEvent,
     return { ok: result.sent, error: result.error ?? null }
   } catch (error) {
     console.error('sendDocumentNotification error', error)
+    await prisma.documentNotificationLog.create({
+      data: {
+        documentId: context.documentId,
+        versionId: context.versionId ?? null,
+        event,
+        ruleId: context.ruleId ?? null,
+        recipientEmail: '-',
+        recipientUserId: null,
+        recipientSource: 'fixedEmails',
+        status: 'FAILED',
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+      },
+    })
     return { ok: false, error: error instanceof Error ? error.message : 'Erro desconhecido' }
   }
 }

@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const mainRoute = fs.readFileSync('src/app/api/documents/notifications/route.ts', 'utf8')
+const rulesRoute = fs.readFileSync('src/app/api/documents/notifications/rules/route.ts', 'utf8')
+const rulesIdRoute = fs.readFileSync('src/app/api/documents/notifications/rules/[id]/route.ts', 'utf8')
+const previewRoute = fs.readFileSync('src/app/api/documents/notifications/preview/route.ts', 'utf8')
+const testRoute = fs.readFileSync('src/app/api/documents/notifications/test/route.ts', 'utf8')
+const resendRoute = fs.readFileSync('src/app/api/documents/notifications/resend/route.ts', 'utf8')
+const historyRoute = fs.readFileSync('src/app/api/documents/notifications/history/route.ts', 'utf8')
+
+assert.match(mainRoute, /requireNotificationAdmin\(Action\.VIEW\)/)
+assert.match(rulesRoute, /requireNotificationAdmin\(Action\.UPDATE\)/)
+assert.match(rulesIdRoute, /requireNotificationAdmin\(Action\.UPDATE\)/)
+assert.match(rulesIdRoute, /requireNotificationAdmin\(Action\.DELETE\)/)
+assert.match(previewRoute, /requireNotificationAdmin\(Action\.VIEW\)/)
+assert.match(testRoute, /requireNotificationAdmin\(Action\.UPDATE\)/)
+assert.match(resendRoute, /requireNotificationAdmin\(Action\.UPDATE\)/)
+assert.match(historyRoute, /requireNotificationAdmin\(Action\.VIEW\)/)
+
+console.info('document-notification-central-admin-api.test.cjs: ok')

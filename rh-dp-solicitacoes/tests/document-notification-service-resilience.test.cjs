@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const service = fs.readFileSync('src/lib/documents/documentNotificationService.ts', 'utf8')
+const recipients = fs.readFileSync('src/lib/documents/documentNotificationRecipients.ts', 'utf8')
+
+assert.match(service, /status: 'FAILED'/)
+assert.match(service, /recipientSource/)
+assert.match(service, /Sem destinatários finais para envio/)
+assert.match(service, /preview\.ccEmails/)
+assert.match(recipients, /Nenhum destinatário final foi resolvido para a regra/)
+assert.match(recipients, /canApproveTab3/)
+assert.match(recipients, /distributionTargets/)
+
+console.info('document-notification-service-resilience.test.cjs: ok')

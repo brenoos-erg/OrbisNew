@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Mail, RefreshCcw, Save } from 'lucide-react'
+import { AlertTriangle, Eye, History, Mail, RefreshCcw, Save, Send, Settings2 } from 'lucide-react'
 import { DOCUMENT_NOTIFICATION_PLACEHOLDERS } from '@/lib/documents/documentNotificationTypes'
 
 type Rule = any
@@ -13,6 +13,13 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
   DOCUMENT_QUALITY_REVIEW: 'Revisão da qualidade',
 }
 
+const TAB_OPTIONS = [
+  { key: 'destinatarios', label: 'Destinatários', icon: Settings2 },
+  { key: 'template', label: 'Template', icon: Mail },
+  { key: 'previa', label: 'Prévia', icon: Eye },
+  { key: 'historico', label: 'Histórico', icon: History },
+] as const
+
 export default function DocumentNotificationsPanel({ canEdit }: Props) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -21,6 +28,8 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
   const [editing, setEditing] = useState<Rule | null>(null)
   const [previewResult, setPreviewResult] = useState<any>(null)
   const [testResult, setTestResult] = useState<string | null>(null)
+  const [modalTab, setModalTab] = useState<(typeof TAB_OPTIONS)[number]['key']>('destinatarios')
+  const [previewDocumentId, setPreviewDocumentId] = useState('')
 
   const refresh = async () => {
     setLoading(true)
@@ -39,7 +48,7 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
   const onSave = async () => {
     if (!editing) return
     setSaving(true)
-    await fetch('/api/documents/notifications', {
+    await fetch(`/api/documents/notifications/rules/${editing.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(editing),
@@ -66,7 +75,7 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold">Central de Notificações de Documentos</h2>
-            <p className="text-sm text-slate-500">Configure quem será notificado em cada etapa do fluxo documental e acompanhe falhas de envio.</p>
+            <p className="text-sm text-slate-500">Configure quem recebe e-mails, por qual motivo e em qual etapa documental.</p>
           </div>
           <div className="flex gap-2">
             <button onClick={refresh} className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm"><RefreshCcw size={14} />Atualizar</button>
@@ -118,7 +127,7 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
       )}
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm dark:bg-slate-900">
-        <h3 className="mb-3 text-base font-semibold">Lista de regras</h3>
+        <h3 className="mb-3 text-base font-semibold">Regras por evento/etapa</h3>
         <div className="space-y-2">
           {(data?.rules ?? []).map((rule: any) => (
             <div key={rule.id} className="rounded-lg border p-3">
@@ -129,13 +138,15 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
                 </div>
                 <button className="rounded border px-2 py-1 text-xs" onClick={() => setEditing({ ...rule })}>Configurar</button>
               </div>
-              <div className="mt-2 grid gap-2 text-xs md:grid-cols-3">
+              <div className="mt-2 grid gap-2 text-xs md:grid-cols-4">
                 <Badge enabled={rule.notifyAuthor} label="Elaborador" />
                 <Badge enabled={rule.notifyApproverGroup} label="Grupo aprovador" />
                 <Badge enabled={rule.notifyQualityReviewers} label="Revisão da qualidade" />
-                <Badge enabled={rule.notifyOwnerDepartment} label="Centro responsável" />
+                <Badge enabled={rule.notifyOwnerDepartment} label="Departamento responsável" />
+                <Badge enabled={rule.notifyOwnerCostCenter} label="Centro de custo" />
                 <Badge enabled={rule.notifyDistributionTargets} label="Distribuição" />
                 <Badge enabled={Array.isArray(rule.fixedEmailsJson) && rule.fixedEmailsJson.length > 0} label="E-mails fixos" />
+                <Badge enabled={Array.isArray(rule.ccEmailsJson) && rule.ccEmailsJson.length > 0} label="Cópias (CC)" />
               </div>
             </div>
           ))}
@@ -146,12 +157,12 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
         <h3 className="mb-3 text-base font-semibold">Histórico geral</h3>
         <div className="overflow-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left"><th>Data/Hora</th><th>Documento</th><th>Revisão</th><th>Evento</th><th>Destinatário</th><th>Origem</th><th>Status</th><th>Erro</th></tr></thead>
+            <thead><tr className="border-b text-left"><th>Data/Hora</th><th>Documento</th><th>Evento</th><th>Destinatário</th><th>Origem</th><th>Status</th><th>Erro</th></tr></thead>
             <tbody>
               {(data?.history ?? []).map((item: any) => (
                 <tr key={item.id} className="border-b align-top text-xs">
                   <td className="py-2">{new Date(item.createdAt).toLocaleString('pt-BR')}</td>
-                  <td>{item.document}</td><td>{item.revision}</td><td>{item.eventLabel}</td><td>{item.recipientEmail}</td><td>{item.recipientOrigin}</td><td>{item.status}</td><td className="text-red-600">{item.error ?? '-'}</td>
+                  <td>{item.document} ({item.revision})</td><td>{item.eventLabel}</td><td>{item.recipientEmail}</td><td>{item.recipientSource}</td><td>{item.status}</td><td className="text-red-600">{item.error ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -161,59 +172,94 @@ export default function DocumentNotificationsPanel({ canEdit }: Props) {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-4 dark:bg-slate-900">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-4 dark:bg-slate-900">
             <div className="mb-2 flex items-center justify-between"><h3 className="font-semibold">Configurar regra</h3><button className="rounded border px-2 py-1" onClick={() => setEditing(null)}>Fechar</button></div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Toggle label="Notificar elaborador" checked={editing.notifyAuthor} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyAuthor: value }))} />
-              <Toggle label="Notificar grupo aprovador" checked={editing.notifyApproverGroup} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyApproverGroup: value }))} />
-              <Toggle label="Notificar revisão da qualidade" checked={editing.notifyQualityReviewers} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyQualityReviewers: value }))} />
-              <Toggle label="Notificar centro responsável" checked={editing.notifyOwnerDepartment} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyOwnerDepartment: value }))} />
-              <Toggle label="Notificar centro de custo" checked={editing.notifyOwnerCostCenter} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyOwnerCostCenter: value }))} />
-              <Toggle label="Notificar distribuição" checked={editing.notifyDistributionTargets} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyDistributionTargets: value }))} />
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {TAB_OPTIONS.map((tab) => (
+                <button key={tab.key} onClick={() => setModalTab(tab.key)} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${modalTab === tab.key ? 'bg-slate-900 text-white' : ''}`}>
+                  <tab.icon className="h-3 w-3" /> {tab.label}
+                </button>
+              ))}
             </div>
-            <label className="mt-3 block text-sm">E-mails fixos (separados por vírgula)</label>
-            <input className="w-full rounded border px-3 py-2" value={(editing.fixedEmailsJson ?? []).join(', ')} onChange={(e) => setEditing((prev: any) => ({ ...prev, fixedEmailsJson: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))} />
-            <label className="mt-3 block text-sm">Assunto</label>
-            <input className="w-full rounded border px-3 py-2" value={editing.subjectTemplate ?? ''} onChange={(e) => setEditing((prev: any) => ({ ...prev, subjectTemplate: e.target.value }))} />
-            <label className="mt-3 block text-sm">Corpo</label>
-            <textarea className="h-32 w-full rounded border px-3 py-2" value={editing.bodyTemplate ?? ''} onChange={(e) => setEditing((prev: any) => ({ ...prev, bodyTemplate: e.target.value }))} />
-            <div className="mt-3 rounded border bg-slate-50 p-2 text-xs dark:bg-slate-800">
-              <p className="mb-1 font-semibold">Placeholders disponíveis</p>
-              <p>{DOCUMENT_NOTIFICATION_PLACEHOLDERS.join(', ')}</p>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                className="rounded border px-3 py-2 text-sm"
-                onClick={async () => {
-                  const response = await fetch('/api/documents/notifications', {
-                    method: 'POST', headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ mode: 'preview', event: editing.event, documentId: data?.history?.[0]?.id ? '' : '' }),
-                  })
-                  const payload = await response.json()
-                  setPreviewResult(payload)
-                }}
-              >Prévia</button>
-              <button className="rounded border px-3 py-2 text-sm" onClick={async () => {
-                const doc = prompt('Informe o ID do documento para teste')
-                if (!doc) return
-                const response = await fetch('/api/documents/notifications', {
-                  method: 'POST', headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ mode: 'test', event: editing.event, documentId: doc }),
-                })
-                const payload = await response.json()
-                setTestResult(payload.ok ? 'Envio de teste realizado.' : `Falha: ${payload.error ?? 'erro no envio'}`)
-                refresh()
-              }}>Enviar teste</button>
-              {testResult && <p className="text-xs">{testResult}</p>}
-            </div>
-            {previewResult && (
-              <div className="mt-3 rounded border p-3 text-xs">
-                <p className="font-semibold">Prévia</p>
-                <p><strong>Assunto:</strong> {previewResult.subject ?? '-'}</p>
-                <p className="mt-1 whitespace-pre-wrap"><strong>Corpo:</strong> {previewResult.body ?? '-'}</p>
-                <p className="mt-1"><strong>Destinatários:</strong> {(previewResult?.recipients?.recipients ?? []).map((item: any) => item.email).join(', ') || '-'}</p>
+
+            {modalTab === 'destinatarios' && (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Toggle label="Elaborador" checked={editing.notifyAuthor} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyAuthor: value }))} />
+                  <Toggle label="Grupo aprovador" checked={editing.notifyApproverGroup} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyApproverGroup: value }))} />
+                  <Toggle label="Revisão da qualidade" checked={editing.notifyQualityReviewers} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyQualityReviewers: value }))} />
+                  <Toggle label="Departamento responsável" checked={editing.notifyOwnerDepartment} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyOwnerDepartment: value }))} />
+                  <Toggle label="Centro de custo responsável" checked={editing.notifyOwnerCostCenter} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyOwnerCostCenter: value }))} />
+                  <Toggle label="Distribuição" checked={editing.notifyDistributionTargets} onChange={(value) => setEditing((prev: any) => ({ ...prev, notifyDistributionTargets: value }))} />
+                </div>
+                <label className="mt-3 block text-sm">E-mails fixos (separados por vírgula)</label>
+                <input className="w-full rounded border px-3 py-2" value={(editing.fixedEmailsJson ?? []).join(', ')} onChange={(e) => setEditing((prev: any) => ({ ...prev, fixedEmailsJson: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))} />
+                <label className="mt-3 block text-sm">Cópias (CC)</label>
+                <input className="w-full rounded border px-3 py-2" value={(editing.ccEmailsJson ?? []).join(', ')} onChange={(e) => setEditing((prev: any) => ({ ...prev, ccEmailsJson: e.target.value.split(',').map((item) => item.trim()).filter(Boolean) }))} />
+              </>
+            )}
+
+            {modalTab === 'template' && (
+              <>
+                <label className="mt-3 block text-sm">Assunto</label>
+                <input className="w-full rounded border px-3 py-2" value={editing.subjectTemplate ?? ''} onChange={(e) => setEditing((prev: any) => ({ ...prev, subjectTemplate: e.target.value }))} />
+                <label className="mt-3 block text-sm">Corpo</label>
+                <textarea className="h-32 w-full rounded border px-3 py-2" value={editing.bodyTemplate ?? ''} onChange={(e) => setEditing((prev: any) => ({ ...prev, bodyTemplate: e.target.value }))} />
+                <div className="mt-3 rounded border bg-slate-50 p-2 text-xs dark:bg-slate-800">
+                  <p className="mb-1 font-semibold">Placeholders disponíveis</p>
+                  <p>{DOCUMENT_NOTIFICATION_PLACEHOLDERS.join(', ')}</p>
+                </div>
+              </>
+            )}
+
+            {modalTab === 'previa' && (
+              <>
+                <div className="mb-2 flex flex-wrap items-end gap-2">
+                  <div>
+                    <label className="block text-xs">ID do documento (para prévia/teste)</label>
+                    <input className="rounded border px-3 py-2 text-sm" value={previewDocumentId} onChange={(e) => setPreviewDocumentId(e.target.value)} placeholder="UUID do documento" />
+                  </div>
+                  <button
+                    className="rounded border px-3 py-2 text-sm"
+                    onClick={async () => {
+                      const response = await fetch('/api/documents/notifications/preview', {
+                        method: 'POST', headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
+                      })
+                      const payload = await response.json()
+                      setPreviewResult(payload)
+                    }}
+                  >Prévia</button>
+                  <button className="inline-flex items-center gap-1 rounded border px-3 py-2 text-sm" onClick={async () => {
+                    const response = await fetch('/api/documents/notifications/test', {
+                      method: 'POST', headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ event: editing.event, documentId: previewDocumentId, flowItemId: editing.flowItemId, ruleId: editing.id }),
+                    })
+                    const payload = await response.json()
+                    setTestResult(payload.ok ? 'Envio de teste realizado.' : `Falha: ${payload.error ?? 'erro no envio'}`)
+                    refresh()
+                  }}><Send className="h-3 w-3" />Enviar teste</button>
+                </div>
+                {testResult && <p className="mb-2 text-xs">{testResult}</p>}
+                {previewResult && (
+                  <div className="rounded border p-3 text-xs">
+                    <p className="font-semibold">Prévia</p>
+                    <p><strong>Assunto:</strong> {previewResult.subject ?? '-'}</p>
+                    <p className="mt-1 whitespace-pre-wrap"><strong>Corpo:</strong> {previewResult.body ?? '-'}</p>
+                    <p className="mt-1"><strong>Destinatários:</strong> {(previewResult?.recipients?.recipients ?? []).map((item: any) => item.email).join(', ') || '-'}</p>
+                    <p className="mt-1"><strong>Alertas:</strong> {(previewResult?.recipients?.warnings ?? []).join(' | ') || 'Sem alertas'}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {modalTab === 'historico' && (
+              <div className="rounded border bg-slate-50 p-3 text-xs dark:bg-slate-800">
+                <p>O histórico completo fica na seção "Histórico geral" desta central. Use filtros por evento/status para diagnosticar ausências de destinatário e falhas de envio.</p>
               </div>
             )}
+
             <div className="mt-3"><button disabled={!canEdit || saving} onClick={onSave} className="inline-flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-sm text-white"><Save size={14} />Salvar</button></div>
           </div>
         </div>
