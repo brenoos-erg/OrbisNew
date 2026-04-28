@@ -216,7 +216,6 @@ function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
 
 async function getAccess(action: Action) {
   const appUser = await requireActiveUser()
-  const isSuperAdminEmail = appUser.email?.toLowerCase() === 'superadmin@ergengenharia.com.br'
   const hasFeatureAccess = await canFeature(
     appUser.id,
     MODULE_KEYS.SOLICITACOES,
@@ -224,7 +223,7 @@ async function getAccess(action: Action) {
     action,
   )
 
-  return hasFeatureAccess && isSuperAdminEmail
+  return hasFeatureAccess
 }
 
 
