@@ -7,6 +7,7 @@ import { resolveDocumentNotificationRecipients } from '@/lib/documents/documentN
 import { renderDocumentNotificationTemplate } from '@/lib/documents/documentNotificationTemplate'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
+import { composePublicUrl, resolveAppBaseUrl } from '@/lib/site-url'
 
 type NotificationContext = {
   documentId: string
@@ -33,6 +34,7 @@ async function getRule(event: DocumentNotificationEvent, documentTypeId?: string
 }
 
 async function buildTemplateVariables(context: NotificationContext, event: DocumentNotificationEvent) {
+  const baseUrl = resolveAppBaseUrl({ context: 'document-notifications' })
   const version = context.versionId
     ? await prisma.documentVersion.findUnique({
         where: { id: context.versionId },
@@ -87,7 +89,7 @@ async function buildTemplateVariables(context: NotificationContext, event: Docum
         : '-',
       approvalStep: flowItem ? `Etapa ${flowItem.order}` : '-',
       approverGroup: flowItem?.approverGroup.name ?? '-',
-      link: `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/dashboard/controle-documentos/visualizacao/${version?.id ?? ''}`,
+      link: composePublicUrl(baseUrl, `/dashboard/controle-documentos/visualizacao/${version?.id ?? ''}`),
       createdAt: document.createdAt.toLocaleString('pt-BR'),
       publishedAt: version?.publishedAt?.toLocaleString('pt-BR') ?? '-',
       expiresAt: version?.expiresAt?.toLocaleString('pt-BR') ?? '-',

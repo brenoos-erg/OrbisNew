@@ -5,9 +5,13 @@ const service = fs.readFileSync('src/lib/documents/documentNotificationService.t
 const recipients = fs.readFileSync('src/lib/documents/documentNotificationRecipients.ts', 'utf8')
 
 assert.match(service, /status: 'FAILED'/)
+assert.match(service, /'SENT'/)
+assert.match(service, /status: 'SKIPPED'/)
 assert.match(service, /recipientSource/)
 assert.match(service, /Sem destinatários finais para envio/)
 assert.match(service, /preview\.ccEmails/)
+assert.match(service, /resolveAppBaseUrl/)
+assert.match(service, /composePublicUrl/)
 assert.match(recipients, /Nenhum destinatário final foi resolvido para a regra/)
 assert.match(recipients, /canApproveTab3/)
 assert.match(recipients, /distributionTargets/)

@@ -408,7 +408,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                      <span className={labelBase}>Central de Notificações de Documentos</span>
+                      <span className={labelBase}>Central de Notificações</span>
                     </Link>
                   )}
                   {isAdmin && (

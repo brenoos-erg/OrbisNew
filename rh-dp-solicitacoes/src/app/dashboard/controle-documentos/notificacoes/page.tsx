@@ -9,7 +9,13 @@ export default async function Page() {
   if (!appUser) redirect('/login')
 
   const userIsAdmin = isAdmin(appUser)
-  if (!userIsAdmin) redirect('/dashboard/controle-documentos/publicados?forbidden=document-notifications')
+  if (!userIsAdmin) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        Acesso negado. Apenas administradores podem acessar a Central de Notificações de Documentos.
+      </div>
+    )
+  }
 
   const [canAccessApproval, canAccessQuality] = await Promise.all([
     canAccessApprovalDocuments(appUser.id, appUser.role),
