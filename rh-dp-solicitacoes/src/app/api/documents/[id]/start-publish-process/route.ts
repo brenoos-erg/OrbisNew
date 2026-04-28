@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { DocumentApprovalStatus, DocumentFlowStepType, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
@@ -37,6 +38,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       data: { status: flow[0].stepType === DocumentFlowStepType.QUALITY ? DocumentVersionStatus.EM_ANALISE_QUALIDADE : DocumentVersionStatus.EM_REVISAO },
     }),
   ])
+
+  void sendDocumentNotification('DOCUMENT_SUBMITTED_FOR_APPROVAL', {
+    documentId: document.id,
+    versionId: version.id,
+    flowItemId: flow[0]?.id,
+    actorUserId: me.id,
+  }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
+
+  if (flow[0]?.stepType === DocumentFlowStepType.QUALITY) {
+    void sendDocumentNotification('DOCUMENT_QUALITY_REVIEW', {
+      documentId: document.id,
+      versionId: version.id,
+      flowItemId: flow[0]?.id,
+      actorUserId: me.id,
+    }).catch((error) => console.error('DOCUMENT_QUALITY_REVIEW notification failed', error))
+  }
 
   return NextResponse.json({ ok: true })
 }

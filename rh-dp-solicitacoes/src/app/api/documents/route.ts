@@ -14,6 +14,7 @@ import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/docu
 import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 import { codeMatchesRequiredPrefix, resolveDocumentCodePrefixFromTypeCode } from '@/lib/documents/documentCodePrefix'
+import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -259,6 +260,17 @@ export async function POST(req: NextRequest)   {
       })
 
       const routing = routingForStatus(initialStatus)
+      void sendDocumentNotification('DOCUMENT_CREATED', {
+        documentId: existing.id,
+        versionId: revisedVersion.id,
+      }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
+
+      if (initialStatus === DocumentVersionStatus.AG_APROVACAO) {
+        void sendDocumentNotification('DOCUMENT_SUBMITTED_FOR_APPROVAL', {
+          documentId: existing.id,
+          versionId: revisedVersion.id,
+        }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
+      }
       return NextResponse.json(
         {
           id: existing.id,
@@ -317,6 +329,20 @@ export async function POST(req: NextRequest)   {
           status: DocumentApprovalStatus.PENDING,
         })),
       })
+    }
+
+    if (created.versions[0]) {
+      void sendDocumentNotification('DOCUMENT_CREATED', {
+        documentId: created.id,
+        versionId: created.versions[0].id,
+      }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
+
+      if (initialStatus === DocumentVersionStatus.AG_APROVACAO) {
+        void sendDocumentNotification('DOCUMENT_SUBMITTED_FOR_APPROVAL', {
+          documentId: created.id,
+          versionId: created.versions[0].id,
+        }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
+      }
     }
 
    failureStage = 'response:success'

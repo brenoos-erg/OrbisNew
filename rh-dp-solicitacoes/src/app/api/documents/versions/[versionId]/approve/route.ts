@@ -3,9 +3,9 @@ import { DocumentApprovalStatus, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
-import { notifyDocumentPublished } from '@/lib/isoDocumentNotifications'
 import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
+import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -108,10 +108,34 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     }),
   ])
 
+  const documentId = (
+    await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { documentId: true } })
+  )?.documentId
+
+  if (documentId) {
+    void sendDocumentNotification('DOCUMENT_APPROVED', {
+      documentId,
+      versionId,
+      flowItemId: approval.flowItemId,
+      actorUserId: me.id,
+    }).catch((error) => console.error('DOCUMENT_APPROVED notification failed', error))
+
+    if (nextStatus === DocumentVersionStatus.EM_ANALISE_QUALIDADE) {
+      void sendDocumentNotification('DOCUMENT_QUALITY_REVIEW', {
+        documentId,
+        versionId,
+        actorUserId: me.id,
+      }).catch((error) => console.error('DOCUMENT_QUALITY_REVIEW notification failed', error))
+    }
+  }
+
   if (nextStatus === DocumentVersionStatus.PUBLICADO) {
-    const mailResult = await notifyDocumentPublished(versionId)
-    if (!mailResult.sent) {
-      console.warn('Document publication alert not sent', { versionId, reason: mailResult.reason })
+    if (documentId) {
+      void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+        documentId,
+        versionId,
+        actorUserId: me.id,
+      }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
     }
   }
 

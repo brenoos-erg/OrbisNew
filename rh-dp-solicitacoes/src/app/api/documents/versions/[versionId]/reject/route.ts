@@ -3,6 +3,7 @@ import { DocumentApprovalStatus, DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { canApproveDocumentStage } from '@/lib/documentApprovalControl'
 import { prisma } from '@/lib/prisma'
+import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -32,6 +33,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     }),
     prisma.documentVersion.update({ where: { id: versionId }, data: { status: DocumentVersionStatus.EM_ELABORACAO } }),
   ])
+
+  const documentId = (
+    await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { documentId: true } })
+  )?.documentId
+
+  if (documentId) {
+    void sendDocumentNotification('DOCUMENT_REJECTED', {
+      documentId,
+      versionId,
+      flowItemId: approval.flowItemId,
+      actorUserId: me.id,
+      comment: typeof comment === 'string' ? comment : null,
+    }).catch((error) => console.error('DOCUMENT_REJECTED notification failed', error))
+  }
 
   return NextResponse.json({ ok: true })
 }
