@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
     const notificationResult = await notifyNonConformityStakeholders({
       nonConformityId: created.id,
       actorId: me.id,
-      trigger: 'created',
+      event: 'NC_CREATED',
     })
     if (!notificationResult.sent) {
       console.warn('NC notification not sent', {
