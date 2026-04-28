@@ -6,41 +6,27 @@ import { EmailControlPanel } from '@/components/solicitacoes/EmailControlPanel'
 
 export default async function SolicitacoesCadastrosPage() {
   const { appUser } = await getCurrentAppUser()
-  const isSuperAdminEmail = appUser?.email?.toLowerCase() === 'superadmin@ergengenharia.com.br'
 
   const canViewFluxos = appUser
-    ? await canFeature(
-        appUser.id,
-        MODULE_KEYS.SOLICITACOES,
-        FEATURE_KEYS.SOLICITACOES.FLUXOS,
-        Action.VIEW,
-      )
+    ? await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.FLUXOS, Action.VIEW)
     : false
 
   const canEditFluxos = appUser
-    ? await canFeature(
-        appUser.id,
-        MODULE_KEYS.SOLICITACOES,
-        FEATURE_KEYS.SOLICITACOES.FLUXOS,
-        Action.UPDATE,
-      )
+    ? await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.FLUXOS, Action.UPDATE)
     : false
-
-
-  const canAccessEmailControl = canViewFluxos && isSuperAdminEmail
 
   return (
     <div className="space-y-4">
-     <h1 className="text-xl font-semibold">Controle de Emails</h1>
+      <h1 className="text-xl font-semibold">Central de Notificações de Solicitações</h1>
       <p className="text-sm text-[var(--muted-foreground)]">
-        Configure as mensagens enviadas para departamentos e aprovadores em cada etapa/ação.
+        Configure quem será notificado em cada etapa do fluxo e acompanhe falhas de envio.
       </p>
 
-      {canAccessEmailControl ? (
+      {canViewFluxos ? (
         <EmailControlPanel canEdit={canEditFluxos} />
       ) : (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Esta área é restrita ao administrador principal (<strong>superadmin@ergengenharia.com.br</strong>).
+          Você não possui permissão para visualizar esta central.
         </div>
       )}
     </div>

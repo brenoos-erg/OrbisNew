@@ -865,7 +865,7 @@ export default function Sidebar({
                             : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
                         }`}
                     >
-                     <FolderCog size={16} /> <span className={labelBase}>Controle de Emails</span>
+                     <FolderCog size={16} /> <span className={labelBase}>Central de Notificações</span>
                     </Link>
                   )}
 
