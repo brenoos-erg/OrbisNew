@@ -141,6 +141,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         aprovadoQualidadeStatus: true,
         centroQueDetectouId: true,
         centroQueOriginouId: true,
+        centroQueDetectou: { select: { description: true } },
+        centroQueOriginou: { select: { description: true } },
       },
     })
     if (!current) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
@@ -193,6 +195,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Somente nível 3 pode reabrir.' }, { status: 403 })
     }
 
+    const centroQueDetectouId =
+      body?.centroQueDetectouId !== undefined
+        ? String(body.centroQueDetectouId || '').trim()
+        : undefined
+    const centroQueOriginouId =
+      body?.centroQueOriginouId !== undefined
+        ? String(body.centroQueOriginouId || '').trim()
+        : undefined
+    const prazoAtendimento =
+      body?.prazoAtendimento !== undefined
+        ? (body.prazoAtendimento ? new Date(String(body.prazoAtendimento)) : undefined)
+        : undefined
+
+    if (body?.prazoAtendimento !== undefined && !body.prazoAtendimento) {
+      return NextResponse.json({ error: 'Prazo de atendimento inválido.' }, { status: 400 })
+    }
+
+    if (prazoAtendimento instanceof Date && Number.isNaN(prazoAtendimento.getTime())) {
+      return NextResponse.json({ error: 'Prazo de atendimento inválido.' }, { status: 400 })
+    }
+
+    if (
+      body?.centroQueDetectouId !== undefined ||
+      body?.centroQueOriginouId !== undefined
+    ) {
+      if (!centroQueDetectouId || !centroQueOriginouId) {
+        return NextResponse.json({ error: 'Centro de custo inválido.' }, { status: 400 })
+      }
+      const [detected, origin] = await Promise.all([
+        prisma.costCenter.findUnique({ where: { id: centroQueDetectouId }, select: { id: true, description: true } }),
+        prisma.costCenter.findUnique({ where: { id: centroQueOriginouId }, select: { id: true, description: true } }),
+      ])
+
+      if (!detected || !origin) {
+        return NextResponse.json({ error: 'Centro de custo inválido.' }, { status: 400 })
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const item = await tx.nonConformity.update({
         where: { id },
@@ -201,6 +241,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           tipoNc: body?.tipoNc && Object.values(NonConformityType).includes(body.tipoNc) ? body.tipoNc : undefined,
           descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
           evidenciaObjetiva: body?.evidenciaObjetiva !== undefined ? String(body.evidenciaObjetiva).trim() : undefined,
+          empresa: body?.empresa !== undefined ? String(body.empresa).trim() : undefined,
+          centroQueDetectouId,
+          centroQueOriginouId,
+          prazoAtendimento,
           referenciaSig: body?.referenciaSig !== undefined ? (body.referenciaSig ? String(body.referenciaSig).trim() : null) : undefined,
           acoesImediatas: body?.acoesImediatas !== undefined ? (body.acoesImediatas ? String(body.acoesImediatas).trim() : null) : undefined,
           causaRaiz: body?.causaRaiz !== undefined ? (body.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined,
@@ -226,6 +270,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 : `Status alterado para ${nextStatus}`
             : 'Não conformidade atualizada',
       })
+
+      if (centroQueDetectouId && centroQueDetectouId !== current.centroQueDetectouId) {
+        const detected = await tx.costCenter.findUnique({
+          where: { id: centroQueDetectouId },
+          select: { description: true },
+        })
+        await appendNonConformityTimelineEvent(tx, {
+          nonConformityId: id,
+          actorId: me.id,
+          tipo: 'ATUALIZACAO',
+          message: `Centro que detectou alterado de ${current.centroQueDetectou?.description || '-'} para ${detected?.description || '-'}`,
+        })
+      }
+
+      if (centroQueOriginouId && centroQueOriginouId !== current.centroQueOriginouId) {
+        const origin = await tx.costCenter.findUnique({
+          where: { id: centroQueOriginouId },
+          select: { description: true },
+        })
+        await appendNonConformityTimelineEvent(tx, {
+          nonConformityId: id,
+          actorId: me.id,
+          tipo: 'ATUALIZACAO',
+          message: `Centro que originou alterado de ${current.centroQueOriginou?.description || '-'} para ${origin?.description || '-'}`,
+        })
+      }
 
         return item
     })
