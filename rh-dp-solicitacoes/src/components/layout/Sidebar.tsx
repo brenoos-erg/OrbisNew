@@ -400,6 +400,19 @@ export default function Sidebar({
                   )}
                   {isAdmin && (
                     <Link
+                      href="/dashboard/controle-documentos/notificacoes"
+                      className={`${submenuItemBase}
+                        ${
+                          pathname.startsWith('/dashboard/controle-documentos/notificacoes')
+                            ? 'bg-orange-500/90 text-white'
+                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                        }`}
+                    >
+                      <span className={labelBase}>Central de Notificações de Documentos</span>
+                    </Link>
+                  )}
+                  {isAdmin && (
+                    <Link
                       href="/dashboard/controle-documentos/controle-aprovadores"
                       className={`${submenuItemBase}
                         ${
