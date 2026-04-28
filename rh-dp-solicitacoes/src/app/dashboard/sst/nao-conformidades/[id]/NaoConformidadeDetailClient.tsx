@@ -58,10 +58,13 @@ type Detail = {
     nonConformityId: string
     totalAcoes: number
   }
-  centroQueDetectou?: { description: string }
-  centroQueOriginou?: { description: string }
+  centroQueDetectouId: string
+  centroQueOriginouId: string
+  centroQueDetectou?: { id: string; description: string }
+  centroQueOriginou?: { id: string; description: string }
   permissions?: { canManageAllNc?: boolean; canApproveQuality?: boolean; canEditFirstScreen?: boolean }
 }
+type CostCenterSelect = { id: string; description: string }
 type SectionKey = 'naoConformidade' | 'evidencias' | 'estudoCausa' | 'planoDeAcao' | 'verificacao' | 'comentarios' | 'timeline'
 
 const ACTION_STATUS_OPTIONS = Object.values(NonConformityActionStatus)
@@ -150,9 +153,16 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [actionFiltersDraft, setActionFiltersDraft] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
  const [actionFilters, setActionFilters] = useState<ActionFilters>(DEFAULT_ACTION_FILTERS)
   const [editingFirstScreen, setEditingFirstScreen] = useState(false)
+  const [costCenters, setCostCenters] = useState<CostCenterSelect[]>([])
+  const [costCentersError, setCostCentersError] = useState<string | null>(null)
+  const [detailSuccess, setDetailSuccess] = useState<string | null>(null)
   const [firstScreenForm, setFirstScreenForm] = useState({
     descricao: '',
     evidenciaObjetiva: '',
+    empresa: '',
+    centroQueDetectouId: '',
+    centroQueOriginouId: '',
+    prazoAtendimento: '',
     referenciaSig: '',
     tipoNc: '' as keyof typeof nonConformityTypeLabel,
     acoesImediatas: '',
@@ -174,9 +184,21 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   async function load() {
     try {
       setLoading(true)
-      const res = await fetch(`/api/sst/nao-conformidades/${id}`, { cache: 'no-store' })
+      const [res, costCentersRes] = await Promise.all([
+        fetch(`/api/sst/nao-conformidades/${id}`, { cache: 'no-store' }),
+        fetch('/api/cost-centers/select', { cache: 'no-store' }),
+      ])
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Erro ao carregar')
+      if (!costCentersRes.ok) {
+        setCostCenters([])
+        setCostCentersError('Não foi possível carregar os centros de custo para edição.')
+      } else {
+        const costCentersData = await costCentersRes.json().catch(() => [])
+        const normalizedCostCenters = Array.isArray(costCentersData) ? costCentersData : []
+        setCostCenters(normalizedCostCenters)
+        setCostCentersError(null)
+      }
       setItem(data.item)
       setGut({
          gravidade: Number(data.item.gravidade) || 1,
@@ -188,6 +210,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       setFirstScreenForm({
         descricao: data.item.descricao || '',
         evidenciaObjetiva: data.item.evidenciaObjetiva || '',
+        empresa: data.item.empresa || '',
+        centroQueDetectouId: data.item.centroQueDetectouId || '',
+        centroQueOriginouId: data.item.centroQueOriginouId || '',
+        prazoAtendimento: data.item.prazoAtendimento ? String(data.item.prazoAtendimento).slice(0, 10) : '',
         referenciaSig: data.item.referenciaSig || '',
         tipoNc: data.item.tipoNc,
         acoesImediatas: data.item.acoesImediatas || '',
@@ -317,14 +343,29 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   async function salvarPrimeiraTela(e: FormEvent) {
     e.preventDefault()
     if (!canEditFirstScreen) return
+    const centroDetectouValido = costCenters.some((center) => center.id === firstScreenForm.centroQueDetectouId)
+    const centroOriginouValido = costCenters.some((center) => center.id === firstScreenForm.centroQueOriginouId)
+    if (!centroDetectouValido || !centroOriginouValido) {
+      setDetailError('Selecione centros de custo válidos para salvar.')
+      return
+    }
+    if (costCentersError) {
+      setDetailError(costCentersError)
+      return
+    }
     setDetailSaving(true)
     setDetailError(null)
+    setDetailSuccess(null)
     const res = await fetch(`/api/sst/nao-conformidades/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         descricao: firstScreenForm.descricao,
         evidenciaObjetiva: firstScreenForm.evidenciaObjetiva,
+        empresa: firstScreenForm.empresa,
+        centroQueDetectouId: firstScreenForm.centroQueDetectouId,
+        centroQueOriginouId: firstScreenForm.centroQueOriginouId,
+        prazoAtendimento: firstScreenForm.prazoAtendimento || null,
         referenciaSig: firstScreenForm.referenciaSig,
         tipoNc: firstScreenForm.tipoNc,
         acoesImediatas: firstScreenForm.acoesImediatas,
@@ -338,7 +379,8 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     }
     setDetailSaving(false)
     setEditingFirstScreen(false)
-    load()
+    setDetailSuccess('Dados da não conformidade atualizados com sucesso.')
+    await load()
   }
 
   async function salvarVerificacao(e: FormEvent) {
@@ -605,6 +647,32 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
                   <textarea value={firstScreenForm.evidenciaObjetiva} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, evidenciaObjetiva: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" rows={3} />
                 </label>
                 <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Empresa
+                  <input value={firstScreenForm.empresa} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, empresa: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" />
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Centro que detectou
+                  <select value={firstScreenForm.centroQueDetectouId} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, centroQueDetectouId: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal">
+                    <option value="">Selecione</option>
+                    {costCenters.map((center) => (
+                      <option key={center.id} value={center.id}>{center.description}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Centro que originou
+                  <select value={firstScreenForm.centroQueOriginouId} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, centroQueOriginouId: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal">
+                    <option value="">Selecione</option>
+                    {costCenters.map((center) => (
+                      <option key={center.id} value={center.id}>{center.description}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
+                  Prazo atendimento
+                  <input type="date" value={firstScreenForm.prazoAtendimento} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, prazoAtendimento: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" />
+                </label>
+                <label className="block space-y-1 text-sm font-medium text-slate-700">
                   Referência SIG
                   <input value={firstScreenForm.referenciaSig} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, referenciaSig: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" />
                 </label>
@@ -620,14 +688,16 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
                   Ações imediatas
                   <textarea value={firstScreenForm.acoesImediatas} onChange={(e) => setFirstScreenForm((prev) => ({ ...prev, acoesImediatas: e.target.value }))} className="w-full rounded border px-2 py-1 text-sm font-normal" rows={3} />
                 </label>
+                {costCentersError ? <p className="text-sm text-rose-700">{costCentersError}</p> : null}
                 {detailError ? <p className="text-sm text-rose-700">{detailError}</p> : null}
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => { setEditingFirstScreen(false); setDetailError(null) }} className="rounded border border-slate-300 px-3 py-2 text-sm">Cancelar</button>
-                  <button disabled={detailSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{detailSaving ? 'Salvando...' : 'Salvar edição'}</button>
+                  <button disabled={detailSaving || Boolean(costCentersError)} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{detailSaving ? 'Salvando...' : 'Salvar edição'}</button>
                 </div>
               </form>
             ) : (
               <>
+                {detailSuccess ? <p className="mb-3 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm text-emerald-700">{detailSuccess}</p> : null}
                 <Info label="Descrição" value={item.descricao} />
                 <Info label="Evidência objetiva" value={item.evidenciaObjetiva} />
                 <Info label="Empresa" value={item.empresa} />

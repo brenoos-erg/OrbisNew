@@ -2,8 +2,15 @@ export const NON_CONFORMITY_FIRST_SCREEN_FIELDS = [
   'tipoNc',
   'descricao',
   'evidenciaObjetiva',
+  'empresa',
+  'centroQueDetectouId',
+  'centroQueOriginouId',
+  'prazoAtendimento',
   'referenciaSig',
   'acoesImediatas',
+  'gravidade',
+  'urgencia',
+  'tendencia',
 ] as const
 
 export function isEditingFirstScreen(touchedFields: string[]) {
