@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { requireActiveUser } from '@/lib/auth'
 
 export async function getDocumentApprovalControl(userId: string) {
   return prisma.documentApprovalControl.findUnique({ where: { userId } })
@@ -6,6 +7,14 @@ export async function getDocumentApprovalControl(userId: string) {
 
 export function isAdmin(user?: { role?: string | null } | null) {
   return user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+}
+
+export async function requireAdminUser() {
+  const me = await requireActiveUser()
+  if (!isAdmin(me)) {
+    throw new Error('Acesso restrito a administradores')
+  }
+  return me
 }
 
 export async function canAccessApprovalDocuments(userId: string, userRole?: string | null) {

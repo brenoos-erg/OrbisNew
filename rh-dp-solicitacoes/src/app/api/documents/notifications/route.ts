@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Action, ModuleLevel } from '@prisma/client'
-import { requireActiveUser } from '@/lib/auth'
+import { Action } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { MODULE_KEYS } from '@/lib/featureKeys'
-import { getUserModuleLevel } from '@/lib/access'
 import {
   DOCUMENT_NOTIFICATION_DEFAULT_TEMPLATES,
   DOCUMENT_NOTIFICATION_EVENT_LABELS,
   type DocumentNotificationEvent,
 } from '@/lib/documents/documentNotificationTypes'
 import { previewDocumentNotification, sendDocumentNotification } from '@/lib/documents/documentNotificationService'
+import { requireAdminUser } from '@/lib/documentApprovalControl'
 
-async function checkAccess(action: Action) {
-  const me = await requireActiveUser()
-  const level = await getUserModuleLevel(me.id, MODULE_KEYS.CONTROLE_DOCUMENTOS)
-  const canView = level === ModuleLevel.NIVEL_2 || level === ModuleLevel.NIVEL_3
-  const canEdit = level === ModuleLevel.NIVEL_3
-  if (action === Action.VIEW && canView) return { me, canEdit }
-  if (action !== Action.VIEW && canEdit) return { me, canEdit }
-  return null
+async function checkAccess(_action: Action) {
+  try {
+    const me = await requireAdminUser()
+    return { me, canEdit: true }
+  } catch {
+    return null
+  }
 }
 
 function getRuleDefaults(event: DocumentNotificationEvent) {
