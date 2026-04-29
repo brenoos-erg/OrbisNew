@@ -11,7 +11,8 @@ function hasMinLevel(level: ModuleLevel | undefined, min: ModuleLevel) {
   return ORDER.indexOf(level) >= ORDER.indexOf(min)
 }
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { appUser } = await getCurrentAppUser()
   if (!appUser) redirect('/login')
 
@@ -21,5 +22,5 @@ export default async function Page({ params }: { params: { id: string } }) {
 
   const canReview = hasMinLevel(level, ModuleLevel.NIVEL_2)
 
-  return <RefusalDetailClient reportId={params.id} canReview={canReview} />
+  return <RefusalDetailClient reportId={id} canReview={canReview} />
 }
