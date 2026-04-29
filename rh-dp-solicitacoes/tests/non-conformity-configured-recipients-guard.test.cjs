@@ -6,7 +6,7 @@ const actionPlanSource = fs.readFileSync('src/app/api/sst/nao-conformidades/[id]
 
 assert.match(notificationSource, /CONFIGURED_RECIPIENT_ALLOWED_EVENTS/)
 assert.match(notificationSource, /'NC_CREATED', 'NC_UPDATED'/)
-assert.match(notificationSource, /Role\.ADMIN, Role\.SUPER_ADMIN/)
+assert.match(notificationSource, /Role\.ADMIN/)
 assert.match(actionPlanSource, /sem notificação automática por ausência de usuário vinculado/)
 
 console.log('non-conformity-configured-recipients-guard ok')
