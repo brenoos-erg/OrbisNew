@@ -255,6 +255,7 @@ export type SolicitationDetail = {
   descricao: string | null
   status: SolicitationStatus | string
   approvalStatus?: ApprovalStatus | null
+  viewerOnly?: boolean
   dataAbertura: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -1038,7 +1039,8 @@ export function SolicitationDetailModal({
 
   // Se for tela de aprovação não mostramos ações de gestão;
   // se canManage=false (Solicitações Enviadas) também não.
-  const showManagementActions = !isApprovalMode && canManage
+  const isViewerOnly = detail?.viewerOnly === true
+  const showManagementActions = !isApprovalMode && canManage && !isViewerOnly
   const userIsSstOrAdmin =
     currentUser?.role === 'ADMIN' ||
    currentUser?.departmentCode === '19' ||
@@ -1075,6 +1077,7 @@ export function SolicitationDetailModal({
   const canShowApprovalActions =
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
+    !isViewerOnly &&
     canApproveByDepartment &&
     (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme)
   const camposFormSolicitante = (
@@ -2136,6 +2139,11 @@ async function handleEncaminharAprovacaoComAnexo() {
           <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Detalhes da Solicitação</h2>
             <p className="text-xs text-[var(--muted-foreground)]">Protocolo {detail?.protocolo ?? row.protocolo ?? '-'}</p>
+            {isViewerOnly && (
+              <p className="mt-1 inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                Visualizador (somente leitura)
+              </p>
+            )}
            </div>
           <button onClick={onClose} className="app-button-secondary">
             Fechar tudo

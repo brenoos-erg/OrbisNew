@@ -12,6 +12,7 @@ import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensi
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 import { canViewSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import {
   listExperienceEvaluators,
   patchExperienceEvaluationEvaluatorPayload,
@@ -101,6 +102,10 @@ export async function GET(
         primaryDepartment: me.department,
       }),
     ])
+    const viewerOnly = await isViewerOnlyForSolicitation({
+      solicitationId: item.id,
+      userId: me.id,
+    })
 
 
     const canViewSensitive = canViewSensitiveHiringRequest({
@@ -211,6 +216,7 @@ export async function GET(
       responsavelAtualId: primaryResponsible.responsavelId,
       responsavelAtual: primaryResponsible.responsavel,
       approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
+      viewerOnly,
 
       dataAbertura: item.dataAbertura?.toISOString(),
       dataPrevista: item.dataPrevista?.toISOString() ?? null,
