@@ -1,4 +1,4 @@
-import { ModuleLevel, NonConformityStatus, Prisma, UserStatus } from '@prisma/client'
+import { ModuleLevel, NonConformityStatus, Prisma, Role, UserStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendMail } from '@/lib/mailer'
 import { ensureNonConformityAlertConfig, renderNcAlertTemplate } from '@/lib/sst/nonConformityAlertConfig'
@@ -30,6 +30,8 @@ type RecipientResolution = {
   marker: string
   includeConfiguredRecipients?: boolean
 }
+
+const CONFIGURED_RECIPIENT_ALLOWED_EVENTS: NonConformityNotificationEvent[] = ['NC_CREATED', 'NC_UPDATED']
 
 const RETROACTIVE_ELIGIBLE_STATUSES: NonConformityStatus[] = [
   NonConformityStatus.ABERTA,
@@ -262,9 +264,39 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
   }
 
   const recipients = new Set(resolved.recipients.map((x) => x.email))
+  const configuredRecipientsAdded: string[] = []
   if (resolved.includeConfiguredRecipients) {
-    const configRecipients = (config.recipients ?? []).map((recipient: { email: string }) => recipient.email).filter(Boolean)
-    for (const email of configRecipients) recipients.add(email)
+    if (CONFIGURED_RECIPIENT_ALLOWED_EVENTS.includes(input.event)) {
+      const configuredEmails = (config.recipients ?? [])
+        .map((recipient: { email: string }) => recipient.email?.trim().toLowerCase())
+        .filter(Boolean) as string[]
+      if (configuredEmails.length > 0) {
+        const users = await db.user.findMany({
+          where: {
+            email: { in: configuredEmails },
+            status: UserStatus.ATIVO,
+            OR: [
+              { role: { in: [Role.ADMIN, Role.SUPER_ADMIN] } },
+              {
+                moduleAccess: {
+                  some: {
+                    module: { key: { in: [...QUALITY_MODULE_KEYS] } },
+                    level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
+                  },
+                },
+              },
+            ],
+          },
+          select: { email: true },
+        })
+        for (const user of users) {
+          const email = user.email?.trim()
+          if (!email) continue
+          recipients.add(email)
+          configuredRecipientsAdded.push(email)
+        }
+      }
+    }
   }
 
   const to = Array.from(recipients)
@@ -305,7 +337,7 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
       nonConformityId: input.nonConformityId,
       actorId: input.actorId ?? null,
       tipo: 'ALERTA',
-      message: `${resolved.marker} (${to.length} destinatário(s); envio=${mailResult.sent ? 'ok' : 'falha'})`,
+      message: `${resolved.marker} (${to.length} destinatário(s); envio=${mailResult.sent ? 'ok' : 'falha'}${configuredRecipientsAdded.length ? `; fixos=${configuredRecipientsAdded.join(', ')}` : ''})`,
     },
   })
 
