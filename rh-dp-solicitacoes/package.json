@@ -19,7 +19,9 @@
     "prisma:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
     "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma",
     "test:workflow-notifications": "node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-rules.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-workflow-notification-link.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/tipo-approver-resolution.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/workflow-approval-recipients.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/equipment-approval-fallback.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitation-types.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/solicitacao-equipamento-workflow.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/workflow-notification-central.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/document-notification-recipients-utils.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/document-notification-template.test.cjs",
-    "nc:retroactive-alerts": "node -r ts-node/register -r tsconfig-paths/register scripts/retroactive-nc-alerts.ts"
+    "nc:retroactive-alerts": "node -r ts-node/register -r tsconfig-paths/register scripts/retroactive-nc-alerts.ts",
+    "build:prod": "cross-env NODE_OPTIONS=--max-old-space-size=12288 NEXT_PRIVATE_BUILD_WORKER_COUNT=1 next build",
+    "build:webpack": "cross-env NODE_OPTIONS=--max-old-space-size=12288 NEXT_PRIVATE_BUILD_WORKER_COUNT=1 next build --webpack"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -54,7 +56,8 @@
     "tailwindcss": "^4.1.16",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "cross-env": "^7.0.3"
   },
   "prisma": {
     "seed": "ts-node -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts"
