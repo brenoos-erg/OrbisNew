@@ -278,7 +278,7 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
             OR: [
               { role: { in: [Role.ADMIN] } },
               {
-                moduleAccess: {
+                moduleAccesses: {
                   some: {
                     module: { key: { in: [...QUALITY_MODULE_KEYS] } },
                     level: { in: [ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
