@@ -276,7 +276,7 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
             email: { in: configuredEmails },
             status: UserStatus.ATIVO,
             OR: [
-              { role: { in: [Role.ADMIN, Role.SUPER_ADMIN] } },
+              { role: { in: [Role.ADMIN] } },
               {
                 moduleAccess: {
                   some: {

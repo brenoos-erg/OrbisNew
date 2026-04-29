@@ -6,7 +6,7 @@ export async function getDocumentApprovalControl(userId: string) {
 }
 
 export function isAdmin(user?: { role?: string | null } | null) {
-  return user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  return user?.role === 'ADMIN'
 }
 
 export async function requireAdminUser() {

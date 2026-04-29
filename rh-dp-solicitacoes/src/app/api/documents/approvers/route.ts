@@ -3,7 +3,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 function isAdmin(role?: string | null) {
-  return role === 'ADMIN' || role === 'SUPER_ADMIN'
+  return role === 'ADMIN'
 }
 
 export async function GET() {
