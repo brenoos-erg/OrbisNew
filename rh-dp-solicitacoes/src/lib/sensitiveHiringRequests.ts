@@ -31,6 +31,7 @@ export function buildSensitiveHiringVisibilityWhere(input: {
   userFullName?: string | null
   role?: Role | null
   departmentIds?: string[]
+  allowedTipoIds?: string[]
 }) {
   const isAdmin = input.role === 'ADMIN'
   const isRh = input.role === 'RH'
@@ -44,6 +45,11 @@ export function buildSensitiveHiringVisibilityWhere(input: {
 
   if (relatedDepartments.length > 0) {
     participantFilters.push({ departmentId: { in: relatedDepartments } })
+  }
+
+  const allowedTipoIds = (input.allowedTipoIds ?? []).filter(Boolean)
+  if (allowedTipoIds.length > 0) {
+    participantFilters.push({ tipoId: { in: allowedTipoIds } })
   }
 
   if (isAdmin || isRh) {
