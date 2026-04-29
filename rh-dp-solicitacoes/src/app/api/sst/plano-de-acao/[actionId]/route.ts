@@ -8,6 +8,7 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
+import { notifyActionItemUpdate } from '@/lib/sst/actionPlanNotifications'
 
 function canAccessAction(
   action: { createdById: string | null; responsavelId: string | null; nonConformity?: { solicitanteId: string } | null },
@@ -183,6 +184,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ac
         status: desiredStatus,
         evidencias: observacao || body?.evidencias !== undefined ? evidenciasWithObs : undefined,      },
     })
+
+
+    if (!updated.responsavelId && updated.responsavelNome) {
+      console.warn('Ação criada com responsável em texto livre; sem notificação automática por ausência de usuário vinculado.')
+    }
+    if (updated.responsavelId && updated.responsavelId !== current.responsavelId) {
+      await notifyActionItemUpdate(updated.id, 'STANDALONE_ACTION_ASSIGNED')
+    }
+    if (current.status !== updated.status && updated.status === NonConformityActionStatus.CONCLUIDA) {
+      await notifyActionItemUpdate(updated.id, 'STANDALONE_ACTION_COMPLETED')
+    } else {
+      await notifyActionItemUpdate(updated.id, 'STANDALONE_ACTION_UPDATED')
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

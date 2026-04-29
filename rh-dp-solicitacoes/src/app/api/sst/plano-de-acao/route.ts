@@ -15,6 +15,7 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { isActionOverdue, resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
+import { notifyActionItemUpdate } from '@/lib/sst/actionPlanNotifications'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -243,6 +244,14 @@ export async function POST(req: NextRequest) {
         evidencias,
       },
     })
+
+
+    await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_CREATED')
+    if (created.responsavelId) {
+      await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_ASSIGNED')
+    } else if (created.responsavelNome) {
+      console.warn('Ação criada com responsável em texto livre; sem notificação automática por ausência de usuário vinculado.')
+    }
 
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
