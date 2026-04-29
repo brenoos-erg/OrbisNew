@@ -134,6 +134,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         tipo: 'PLANO_ACAO',
         message: `Ação ${created.id} criada no plano de ação (${created.status})${created.descricao ? ` - ${created.descricao}` : ''}`,
       })
+      if (!created.responsavelId && created.responsavelNome) {
+        await appendNonConformityTimelineEvent(tx, {
+          nonConformityId: id,
+          actorId: me.id,
+          tipo: 'ALERTA',
+          message: `Ação ${created.id} criada com responsável em texto livre (${created.responsavelNome}); sem notificação automática por ausência de usuário vinculado`,
+        })
+      }
       return created
     })
 
@@ -271,6 +279,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             ? `Ação ${updated.id} alterada de ${previous.status} para ${updated.status}${updated.descricao ? ` - ${updated.descricao}` : ''}`
             : `Ação ${updated.id} atualizada (${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`,
       })
+      if (!updated.responsavelId && updated.responsavelNome) {
+        await appendNonConformityTimelineEvent(tx, {
+          nonConformityId: id,
+          actorId: me.id,
+          tipo: 'ALERTA',
+          message: `Ação ${updated.id} permanece com responsável em texto livre (${updated.responsavelNome}); sem notificação automática por ausência de usuário vinculado`,
+        })
+      }
       return updated
     })
 
