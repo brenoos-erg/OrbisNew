@@ -9,6 +9,7 @@ import {
   NADA_CONSTA_SETORES,
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
+import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 const normalizeConstaValue = (value: unknown): 'CONSTA' | 'NADA_CONSTA' | null => {
   if (typeof value !== 'string') return null
@@ -50,6 +51,11 @@ export async function POST(
   try {
     const me = await requireActiveUser()
     const { id } = await params
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+    }
+
     const body = await req.json().catch(() => null)
 
     if (!body || typeof body !== 'object') {

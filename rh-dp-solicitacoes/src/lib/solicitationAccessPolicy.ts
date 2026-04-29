@@ -22,6 +22,7 @@ export type UserAccessContext = {
   userSetorKeys: string[]
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
+  actionableTipoIds: string[]
 }
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
@@ -69,13 +70,17 @@ export async function resolveUserAccessContext(input: {
   }
 
   const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
-  const [finalizerRows, allowedTipoRows] = await Promise.all([
+  const [finalizerRows, allowedTipoRows, approverTipoRows] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
       select: { tipoId: true },
     }),
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId },
+      select: { tipoId: true },
+    }),
+    prisma.tipoSolicitacaoApprover.findMany({
+      where: { userId: input.userId, role: 'APPROVER' },
       select: { tipoId: true },
     }),
   ])
@@ -90,6 +95,7 @@ export async function resolveUserAccessContext(input: {
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
     allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
+    actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
   }
 }
 
@@ -159,7 +165,7 @@ function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: Solicita
     }
   }
 
-  if (solicitation.tipoId && ctx.allowedTipoIds.includes(solicitation.tipoId)) {
+  if (solicitation.tipoId && ctx.actionableTipoIds.includes(solicitation.tipoId)) {
     return true
   }
 

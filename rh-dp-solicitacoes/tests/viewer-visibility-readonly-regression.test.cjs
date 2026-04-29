@@ -6,6 +6,33 @@ const visibility = fs.readFileSync('src/lib/solicitationVisibility.ts', 'utf8')
 const detailRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/route.ts', 'utf8')
 const detailModal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
 
+const assumeRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/assumir/route.ts', 'utf8')
+const updateFieldsRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/atualizar-campos/route.ts', 'utf8')
+
+assert.match(
+  accessPolicy,
+  /actionableTipoIds:\s*Array\.from\(new Set\(approverTipoRows\.map\(\(row\) => row\.tipoId\)\)\)/,
+  'Contexto de ação deve considerar apenas tipos com papel de APPROVER para evitar ações indevidas de VIEWER.',
+)
+
+assert.match(
+  accessPolicy,
+  /if \(solicitation\.tipoId && ctx\.actionableTipoIds\.includes\(solicitation\.tipoId\)\) \{/,
+  'Ações operacionais por tipo não devem ser liberadas para VIEWER.',
+)
+
+assert.match(
+  assumeRoute,
+  /const isViewerOnly = await isViewerOnlyForSolicitation\(\{ solicitationId, userId: me\.id \}\)/,
+  'API de assumir deve bloquear usuário VIEWER.',
+)
+
+assert.match(
+  updateFieldsRoute,
+  /const isViewerOnly = await isViewerOnlyForSolicitation\(\{ solicitationId: id, userId: me\.id \}\)/,
+  'API de atualização de campos deve bloquear usuário VIEWER.',
+)
+
 assert.match(
   accessPolicy,
   /allowedTipoIds:\s*Array\.from\(new Set\(allowedTipoRows\.map\(\(row\) => row\.tipoId\)\)\)/,
