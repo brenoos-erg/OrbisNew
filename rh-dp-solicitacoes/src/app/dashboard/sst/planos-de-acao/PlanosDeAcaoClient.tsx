@@ -20,6 +20,8 @@ type ActionRow = {
   autonomia?: number | null
   beneficio?: number | null
   centroResponsavel?: { description: string } | null
+  centroImpactado?: { description: string } | null
+  origemPlano?: 'PLANO_AVULSO' | 'NAO_CONFORMIDADE'
 }
 
 type PriorityFilter = 'TODAS' | 'ALTA' | 'MEDIA' | 'BAIXA'
@@ -79,6 +81,7 @@ export default function PlanosDeAcaoClient() {
 
   const [numeroProcessoDraft, setNumeroProcessoDraft] = useState('')
   const [centroResponsavelDraft, setCentroResponsavelDraft] = useState('')
+  const [centroImpactadoDraft, setCentroImpactadoDraft] = useState('')
   const [responsavelDraft, setResponsavelDraft] = useState('')
   const [statusDraft, setStatusDraft] = useState<FilterStatus>('TODOS')
   const [prioridadeDraft, setPrioridadeDraft] = useState<PriorityFilter>('TODAS')
@@ -91,6 +94,7 @@ export default function PlanosDeAcaoClient() {
 
   const [numeroProcesso, setNumeroProcesso] = useState('')
   const [centroResponsavel, setCentroResponsavel] = useState('')
+  const [centroImpactado, setCentroImpactado] = useState('')
   const [responsavel, setResponsavel] = useState('')
   const [status, setStatus] = useState<FilterStatus>('TODOS')
   const [prioridade, setPrioridade] = useState<PriorityFilter>('TODAS')
@@ -140,6 +144,11 @@ export default function PlanosDeAcaoClient() {
       if (centroResponsavel.trim()) {
         const centro = item.centroResponsavel?.description || ''
         if (!centro.toLowerCase().includes(centroResponsavel.toLowerCase())) return false
+      }
+
+      if (centroImpactado.trim()) {
+        const centro = item.centroImpactado?.description || ''
+        if (!centro.toLowerCase().includes(centroImpactado.toLowerCase())) return false
       }
 
       if (onde.trim() && !getOnde(item.origem).toLowerCase().includes(onde.toLowerCase())) return false
@@ -224,6 +233,7 @@ export default function PlanosDeAcaoClient() {
     setNumeroProcesso(numeroProcessoDraft)
     setCentroResponsavel(centroResponsavelDraft)
     setResponsavel(responsavelDraft)
+    setCentroImpactado(centroImpactadoDraft)
     setStatus(statusDraft)
     setPrioridade(prioridadeDraft)
     setOnde(ondeDraft)
@@ -238,6 +248,7 @@ export default function PlanosDeAcaoClient() {
     setNumeroProcessoDraft('')
     setCentroResponsavelDraft('')
     setResponsavelDraft('')
+    setCentroImpactadoDraft('')
     setStatusDraft('TODOS')
     setPrioridadeDraft('TODAS')
     setOndeDraft('')
@@ -250,6 +261,7 @@ export default function PlanosDeAcaoClient() {
     setNumeroProcesso('')
     setCentroResponsavel('')
     setResponsavel('')
+    setCentroImpactado('')
     setStatus('TODOS')
     setPrioridade('TODAS')
     setOnde('')
@@ -282,6 +294,7 @@ export default function PlanosDeAcaoClient() {
           <Field label="Nº Processo"><input value={numeroProcessoDraft} onChange={(e) => setNumeroProcessoDraft(e.target.value)} className="input" /></Field>
           <Field label="Centro responsável"><input value={centroResponsavelDraft} onChange={(e) => setCentroResponsavelDraft(e.target.value)} className="input" /></Field>
           <Field label="Responsável"><input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} className="input" /></Field>
+          <Field label="Centro impactado"><input value={centroImpactadoDraft} onChange={(e) => setCentroImpactadoDraft(e.target.value)} className="input" /></Field>
           <Field label="Prioridade"><select value={prioridadeDraft} onChange={(e) => setPrioridadeDraft(e.target.value as PriorityFilter)} className="input"><option value="TODAS">Todas</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></Field>
           <Field label="Status"><select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="input">{ACTION_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>)}</select></Field>
           <Field label="Onde"><input value={ondeDraft} onChange={(e) => setOndeDraft(e.target.value)} className="input" /></Field>
@@ -307,8 +320,10 @@ export default function PlanosDeAcaoClient() {
               <th className="px-3 py-2">Data criação</th>
               <th className="px-3 py-2">Prioridade</th>
               <th className="px-3 py-2">O quê</th>
+              <th className="px-3 py-2">Origem</th>
               <th className="px-3 py-2">Onde</th>
               <th className="px-3 py-2">Centro responsável</th>
+              <th className="px-3 py-2">Centro impactado</th>
               <th className="px-3 py-2">Ações</th>
             </tr>
           </thead>
@@ -324,8 +339,10 @@ export default function PlanosDeAcaoClient() {
                   <td className="px-3 py-2 text-slate-600">{formatDate(item.createdAt)}</td>
                   <td className="px-3 py-2 text-slate-700">{getPriority(item)}</td>
                   <td className="px-3 py-2 text-slate-700">{item.descricao}</td>
+                  <td className="px-3 py-2 text-slate-700">{item.origemPlano === 'NAO_CONFORMIDADE' ? 'Não conformidade' : 'Plano avulso'}</td>
                   <td className="px-3 py-2 text-slate-700">{getOnde(item.origem)}</td>
                   <td className="px-3 py-2 text-slate-700">{item.centroResponsavel?.description || '-'}</td>
+                  <td className="px-3 py-2 text-slate-700">{item.centroImpactado?.description || '-'}</td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
                       <Link href={detailHref} className="rounded bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700">Visualizar / Editar</Link>
@@ -335,7 +352,7 @@ export default function PlanosDeAcaoClient() {
                 </tr>
               )
             })}
-            {!loading && pagedItems.length === 0 ? <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-slate-500">Nenhuma ação encontrada com os filtros atuais.</td></tr> : null}
+            {!loading && pagedItems.length === 0 ? <tr><td colSpan={10} className="px-3 py-8 text-center text-sm text-slate-500">Nenhuma ação encontrada para seus filtros ou permissões.</td></tr> : null}
           </tbody>
         </table>
       </div>
