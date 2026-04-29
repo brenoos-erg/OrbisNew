@@ -16,6 +16,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { isActionOverdue, resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 import { notifyActionItemUpdate } from '@/lib/sst/actionPlanNotifications'
+import { getUserSectorCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -91,6 +92,8 @@ export async function GET(req: NextRequest) {
     const responsavel = searchParams.get('responsavel')?.trim()
     const emAtraso = searchParams.get('emAtraso') === '1'
     const referencia = searchParams.get('referencia')?.trim()
+    const centroResponsavelId = searchParams.get('centroResponsavelId')?.trim()
+    const centroImpactadoId = searchParams.get('centroImpactadoId')?.trim()
 
     const where: Prisma.NonConformityActionItemWhereInput = {
       ...(status && Object.values(NonConformityActionStatus).includes(status as NonConformityActionStatus)
@@ -113,15 +116,26 @@ export async function GET(req: NextRequest) {
           }
         : {}),
       ...(referencia ? { referencia: { equals: referencia } } : {}),
-      origemPlano: NonConformityActionPlanOrigin.PLANO_AVULSO,
+      ...(centroResponsavelId ? { centroResponsavelId } : {}),
+      ...(centroImpactadoId ? { centroImpactadoId } : {}),
     }
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
-      where.OR = [
-        ...(where.OR ?? []),
-        { createdById: me.id },
-        { responsavelId: me.id },
-        { nonConformity: { solicitanteId: me.id } },
+      const userCenterIds = await getUserSectorCostCenterIds(me.id)
+      const currentAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []
+      where.AND = [
+        ...currentAnd,
+        {
+          OR: [
+            { createdById: me.id },
+            { responsavelId: me.id },
+            { nonConformity: { solicitanteId: me.id } },
+            { centroResponsavelId: { in: userCenterIds } },
+            { centroImpactadoId: { in: userCenterIds } },
+            { nonConformity: { centroQueDetectouId: { in: userCenterIds } } },
+            { nonConformity: { centroQueOriginouId: { in: userCenterIds } } },
+          ],
+        },
       ]
     }
 
@@ -137,6 +151,8 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         updatedAt: true,
         origemPlano: true,
+        centroResponsavelId: true,
+        centroImpactadoId: true,
         nonConformityId: true,
         referencia: true,
         origem: true,
@@ -175,7 +191,7 @@ export async function GET(req: NextRequest) {
         })
       : items
 
-    return NextResponse.json({ items: filtered })
+    return NextResponse.json({ items: filtered, total: filtered.length })
   } catch (error) {
     console.error('GET /api/sst/planos-de-acao error', error)
     return NextResponse.json({ error: 'Erro ao listar planos de ação.', detail: devErrorDetail(error) }, { status: 500 })
