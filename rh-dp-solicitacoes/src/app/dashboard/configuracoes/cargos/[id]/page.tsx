@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent } from 'react';
+import { use, useEffect, useState, type FormEvent } from 'react';
 
 import type {
   CargoForm as CargoFormData,
@@ -11,10 +11,10 @@ import type {
 export default function EditarCargoPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const cargoId = params.id;
+  const { id: cargoId } = use(params);
 
   const [form, setForm] = useState<CargoFormData>({
     name: '',
