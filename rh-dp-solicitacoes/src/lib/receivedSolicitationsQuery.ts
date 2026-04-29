@@ -118,6 +118,9 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
         OR: [
           { titulo: { contains: text } },
           { descricao: { contains: text } },
+          { protocolo: { contains: text } },
+          { tipo: { nome: { contains: text } } },
+          { tipo: { codigo: { contains: text } } },
           { payload: { path: '$.campos', string_contains: text } },
           { payload: { path: '$', string_contains: text } },
           { payload: { path: '$.formulario', string_contains: text } },

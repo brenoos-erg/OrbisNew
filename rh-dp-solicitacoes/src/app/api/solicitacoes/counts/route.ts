@@ -35,6 +35,7 @@ export async function GET() {
           userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
+          allowedTipoIds: userAccess.allowedTipoIds,
         }),
       ],
       OR: [
@@ -73,6 +74,7 @@ export async function GET() {
           userFullName: me.fullName,
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
+          allowedTipoIds: userAccess.allowedTipoIds,
         }),
       ],
       requiresApproval: true,

@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
         userFullName: me.fullName,
         role: me.role,
         departmentIds: userDepartmentIdsForSensitive,
+        allowedTipoIds: userAccess.allowedTipoIds,
       }),
     ]
 
