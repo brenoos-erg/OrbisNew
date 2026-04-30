@@ -271,6 +271,12 @@ export async function POST(req: NextRequest)   {
           versionId: revisedVersion.id,
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
       }
+      if (initialStatus === DocumentVersionStatus.PUBLICADO) {
+        void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+          documentId: existing.id,
+          versionId: revisedVersion.id,
+        }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
+      }
       return NextResponse.json(
         {
           id: existing.id,
@@ -342,6 +348,12 @@ export async function POST(req: NextRequest)   {
           documentId: created.id,
           versionId: created.versions[0].id,
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
+      }
+      if (initialStatus === DocumentVersionStatus.PUBLICADO) {
+        void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+          documentId: created.id,
+          versionId: created.versions[0].id,
+        }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
       }
     }
 
