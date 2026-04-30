@@ -148,13 +148,25 @@ export async function previewDocumentNotification(event: DocumentNotificationEve
 
 export async function sendDocumentNotification(event: DocumentNotificationEvent, context: NotificationContext) {
   try {
+    console.info('[documents:notifications] '+event+' start', { documentId: context.documentId, versionId: context.versionId ?? null })
     const preview = await previewDocumentNotification(event, context)
     if ('error' in preview) return { ok: false, error: preview.error }
+
+    if (!preview.rule) {
+      console.warn('[documents:notifications] no active rule for '+event, { documentId: context.documentId, versionId: context.versionId ?? null })
+    }
 
     const to = preview.recipients.recipients.map((item) => item.email)
     const cc = preview.ccEmails ?? []
     const finalRecipients = [...to, ...cc]
+    console.info('[documents:notifications] recipients resolved: '+finalRecipients.length, {
+      event,
+      documentId: context.documentId,
+      versionId: context.versionId ?? null,
+      warnings: preview.recipients.warnings,
+    })
     if (finalRecipients.length === 0) {
+      console.warn('[documents:notifications] skipped: no recipients', { event, documentId: context.documentId, versionId: context.versionId ?? null })
       await prisma.documentNotificationLog.create({
         data: {
           documentId: context.documentId,
@@ -187,6 +199,12 @@ export async function sendDocumentNotification(event: DocumentNotificationEvent,
         sentAt: result.sent ? new Date() : null,
       })),
     })
+
+    if (result.sent) {
+      console.info('[documents:notifications] email sent', { event, documentId: context.documentId, versionId: context.versionId ?? null })
+    } else {
+      console.error('[documents:notifications] email failed', { event, documentId: context.documentId, versionId: context.versionId ?? null, error: result.error ?? null })
+    }
 
     return { ok: result.sent, error: result.error ?? null }
   } catch (error) {

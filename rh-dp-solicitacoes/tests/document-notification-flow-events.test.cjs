@@ -8,6 +8,7 @@ const rejectRoute = fs.readFileSync('src/app/api/documents/versions/[versionId]/
 
 assert.match(documentsRoute, /sendDocumentNotification\('DOCUMENT_CREATED'/)
 assert.match(documentsRoute, /sendDocumentNotification\('DOCUMENT_SUBMITTED_FOR_APPROVAL'/)
+assert.match(documentsRoute, /sendDocumentNotification\('DOCUMENT_PUBLISHED'/)
 assert.match(startPublishRoute, /sendDocumentNotification\('DOCUMENT_SUBMITTED_FOR_APPROVAL'/)
 assert.match(startPublishRoute, /sendDocumentNotification\('DOCUMENT_QUALITY_REVIEW'/)
 assert.match(approveRoute, /sendDocumentNotification\('DOCUMENT_APPROVED'/)
