@@ -1442,7 +1442,7 @@ useEffect(() => {
                         sideOffset={4}
                         className="z-50 w-[var(--radix-select-trigger-width)] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
-                        <Select.Viewport className="max-h-56 w-full overflow-y-scroll p-1 text-sm">
+                        <Select.Viewport className="max-h-56 w-full overflow-y-scroll p-1 text-sm [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500">
                           {departamentos.map((d) => (
                             <Select.Item
                               key={d.id}
@@ -1502,7 +1502,7 @@ useEffect(() => {
                         sideOffset={4}
                         className="z-20 w-[var(--radix-select-trigger-width)] min-w-[420px] max-w-[700px] overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
-                        <Select.Viewport className="max-h-64 overflow-y-scroll p-1 text-sm">
+                        <Select.Viewport className="max-h-64 overflow-y-scroll p-1 text-sm [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500">
                           {tipos.map((t) => (
                             <Select.Item
                               key={t.id}
