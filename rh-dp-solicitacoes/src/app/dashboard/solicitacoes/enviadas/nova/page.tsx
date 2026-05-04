@@ -1435,8 +1435,12 @@ useEffect(() => {
                     <Select.Portal>
                       <Select.Content
                         position="popper"
+                        side="bottom"
+                        align="start"
+                        avoidCollisions
+                        collisionPadding={8}
                         sideOffset={4}
-                        className="z-20 min-w-[320px] max-w-[700px] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
+                        className="z-20 w-[var(--radix-select-trigger-width)] min-w-[320px] max-w-[700px] overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
                         <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {departamentos.map((d) => (
@@ -1491,8 +1495,12 @@ useEffect(() => {
                     <Select.Portal>
                       <Select.Content
                         position="popper"
+                        side="bottom"
+                        align="start"
+                        avoidCollisions
+                        collisionPadding={8}
                         sideOffset={4}
-                      className="z-20 min-w-[420px] max-w-[700px] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
+                        className="z-20 w-[var(--radix-select-trigger-width)] min-w-[420px] max-w-[700px] overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
                         <Select.Viewport className="max-h-64 overflow-y-auto p-1 text-sm">
                           {tipos.map((t) => (
