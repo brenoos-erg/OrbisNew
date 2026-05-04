@@ -15,6 +15,11 @@ type CampoEspecifico = {
   defaultValue?: string
   section?: string
   stage?: string
+  visibleWhen?: {
+    field: string
+    equals?: string
+    includes?: string
+  }
 }
 
 type TipoDestino = {
@@ -66,6 +71,43 @@ const normalizeCampo = (campo: CampoEspecifico): CampoEspecifico => {
   }
 }
 
+
+const TI_EQUIPAMENTO_CODIGO = 'RQ.TI.003'
+const TI_LEGACY_FIELDS = new Set(['tipoEquipamentoTi', 'configuracaoEquipamentoTi'])
+
+const harmonizeTiEquipmentSchema = (tipoCodigo: string, campos: CampoEspecifico[]) => {
+  if (tipoCodigo.toUpperCase() !== TI_EQUIPAMENTO_CODIGO) return campos
+
+  const withoutLegacy = campos.filter((campo) => !TI_LEGACY_FIELDS.has(campo.name))
+  const names = new Set(withoutLegacy.map((campo) => campo.name))
+
+  const applyRule = (name: string, visibleWhen?: CampoEspecifico['visibleWhen']) => {
+    const idx = withoutLegacy.findIndex((campo) => campo.name === name)
+    if (idx === -1) return
+    withoutLegacy[idx] = { ...withoutLegacy[idx], ...(visibleWhen ? { visibleWhen } : {}) }
+  }
+
+  applyRule('descricaoEquipamentoOutro', { field: 'equipamentoSolicitado', equals: 'Outro' })
+  applyRule('descricaoPeriferico', { field: 'equipamentoSolicitado', equals: 'Periféricos' })
+
+  const notebookFields = ['precisaMochila','precisaMouse','precisaTeclado','precisaHeadset','precisaAdaptador','precisaCarregadorFonte','precisaOutroAcessorio']
+  notebookFields.forEach((fieldName) => applyRule(fieldName, { field: 'equipamentoSolicitado', equals: 'Notebook' }))
+  applyRule('descricaoOutroAcessorio', { field: 'precisaOutroAcessorio', equals: 'true' })
+
+  if (!names.has('equipamentoSolicitado')) {
+    withoutLegacy.unshift({
+      name: 'equipamentoSolicitado',
+      label: 'Equipamento solicitado',
+      type: 'select',
+      required: true,
+      options: ['Notebook', 'Desktop', 'Celular', 'Impressora', 'Periféricos', 'Outro'],
+      stage: 'solicitante',
+      section: 'Equipamento',
+    })
+  }
+
+  return withoutLegacy
+}
 const shouldIncludeTipo = ({
   tipoId,
   tipoCodigo,
@@ -148,7 +190,7 @@ export async function GET(request: Request) {
       )
       .map((tipo) => {
         const schema = tipo.schemaJson as SchemaJson
-        let campos = (schema?.camposEspecificos ?? schema?.campos ?? []).map(normalizeCampo)
+        let campos = harmonizeTiEquipmentSchema(tipo.codigo, (schema?.camposEspecificos ?? schema?.campos ?? []).map(normalizeCampo))
         const isAgendamentoFerias = tipo.id === 'AGENDAMENTO_DE_FERIAS'
 
         if (isAgendamentoFerias) {

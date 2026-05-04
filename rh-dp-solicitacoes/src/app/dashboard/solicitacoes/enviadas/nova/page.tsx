@@ -81,6 +81,11 @@ type CampoEspecifico = {
   section?: string;
   stage?: string;
   disabled?: boolean;
+  visibleWhen?: {
+    field: string;
+    equals?: string;
+    includes?: string;
+  };
 };
 
 type TipoSolicitacao = {
@@ -180,32 +185,6 @@ function isCostCenterField(campo: Pick<CampoEspecifico, 'name' | 'label' | 'type
   );
 }
 
-const TI_EQUIPMENT_CONFIGS: Record<string, string[]> = {
-  'Linhas telefônicas': [
-    'Ramais internos',
-    'Linha direta (fixa)',
-    'Linha com DDD/DID externo',
-  ],
-  Smartphones: [
-    'Básico (apps corporativos e comunicação)',
-    'Intermediário (apps de campo e câmera avançada)',
-    'Avançado (alto desempenho + pacote de dados)',
-  ],
-  Notebooks: [
-    'Administrativo (uso office e web)',
-    'Engenharia/Projetos (maior memória e processamento)',
-    'Executivo (mobilidade + bateria estendida)',
-  ],
-  Desktops: [
-    'Padrão escritório',
-    'Desempenho elevado',
-    'Estação fixa com múltiplos monitores',
-  ],
-  Monitores: ['21" Full HD', '24" Full HD', '27" QHD/4K', 'Ultrawide'],
-  Impressoras: ['Jato de tinta', 'Laser mono', 'Laser colorida', 'Multifuncional'],
-  'TP-Link': ['Roteador', 'Access Point', 'Switch gerenciável', 'Switch não gerenciável'],
-  'Outros equipamentos': ['Webcam', 'Headset', 'Dock station', 'Teclado e mouse', 'Outro'],
-};
 const TI_STOCK_EQUIPMENT_OPTIONS = [
   'Linha telefônica',
   'Smartphone',
@@ -594,42 +573,29 @@ export default function NovaSolicitacaoPage() {
       }
     }
 
-    if (!isSolicitacaoEquipamentoTi) return mergedBaseCampos;
-
-    const equipmentTypeOptions = Object.keys(TI_EQUIPMENT_CONFIGS);
-    const selectedEquipmentType = extras.tipoEquipamentoTi ?? '';
-    const requiredConfigs = TI_EQUIPMENT_CONFIGS[selectedEquipmentType] ?? [];
-
-    const camposTi: CampoEspecifico[] = [
-      {
-        name: 'tipoEquipamentoTi',
-        label: 'Tipo de equipamento TI',
-        type: 'select',
-        required: true,
-        options: equipmentTypeOptions,
-        section: 'Equipamento TI',
-      },
-      {
-        name: 'configuracaoEquipamentoTi',
-        label: 'Configuração exigida',
-        type: 'select',
-        required: true,
-        options: requiredConfigs,
-        disabled: !selectedEquipmentType,
-        section: 'Equipamento TI',
-      },
-    ];
-
-       const existingNames = new Set(mergedBaseCampos.map((campo) => campo.name));
-    return [...mergedBaseCampos, ...camposTi.filter((campo) => !existingNames.has(campo.name))];
+    return mergedBaseCampos;
   }, [
     camposSolicitante,
     destinoOptions,
-    extras.tipoEquipamentoTi,
     isAgendamentoFerias,
-    isSolicitacaoEquipamentoTi,
     isSolicitacaoExamesSst,
   ]);
+
+  const isFieldVisibleByRule = (campo: CampoEspecifico) => {
+    const rule = campo.visibleWhen;
+    if (!rule?.field) return true;
+
+    const currentValue = extras[rule.field] ?? '';
+    if (rule.equals !== undefined) return currentValue === rule.equals;
+    if (rule.includes !== undefined) {
+      return currentValue
+        .split(',')
+        .map((item) => item.trim())
+        .includes(rule.includes);
+    }
+    return true;
+  };
+
   const shouldFieldUseFullWidth = (campo: CampoEspecifico) =>
     campo.type === 'textarea' || campo.name === 'observacoes';
 
@@ -725,15 +691,6 @@ export default function NovaSolicitacaoPage() {
    5) EXTRAS / RQ_063 / ABONO
   ============================================================ */
   const handleExtraChange = (name: string, value: string) => {
-    if (name === 'tipoEquipamentoTi') {
-      setExtras((prev) => ({
-        ...prev,
-        tipoEquipamentoTi: value,
-        configuracaoEquipamentoTi: '',
-      }));
-      return;
-    }
-
      if (name === 'itemManutencao') {
       setExtras((prev) => ({
         ...prev,
@@ -2742,6 +2699,10 @@ useEffect(() => {
                       campo.name !== 'descricaoPeriferico' || isPerifericosEquipment;
                     const shouldShowDescricaoEquipamentoOutro =
                       campo.name !== 'descricaoEquipamentoOutro' || isOutroEquipment;
+
+                    if (!isFieldVisibleByRule(campo)) {
+                      return null;
+                    }
 
                     if (
                       !shouldShowEnderecoEnvio ||
