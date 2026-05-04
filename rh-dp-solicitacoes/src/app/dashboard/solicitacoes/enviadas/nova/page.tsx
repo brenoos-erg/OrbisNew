@@ -2722,12 +2722,36 @@ useEffect(() => {
                       !isRQ247 ||
                       campo.name !== 'dataFimExperiencia' ||
                       extras.motivoTerminoExperiencia === 'true';
+                    const isNotebookEquipment = extras.equipamentoSolicitado === 'Notebook';
+                    const isPerifericosEquipment = extras.equipamentoSolicitado === 'Periféricos';
+                    const isOutroEquipment = extras.equipamentoSolicitado === 'Outro';
+                    const shouldShowNotebookAccessories =
+                      ![
+                        'precisaMochila',
+                        'precisaMouse',
+                        'precisaTeclado',
+                        'precisaHeadset',
+                        'precisaAdaptador',
+                        'precisaCarregadorFonte',
+                        'precisaOutroAcessorio',
+                        'descricaoOutroAcessorio',
+                      ].includes(campo.name) || isNotebookEquipment;
+                    const shouldShowDescricaoOutroAcessorio =
+                      campo.name !== 'descricaoOutroAcessorio' || extras.precisaOutroAcessorio === 'true';
+                    const shouldShowDescricaoPeriferico =
+                      campo.name !== 'descricaoPeriferico' || isPerifericosEquipment;
+                    const shouldShowDescricaoEquipamentoOutro =
+                      campo.name !== 'descricaoEquipamentoOutro' || isOutroEquipment;
 
                     if (
                       !shouldShowEnderecoEnvio ||
                       !shouldShowTiMaintenanceSystemField ||
                       !shouldShowTiMaintenanceEquipmentField ||
-                      !shouldShowDataFimExperiencia
+                      !shouldShowDataFimExperiencia ||
+                      !shouldShowNotebookAccessories ||
+                      !shouldShowDescricaoOutroAcessorio ||
+                      !shouldShowDescricaoPeriferico ||
+                      !shouldShowDescricaoEquipamentoOutro
                     ) {
                       return null;
                     }
