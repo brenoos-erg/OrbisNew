@@ -32,6 +32,12 @@ export function formatBooleanForDisplay(value: unknown, fieldName?: string) {
 export function formatDisplayValueForUser(value: unknown, fieldName?: string) {
   const booleanLabel = formatBooleanForDisplay(value, fieldName)
   if (booleanLabel !== null) return booleanLabel
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === null || item === undefined ? '' : String(item).trim()))
+      .filter(Boolean)
+      .join(', ')
+  }
   if (value === null || value === undefined) return ''
   return String(value)
 }
