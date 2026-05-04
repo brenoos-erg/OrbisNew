@@ -10,7 +10,7 @@ import {
   ChangeEvent,
 } from 'react';
 import * as Select from '@radix-ui/react-select';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
@@ -1440,26 +1440,38 @@ useEffect(() => {
                         avoidCollisions
                         collisionPadding={8}
                         sideOffset={4}
-                        className="z-50 w-[var(--radix-select-trigger-width)] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
+                        className="z-50 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
-                        <Select.Viewport className="max-h-56 w-full overflow-y-scroll p-1 text-sm [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500">
-                          {departamentos.map((d) => (
-                            <Select.Item
-                              key={d.id}
-                              value={d.id}
-                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
-                            >
-                              <Select.ItemText>
-                                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
-                                  {d.label}
-                                </span>
-                              </Select.ItemText>
-                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
-                                <Check className="h-4 w-4" />
-                              </Select.ItemIndicator>
-                            </Select.Item>
-                          ))}
-                        </Select.Viewport>
+                        <Select.ScrollUpButton className="flex h-6 cursor-default items-center justify-center bg-[var(--card)] text-[var(--muted-foreground)]">
+                          <ChevronUp className="h-4 w-4" />
+                        </Select.ScrollUpButton>
+                        <div className="relative">
+                          <Select.Viewport className="max-h-56 w-full overflow-y-auto p-1 pr-4 text-sm">
+                            {departamentos.map((d) => (
+                              <Select.Item
+                                key={d.id}
+                                value={d.id}
+                                className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                              >
+                                <Select.ItemText>
+                                  <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {d.label}
+                                  </span>
+                                </Select.ItemText>
+                                <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
+                                  <Check className="h-4 w-4" />
+                                </Select.ItemIndicator>
+                              </Select.Item>
+                            ))}
+                          </Select.Viewport>
+                          <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute bottom-2 right-1 top-2 w-1.5 rounded-full bg-slate-300/80 dark:bg-slate-500/80"
+                          />
+                        </div>
+                        <Select.ScrollDownButton className="flex h-6 cursor-default items-center justify-center bg-[var(--card)] text-[var(--muted-foreground)]">
+                          <ChevronDown className="h-4 w-4" />
+                        </Select.ScrollDownButton>
                       </Select.Content>
                     </Select.Portal>
                   </Select.Root>
@@ -1502,24 +1514,36 @@ useEffect(() => {
                         sideOffset={4}
                         className="z-20 w-[var(--radix-select-trigger-width)] min-w-[420px] max-w-[700px] overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
-                        <Select.Viewport className="max-h-64 overflow-y-scroll p-1 text-sm [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500">
-                          {tipos.map((t) => (
-                            <Select.Item
-                              key={t.id}
-                              value={t.id}
-                              className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
-                            >
-                              <Select.ItemText>
-                                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
-                                  {getTipoOptionLabel(t)}
-                                </span>
-                              </Select.ItemText>
-                              <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
-                                <Check className="h-4 w-4" />
-                              </Select.ItemIndicator>
-                            </Select.Item>
-                          ))}
-                        </Select.Viewport>
+                        <Select.ScrollUpButton className="flex h-6 cursor-default items-center justify-center bg-[var(--card)] text-[var(--muted-foreground)]">
+                          <ChevronUp className="h-4 w-4" />
+                        </Select.ScrollUpButton>
+                        <div className="relative">
+                          <Select.Viewport className="max-h-56 w-full overflow-y-auto p-1 pr-4 text-sm">
+                            {tipos.map((t) => (
+                              <Select.Item
+                                key={t.id}
+                                value={t.id}
+                                className="relative flex cursor-pointer select-none items-center whitespace-nowrap rounded-sm py-2 pl-9 pr-8 text-[var(--foreground)] outline-none data-[highlighted]:bg-orange-100 data-[highlighted]:text-orange-900"
+                              >
+                                <Select.ItemText>
+                                  <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {getTipoOptionLabel(t)}
+                                  </span>
+                                </Select.ItemText>
+                                <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
+                                  <Check className="h-4 w-4" />
+                                </Select.ItemIndicator>
+                              </Select.Item>
+                            ))}
+                          </Select.Viewport>
+                          <div
+                            aria-hidden="true"
+                            className="pointer-events-none absolute bottom-2 right-1 top-2 w-1.5 rounded-full bg-slate-300/80 dark:bg-slate-500/80"
+                          />
+                        </div>
+                        <Select.ScrollDownButton className="flex h-6 cursor-default items-center justify-center bg-[var(--card)] text-[var(--muted-foreground)]">
+                          <ChevronDown className="h-4 w-4" />
+                        </Select.ScrollDownButton>
                       </Select.Content>
                     </Select.Portal>
                   </Select.Root>
