@@ -289,25 +289,33 @@ export default function PlanosDeAcaoClient() {
           Registrar ação
         </button>      </div>
 
-      <form onSubmit={handleSearch} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Nº Processo"><input value={numeroProcessoDraft} onChange={(e) => setNumeroProcessoDraft(e.target.value)} className="input" /></Field>
-          <Field label="Centro responsável"><input value={centroResponsavelDraft} onChange={(e) => setCentroResponsavelDraft(e.target.value)} className="input" /></Field>
-          <Field label="Responsável"><input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} className="input" /></Field>
-          <Field label="Centro impactado"><input value={centroImpactadoDraft} onChange={(e) => setCentroImpactadoDraft(e.target.value)} className="input" /></Field>
-          <Field label="Prioridade"><select value={prioridadeDraft} onChange={(e) => setPrioridadeDraft(e.target.value as PriorityFilter)} className="input"><option value="TODAS">Todas</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></Field>
-          <Field label="Status"><select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="input">{ACTION_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>)}</select></Field>
-          <Field label="Onde"><input value={ondeDraft} onChange={(e) => setOndeDraft(e.target.value)} className="input" /></Field>
-          <label className="flex items-end gap-2 pb-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={emAtrasoDraft} onChange={(e) => setEmAtrasoDraft(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />Em atraso</label>
-          <div />
-          <Field label="Data criação (início)"><input type="date" value={dataCriacaoInicioDraft} onChange={(e) => setDataCriacaoInicioDraft(e.target.value)} className="input" /></Field>
-          <Field label="Data criação (fim)"><input type="date" value={dataCriacaoFimDraft} onChange={(e) => setDataCriacaoFimDraft(e.target.value)} className="input" /></Field>
-          <Field label="Data conclusão (início)"><input type="date" value={dataConclusaoInicioDraft} onChange={(e) => setDataConclusaoInicioDraft(e.target.value)} className="input" /></Field>
-          <Field label="Data conclusão (fim)"><input type="date" value={dataConclusaoFimDraft} onChange={(e) => setDataConclusaoFimDraft(e.target.value)} className="input" /></Field>
+      <form onSubmit={handleSearch} className="app-card space-y-4">
+        <header className="space-y-1">
+          <h2 className="text-sm font-semibold">Filtros</h2>
+          <p className="text-xs app-muted-text">Refine a listagem de ações do plano de ação.</p>
+        </header>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Nº Processo"><input value={numeroProcessoDraft} onChange={(e) => setNumeroProcessoDraft(e.target.value)} className="app-input min-h-10" placeholder="Ex: PA-2026-001" /></Field>
+          <Field label="Centro responsável"><input value={centroResponsavelDraft} onChange={(e) => setCentroResponsavelDraft(e.target.value)} className="app-input min-h-10" placeholder="Nome do centro" /></Field>
+          <Field label="Responsável"><input value={responsavelDraft} onChange={(e) => setResponsavelDraft(e.target.value)} className="app-input min-h-10" placeholder="Nome do responsável" /></Field>
+          <Field label="Centro impactado"><input value={centroImpactadoDraft} onChange={(e) => setCentroImpactadoDraft(e.target.value)} className="app-input min-h-10" placeholder="Nome do centro" /></Field>
+          <Field label="Prioridade"><select value={prioridadeDraft} onChange={(e) => setPrioridadeDraft(e.target.value as PriorityFilter)} className="app-select min-h-10"><option value="TODAS">Todas</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select></Field>
+          <Field label="Status"><select value={statusDraft} onChange={(e) => setStatusDraft(e.target.value as FilterStatus)} className="app-select min-h-10">{ACTION_STATUS_FILTER_OPTIONS.map((option) => <option key={option} value={option}>{option === 'TODOS' ? 'Todos' : actionStatusLabel[option]}</option>)}</select></Field>
+          <Field label="Onde"><input value={ondeDraft} onChange={(e) => setOndeDraft(e.target.value)} className="app-input min-h-10" placeholder="Local/origem" /></Field>
+          <Field label="Em atraso">
+            <label className="flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm" style={{ borderColor: 'var(--input-border)', background: 'var(--input)' }}>
+              <input type="checkbox" checked={emAtrasoDraft} onChange={(e) => setEmAtrasoDraft(e.target.checked)} className="h-4 w-4 rounded" />
+              <span>Mostrar apenas ações em atraso</span>
+            </label>
+          </Field>
+          <Field label="Data criação (início)"><input type="date" value={dataCriacaoInicioDraft} onChange={(e) => setDataCriacaoInicioDraft(e.target.value)} className="app-input min-h-10" /></Field>
+          <Field label="Data criação (fim)"><input type="date" value={dataCriacaoFimDraft} onChange={(e) => setDataCriacaoFimDraft(e.target.value)} className="app-input min-h-10" /></Field>
+          <Field label="Data conclusão (início)"><input type="date" value={dataConclusaoInicioDraft} onChange={(e) => setDataConclusaoInicioDraft(e.target.value)} className="app-input min-h-10" /></Field>
+          <Field label="Data conclusão (fim)"><input type="date" value={dataConclusaoFimDraft} onChange={(e) => setDataConclusaoFimDraft(e.target.value)} className="app-input min-h-10" /></Field>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="submit" className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600">Pesquisar</button>
-          <button type="button" onClick={limparFiltros} className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Limpar filtros</button>
+        <div className="flex flex-wrap items-end gap-2 pt-1">
+          <button type="submit" className="app-button-primary">Pesquisar</button>
+          <button type="button" onClick={limparFiltros} className="app-button-secondary">Limpar filtros</button>
         </div>
       </form>
 
@@ -429,9 +437,9 @@ export default function PlanosDeAcaoClient() {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="text-sm font-medium text-slate-700">
-      <span>{label}</span>
-      <div className="mt-1">{children}</div>
+    <label className="space-y-1.5 text-sm font-medium">
+      <span className="app-label">{label}</span>
+      <div>{children}</div>
     </label>
   )
 }
