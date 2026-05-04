@@ -1440,9 +1440,9 @@ useEffect(() => {
                         avoidCollisions
                         collisionPadding={8}
                         sideOffset={4}
-                        className="z-50 w-[var(--radix-select-trigger-width)] max-h-56 overflow-y-auto rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
+                        className="z-50 w-[var(--radix-select-trigger-width)] rounded-md border border-[var(--border-subtle)] bg-[var(--card)] shadow-xl"
                       >
-                        <Select.Viewport className="w-full p-1 text-sm">
+                        <Select.Viewport className="max-h-56 w-full overflow-y-auto p-1 text-sm">
                           {departamentos.map((d) => (
                             <Select.Item
                               key={d.id}
