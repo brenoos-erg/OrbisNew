@@ -23,14 +23,16 @@ export async function POST(req: Request) {
   await prisma.$transaction(async (tx) => {
     for (const row of toCreate) {
       if (!row.isValid) { ignored.push(row); continue }
+      const resolvedUserId = row.responsibleId ?? parsed.data.common.defaultResponsibleId
+      if (!resolvedUserId) { ignored.push({ ...row, errors: ['Responsável obrigatório.'] }); continue }
       try {
         const item = await tx.tiEquipment.create({ data: {
           name: [row.brand, row.model, row.hostname].filter(Boolean).join(' ').trim() || `Equipamento ${row.patrimonio}`,
           patrimonio: row.patrimonio,
-          userId: row.responsibleId || parsed.data.common.defaultResponsibleId,
+          userId: resolvedUserId,
           serialNumber: row.serialNumber,
           category: parsed.data.common.category,
-          status: row.normalizedStatus,
+          status: row.normalizedStatus ?? undefined,
           observations: [parsed.data.common.observations,row.observations].filter(Boolean).join(' | ') || null,
           costCenterIdSnapshot: parsed.data.common.costCenterId,
           value: null,
