@@ -1,8 +1,33 @@
 import { Prisma } from '@prisma/client'
 import { buildUtcDateRangeFilter, normalizeFilterText } from './solicitationFilters'
 
+const GLOBAL_TEXT_CANDIDATE_LIMIT = 500
+
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+export function flattenSearchableText(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+  if (value instanceof Date) return value.toISOString()
+  if (Array.isArray(value)) return value.map((item) => flattenSearchableText(item)).filter(Boolean).join(' ')
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>)
+      .map((item) => flattenSearchableText(item))
+      .filter(Boolean)
+      .join(' ')
+  }
+  return ''
+}
+
 export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
-  const where: any = {}
+  const where: Prisma.SolicitationWhereInput = {}
 
   const openedDate = searchParams.get('openedDate')
   const dateStart = searchParams.get('dateStart') ?? searchParams.get('openedStart')
@@ -15,14 +40,8 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
   const protocolo = normalizeFilterText(searchParams.get('protocolo'))
-  const solicitante = normalizeFilterText(searchParams.get('solicitante'))
-  const solicitanteNome = normalizeFilterText(searchParams.get('solicitanteNome'))
-  const solicitanteLogin = normalizeFilterText(searchParams.get('solicitanteLogin'))
-  const matricula = normalizeFilterText(searchParams.get('matricula'))
   const status = normalizeFilterText(searchParams.get('status'))
   const situacao = normalizeFilterText(searchParams.get('situacao'))
-  const responsavel = normalizeFilterText(searchParams.get('responsavel'))
-  const text = normalizeFilterText(searchParams.get('text'))
 
   if (openedDate) {
     where.dataAbertura = {
@@ -48,10 +67,8 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     if (closedRange) where.dataFechamento = closedRange
   }
 
-  const hasProtocoloFilter = protocolo.length > 0
-
   if (status) {
-    where.status = status
+    where.status = status as any
   } else if (situacao) {
     const statusBySituacao: Record<string, string[]> = {
       PENDENTE: ['ABERTA', 'AGUARDANDO_APROVACAO', 'AGUARDANDO_TERMO'],
@@ -60,115 +77,43 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
       REJEITADO: ['CANCELADA'],
     }
     if (statusBySituacao[situacao]) {
-      where.status = { in: statusBySituacao[situacao] }
+      where.status = { in: statusBySituacao[situacao] as any }
     }
   }
 
-  if (hasProtocoloFilter) {
-    where.protocolo = { contains: protocolo }
-  }
-
-  const solicitanteBusca = solicitanteNome || solicitante
-  if (solicitanteBusca) {
-    where.solicitante = {
-      OR: [{ fullName: { contains: solicitanteBusca } }, { email: { contains: solicitanteBusca } }],
-    }
-  }
-
-  if (solicitanteLogin) {
-    where.solicitante = {
-      ...(where.solicitante ?? {}),
-      ...(where.solicitante?.OR ? {} : { OR: [] }),
-      login: { contains: solicitanteLogin },
-    }
-  }
-
-  if (responsavel) {
-    where.AND = [
-      ...(where.AND ?? []),
-      {
-        OR: [
-          { assumidaPor: { fullName: { contains: responsavel } } },
-          { approver: { fullName: { contains: responsavel } } },
-        ],
-      },
-    ]
-  }
-
-  if (matricula) {
-    where.AND = [
-      ...(where.AND ?? []),
-      {
-        OR: [
-          {
-            payload: {
-              path: '$.solicitante.matricula',
-              string_contains: matricula,
-            },
-          },
-        ],
-      },
-    ]
-  }
-
-  if (text) {
-    where.AND = [
-      ...(where.AND ?? []),
-      {
-        OR: [
-          { titulo: { contains: text } },
-          { descricao: { contains: text } },
-          { protocolo: { contains: text } },
-          { status: { contains: text } },
-          { approvalComment: { contains: text } },
-          { tipo: { nome: { contains: text } } },
-          { tipo: { codigo: { contains: text } } },
-          { department: { name: { contains: text } } },
-          {
-            costCenter: {
-              OR: [
-                { description: { contains: text } },
-                { code: { contains: text } },
-                { externalCode: { contains: text } },
-                { abbreviation: { contains: text } },
-                { observations: { contains: text } },
-              ],
-            },
-          },
-          {
-            solicitante: {
-              OR: [
-                { fullName: { contains: text } },
-                { login: { contains: text } },
-                { email: { contains: text } },
-              ],
-            },
-          },
-          { assumidaPor: { fullName: { contains: text } } },
-          { approver: { fullName: { contains: text } } },
-          { comentarios: { some: { texto: { contains: text } } } },
-          { anexos: { some: { filename: { contains: text } } } },
-          { anexos: { some: { url: { contains: text } } } },
-          { eventos: { some: { tipo: { contains: text } } } },
-          { timelines: { some: { status: { contains: text } } } },
-          { timelines: { some: { message: { contains: text } } } },
-          { solicitacaoSetores: { some: { status: { contains: text } } } },
-          { payload: { path: '$.campos', string_contains: text } },
-          { payload: { path: '$', string_contains: text } },
-          { payload: { path: '$.formulario', string_contains: text } },
-          { payload: { path: '$.form', string_contains: text } },
-          { payload: { path: '$.metadata', string_contains: text } },
-          { payload: { path: '$.requestData', string_contains: text } },
-          { payload: { path: '$.dynamicForm', string_contains: text } },
-          { payload: { path: '$.answers', string_contains: text } },
-          { payload: { path: '$.fields', string_contains: text } },
-          { payload: { path: '$.avaliacaoGestor', string_contains: text } },
-        ],
-      },
-    ]
+  if (protocolo.length > 0) {
+    where.protocolo = { startsWith: protocolo }
   }
 
   return where
+}
+
+export function getGlobalTextSearch(searchParams: URLSearchParams): string {
+  return normalizeFilterText(searchParams.get('text'))
+}
+
+export function buildSolicitationSearchText(solicitation: Record<string, unknown>): string {
+  const parts = [
+    flattenSearchableText(solicitation.protocolo),
+    flattenSearchableText(solicitation.titulo),
+    flattenSearchableText(solicitation.descricao),
+    flattenSearchableText(solicitation.status),
+    flattenSearchableText(solicitation.tipo),
+    flattenSearchableText(solicitation.department),
+    flattenSearchableText(solicitation.costCenter),
+    flattenSearchableText(solicitation.solicitante),
+    flattenSearchableText(solicitation.assumidaPor),
+    flattenSearchableText(solicitation.approver),
+    flattenSearchableText(solicitation.comentarios),
+    flattenSearchableText(solicitation.anexos),
+    flattenSearchableText(solicitation.eventos),
+    flattenSearchableText(solicitation.timelines),
+    flattenSearchableText(solicitation.solicitacaoSetores),
+    flattenSearchableText(solicitation.payload),
+    flattenSearchableText(solicitation.approvalComment),
+  ]
+
+  return normalizeSearchText(parts.filter(Boolean).join(' '))
 }
 
 export function buildListAndCountArgs(
@@ -177,34 +122,35 @@ export function buildListAndCountArgs(
     skip,
     pageSize,
     orderBy,
+    includeGlobalSearchData,
   }: {
     skip: number
     pageSize: number
     orderBy: Prisma.SolicitationOrderByWithRelationInput[]
+    includeGlobalSearchData?: boolean
   },
 ) {
+  const take = includeGlobalSearchData ? Math.max(skip + pageSize, GLOBAL_TEXT_CANDIDATE_LIMIT) : pageSize
+
   return {
     findManyArgs: {
       where,
-      skip,
-      take: pageSize,
+      skip: includeGlobalSearchData ? 0 : skip,
+      take,
       orderBy,
       include: {
         tipo: { select: { codigo: true, nome: true } },
         department: { select: { name: true } },
-        costCenter: { select: { description: true, externalCode: true, code: true } },
-        approver: { select: { id: true, fullName: true } },
-        assumidaPor: { select: { id: true, fullName: true } },
-        solicitante: { select: { id: true, fullName: true } },
+        costCenter: { select: { description: true, externalCode: true, code: true, abbreviation: true, observations: true } },
+        approver: { select: { id: true, fullName: true, login: true, email: true } },
+        assumidaPor: { select: { id: true, fullName: true, login: true, email: true } },
+        solicitante: { select: { id: true, fullName: true, login: true, email: true } },
         solicitacaoSetores: { select: { status: true, constaFlag: true } },
+        comentarios: { select: { texto: true } },
+        anexos: { select: { filename: true, url: true } },
+        timelines: { select: { status: true, message: true } },
         eventos: {
-          where: {
-            tipo: {
-              in: ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'],
-            },
-          },
           orderBy: { createdAt: 'desc' as const },
-          take: 1,
           include: { actor: { select: { id: true, fullName: true } } },
         },
       },

@@ -6,29 +6,24 @@ const queryBuilderSource = fs.readFileSync('src/lib/receivedSolicitationsQuery.t
 
 assert.doesNotMatch(
   queryBuilderSource,
-  /mode:\s*['"]insensitive['"]/,
-  'Builder da rota de recebidas não pode usar mode: insensitive',
+  /string_contains\s*:/,
+  'Builder de recebidas não pode usar string_contains em JSON no provider atual.',
 )
 
-for (const expected of [
-  "{ titulo: { contains: text } }",
-  "{ descricao: { contains: text } }",
-  "{ payload: { path: '$.campos', string_contains: text } }",
-  "{ payload: { path: '$', string_contains: text } }",
-  "{ payload: { path: '$.formulario', string_contains: text } }",
-  "{ payload: { path: '$.form', string_contains: text } }",
-  "{ payload: { path: '$.metadata', string_contains: text } }",
-  "{ payload: { path: '$.requestData', string_contains: text } }",
-  "{ payload: { path: '$.dynamicForm', string_contains: text } }",
-  "{ payload: { path: '$.answers', string_contains: text } }",
-  "{ payload: { path: '$.fields', string_contains: text } }",
-  "{ payload: { path: '$.avaliacaoGestor', string_contains: text } }",
-]) {
-  assert.match(queryBuilderSource, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-}
+assert.doesNotMatch(
+  queryBuilderSource,
+  /\{\s*titulo:\s*\{\s*contains\s*:/,
+  'Builder de recebidas não pode usar contains diretamente no Prisma where global.',
+)
 
-assert.match(routeSource, /const \{ findManyArgs, countArgs \} = buildListAndCountArgs\(where, \{/)
-assert.match(routeSource, /prisma\.solicitation\.findMany\(findManyArgs\)/)
-assert.match(routeSource, /prisma\.solicitation\.count\(countArgs\)/)
+assert.match(queryBuilderSource, /export function flattenSearchableText\(value: unknown\): string/)
+assert.match(queryBuilderSource, /export function normalizeSearchText\(value: string\): string/)
+assert.match(queryBuilderSource, /where\.protocolo\s*=\s*\{\s*startsWith:\s*protocolo\s*\}/)
+
+assert.match(routeSource, /const globalSearchText = getGlobalTextSearch\(searchParams\)/)
+assert.match(routeSource, /includeGlobalSearchData:\s*Boolean\(globalSearchText\)/)
+assert.match(routeSource, /const filteredSolicitations = !globalSearchText/)
+assert.match(routeSource, /buildSolicitationSearchText\(s as unknown as Record<string, unknown>\)/)
+assert.match(routeSource, /const total = globalSearchText \? filteredSolicitations\.length : dbTotal/)
 
 console.log('solicitacoes-recebidas-prisma-mode-regression ok')

@@ -9,8 +9,20 @@ import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { buildListAndCountArgs, buildWhereFromSearchParams } from '@/lib/receivedSolicitationsQuery'
+import {
+  buildListAndCountArgs,
+  buildSolicitationSearchText,
+  buildWhereFromSearchParams,
+  getGlobalTextSearch,
+  normalizeSearchText,
+} from '@/lib/receivedSolicitationsQuery'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
+
+
+function toAndArray(andClause: Prisma.SolicitationWhereInput['AND']): Prisma.SolicitationWhereInput[] {
+  if (!andClause) return []
+  return Array.isArray(andClause) ? andClause : [andClause]
+}
 
 function resolveOrderBy(searchParams: URLSearchParams): Prisma.SolicitationOrderByWithRelationInput[] {
   const sortBy = searchParams.get('sortBy') ?? 'dataAbertura'
@@ -37,6 +49,7 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * pageSize
     const where = buildWhereFromSearchParams(searchParams)
     const orderBy = resolveOrderBy(searchParams)
+    const globalSearchText = getGlobalTextSearch(searchParams)
 
 
     const userAccess = await resolveUserAccessContext({
@@ -49,13 +62,13 @@ export async function GET(req: NextRequest) {
       primaryDepartment: me.department,
     })
     where.AND = [
-      ...(where.AND ?? []),
+      ...toAndArray(where.AND),
       buildReceivedWhereByPolicy(userAccess),
     ]
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
     where.AND = [
-      ...(where.AND ?? []),
+      ...toAndArray(where.AND),
       buildSensitiveHiringVisibilityWhere({
         userId: me.id,
         userLogin: me.login,
@@ -68,7 +81,7 @@ export async function GET(req: NextRequest) {
     ]
 
      where.AND = [
-      ...(where.AND ?? []),
+      ...toAndArray(where.AND),
       {
         NOT: {
           AND: [
@@ -84,15 +97,23 @@ export async function GET(req: NextRequest) {
       skip,
       pageSize,
       orderBy,
+      includeGlobalSearchData: Boolean(globalSearchText),
     })
 
-   const [solicitations, total] = await Promise.all([
+   const [dbSolicitations, dbTotal] = await Promise.all([
       prisma.solicitation.findMany(findManyArgs),
       prisma.solicitation.count(countArgs),
     ])
 
-   const rows = solicitations.map((s) => {
-      const finalizadorEvent = s.eventos?.[0] ?? null
+   const filteredSolicitations = !globalSearchText
+      ? dbSolicitations
+      : dbSolicitations.filter((s) => buildSolicitationSearchText(s as unknown as Record<string, unknown>).includes(normalizeSearchText(globalSearchText)))
+
+   const total = globalSearchText ? filteredSolicitations.length : dbTotal
+   const pagedSolicitations = globalSearchText ? filteredSolicitations.slice(skip, skip + pageSize) : filteredSolicitations
+
+   const rows = pagedSolicitations.map((s) => {
+      const finalizadorEvent = s.eventos?.find((event) => ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'].includes(event.tipo)) ?? null
       const responsible = resolvePrimaryResponsibleForList({
         tipo: s.tipo,
         assumidaPor: s.assumidaPor,
