@@ -528,7 +528,16 @@ export default function NovaSolicitacaoPage() {
     return true;
   });
   const camposSolicitanteComTi = useMemo(() => {
-    const baseCampos = camposSolicitante.map((campo) => {
+    const camposFiltrados = isAvaliacaoExperiencia
+      ? camposSolicitante.filter(
+          (campo) =>
+            !EXPERIENCE_EVALUATION_REQUIRED_FIELDS.includes(
+              campo.name as (typeof EXPERIENCE_EVALUATION_REQUIRED_FIELDS)[number],
+            ),
+        )
+      : camposSolicitante;
+
+    const baseCampos = camposFiltrados.map((campo) => {
       if (campo.name !== 'destinadoPara') return campo;
 
       return {
@@ -569,7 +578,7 @@ export default function NovaSolicitacaoPage() {
   }, [
     camposSolicitante,
     destinoOptions,
-    isAgendamentoFerias,
+    isAvaliacaoExperiencia,
     isSolicitacaoExamesSst,
   ]);
 
