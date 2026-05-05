@@ -516,14 +516,6 @@ export default function NovaSolicitacaoPage() {
   const camposEspecificos = selectedTipo?.camposEspecificos ?? [];
   const camposSolicitante = camposEspecificos.filter((campo) => {
     if (campo.stage && campo.stage !== 'solicitante') return false;
-    if (
-      isAvaliacaoExperiencia &&
-      EXPERIENCE_EVALUATION_REQUIRED_FIELDS.includes(
-        campo.name as (typeof EXPERIENCE_EVALUATION_REQUIRED_FIELDS)[number],
-      )
-    ) {
-      return false;
-    }
     if (isSolicitacaoEpi && ['emailSolicitante', 'local', 'data'].includes(campo.name)) {
       return false;
     }

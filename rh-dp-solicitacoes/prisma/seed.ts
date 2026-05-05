@@ -264,6 +264,30 @@ async function main() {
  const rhTipoDepartamentos = [rhDepartment?.id].filter(
     (value): value is string => Boolean(value),
   )
+  const avaliacaoExperienciaSchema = {
+    meta: {
+      departamentos: [rhDepartment?.id].filter((value): value is string => Boolean(value)),
+      requiresApproval: false,
+    },
+    camposEspecificos: [
+      { name: 'colaboradorAvaliado', label: 'Colaborador avaliado', type: 'text', required: true, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'cargo', label: 'Cargo', type: 'text', required: true, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'setor', label: 'Setor', type: 'text', required: true, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'dataAdmissao', label: 'Data de admissão', type: 'date', required: true, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'periodoAvaliacao', label: 'Período da avaliação', type: 'select', required: true, options: ['45 dias', '90 dias', 'Experiência'], stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'gestorAvaliador', label: 'Gestor avaliador', type: 'text', required: true, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'observacoesIniciais', label: 'Observações adicionais', type: 'textarea', required: false, stage: 'solicitante', section: 'Dados da avaliação' },
+      { name: 'relacionamentoNota', label: 'Relacionamento', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'comunicacaoNota', label: 'Comunicação', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'atitudeNota', label: 'Atitude', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'saudeSegurancaNota', label: 'Saúde e Segurança', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'dominioTecnicoProcessosNota', label: 'Domínio técnico/processos', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'adaptacaoMudancaNota', label: 'Adaptação à mudança', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'autogestaoGestaoPessoasNota', label: 'Autogestão/Gestão de pessoas', type: 'select', required: true, options: ['1', '2', '3', '4', '5'], stage: 'gestor', section: 'Avaliação' },
+      { name: 'comentarioFinal', label: 'Comentário final', type: 'textarea', required: true, stage: 'gestor', section: 'Avaliação' },
+    ],
+  }
+
   if (rhDepartment) {
     await prisma.tipoSolicitacao.upsert({
       where: { id: 'RQ_RH_103' },
@@ -271,12 +295,7 @@ async function main() {
         codigo: 'RQ.RH.103',
         nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
-        schemaJson: {
-          meta: {
-            departamentos: [rhDepartment.id],
-            requiresApproval: false,
-          },
-        },
+        schemaJson: avaliacaoExperienciaSchema,
         updatedAt: new Date(),
       },
       create: {
@@ -284,12 +303,7 @@ async function main() {
         codigo: 'RQ.RH.103',
         nome: 'Avaliação do período de experiência',
         descricao: 'Solicitação de avaliação do período de experiência.',
-        schemaJson: {
-          meta: {
-            departamentos: [rhDepartment.id],
-            requiresApproval: false,
-          },
-        },
+        schemaJson: avaliacaoExperienciaSchema,
         updatedAt: new Date(),
       },
     })
@@ -2796,33 +2810,6 @@ async function main() {
       },
     })
     console.log('✅ Tipo "RQ.016 NADA CONSTA" ok.')
-    const avaliacaoExperienciaSchema = {
-      meta: {
-        departamentos: [rhDepartment?.id].filter((value): value is string => Boolean(value)),
-        requiresApproval: false,
-      },
-      camposEspecificos: [
-        { name: 'colaboradorAvaliado', label: 'Colaborador avaliado', type: 'text', stage: 'solicitante', section: 'Dados' },
-        { name: 'contratoSetor', label: 'Contrato/Setor', type: 'text', stage: 'solicitante', section: 'Dados' },
-        { name: 'gestorImediatoAvaliador', label: 'Gestor imediato avaliador', type: 'text', stage: 'solicitante', section: 'Dados' },
-        { name: 'cargoColaborador', label: 'Cargo do colaborador', type: 'text', stage: 'solicitante', section: 'Dados' },
-        { name: 'dataAdmissao', label: 'Data de admissão', type: 'date', stage: 'solicitante', section: 'Dados' },
-        { name: 'cargoAvaliador', label: 'Cargo do avaliador', type: 'text', stage: 'solicitante', section: 'Dados' },
-        ...[
-          'relacionamentoNota', 'comunicacaoNota', 'atitudeNota', 'saudeSegurancaNota',
-          'dominioTecnicoProcessosNota', 'adaptacaoMudancaNota', 'autogestaoGestaoPessoasNota',
-        ].map((name) => ({
-          name,
-          label: name,
-          type: 'select',
-          options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-          stage: 'solicitante',
-          section: 'Avaliação',
-        })),
-        { name: 'comentarioFinal', label: 'Comentário final', type: 'textarea', stage: 'solicitante', section: 'Comentários' },
-      ],
-    }
-
     await prisma.tipoSolicitacao.update({ where: { id: 'RQ_RH_103' }, data: { schemaJson: avaliacaoExperienciaSchema, updatedAt: new Date() } })
 
     await prisma.tipoSolicitacao.update({
