@@ -18,6 +18,7 @@ type SolicitationVisibilityInput = {
   userSetorKeys: string[]
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
+  isExperienceEvaluationCoordinator: boolean
 }
 
 type SolicitationLike = {
@@ -95,6 +96,7 @@ export function buildReceivedSolicitationVisibilityWhere(
       OR: [
         { solicitanteId: input.userId },
         { approverId: input.userId },
+        ...(input.isExperienceEvaluationCoordinator ? [{ id: { not: '' } }] : []),
         {
           AND: [
             { OR: [{ approverId: null }, { approverId: '' }] },
@@ -105,13 +107,14 @@ export function buildReceivedSolicitationVisibilityWhere(
     },
   ]
 
-  if (input.finalizerTipoIds.length > 0) {
-    if (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)) {
-      orFilters.push({
-        tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-        status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
-      })
-    }
+  if (
+    input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+    input.isExperienceEvaluationCoordinator
+  ) {
+    orFilters.push({
+      tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+      status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+    })
   }
   return {
     OR: orFilters,
@@ -215,7 +218,8 @@ export function canUserViewSolicitationByDepartment(
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)
+    (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+      input.isExperienceEvaluationCoordinator)
   ) {
     return true
   }

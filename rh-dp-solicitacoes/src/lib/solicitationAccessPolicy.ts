@@ -6,6 +6,7 @@ import {
   resolveUserSetorKeysFromDepartments,
 } from '@/lib/solicitationVisibility'
 import {
+  EXPERIENCE_EVALUATOR_GROUP_NAME,
   isExperienceEvaluationEvaluator,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
@@ -23,6 +24,7 @@ export type UserAccessContext = {
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
   actionableTipoIds: string[]
+  isExperienceEvaluationCoordinator: boolean
 }
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
@@ -70,7 +72,7 @@ export async function resolveUserAccessContext(input: {
   }
 
   const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
-  const [finalizerRows, allowedTipoRows, approverTipoRows] = await Promise.all([
+  const [finalizerRows, allowedTipoRows, approverTipoRows, evaluatorGroupMember] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
       select: { tipoId: true },
@@ -82,6 +84,13 @@ export async function resolveUserAccessContext(input: {
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'APPROVER' },
       select: { tipoId: true },
+    }),
+    prisma.approverGroupMember.findFirst({
+      where: {
+        userId: input.userId,
+        group: { name: EXPERIENCE_EVALUATOR_GROUP_NAME },
+      },
+      select: { userId: true },
     }),
   ])
 
@@ -96,6 +105,7 @@ export async function resolveUserAccessContext(input: {
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
     allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
+    isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
   }
 }
 
@@ -110,6 +120,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     userSetorKeys: ctx.userSetorKeys,
     finalizerTipoIds: ctx.finalizerTipoIds,
     allowedTipoIds: ctx.allowedTipoIds,
+    isExperienceEvaluationCoordinator: ctx.isExperienceEvaluationCoordinator,
   })
 }
 
@@ -125,6 +136,7 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
   if (ctx.role === 'ADMIN') return true
   if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (solicitation.status !== EXPERIENCE_EVALUATION_STATUS) return false
+  if (ctx.isExperienceEvaluationCoordinator) return true
 
   return isExperienceEvaluationEvaluator(
     { payload: solicitation.payload, approverId: solicitation.approverId },
@@ -135,14 +147,16 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
       fullName: ctx.userFullName,
     },
   )
-}function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
+}
+
+function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (ctx.role === 'ADMIN') return true
   if (!solicitation.tipoId || !solicitation.status) return false
 
   return (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    ctx.finalizerTipoIds.includes(solicitation.tipoId)
+    (ctx.finalizerTipoIds.includes(solicitation.tipoId) || ctx.isExperienceEvaluationCoordinator)
   )
 }
 
@@ -187,7 +201,7 @@ export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: So
   if (isExperienceFinalizationStage && ctx.role !== 'ADMIN') {
     return (
       canViewSolicitation(ctx, solicitation) &&
-      canUserActOnCurrentStage(ctx, solicitation) &&
+      canUserActAsFinalizerForCurrentStage(ctx, solicitation) &&
       solicitation.approverId !== ctx.userId
     )
   }

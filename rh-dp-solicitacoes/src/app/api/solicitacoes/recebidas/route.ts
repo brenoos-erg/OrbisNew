@@ -24,6 +24,11 @@ function toAndArray(andClause: Prisma.SolicitationWhereInput['AND']): Prisma.Sol
   return Array.isArray(andClause) ? andClause : [andClause]
 }
 
+function debugReceivedSolicitations(message: string, details: Record<string, unknown>) {
+  if (process.env.DEBUG_SOLICITACOES_RECEBIDAS !== 'true') return
+  console.debug(`[solicitacoes:recebidas] ${message}`, details)
+}
+
 function resolveOrderBy(searchParams: URLSearchParams): Prisma.SolicitationOrderByWithRelationInput[] {
   const sortBy = searchParams.get('sortBy') ?? 'dataAbertura'
   const sortDir = (searchParams.get('sortDir') ?? 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'
@@ -61,10 +66,24 @@ export async function GET(req: NextRequest) {
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
     })
+    const receivedVisibilityWhere = buildReceivedWhereByPolicy(userAccess)
     where.AND = [
       ...toAndArray(where.AND),
-      buildReceivedWhereByPolicy(userAccess),
+      receivedVisibilityWhere,
     ]
+
+    debugReceivedSolicitations('policy-context', {
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      role: me.role,
+      status: where.status ?? null,
+      tipoId: where.tipoId ?? null,
+      finalizerTipoIds: userAccess.finalizerTipoIds,
+      allowedTipoIds: userAccess.allowedTipoIds,
+      isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
+      visibilityWhere: receivedVisibilityWhere,
+    })
 
     const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
     where.AND = [
@@ -77,6 +96,7 @@ export async function GET(req: NextRequest) {
         role: me.role,
         departmentIds: userDepartmentIdsForSensitive,
         allowedTipoIds: userAccess.allowedTipoIds,
+        isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
       }),
     ]
 
@@ -112,6 +132,21 @@ export async function GET(req: NextRequest) {
    const total = globalSearchText ? filteredSolicitations.length : dbTotal
    const pagedSolicitations = globalSearchText ? filteredSolicitations.slice(skip, skip + pageSize) : filteredSolicitations
 
+   debugReceivedSolicitations('query-result', {
+      userId: me.id,
+      total,
+      dbTotal,
+      returned: pagedSolicitations.length,
+      rows: pagedSolicitations.map((item) => ({
+        protocolo: item.protocolo,
+        status: item.status,
+        tipoId: item.tipoId,
+        approverId: item.approverId,
+        assumidaPorId: item.assumidaPorId,
+        departmentId: item.departmentId,
+      })),
+    })
+
    const rows = pagedSolicitations.map((s) => {
       const finalizadorEvent = s.eventos?.find((event) => ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'].includes(event.tipo)) ?? null
       const responsible = resolvePrimaryResponsibleForList({
@@ -120,6 +155,7 @@ export async function GET(req: NextRequest) {
         assumidaPorId: s.assumidaPorId,
         approver: s.approver,
         approverId: s.approverId,
+        status: s.status,
       })
 
       return {

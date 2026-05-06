@@ -75,10 +75,10 @@ assert.match(
   'Modal geral deve preferir responsavelAtualId canônico antes de qualquer fallback legado.',
 )
 
-assert.match(
+assert.doesNotMatch(
   receivedQuerySource,
-  /OR:\s*\[\s*\{ assumidaPor: \{ fullName: \{ contains: responsavel \} \} \},\s*\{ approver: \{ fullName: \{ contains: responsavel \} \} \},\s*\]/s,
-  'Filtro por responsável deve localizar tanto atendente quanto avaliador responsável.',
+  /fullName:\s*\{\s*contains:\s*responsavel\s*\}/,
+  'Filtro por responsável não deve usar contains no Prisma where da rota de recebidas.',
 )
 
 console.log('✅ experience-evaluation-general-responsibility-regression.test passed')

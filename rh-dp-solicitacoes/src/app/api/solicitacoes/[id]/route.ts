@@ -201,6 +201,7 @@ export async function GET(
       assumidaPorId: item.assumidaPorId,
       approver: item.approver,
       approverId: item.approverId,
+      status: item.status,
     })
 
    // Mapeia para o formato que o front espera
