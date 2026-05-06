@@ -218,20 +218,19 @@ export const GET = withModuleLevel(
         const where = buildWhereFromSearchParams(searchParams)
 
         const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
+        const userAccess = await resolveUserAccessContext({
+          userId: me.id,
+          userLogin: me.login,
+          userEmail: me.email,
+          userFullName: me.fullName,
+          role: me.role,
+          primaryDepartmentId: me.departmentId,
+          primaryDepartment: me.department,
+        })
 
         if (scope === 'sent') {
           where.solicitanteId = me.id
         } else if (scope === 'received') {
-           const userAccess = await resolveUserAccessContext({
-            userId: me.id,
-            userLogin: me.login,
-            userEmail: me.email,
-            userFullName: me.fullName,
-            role: me.role,
-            primaryDepartmentId: me.departmentId,
-            primaryDepartment: me.department,
-          })
-
           const gestorAvaliadorFilter = {
             approverId: me.id,
             status: EXPERIENCE_EVALUATION_STATUS,
@@ -282,6 +281,8 @@ export const GET = withModuleLevel(
             userFullName: me.fullName,
             role: me.role,
             departmentIds: userDepartmentIdsForSensitive,
+            allowedTipoIds: userAccess.allowedTipoIds,
+            isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
           }),
         ]
 
@@ -322,6 +323,7 @@ export const GET = withModuleLevel(
     assumidaPorId: s.assumidaPorId,
     approver: s.approver,
     approverId: s.approverId,
+    status: s.status,
   })
 
   return {

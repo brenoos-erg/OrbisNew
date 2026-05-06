@@ -36,6 +36,7 @@ export async function GET() {
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
           allowedTipoIds: userAccess.allowedTipoIds,
+          isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
         }),
       ],
       OR: [
@@ -75,6 +76,7 @@ export async function GET() {
           role: me.role,
           departmentIds: userDepartmentIdsForSensitive,
           allowedTipoIds: userAccess.allowedTipoIds,
+          isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
         }),
       ],
       requiresApproval: true,

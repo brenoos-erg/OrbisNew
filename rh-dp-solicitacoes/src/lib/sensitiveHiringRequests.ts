@@ -32,6 +32,7 @@ export function buildSensitiveHiringVisibilityWhere(input: {
   role?: Role | null
   departmentIds?: string[]
   allowedTipoIds?: string[]
+  isExperienceEvaluationCoordinator?: boolean
 }) {
   const isAdmin = input.role === 'ADMIN'
   const isRh = input.role === 'RH'
@@ -54,6 +55,19 @@ export function buildSensitiveHiringVisibilityWhere(input: {
 
   if (isAdmin || isRh) {
     participantFilters.push({ id: { not: '' } })
+  }
+
+  if (input.isExperienceEvaluationCoordinator) {
+    participantFilters.push({
+      AND: [
+        { tipoId: 'RQ_RH_103' },
+        {
+          status: {
+            in: ['AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
+          },
+        },
+      ],
+    })
   }
 
   const normalizedLogin = normalizeParticipantValue(input.userLogin)

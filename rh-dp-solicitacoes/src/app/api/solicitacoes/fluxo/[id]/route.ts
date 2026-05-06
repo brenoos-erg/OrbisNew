@@ -375,6 +375,7 @@ export const GET = withModuleLevel('configuracoes', ModuleLevel.NIVEL_1, async (
     assumidaPorId: solicitation.assumidaPorId,
     approver: solicitation.approver,
     approverId: solicitation.approverId,
+    status: solicitation.status,
   })
 
   return NextResponse.json({

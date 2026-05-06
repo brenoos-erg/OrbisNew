@@ -1,3 +1,4 @@
+import { EXPERIENCE_EVALUATION_FINALIZATION_STATUS } from './experienceEvaluation.constants'
 import { isExperienceEvaluationTipo } from './experienceEvaluationForm'
 
 type PersonRef = {
@@ -21,8 +22,19 @@ export function resolvePrimaryResponsibleForList(input: {
   assumidaPorId?: string | null
   approver?: PersonRef | null
   approverId?: string | null
+  status?: string | null
 }) {
   const preferApprover = shouldUseApproverAsPrimaryResponsible(input.tipo)
+
+  if (preferApprover && input.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS) {
+    return {
+      responsavelId: input.assumidaPor?.id ?? input.assumidaPorId ?? input.approver?.id ?? input.approverId ?? null,
+      responsavel:
+        input.assumidaPor?.fullName && input.assumidaPor.fullName.trim().length > 0
+          ? { fullName: input.assumidaPor.fullName }
+          : { fullName: 'RH / Coordenadores de Avaliação' },
+    }
+  }
 
   if (preferApprover) {
     return {
