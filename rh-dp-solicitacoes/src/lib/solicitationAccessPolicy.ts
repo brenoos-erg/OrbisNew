@@ -23,6 +23,7 @@ export type UserAccessContext = {
   userSetorKeys: string[]
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
+  viewerTipoIds: string[]
   actionableTipoIds: string[]
   isExperienceEvaluationCoordinator: boolean
 }
@@ -72,13 +73,17 @@ export async function resolveUserAccessContext(input: {
   }
 
   const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
-  const [finalizerRows, allowedTipoRows, approverTipoRows, evaluatorGroupMember] = await Promise.all([
+  const [finalizerRows, allowedTipoRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
       select: { tipoId: true },
     }),
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId },
+      select: { tipoId: true },
+    }),
+    prisma.tipoSolicitacaoApprover.findMany({
+      where: { userId: input.userId, role: 'VIEWER' },
       select: { tipoId: true },
     }),
     prisma.tipoSolicitacaoApprover.findMany({
@@ -104,6 +109,7 @@ export async function resolveUserAccessContext(input: {
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
     allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
+    viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
   }
@@ -160,6 +166,10 @@ function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitati
   )
 }
 
+export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  return canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation)
+}
+
 function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (ctx.role === 'ADMIN') return true
   if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) return false
@@ -186,11 +196,47 @@ function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: Solicita
   return false
 }
 
+export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (ctx.role === 'ADMIN') return false
+  return Boolean(
+    solicitation.tipoId &&
+      ctx.viewerTipoIds.includes(solicitation.tipoId) &&
+      !ctx.actionableTipoIds.includes(solicitation.tipoId) &&
+      !ctx.finalizerTipoIds.includes(solicitation.tipoId) &&
+      !canUserActAsExperienceEvaluator(ctx, solicitation) &&
+      !canUserActAsFinalizerForCurrentStage(ctx, solicitation) &&
+      !canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null }),
+  )
+}
+
 export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
   return (
+    !isViewerOnlyByPolicy(ctx, solicitation) &&
     canViewSolicitation(ctx, solicitation) &&
     (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
   )
+}
+
+export function canApproveSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
+  if (ctx.role === 'ADMIN') return true
+  return Boolean(
+    canViewSolicitation(ctx, solicitation) &&
+      solicitation.tipoId &&
+      (ctx.actionableTipoIds.includes(solicitation.tipoId) || solicitation.approverId === ctx.userId),
+  )
+}
+
+export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  return !isViewerOnlyByPolicy(ctx, solicitation) && canActOnSolicitation(ctx, solicitation)
+}
+
+export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  return canEditSolicitation(ctx, solicitation)
+}
+
+export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  return ctx.role === 'ADMIN' && !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation)
 }
 
 export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
@@ -200,6 +246,7 @@ export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: So
 
   if (isExperienceFinalizationStage && ctx.role !== 'ADMIN') {
     return (
+      !isViewerOnlyByPolicy(ctx, solicitation) &&
       canViewSolicitation(ctx, solicitation) &&
       canUserActAsFinalizerForCurrentStage(ctx, solicitation) &&
       solicitation.approverId !== ctx.userId
@@ -207,6 +254,7 @@ export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: So
   }
 
   return (
+    !isViewerOnlyByPolicy(ctx, solicitation) &&
     canViewSolicitation(ctx, solicitation) &&
     (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
   )

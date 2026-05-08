@@ -8,6 +8,7 @@ import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildDocumentUploadPaths, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 async function ensureSensitiveHiringAccess(solicitationId: string, user: { id: string; role: 'COLABORADOR' | 'RH' | 'DP' | 'ADMIN'; departmentId?: string | null }) {
   const solicitation = await prisma.solicitation.findUnique({
@@ -98,6 +99,8 @@ async function saveFile(file: File) {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const me = await requireActiveUser()
   const solicitationId = (await params).id
+  const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+  if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
   const access = await ensureSensitiveHiringAccess(solicitationId, me as any)
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
@@ -122,6 +125,9 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
   const me = await requireActiveUser()
   const solicitationId = (await params).id
 
+  const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+  if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+
   const access = await ensureSensitiveHiringAccess(solicitationId, me as any)
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
@@ -140,6 +146,11 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const ids: string[] = body?.ids ?? []
   const rows = await prisma.attachment.findMany({ where: { id: { in: ids } } })
+
+  for (const row of rows) {
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: row.solicitationId, userId: me.id })
+    if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+  }
 
   for (const row of rows) {
     const access = await ensureSensitiveHiringAccess(row.solicitationId, me as any)

@@ -10,14 +10,20 @@ import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
-import { canViewSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
-import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import {
-  listExperienceEvaluators,
-  patchExperienceEvaluationEvaluatorPayload,
-  resolveExperienceEvaluationEvaluatorFromDirectory,
-} from '@/lib/experienceEvaluation'
+  canApproveSolicitation,
+  canAssumeSolicitation,
+  canCancelSolicitation,
+  canCommentSolicitation,
+  canEditSolicitation,
+  canFinalizeSolicitation,
+  canViewSolicitation,
+  isViewerOnlyByPolicy,
+  resolveUserAccessContext,
+} from '@/lib/solicitationAccessPolicy'
+import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
+import { buildSolicitationDetailPayload } from '@/lib/solicitationDetailPayload'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -27,70 +33,34 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    const item = await prisma.solicitation.findUnique({
-      where: { id: (await params).id },
-      include: {
-        tipo: true,
-        approver: { select: { id: true, fullName: true } },
-        assumidaPor: { select: { id: true, fullName: true } },
-        costCenter: true,
-        department: { select: { id: true, name: true, code: true } },
-        nonConformity: { select: { id: true, numeroRnc: true, status: true } },
-        comentarios: {
-          include: {
-            autor: {
-              select: { id: true, fullName: true, email: true },
-            },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-         // anexos buscados separadamente (abaixo)
-        parent: true,
-        eventos: {
-          orderBy: { createdAt: 'asc' },
-        },
-        timelines: {
-          orderBy: { createdAt: 'asc' },
-        },
-        solicitacaoSetores: {
-          orderBy: { setor: 'asc' },
-        },
-        // 👇 filhos vinculados
-        children: {
-          include: {
-            tipo: { select: { nome: true } },
-            department: { select: { name: true } },
-          },
-          orderBy: { dataAbertura: 'asc' },
-        },
-        documents: {
-          include: {
-            assignments: {
-              select: {
-                id: true,
-                userId: true,
-                status: true,
-                signedAt: true,
-                vistoriaObservacoes: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    })
+  const { id } = await params
+  let stage = 'inicio'
+  let logContext: Record<string, unknown> = { id }
 
-     if (!item) {
+  try {
+    stage = 'buscar-solicitacao'
+    const item = await prisma.solicitation.findUnique({ where: { id } })
+
+    if (!item) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
       )
     }
 
+    logContext = {
+      ...logContext,
+      protocolo: item.protocolo,
+      tipoId: item.tipoId,
+      status: item.status,
+    }
 
-  const me = await requireActiveUser()
-    const [userDepartmentIds, userAccess] = await Promise.all([
+    stage = 'usuario-atual'
+    const me = await requireActiveUser()
+    logContext.usuarioAtual = { id: me.id, email: me.email, login: me.login, role: me.role }
+
+    stage = 'contexto-acesso'
+    const [userDepartmentIds, userAccess, extraDepartments] = await Promise.all([
       getUserDepartmentIds(me.id, me.departmentId),
       resolveUserAccessContext({
         userId: me.id,
@@ -101,13 +71,43 @@ export async function GET(
         primaryDepartmentId: me.departmentId,
         primaryDepartment: me.department,
       }),
+      prisma.userDepartment.findMany({
+        where: { userId: me.id },
+        include: { department: { select: { id: true, code: true, name: true } } },
+      }),
     ])
-    const viewerOnly = await isViewerOnlyForSolicitation({
-      solicitationId: item.id,
-      userId: me.id,
+
+    stage = 'dados-relacionados-criticos'
+    const [tipo, department] = await Promise.all([
+      item.tipoId ? prisma.tipoSolicitacao.findUnique({ where: { id: item.tipoId } }) : Promise.resolve(null),
+      item.departmentId
+        ? prisma.department.findUnique({
+            where: { id: item.departmentId },
+            select: { id: true, name: true, code: true },
+          })
+        : Promise.resolve(null),
+    ])
+
+    const solicitationForPolicy = {
+      tipoId: item.tipoId,
+      status: item.status,
+      solicitanteId: item.solicitanteId,
+      approverId: item.approverId,
+      assumidaPorId: item.assumidaPorId,
+      departmentId: item.departmentId,
+      solicitacaoSetores: [] as { setor?: string | null }[],
+      payload: item.payload ?? {},
+    }
+
+    stage = 'setores-para-politica'
+    const policySetores = await prisma.solicitacaoSetor.findMany({
+      where: { solicitacaoId: item.id },
+      select: { setor: true },
+      orderBy: { setor: 'asc' },
     })
+    solicitationForPolicy.solicitacaoSetores = policySetores
 
-
+    stage = 'validar-visualizacao'
     const canViewSensitive = canViewSensitiveHiringRequest({
       user: { id: me.id, role: me.role },
       solicitation: {
@@ -115,57 +115,43 @@ export async function GET(
         assumidaPorId: item.assumidaPorId,
         approverId: item.approverId,
         departmentId: item.departmentId,
-        tipo: item.tipo
+        tipo: tipo
           ? {
-              id: item.tipo.id,
-              nome: item.tipo.nome,
-              codigo: (item.tipo as { codigo?: string | null }).codigo ?? null,
+              id: tipo.id,
+              nome: tipo.nome,
+              codigo: (tipo as { codigo?: string | null }).codigo ?? null,
             }
           : null,
       },
-       isResponsibleDepartmentMember: userDepartmentIds.includes(item.departmentId),
+      isResponsibleDepartmentMember: item.departmentId ? userDepartmentIds.includes(item.departmentId) : false,
     })
 
-   const canViewByDepartment = canViewSolicitation(
-      userAccess,
-      {
-        tipoId: item.tipoId,
-        status: item.status,
-        solicitanteId: item.solicitanteId,
-        approverId: item.approverId,
-        assumidaPorId: item.assumidaPorId,
-        departmentId: item.departmentId,
-        solicitacaoSetores: item.solicitacaoSetores,
-        payload: item.payload,
-      },
-    )
-
+    const canViewByDepartment = canViewSolicitation(userAccess, solicitationForPolicy)
 
     const canViewNadaConsta = canUserViewNadaConsta(
       {
-       id: me.id,
+        id: me.id,
         role: me.role,
         departments: [
           ...(me.department ? [me.department] : []),
-          ...(await prisma.userDepartment.findMany({
-            where: { userId: me.id },
-            include: { department: { select: { id: true, code: true, name: true } } },
-          })).map((link) => link.department).filter((d): d is { id: string; code: string; name: string } => Boolean(d)),
+          ...extraDepartments
+            .map((link) => link.department)
+            .filter((d): d is { id: string; code: string; name: string } => Boolean(d)),
         ],
       },
       {
         solicitanteId: item.solicitanteId,
         assumidaPorId: item.assumidaPorId,
         approverId: item.approverId,
-        tipo: item.tipo
+        tipo: tipo
           ? {
-              id: item.tipo.id,
-              nome: item.tipo.nome,
-              schemaJson: item.tipo.schemaJson,
+              id: tipo.id,
+              nome: tipo.nome,
+              schemaJson: tipo.schemaJson,
             }
           : null,
-        solicitacaoSetores: item.solicitacaoSetores,
-        payload: item.payload,
+        solicitacaoSetores: policySetores,
+        payload: item.payload ?? {},
       },
     )
 
@@ -173,161 +159,135 @@ export async function GET(
       return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
     }
 
+    stage = 'dados-relacionados-opcionais'
     const attachmentIds = [item.id, item.parentId].filter(Boolean) as string[]
-    const allAttachments = await prisma.attachment.findMany({
-      where: { solicitationId: { in: attachmentIds } },
-      orderBy: { createdAt: 'asc' },
-    })
+    const [
+      approver,
+      assumidaPor,
+      costCenter,
+      nonConformity,
+      comentarios,
+      eventos,
+      timelines,
+      solicitacaoSetores,
+      children,
+      documents,
+      allAttachments,
+      experienceEvaluators,
+    ] = await Promise.all([
+      item.approverId ? prisma.user.findUnique({ where: { id: item.approverId }, select: { id: true, fullName: true } }) : Promise.resolve(null),
+      item.assumidaPorId ? prisma.user.findUnique({ where: { id: item.assumidaPorId }, select: { id: true, fullName: true } }) : Promise.resolve(null),
+      item.costCenterId ? prisma.costCenter.findUnique({ where: { id: item.costCenterId } }) : Promise.resolve(null),
+      item.nonConformityId ? prisma.nonConformity.findUnique({ where: { id: item.nonConformityId }, select: { id: true, numeroRnc: true, status: true } }) : Promise.resolve(null),
+      prisma.comment.findMany({
+        where: { solicitationId: item.id },
+        include: { autor: { select: { id: true, fullName: true, email: true } } },
+        orderBy: { createdAt: 'asc' },
+      }).catch((error) => {
+        console.error('Falha ao buscar comentários da solicitação', { ...logContext, error })
+        return []
+      }),
+      prisma.event.findMany({ where: { solicitationId: item.id }, orderBy: { createdAt: 'asc' } }).catch((error) => {
+        console.error('Falha ao buscar eventos da solicitação', { ...logContext, error })
+        return []
+      }),
+      prisma.solicitationTimeline.findMany({ where: { solicitationId: item.id }, orderBy: { createdAt: 'asc' } }).catch((error) => {
+        console.error('Falha ao buscar timeline da solicitação', { ...logContext, error })
+        return []
+      }),
+      prisma.solicitacaoSetor.findMany({ where: { solicitacaoId: item.id }, orderBy: { setor: 'asc' } }).catch((error) => {
+        console.error('Falha ao buscar setores da solicitação', { ...logContext, error })
+        return []
+      }),
+      prisma.solicitation.findMany({
+        where: { parentId: item.id },
+        include: {
+          tipo: { select: { nome: true } },
+          department: { select: { name: true } },
+        },
+        orderBy: { dataAbertura: 'asc' },
+      }).catch((error) => {
+        console.error('Falha ao buscar filhos da solicitação', { ...logContext, error })
+        return []
+      }),
+      prisma.document.findMany({
+        where: { solicitationId: item.id },
+        include: {
+          assignments: {
+            select: {
+              id: true,
+              userId: true,
+              status: true,
+              signedAt: true,
+              vistoriaObservacoes: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }).catch((error) => {
+        console.error('Falha ao buscar documentos da solicitação', { ...logContext, error })
+        return []
+      }),
+      attachmentIds.length > 0
+        ? prisma.attachment.findMany({ where: { solicitationId: { in: attachmentIds } }, orderBy: { createdAt: 'asc' } }).catch((error) => {
+            console.error('Falha ao buscar anexos da solicitação', { ...logContext, error })
+            return []
+          })
+        : Promise.resolve([]),
+      listExperienceEvaluators().catch((error) => {
+        console.error('Falha ao buscar avaliadores de experiência', { ...logContext, error })
+        return []
+      }),
+    ])
 
-    // Junta anexos da própria solicitação e, se houver, da solicitação de origem
-    const seenUrls = new Set<string>()
-    const dedupedAttachments = allAttachments.filter((a) => {
-      const already = seenUrls.has(a.url)
-      if (!already) {
-        seenUrls.add(a.url)
-      }
-      return !already
-    })
-
-    const payload = (item.payload ?? {}) as Record<string, unknown>
-    const experienceEvaluators = await listExperienceEvaluators()
-    const resolvedEvaluator =
-      resolveExperienceEvaluationEvaluatorFromDirectory(payload, experienceEvaluators) ??
-      null
-    const normalizedPayload = patchExperienceEvaluationEvaluatorPayload(payload, resolvedEvaluator)
-    const primaryResponsible = resolvePrimaryResponsibleForList({
-      tipo: item.tipo,
-      assumidaPor: item.assumidaPor,
-      assumidaPorId: item.assumidaPorId,
-      approver: item.approver,
-      approverId: item.approverId,
-      status: item.status,
-    })
-
-   // Mapeia para o formato que o front espera
-    const result = {
-   id: item.id,
-      protocolo: item.protocolo,
-      titulo: item.titulo,
-      descricao: item.descricao,
-
-      status: item.status,
-      approverId: item.approverId,
-      assumidaPorId: item.assumidaPorId,
-      responsavelAtualId: primaryResponsible.responsavelId,
-      responsavelAtual: primaryResponsible.responsavel,
-      approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
+    stage = 'montar-permissoes'
+    const solicitationForActions = { ...solicitationForPolicy, solicitacaoSetores }
+    const viewerOnly = isViewerOnlyByPolicy(userAccess, solicitationForActions)
+    const permissions = {
       viewerOnly,
-
-      dataAbertura: item.dataAbertura?.toISOString(),
-      dataPrevista: item.dataPrevista?.toISOString() ?? null,
-      dataFechamento: item.dataFechamento?.toISOString() ?? null,
-      dataCancelamento: item.dataCancelamento?.toISOString() ?? null,
-      tipo: item.tipo
-        ? {
-            id: item.tipo.id,
-            codigo: (item.tipo as { codigo?: string | null }).codigo ?? null,
-            nome: item.tipo.nome,
-            descricao: item.tipo.descricao,
-            schemaJson: item.tipo.schemaJson as any,
-          }
-        : null,
-      costCenter: item.costCenter
-        ? {
-            description: item.costCenter.description,
-            code: item.costCenter.code,
-            externalCode: item.costCenter.externalCode,
-          }
-        : null,
-        department: item.department
-        ? {
-           id: item.department.id,
-            name: item.department.name,
-            code: item.department.code,
-          }
-         : null,
-      payload: {
-        ...(normalizedPayload as Record<string, unknown>),
-      } as any,
-      dataSources: {
-        experienceEvaluators,
-      },
-      nonConformity: item.nonConformity
-        ? { id: item.nonConformity.id, numeroRnc: item.nonConformity.numeroRnc, status: item.nonConformity.status }
-        : null,
-      anexos: dedupedAttachments.map((a) => ({
-        id: a.id,
-        filename: a.filename,
-        url: `/api/solicitacoes/${a.solicitationId}/anexos/${a.id}`,
-        mimeType: a.mimeType,
-        sizeBytes: a.sizeBytes,
-        createdAt: a.createdAt.toISOString(),
-      })),
-      comentarios: item.comentarios.map((c) => ({
-        id: c.id,
-        texto: c.texto,
-        createdAt: c.createdAt.toISOString(),
-        autor: c.autor
-          ? {
-              id: c.autor.id,
-              fullName: c.autor.fullName,
-              email: c.autor.email,
-            }
-          : null,
-      })),
-      eventos: item.eventos.map((e) => ({
-        id: e.id,
-        tipo: e.tipo,
-        createdAt: e.createdAt.toISOString(),
-        actorId: e.actorId,
-      })),
-      timelines: item.timelines.map((t) => ({
-        id: t.id,
-        status: t.status,
-        message: t.message,
-        createdAt: t.createdAt.toISOString(),
-      })),
-      solicitacaoSetores: item.solicitacaoSetores.map((setor) => ({
-        id: setor.id,
-        setor: setor.setor,
-        status: setor.status,
-        constaFlag: setor.constaFlag,
-        campos: setor.campos as any,
-        finalizadoEm: setor.finalizadoEm?.toISOString() ?? null,
-        finalizadoPor: setor.finalizadoPor ?? null,
-      })),
-      // 👇 filhos simplificados para o modal
-      children: item.children.map((child) => ({
-        id: child.id,
-        protocolo: child.protocolo,
-        titulo: child.titulo,
-        status: child.status,
-        dataAbertura: child.dataAbertura.toISOString(),
-        tipo: child.tipo ? { nome: child.tipo.nome } : null,
-        setorDestino: (child as any).department?.name ?? null,
-      })),
-      documents: item.documents.map((doc) => ({
-        id: doc.id,
-        type: doc.type,
-        title: doc.title,
-        pdfUrl: doc.pdfUrl,
-        signedPdfUrl: doc.signedPdfUrl,
-        createdAt: doc.createdAt.toISOString(),
-        assignments: doc.assignments.map((assignment) => ({
-          id: assignment.id,
-          userId: assignment.userId,
-          status: assignment.status,
-          signedAt: assignment.signedAt?.toISOString() ?? null,
-          vistoriaObservacoes: assignment.vistoriaObservacoes,
-        })),
-      })),
+      canAssume: canAssumeSolicitation(userAccess, solicitationForActions),
+      canEdit: canEditSolicitation(userAccess, solicitationForActions),
+      canApprove: canApproveSolicitation(userAccess, solicitationForActions),
+      canFinalize: canFinalizeSolicitation(userAccess, solicitationForActions),
+      canCancel: canCancelSolicitation(userAccess, solicitationForActions),
+      canComment: canCommentSolicitation(userAccess, solicitationForActions),
     }
 
+    stage = 'montar-payload-resposta'
+    const result = buildSolicitationDetailPayload({
+      item,
+      tipo,
+      approver,
+      assumidaPor,
+      costCenter,
+      department,
+      nonConformity,
+      comentarios,
+      eventos,
+      timelines,
+      solicitacaoSetores,
+      children,
+      documents,
+      attachments: allAttachments,
+      experienceEvaluators,
+      permissions,
+    })
+
     return NextResponse.json(result)
-  } catch (e) {
-    console.error('❌ GET /api/solicitacoes/[id] error:', e)
+  } catch (e: any) {
+    const stack = e?.stack ?? String(e)
+    console.error('❌ GET /api/solicitacoes/[id] error:', {
+      ...logContext,
+      etapa: stage,
+      stack,
+    })
     return NextResponse.json(
-      { error: 'Erro interno ao buscar solicitação.' },
+      {
+        error: 'Erro interno ao buscar solicitação.',
+        ...(process.env.NODE_ENV !== 'production'
+          ? { detail: e?.message ?? String(e), etapa: stage, context: logContext, stack }
+          : {}),
+      },
       { status: 500 },
     )
   }
@@ -348,6 +308,11 @@ export async function PATCH(
   try {
     const me = await requireActiveUser() // usuário logado
     const solicitationId = (await params).id
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+    }
 
     const body = await req.json().catch(() => ({}))
     const comment: string | undefined = body.comment

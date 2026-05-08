@@ -9,7 +9,7 @@ import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPesso
 import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
-import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 
 export async function POST(
@@ -53,7 +53,7 @@ export async function POST(
       userId: me.id,
     })
     if (isViewerOnly) {
-      return NextResponse.json({ error: 'Usuário visualizador não pode aprovar solicitações.' }, { status: 403 })
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
     }
     if (solic.approvalStatus !== 'PENDENTE') {
       return NextResponse.json(

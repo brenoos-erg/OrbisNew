@@ -9,7 +9,7 @@ import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
-import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 
@@ -26,7 +26,7 @@ export const POST = withModuleLevel<RouteParams>(
       const { id: solicitationId } = await params
       const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
       if (isViewerOnly) {
-        return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+        return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
       }
 
       const body = await req.json().catch(() => ({}))
