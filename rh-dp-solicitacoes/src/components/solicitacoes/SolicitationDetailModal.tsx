@@ -256,6 +256,12 @@ export type SolicitationDetail = {
   status: SolicitationStatus | string
   approvalStatus?: ApprovalStatus | null
   viewerOnly?: boolean
+  canAssume?: boolean
+  canEdit?: boolean
+  canApprove?: boolean
+  canFinalize?: boolean
+  canCancel?: boolean
+  canComment?: boolean
   dataAbertura: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -889,7 +895,15 @@ export function SolicitationDetailModal({
       userSectorKeys.has(activeSector as NadaConstaSetorKey)) &&
     !(activeSector === 'SAUDE' && !userIsAdmin && !userSectorKeys.has('SAUDE'))
 
+  const apiCanEdit = detail?.canEdit !== false
+  const apiCanAssume = detail?.canAssume !== false
+  const apiCanApprove = detail?.canApprove !== false
+  const apiCanFinalize = detail?.canFinalize !== false
+  const apiCanCancel = detail?.canCancel !== false
+  const apiCanComment = detail?.canComment !== false
+
   const canEditNadaConstaSetor =
+    apiCanEdit &&
     Boolean(activeSector) &&
     userCanEditSetor &&
     !isFinalizadaOuCancelada &&
@@ -899,10 +913,10 @@ export function SolicitationDetailModal({
   // em Nada Consta, apenas DP (ou admin) pode assumir
   const canAssumirNadaConsta = userIsAdmin || userSectorKeys.has('DP')
   const canAssumir =
-    !isFinalizadaOuCancelada && (!isNadaConsta || canAssumirNadaConsta)
+    apiCanAssume && !isFinalizadaOuCancelada && (!isNadaConsta || canAssumirNadaConsta)
 
   // pode finalizar no RH (RQ_063 envia para DP, RQ_091 encerra no RH ou DP)
-  const canFinalizarRh = followsRhFinalizationFlow && !isFinalizadaOuCancelada
+  const canFinalizarRh = apiCanFinalize && followsRhFinalizationFlow && !isFinalizadaOuCancelada
   const finalizarLabel = isDpDestino
     ? 'Finalizar chamado'
     : isSolicitacaoPessoalTipo || isDesligamento
@@ -911,9 +925,9 @@ export function SolicitationDetailModal({
         ? 'Finalizar'
         : 'Finalizar no RH'
   const canEditRhSection =
-    isDesligamento && isRhDestino && !isFinalizadaOuCancelada
+    apiCanEdit && isDesligamento && isRhDestino && !isFinalizadaOuCancelada
   const canEditDpSection =
-    isDesligamento && isDpDestino && !isFinalizadaOuCancelada
+    apiCanEdit && isDesligamento && isDpDestino && !isFinalizadaOuCancelada
 
   const departamentosFluxo = asStringArray(detail?.tipo?.schemaJson?.meta?.departamentos)
   const departamentoFinalFluxo =
@@ -925,6 +939,7 @@ export function SolicitationDetailModal({
     (departamentoFinalFluxo !== null &&
       detail?.department?.id === departamentoFinalFluxo)
   const canFinalizarUltimaEtapa =
+    apiCanFinalize &&
     isUltimaEtapaFluxo &&
     !isAvaliacaoExperiencia &&
     !followsRhFinalizationFlow &&
@@ -1045,7 +1060,7 @@ export function SolicitationDetailModal({
     currentUser?.role === 'ADMIN' ||
    currentUser?.departmentCode === '19' ||
     (currentUser?.departments ?? []).some((dept) => dept.code === '19')
-  const canEditSstResposta = showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
+  const canEditSstResposta = apiCanEdit && showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
   const canApproveEpiUniforme =
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' && userIsSstOrAdmin
 
@@ -1067,6 +1082,7 @@ export function SolicitationDetailModal({
   const isExperienceEvaluationPdfAvailableStatus =
     effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' || effectiveStatus === 'CONCLUIDA'
   const canFinalizeExperienceByRh =
+    apiCanFinalize &&
     isAvaliacaoExperiencia &&
     effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' &&
     (userIsAdmin || userIsCurrentDepartmentResponsible)
@@ -1078,6 +1094,7 @@ export function SolicitationDetailModal({
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
     !isViewerOnly &&
+    apiCanApprove &&
     canApproveByDepartment &&
     (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme)
   const camposFormSolicitante = (
@@ -3419,7 +3436,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                 </div>
               </aside>
             )}
-            {showManagementActions && !isFinalizadaOuCancelada && (
+            {showManagementActions && apiCanComment && !isFinalizadaOuCancelada && (
           <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
             <label className={LABEL_RO}>Observação do atendimento</label>
             <textarea
@@ -3470,7 +3487,7 @@ async function handleEncaminharAprovacaoComAnexo() {
               </button>
             )}
 
-            {showManagementActions && userIsAdmin && !isFinalizadaOuCancelada && (
+            {showManagementActions && apiCanCancel && userIsAdmin && !isFinalizadaOuCancelada && (
               <div className="app-alert-error">
                 <button
                   type="button"

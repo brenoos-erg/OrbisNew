@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma'
 
+export const VIEWER_ONLY_ACTION_ERROR =
+  'Usuário possui apenas permissão de visualização para este tipo de solicitação.'
+
 export async function isViewerOnlyForSolicitation(params: {
   solicitationId: string
   userId: string
@@ -11,15 +14,19 @@ export async function isViewerOnlyForSolicitation(params: {
 
   if (!solicitation) return false
 
-  const role = await prisma.tipoSolicitacaoApprover.findUnique({
+  const roles = await prisma.tipoSolicitacaoApprover.findMany({
     where: {
-      tipoId_userId: {
-        tipoId: solicitation.tipoId,
-        userId: params.userId,
-      },
+      tipoId: solicitation.tipoId,
+      userId: params.userId,
     },
     select: { role: true },
   })
 
-  return role?.role === 'VIEWER'
+  if (roles.length === 0) return false
+  const normalizedRoles = new Set(roles.map((row) => String(row.role).toUpperCase()))
+  return (
+    (normalizedRoles.has('VIEWER') || normalizedRoles.has('VISUALIZADOR')) &&
+    !normalizedRoles.has('APPROVER') &&
+    !normalizedRoles.has('FINALIZER')
+  )
 }

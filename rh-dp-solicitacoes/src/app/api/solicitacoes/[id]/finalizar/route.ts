@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
-import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
@@ -24,7 +24,7 @@ export async function PATCH(
 
     const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
     if (isViewerOnly) {
-      return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({}))

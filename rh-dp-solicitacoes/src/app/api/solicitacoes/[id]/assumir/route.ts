@@ -8,7 +8,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import crypto from 'crypto'
 import { canAssumeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -19,7 +19,7 @@ export async function POST(
 
     const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
     if (isViewerOnly) {
-      return NextResponse.json({ error: 'Usuário visualizador não pode executar esta ação.' }, { status: 403 })
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
     }
 
     const solic = await prisma.solicitation.findUnique({

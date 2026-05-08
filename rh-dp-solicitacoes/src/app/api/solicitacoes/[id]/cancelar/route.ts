@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { randomUUID } from 'crypto'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 export async function PATCH(
   req: Request,
@@ -14,6 +15,11 @@ export async function PATCH(
   try {
     const me = await requireActiveUser()
     const { id } = await params
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+    }
 
     if (me.role !== 'ADMIN') {
       return NextResponse.json(

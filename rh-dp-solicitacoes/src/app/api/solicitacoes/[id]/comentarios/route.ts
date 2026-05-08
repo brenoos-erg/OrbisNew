@@ -5,6 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -15,6 +16,11 @@ export async function POST(
   try {
     const me = await requireActiveUser()
     const solicitationId = (await params).id
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId, userId: me.id })
+    if (isViewerOnly) {
+      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+    }
 
     const body = await req.json().catch(() => ({}))
     const text = typeof body?.texto === 'string' ? body.texto.trim() : ''
