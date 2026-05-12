@@ -76,6 +76,11 @@ export type Row = {
   costCenterId?: string | null
   departmentId?: string | null
   approverId?: string | null
+  solicitanteId?: string | null
+  assumidaPorId?: string | null
+  cancelamentoStatus?: string | null
+  cancelamentoSolicitadoEm?: string | null
+  cancelamentoMotivo?: string | null
 }
 type TiInventoryItem = {
   id: string
@@ -270,6 +275,14 @@ export type SolicitationDetail = {
   dataPrevista?: string | null
   dataFechamento?: string | null
   dataCancelamento?: string | null
+  cancelamentoStatus?: string | null
+  cancelamentoSolicitadoPorId?: string | null
+  cancelamentoSolicitadoEm?: string | null
+  cancelamentoMotivo?: string | null
+  cancelamentoAnalisadoPorId?: string | null
+  cancelamentoAnalisadoEm?: string | null
+  cancelamentoJustificativaAnalise?: string | null
+  cancelamentoOrigem?: string | null
   tipo?: {
     id: string
     codigo?: string | null
@@ -635,6 +648,8 @@ export function SolicitationDetailModal({
   const [recusaDpMotivo, setRecusaDpMotivo] = useState('')
   const [showAdminCancelForm, setShowAdminCancelForm] = useState(false)
   const [adminCancelReason, setAdminCancelReason] = useState('')
+  const [cancellationAnalysisReason, setCancellationAnalysisReason] = useState('')
+  const [cancellationAnalysisAction, setCancellationAnalysisAction] = useState<'aprovar' | 'recusar' | null>(null)
   const [candidatoNome, setCandidatoNome] = useState('')
   const [candidatoDocumento, setCandidatoDocumento] = useState('')
   const [dataAdmissaoPrevista, setDataAdmissaoPrevista] = useState('')
@@ -901,6 +916,7 @@ export function SolicitationDetailModal({
   const apiCanFinalize = detail?.canFinalize !== false
   const apiCanCancel = detail?.canCancel !== false
   const apiCanComment = detail?.canComment !== false
+  const hasPendingCancellationRequest = detail?.cancelamentoStatus === 'PENDENTE'
 
   const canEditNadaConstaSetor =
     apiCanEdit &&
@@ -1958,6 +1974,42 @@ async function handleEncaminharAprovacaoComAnexo() {
     } catch (err: any) {
       console.error('Erro ao cancelar solicitação como admin', err)
       setCloseError(err?.message ?? 'Erro ao cancelar solicitação.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+
+  async function handleAnalyzeCancellationRequest(action: 'aprovar' | 'recusar') {
+    const solicitationId = detail?.id ?? row?.id
+    if (!solicitationId) return
+    const justificativa = cancellationAnalysisReason.trim()
+    if (!justificativa) {
+      setCloseError('Informe a justificativa.')
+      return
+    }
+
+    setClosing(true)
+    setCloseError(null)
+    setCloseSuccess(null)
+    try {
+      const res = await fetch(`/api/solicitacoes/${solicitationId}/cancelamento/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ justificativa }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json?.error ?? 'Falha ao analisar pedido de cancelamento.')
+      }
+      await refreshDetailFromServer()
+      setCancellationAnalysisAction(null)
+      setCancellationAnalysisReason('')
+      setCloseSuccess(action === 'aprovar' ? 'Pedido de cancelamento aprovado.' : 'Pedido de cancelamento recusado.')
+      onFinalized?.()
+    } catch (err: any) {
+      console.error('Erro ao analisar pedido de cancelamento', err)
+      setCloseError(err?.message ?? 'Erro ao analisar pedido de cancelamento.')
     } finally {
       setClosing(false)
     }
@@ -3465,6 +3517,39 @@ async function handleEncaminharAprovacaoComAnexo() {
             </div>
 
           <div className="mt-2 flex w-full flex-col items-stretch gap-2">
+            {hasPendingCancellationRequest && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="font-semibold">Pedido de cancelamento pendente</p>
+                <p className="mt-1">Solicitante pediu cancelamento desta solicitação.</p>
+                <dl className="mt-2 space-y-1 text-xs">
+                  <div><dt className="inline font-semibold">Solicitado por: </dt><dd className="inline">{detail?.cancelamentoSolicitadoPorId ?? '-'}</dd></div>
+                  <div><dt className="inline font-semibold">Solicitado em: </dt><dd className="inline">{formatDateTime(detail?.cancelamentoSolicitadoEm)}</dd></div>
+                  <div><dt className="inline font-semibold">Motivo: </dt><dd className="inline whitespace-pre-wrap">{detail?.cancelamentoMotivo ?? '-'}</dd></div>
+                </dl>
+                {showManagementActions && apiCanCancel && currentUser?.id !== detail?.cancelamentoSolicitadoPorId && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button type="button" onClick={() => setCancellationAnalysisAction('aprovar')} className="app-button-danger flex-1">Aprovar cancelamento</button>
+                      <button type="button" onClick={() => setCancellationAnalysisAction('recusar')} className="app-button-secondary flex-1">Recusar cancelamento</button>
+                    </div>
+                    {cancellationAnalysisAction && (
+                      <div className="rounded-md border border-amber-200 bg-white/70 p-2">
+                        <label className="app-label">
+                          {cancellationAnalysisAction === 'aprovar' ? 'Justificativa da aprovação' : 'Justificativa da recusa'}
+                        </label>
+                        <textarea value={cancellationAnalysisReason} onChange={(event) => setCancellationAnalysisReason(event.target.value)} className="app-textarea mt-2 min-h-[90px]" />
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button type="button" onClick={() => { setCancellationAnalysisAction(null); setCancellationAnalysisReason('') }} className="app-button-secondary">Voltar</button>
+                          <button type="button" onClick={() => handleAnalyzeCancellationRequest(cancellationAnalysisAction)} disabled={closing || !cancellationAnalysisReason.trim()} className="app-button-danger">
+                            {cancellationAnalysisAction === 'aprovar' ? 'Confirmar aprovação' : 'Confirmar recusa'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
              {showManagementActions && canAssumir && (
               <button
                 onClick={handleAssumirChamado}

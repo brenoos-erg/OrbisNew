@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Filter, RefreshCcw, Search, Plus, Info, Copy, Eraser, Printer } from 'lucide-react'
+import { Download, Filter, RefreshCcw, Search, Plus, Info, Copy, Eraser, Printer, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatDateDDMMYYYY } from '@/lib/date'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -51,6 +51,21 @@ const DEFAULT_FILTERS: FilterState = {
   solicitante: '',
   status: '',
   text: '',
+}
+
+
+const CLOSED_CANCELLATION_STATUSES = new Set(['CANCELADA', 'CONCLUIDA', 'FINALIZADA', 'REJEITADA'])
+const DIRECT_REQUESTER_CANCELLATION_STATUSES = new Set(['ABERTA', 'AGUARDANDO_ATENDIMENTO', 'AGUARDANDO_APROVACAO'])
+
+function resolveSentCancellationAction(row: Row | null, currentUserId?: string | null) {
+  if (!row || !currentUserId) return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
+  const status = String(row.status ?? '').toUpperCase()
+  if (CLOSED_CANCELLATION_STATUSES.has(status)) return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
+  if (row.solicitanteId === currentUserId && !row.assumidaPorId && DIRECT_REQUESTER_CANCELLATION_STATUSES.has(status)) {
+    return { enabled: true, label: 'Cancelar' as const, mode: 'DIRECT' as const }
+  }
+  if (row.solicitanteId === currentUserId) return { enabled: true, label: 'Solicitar cancelamento' as const, mode: 'REQUEST' as const }
+  return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
 }
 
 function escapeCsv(v: string) {
@@ -133,6 +148,10 @@ export default function SentRequestsPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [sessionExpiredToastShown, setSessionExpiredToastShown] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const sessionExpiredToastShownRef = useRef(false)
 
   const applyingFromUrlRef = useRef(false)
@@ -151,6 +170,7 @@ export default function SentRequestsPage() {
   ], [])
 
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
+  const cancellationAction = useMemo(() => resolveSentCancellationAction(selectedRow, sessionData?.appUser?.id), [selectedRow, sessionData?.appUser?.id])
 
   const showSessionExpiredToastOnce = useCallback(() => {
     if (sessionExpiredToastShownRef.current) return
@@ -421,6 +441,47 @@ export default function SentRequestsPage() {
     window.open(`/solicitacoes/impressao/${selectedRow.id}`, '_blank', 'noopener,noreferrer')
   }
 
+  const openCancellationModal = () => {
+    if (!selectedRow || !cancellationAction.enabled) {
+      pushToast('Selecione uma solicitação cancelável.', 'info')
+      return
+    }
+    setCancelReason('')
+    setCancelError(null)
+    setCancelModalOpen(true)
+  }
+
+  const submitCancellation = async () => {
+    if (!selectedRow) return
+    const motivo = cancelReason.trim()
+    if (!motivo) {
+      setCancelError('Informe o motivo do cancelamento.')
+      return
+    }
+    setCancelSubmitting(true)
+    setCancelError(null)
+    try {
+      const endpoint = cancellationAction.mode === 'REQUEST'
+        ? `/api/solicitacoes/${selectedRow.id}/solicitar-cancelamento`
+        : `/api/solicitacoes/${selectedRow.id}/cancelar`
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cancellationAction.mode === 'REQUEST' ? { motivo } : { motivo, tipo: 'DIRETO' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error ?? 'Não foi possível concluir a ação.')
+      pushToast(cancellationAction.mode === 'REQUEST' ? 'Pedido de cancelamento enviado.' : 'Solicitação cancelada.', 'success')
+      setCancelModalOpen(false)
+      setCancelReason('')
+      await load(currentSearchState)
+    } catch (err: any) {
+      setCancelError(err?.message ?? 'Não foi possível concluir a ação.')
+    } finally {
+      setCancelSubmitting(false)
+    }
+  }
+
 
   return (
     <div className="app-page">
@@ -466,11 +527,12 @@ export default function SentRequestsPage() {
           </button>
 
           <button
-            disabled
-            title="Disponível apenas para a equipe responsável"
+            onClick={openCancellationModal}
+            disabled={!cancellationAction.enabled}
+            title={!selectedRow ? 'Selecione uma solicitação' : cancellationAction.enabled ? cancellationAction.label : 'Esta solicitação não pode ser cancelada'}
             className="app-button-danger w-full sm:w-auto"
           >
-            Cancelar
+            {cancellationAction.label}
           </button>
 
           <button onClick={exportCsv} className="app-button-secondary w-full sm:w-auto">
@@ -604,6 +666,44 @@ export default function SentRequestsPage() {
           </div>
         </div>
       </div>
+
+      {cancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-[var(--card)] p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">
+                  {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}
+                </h2>
+                <p className="mt-1 text-sm app-muted-text">
+                  {selectedRow?.protocolo ? `Protocolo ${selectedRow.protocolo}` : 'Informe a justificativa obrigatória.'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setCancelModalOpen(false)} className="app-button-ghost rounded p-1"><X size={18} /></button>
+            </div>
+            <label className="app-label">
+              {cancellationAction.mode === 'REQUEST' ? 'Motivo da solicitação de cancelamento' : 'Motivo do cancelamento'}
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              className="app-textarea mt-2 min-h-[120px]"
+              placeholder="Descreva o motivo"
+            />
+            {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setCancelModalOpen(false)} className="app-button-secondary">Voltar</button>
+              <button type="button" onClick={submitCancellation} disabled={cancelSubmitting || !cancelReason.trim()} className="app-button-danger">
+                {cancelSubmitting
+                  ? 'Enviando...'
+                  : cancellationAction.mode === 'REQUEST'
+                    ? 'Enviar solicitação de cancelamento'
+                    : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <SolicitationDetailModal
         isOpen={detailOpen}

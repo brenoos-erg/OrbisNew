@@ -236,7 +236,16 @@ export function canCommentSolicitation(ctx: UserAccessContext, solicitation: Sol
 }
 
 export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
-  return ctx.role === 'ADMIN' && !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation)
+  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
+  if (ctx.role === 'ADMIN') return canViewSolicitation(ctx, solicitation)
+  return (
+    canViewSolicitation(ctx, solicitation) &&
+    (
+      solicitation.assumidaPorId === ctx.userId ||
+      canUserActOnCurrentStage(ctx, solicitation) ||
+      canUserActAsFinalizerForCurrentStage(ctx, solicitation)
+    )
+  )
 }
 
 export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
