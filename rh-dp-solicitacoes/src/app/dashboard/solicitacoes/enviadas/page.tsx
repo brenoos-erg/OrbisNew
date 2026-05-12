@@ -204,7 +204,12 @@ export default function SentRequestsPage() {
         return
       }
       const json: ApiResponse = await res.json()
-      setData(json.rows)
+      const rows = Array.isArray(json.rows) ? json.rows : []
+      setData(rows)
+      setSelectedRow((current) => {
+        if (!current) return current
+        return rows.find((row) => row.id === current.id) ?? null
+      })
       setTotal(json.total)
       setLastUpdatedAt(new Date())
     } catch (e) {
@@ -409,7 +414,6 @@ export default function SentRequestsPage() {
 
  const closeDetail = () => {
     setDetailOpen(false)
-    setSelectedRow(null)
     setDetail(null)
     setDetailError(null)
   }
@@ -613,7 +617,16 @@ export default function SentRequestsPage() {
                 {loading && <TableSkeletonRows columns={7} rows={5} />}
                 {!loading && data.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center app-muted-text">Nenhuma solicitação encontrada</td></tr>}
                 {!loading && data.map((r) => (
-                  <tr key={r.id} className={`app-table-row cursor-pointer ${selectedRow?.id === r.id ? 'app-table-row-selected' : ''}`} onClick={() => openDetail(r)}>
+                  <tr
+                    key={r.id}
+                    className={`app-table-row cursor-pointer ${selectedRow?.id === r.id ? 'app-table-row-selected' : ''}`}
+                    onClick={() => {
+                      setSelectedRow(r)
+                    }}
+                    onDoubleClick={() => {
+                      openDetail(r)
+                    }}
+                  >
                     <td className="px-3 py-2">
                       <div className="flex flex-col items-start gap-1">
                         <SolicitationStatusBadge status={r.status} />
