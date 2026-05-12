@@ -16,6 +16,7 @@ import { TableSkeletonRows } from '@/components/solicitacoes/TableSkeletonRows'
 import { SolicitacoesToastViewport, useSolicitacoesToast } from '@/components/solicitacoes/SolicitacoesToast'
 import { useSessionMe } from '@/components/session/SessionProvider'
 import { getStatusPresentation } from '@/lib/solicitationStatusPresentation'
+import { resolveSentCancellationAction } from '@/lib/sentCancellationAction'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,20 +54,6 @@ const DEFAULT_FILTERS: FilterState = {
   text: '',
 }
 
-
-const CLOSED_CANCELLATION_STATUSES = new Set(['CANCELADA', 'CONCLUIDA', 'FINALIZADA', 'REJEITADA'])
-const DIRECT_REQUESTER_CANCELLATION_STATUSES = new Set(['ABERTA', 'AGUARDANDO_ATENDIMENTO', 'AGUARDANDO_APROVACAO'])
-
-function resolveSentCancellationAction(row: Row | null, currentUserId?: string | null) {
-  if (!row || !currentUserId) return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
-  const status = String(row.status ?? '').toUpperCase()
-  if (CLOSED_CANCELLATION_STATUSES.has(status)) return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
-  if (row.solicitanteId === currentUserId && !row.assumidaPorId && DIRECT_REQUESTER_CANCELLATION_STATUSES.has(status)) {
-    return { enabled: true, label: 'Cancelar' as const, mode: 'DIRECT' as const }
-  }
-  if (row.solicitanteId === currentUserId) return { enabled: true, label: 'Solicitar cancelamento' as const, mode: 'REQUEST' as const }
-  return { enabled: false, label: 'Cancelar' as const, mode: 'DIRECT' as const }
-}
 
 function escapeCsv(v: string) {
   if (v == null) return ''
@@ -170,7 +157,7 @@ export default function SentRequestsPage() {
   ], [])
 
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
-  const cancellationAction = useMemo(() => resolveSentCancellationAction(selectedRow, sessionData?.appUser?.id), [selectedRow, sessionData?.appUser?.id])
+  const cancellationAction = useMemo(() => resolveSentCancellationAction(selectedRow), [selectedRow])
 
   const showSessionExpiredToastOnce = useCallback(() => {
     if (sessionExpiredToastShownRef.current) return
@@ -529,7 +516,7 @@ export default function SentRequestsPage() {
           <button
             onClick={openCancellationModal}
             disabled={!cancellationAction.enabled}
-            title={!selectedRow ? 'Selecione uma solicitação' : cancellationAction.enabled ? cancellationAction.label : 'Esta solicitação não pode ser cancelada'}
+            title={cancellationAction.title}
             className="app-button-danger w-full sm:w-auto"
           >
             {cancellationAction.label}
@@ -627,7 +614,16 @@ export default function SentRequestsPage() {
                 {!loading && data.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center app-muted-text">Nenhuma solicitação encontrada</td></tr>}
                 {!loading && data.map((r) => (
                   <tr key={r.id} className={`app-table-row cursor-pointer ${selectedRow?.id === r.id ? 'app-table-row-selected' : ''}`} onClick={() => openDetail(r)}>
-                    <td className="px-3 py-2"><SolicitationStatusBadge status={r.status} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col items-start gap-1">
+                        <SolicitationStatusBadge status={r.status} />
+                        {r.cancelamentoStatus === 'PENDENTE' && (
+                          <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Cancelamento solicitado
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2">
                       <div className="inline-flex items-center gap-1">
                         <span>{r.protocolo ?? '-'}</span>
@@ -676,10 +672,15 @@ export default function SentRequestsPage() {
                   {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}
                 </h2>
                 <p className="mt-1 text-sm app-muted-text">
-                  {selectedRow?.protocolo ? `Protocolo ${selectedRow.protocolo}` : 'Informe a justificativa obrigatória.'}
+                  {selectedRow?.protocolo ? `Protocolo: ${selectedRow.protocolo}` : 'Informe a justificativa obrigatória.'}
                 </p>
               </div>
               <button type="button" onClick={() => setCancelModalOpen(false)} className="app-button-ghost rounded p-1"><X size={18} /></button>
+            </div>
+            <div className="mb-4 rounded-md border border-[var(--border-subtle)] bg-[var(--muted)]/30 p-3 text-sm">
+              <p><span className="font-semibold">Protocolo:</span> {selectedRow?.protocolo ?? '-'}</p>
+              <p><span className="font-semibold">Solicitação:</span> {selectedRow?.titulo ?? selectedRow?.tipo?.nome ?? '-'}</p>
+              <p><span className="font-semibold">Ação:</span> {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}</p>
             </div>
             <label className="app-label">
               {cancellationAction.mode === 'REQUEST' ? 'Motivo da solicitação de cancelamento' : 'Motivo do cancelamento'}
@@ -688,7 +689,7 @@ export default function SentRequestsPage() {
               value={cancelReason}
               onChange={(event) => setCancelReason(event.target.value)}
               className="app-textarea mt-2 min-h-[120px]"
-              placeholder="Descreva o motivo"
+              placeholder="Descreva o motivo do cancelamento"
             />
             {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
             <div className="mt-4 flex justify-end gap-2">

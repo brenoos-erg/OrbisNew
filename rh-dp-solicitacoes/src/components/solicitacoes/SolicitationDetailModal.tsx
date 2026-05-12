@@ -266,6 +266,7 @@ export type SolicitationDetail = {
   canApprove?: boolean
   canFinalize?: boolean
   canCancel?: boolean
+  canManageCancellationRequest?: boolean
   canComment?: boolean
   dataAbertura: string
   approverId?: string | null
@@ -915,6 +916,7 @@ export function SolicitationDetailModal({
   const apiCanApprove = detail?.canApprove !== false
   const apiCanFinalize = detail?.canFinalize !== false
   const apiCanCancel = detail?.canCancel !== false
+  const apiCanManageCancellationRequest = detail?.canManageCancellationRequest === true
   const apiCanComment = detail?.canComment !== false
   const hasPendingCancellationRequest = detail?.cancelamentoStatus === 'PENDENTE'
 
@@ -3522,11 +3524,12 @@ async function handleEncaminharAprovacaoComAnexo() {
                 <p className="font-semibold">Pedido de cancelamento pendente</p>
                 <p className="mt-1">Solicitante pediu cancelamento desta solicitação.</p>
                 <dl className="mt-2 space-y-1 text-xs">
+                  <div><dt className="inline font-semibold">Protocolo: </dt><dd className="inline">{detail?.protocolo ?? row?.protocolo ?? '-'}</dd></div>
                   <div><dt className="inline font-semibold">Solicitado por: </dt><dd className="inline">{detail?.cancelamentoSolicitadoPorId ?? '-'}</dd></div>
                   <div><dt className="inline font-semibold">Solicitado em: </dt><dd className="inline">{formatDateTime(detail?.cancelamentoSolicitadoEm)}</dd></div>
                   <div><dt className="inline font-semibold">Motivo: </dt><dd className="inline whitespace-pre-wrap">{detail?.cancelamentoMotivo ?? '-'}</dd></div>
                 </dl>
-                {showManagementActions && apiCanCancel && currentUser?.id !== detail?.cancelamentoSolicitadoPorId && (
+                {showManagementActions && apiCanManageCancellationRequest && currentUser?.id !== detail?.cancelamentoSolicitadoPorId && (
                   <div className="mt-3 space-y-2">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <button type="button" onClick={() => setCancellationAnalysisAction('aprovar')} className="app-button-danger flex-1">Aprovar cancelamento</button>

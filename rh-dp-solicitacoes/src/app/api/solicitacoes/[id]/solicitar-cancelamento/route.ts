@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import {
   CANCELLATION_CLOSED_ERROR,
   assertRequiredReason,
@@ -25,6 +26,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
     if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     if (isClosedForCancellation(solicitation.status)) return NextResponse.json({ error: CANCELLATION_CLOSED_ERROR }, { status: 400 })
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
+    if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
 
     const { action } = await resolveCancellationContext(me, solicitation)
     if (action !== 'REQUEST') {

@@ -5,6 +5,7 @@ export type DetailPermissionFlags = {
   canApprove: boolean
   canFinalize: boolean
   canCancel: boolean
+  canManageCancellationRequest: boolean
   canComment: boolean
 }
 
