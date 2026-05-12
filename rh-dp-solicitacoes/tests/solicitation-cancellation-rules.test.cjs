@@ -176,3 +176,27 @@ test('permissões continuam bloqueando usuário sem acesso ao módulo ou sem vis
   assert.strictEqual(resolveCancellationAction({ solicitation: solicitation(), userId: 'user-common', userAccess: ctx({ hasSolicitationsModuleAccess: false }) }), 'NONE')
   assert.strictEqual(canCancelSolicitation(ctx({ allowedTipoIds: [] }), solicitation()), false)
 })
+
+test('tabela de enviadas seleciona com clique simples e abre detalhe somente no duplo clique', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /onClick=\{\(\) => \{\s*setSelectedRow\(r\)\s*\}\}/s)
+  assert.match(source, /onDoubleClick=\{\(\) => \{\s*openDetail\(r\)\s*\}\}/s)
+  assert.doesNotMatch(source, /<tr[^>]+onClick=\{\(\) => openDetail\(r\)\}/s)
+})
+
+test('botão Detalhes abre o detalhe da linha selecionada', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /if \(!selectedRow\) \{\s*pushToast\('Selecione uma solicitação na tabela', 'info'\)\s*return\s*\}\s*openDetail\(selectedRow\)/s)
+})
+
+test('recarregamento mantém seleção existente ou limpa quando a solicitação sai da lista', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /setSelectedRow\(\(current\) => \{\s*if \(!current\) return current\s*return rows\.find\(\(row\) => row\.id === current\.id\) \?\? null\s*\}\)/s)
+})
+
+test('API de solicitações retorna campos necessários para decidir cancelamento no frontend', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/api/solicitacoes/route.ts'), 'utf8')
+  for (const field of ['id', 'status', 'protocolo', 'titulo', 'tipo', 'assumidaPorId', 'cancelamentoStatus']) {
+    assert.match(source, new RegExp(`${field}:`), `campo ${field} deve estar no payload da lista`)
+  }
+})
