@@ -542,6 +542,9 @@ export default function SentRequestsPage() {
           <span className="text-xs app-muted-text">
             {lastUpdatedAt ? `Atualizado agora (${format(lastUpdatedAt, 'HH:mm:ss')})` : 'Ainda não atualizado'}
           </span>
+          <span className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--muted)]/30 px-3 py-2 text-sm font-medium text-[var(--foreground)] sm:w-auto">
+            {selectedRow ? `Selecionado: ${selectedRow.protocolo ?? '-'}` : 'Nenhuma solicitação selecionada'}
+          </span>
          </div>
       </div>
 
@@ -610,12 +613,12 @@ export default function SentRequestsPage() {
             <table className="min-w-full text-sm">
               <thead className="app-table-header sticky top-0">
                 <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left">
-                 <th>Status</th><th>Protocolo</th><th>Data Abertura</th><th>Solicitação</th><th>SLA</th><th>Departamento responsável</th><th>Atendente</th>
+                 <th>Selecionar</th><th>Status</th><th>Protocolo</th><th>Data Abertura</th><th>Solicitação</th><th>SLA</th><th>Departamento responsável</th><th>Atendente</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && <TableSkeletonRows columns={7} rows={5} />}
-                {!loading && data.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center app-muted-text">Nenhuma solicitação encontrada</td></tr>}
+                {loading && <TableSkeletonRows columns={8} rows={5} />}
+                {!loading && data.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center app-muted-text">Nenhuma solicitação encontrada</td></tr>}
                 {!loading && data.map((r) => (
                   <tr
                     key={r.id}
@@ -627,6 +630,16 @@ export default function SentRequestsPage() {
                       openDetail(r)
                     }}
                   >
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="radio"
+                        name="selectedSolicitation"
+                        checked={selectedRow?.id === r.id}
+                        onChange={() => setSelectedRow(r)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Selecionar solicitação ${r.protocolo ?? r.id}`}
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <div className="flex flex-col items-start gap-1">
                         <SolicitationStatusBadge status={r.status} />
@@ -696,7 +709,7 @@ export default function SentRequestsPage() {
               <p><span className="font-semibold">Ação:</span> {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}</p>
             </div>
             <label className="app-label">
-              {cancellationAction.mode === 'REQUEST' ? 'Motivo da solicitação de cancelamento' : 'Motivo do cancelamento'}
+              Justificativa obrigatória
             </label>
             <textarea
               value={cancelReason}

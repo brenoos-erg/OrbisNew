@@ -105,6 +105,7 @@ test('modal mostra protocolo, ação, solicitação e placeholder correto', () =
   assert.match(source, /Protocolo:/)
   assert.match(source, /Solicitação:/)
   assert.match(source, /Ação:/)
+  assert.match(source, /Justificativa obrigatória/)
   assert.match(source, /Descreva o motivo do cancelamento/)
 })
 
@@ -177,11 +178,25 @@ test('permissões continuam bloqueando usuário sem acesso ao módulo ou sem vis
   assert.strictEqual(canCancelSolicitation(ctx({ allowedTipoIds: [] }), solicitation()), false)
 })
 
-test('tabela de enviadas seleciona com clique simples e abre detalhe somente no duplo clique', () => {
+test('tabela de enviadas tem seleção explícita por coluna, radio e clique simples', () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
-  assert.match(source, /onClick=\{\(\) => \{\s*setSelectedRow\(r\)\s*\}\}/s)
-  assert.match(source, /onDoubleClick=\{\(\) => \{\s*openDetail\(r\)\s*\}\}/s)
-  assert.doesNotMatch(source, /<tr[^>]+onClick=\{\(\) => openDetail\(r\)\}/s)
+  assert.match(source, /<th>Selecionar<\/th>/, 'existe coluna Selecionar')
+  assert.match(source, /type="radio"[\s\S]*name="selectedSolicitation"/, 'existe input radio com name selectedSolicitation')
+  assert.match(source, /checked=\{selectedRow\?\.id === r\.id\}/, 'radio reflete a linha selecionada')
+  assert.match(source, /onChange=\{\(\) => setSelectedRow\(r\)\}/, 'radio chama setSelectedRow(r)')
+  assert.match(source, /onClick=\{\(e\) => e\.stopPropagation\(\)\}/, 'clique no radio não propaga para a linha')
+  assert.match(source, /onClick=\{\(\) => \{\s*setSelectedRow\(r\)\s*\}\}/s, 'clique simples na linha seleciona')
+  assert.match(source, /onDoubleClick=\{\(\) => \{\s*openDetail\(r\)\s*\}\}/s, 'duplo clique na linha abre detalhe')
+  assert.doesNotMatch(source, /<tr[^>]+onClick=\{\(\) => openDetail\(r\)\}/s, 'clique simples não abre detalhe')
+})
+
+test('tabela de enviadas mostra estado de seleção e ajusta 8 colunas', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /Selecionado: /, 'aparece texto Selecionado: quando há selectedRow')
+  assert.match(source, /Nenhuma solicitação selecionada/, 'aparece texto quando não há selectedRow')
+  assert.match(source, /TableSkeletonRows columns=\{8\}/, 'skeleton usa 8 colunas')
+  assert.match(source, /colSpan=\{8\}/, 'estado vazio usa colSpan 8')
+  assert.match(source, /app-table-row-selected/, 'linha selecionada recebe destaque visual')
 })
 
 test('botão Detalhes abre o detalhe da linha selecionada', () => {
