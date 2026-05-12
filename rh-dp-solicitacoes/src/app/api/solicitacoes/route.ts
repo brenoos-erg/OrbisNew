@@ -333,7 +333,13 @@ export const GET = withModuleLevel(
   protocolo: s.protocolo,
   createdAt: s.dataAbertura.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
-  tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
+  tipo: s.tipo ? { id: s.tipoId, codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
+
+  solicitanteId: s.solicitanteId,
+  assumidaPorId: s.assumidaPorId,
+  cancelamentoStatus: s.cancelamentoStatus,
+  cancelamentoSolicitadoEm: s.cancelamentoSolicitadoEm?.toISOString() ?? null,
+  cancelamentoMotivo: s.cancelamentoMotivo,
 
   responsavelId: responsible.responsavelId,
   responsavel: responsible.responsavel,

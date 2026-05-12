@@ -124,6 +124,14 @@ export function buildSolicitationDetailPayload(input: {
     dataPrevista: iso(item.dataPrevista),
     dataFechamento: iso(item.dataFechamento),
     dataCancelamento: iso(item.dataCancelamento),
+    cancelamentoStatus: item.cancelamentoStatus ?? null,
+    cancelamentoSolicitadoPorId: item.cancelamentoSolicitadoPorId ?? null,
+    cancelamentoSolicitadoEm: iso(item.cancelamentoSolicitadoEm),
+    cancelamentoMotivo: item.cancelamentoMotivo ?? null,
+    cancelamentoAnalisadoPorId: item.cancelamentoAnalisadoPorId ?? null,
+    cancelamentoAnalisadoEm: iso(item.cancelamentoAnalisadoEm),
+    cancelamentoJustificativaAnalise: item.cancelamentoJustificativaAnalise ?? null,
+    cancelamentoOrigem: item.cancelamentoOrigem ?? null,
     tipo: tipo
       ? {
           id: tipo.id,

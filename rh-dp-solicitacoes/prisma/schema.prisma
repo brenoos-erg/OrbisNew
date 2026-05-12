@@ -30,9 +30,9 @@ model RefusalAttachment {
 }
 
 model RefusalReport {
-  id                     String         @id @default(uuid())
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  id                     String              @id @default(uuid())
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
   employeeId             String
   employeeName           String
   sectorOrContract       String
@@ -43,17 +43,17 @@ model RefusalReport {
   generalCoordinatorName String?
   contractManagerId      String?
   generalCoordinatorId   String?
-  status                 RefusalStatus  @default(PENDENTE)
+  status                 RefusalStatus       @default(PENDENTE)
   decision               Boolean?
   decisionComment        String?
   decidedAt              DateTime?
   decidedById            String?
   decisionLevel          ModuleLevel?
   attachments            RefusalAttachment[]
-  contractManager        User?          @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
-  decidedBy              User?          @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
-  employee               User           @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
-  generalCoordinator     User?          @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
+  contractManager        User?               @relation("RefusalReportContractManager", fields: [contractManagerId], references: [id])
+  decidedBy              User?               @relation("RefusalReportDecisionUser", fields: [decidedById], references: [id])
+  employee               User                @relation("RefusalReportEmployee", fields: [employeeId], references: [id])
+  generalCoordinator     User?               @relation("RefusalReportGeneralCoordinator", fields: [generalCoordinatorId], references: [id])
 }
 
 model Comment {
@@ -106,7 +106,6 @@ model CostCenter {
 
   @@map("CostCenter")
 }
-
 
 model Position {
   id                      String      @id @default(uuid())
@@ -164,14 +163,14 @@ model TipoSolicitacao {
 }
 
 model TipoSolicitacaoApprover {
-  id        String            @id @default(uuid())
+  id        String           @id @default(uuid())
   tipoId    String
   userId    String
-  role      TipoApproverRole  @default(APPROVER)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  tipo      TipoSolicitacao   @relation(fields: [tipoId], references: [id], onDelete: Cascade)
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TipoApproverRole @default(APPROVER)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  tipo      TipoSolicitacao  @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tipoId, userId])
 }
@@ -194,49 +193,57 @@ model Department {
 }
 
 model Solicitation {
-  id                 String               @id @default(uuid())
-  titulo             String
-  descricao          String?
-  tipoId             String
-  payload            Json
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  approvalAt         DateTime?
-  approvalComment    String?
-  approvalStatus     ApprovalStatus       @default(NAO_PRECISA)
-  approverId         String?
-  costCenterId       String?
-  dataAbertura       DateTime             @default(now())
-  dataCancelamento   DateTime?
-  dataFechamento     DateTime?
-  dataPrevista       DateTime?
-  departmentId       String
-  prioridade         SolicitationPriority?
-  protocolo          String               @unique
-  idempotencyKey     String?              @unique
-  requiresApproval   Boolean              @default(false)
-  solicitanteId      String
-  status             SolicitationStatus   @default(ABERTA)
-  parentId           String?
-  vagaPrevista       Boolean              @default(false)
-  assumidaPorId      String?
-  assumidaEm         DateTime?
-  nonConformityId    String?
-  anexos             Attachment[]
-  comentarios        Comment[]
-  eventos            Event[]
-  approver           User?                @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
-  assumidaPor        User?                @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
-  costCenter         CostCenter?          @relation(fields: [costCenterId], references: [id])
-  department         Department           @relation(fields: [departmentId], references: [id])
-  parent             Solicitation?        @relation("SolicitationParent", fields: [parentId], references: [id])
-  children           Solicitation[]       @relation("SolicitationParent")
-  solicitante        User                 @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
-  tipo               TipoSolicitacao      @relation(fields: [tipoId], references: [id])
-  timelines          SolicitationTimeline[]
-  solicitacaoSetores SolicitacaoSetor[]
-  documents          Document[]
-  nonConformity      NonConformity?       @relation(fields: [nonConformityId], references: [id])
+  id                               String                 @id @default(uuid())
+  titulo                           String
+  descricao                        String?
+  tipoId                           String
+  payload                          Json
+  createdAt                        DateTime               @default(now())
+  updatedAt                        DateTime               @updatedAt
+  approvalAt                       DateTime?
+  approvalComment                  String?
+  approvalStatus                   ApprovalStatus         @default(NAO_PRECISA)
+  approverId                       String?
+  costCenterId                     String?
+  dataAbertura                     DateTime               @default(now())
+  dataCancelamento                 DateTime?
+  dataFechamento                   DateTime?
+  dataPrevista                     DateTime?
+  departmentId                     String
+  prioridade                       SolicitationPriority?
+  protocolo                        String                 @unique
+  idempotencyKey                   String?                @unique
+  requiresApproval                 Boolean                @default(false)
+  solicitanteId                    String
+  status                           SolicitationStatus     @default(ABERTA)
+  parentId                         String?
+  vagaPrevista                     Boolean                @default(false)
+  assumidaPorId                    String?
+  assumidaEm                       DateTime?
+  cancelamentoStatus               String?
+  cancelamentoSolicitadoPorId      String?
+  cancelamentoSolicitadoEm         DateTime?
+  cancelamentoMotivo               String?                @db.Text
+  cancelamentoAnalisadoPorId       String?
+  cancelamentoAnalisadoEm          DateTime?
+  cancelamentoJustificativaAnalise String?                @db.Text
+  cancelamentoOrigem               String?
+  nonConformityId                  String?
+  anexos                           Attachment[]
+  comentarios                      Comment[]
+  eventos                          Event[]
+  approver                         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  assumidaPor                      User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
+  costCenter                       CostCenter?            @relation(fields: [costCenterId], references: [id])
+  department                       Department             @relation(fields: [departmentId], references: [id])
+  parent                           Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
+  children                         Solicitation[]         @relation("SolicitationParent")
+  solicitante                      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
+  tipo                             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
+  timelines                        SolicitationTimeline[]
+  solicitacaoSetores               SolicitacaoSetor[]
+  documents                        Document[]
+  nonConformity                    NonConformity?         @relation(fields: [nonConformityId], references: [id])
 
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
@@ -300,42 +307,42 @@ model SolicitacaoSetor {
 }
 
 model User {
-  id                                         String                       @id @default(uuid())
-  email                                      String                       @unique
-  role                                       Role                         @default(COLABORADOR)
-  createdAt                                  DateTime                     @default(now())
-  updatedAt                                  DateTime                     @updatedAt
-  fullName                                   String
-  passwordHash                               String?
-  mustChangePassword                         Boolean                      @default(false)
-  resetTokenHash                             String?
-  resetTokenExpiresAt                        DateTime?
-  lastLoginAt                                DateTime?
-  login                                      String?                      @unique(map: "user_login_key")
-  phone                                      String?
-  status                                     UserStatus                   @default(ATIVO)
-  leaderId                                   String?
-  costCenterId                               String?
-  positionId                                 String?
-  avatarUrl                                  String?
-  departmentId                               String?
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  role                Role       @default(COLABORADOR)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  fullName            String
+  passwordHash        String?
+  mustChangePassword  Boolean    @default(false)
+  resetTokenHash      String?
+  resetTokenExpiresAt DateTime?
+  lastLoginAt         DateTime?
+  login               String?    @unique(map: "user_login_key")
+  phone               String?
+  status              UserStatus @default(ATIVO)
+  leaderId            String?
+  costCenterId        String?
+  positionId          String?
+  avatarUrl           String?
+  departmentId        String?
 
-  comments                                   Comment[]                    @relation("CommentAutor")
-  events                                     Event[]                      @relation("EventActor")
-  membersOfGroups                            GroupMember[]
-  refusalReportsAsContractManager            RefusalReport[]              @relation("RefusalReportContractManager")
-  refusalReportsAsDecidedBy                  RefusalReport[]              @relation("RefusalReportDecisionUser")
-  refusalReportsAsEmployee                   RefusalReport[]              @relation("RefusalReportEmployee")
-  refusalReportsAsGeneralCoordinator         RefusalReport[]              @relation("RefusalReportGeneralCoordinator")
-  solicitacoesAprovador                      Solicitation[]               @relation("SolicitationAprovador")
-  solicitacoesAssumidas                      Solicitation[]               @relation("SolicitationAssumidaPor")
-  solicitacoesCriadas                        Solicitation[]               @relation("SolicitationSolicitante")
-  tipoSolicitacaoApprovers                   TipoSolicitacaoApprover[]
+  comments                           Comment[]                 @relation("CommentAutor")
+  events                             Event[]                   @relation("EventActor")
+  membersOfGroups                    GroupMember[]
+  refusalReportsAsContractManager    RefusalReport[]           @relation("RefusalReportContractManager")
+  refusalReportsAsDecidedBy          RefusalReport[]           @relation("RefusalReportDecisionUser")
+  refusalReportsAsEmployee           RefusalReport[]           @relation("RefusalReportEmployee")
+  refusalReportsAsGeneralCoordinator RefusalReport[]           @relation("RefusalReportGeneralCoordinator")
+  solicitacoesAprovador              Solicitation[]            @relation("SolicitationAprovador")
+  solicitacoesAssumidas              Solicitation[]            @relation("SolicitationAssumidaPor")
+  solicitacoesCriadas                Solicitation[]            @relation("SolicitationSolicitante")
+  tipoSolicitacaoApprovers           TipoSolicitacaoApprover[]
 
-  costCenter                                 CostCenter?                  @relation(fields: [costCenterId], references: [id])
-  department                                 Department?                  @relation(fields: [departmentId], references: [id])
-  leader                                     Leader?                      @relation(fields: [leaderId], references: [id])
-  position                                   Position?                    @relation(fields: [positionId], references: [id])
+  costCenter CostCenter? @relation(fields: [costCenterId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  leader     Leader?     @relation(fields: [leaderId], references: [id])
+  position   Position?   @relation(fields: [positionId], references: [id])
 
   costCenters                                UserCostCenter[]
   userDepartments                            UserDepartment[]
@@ -344,32 +351,32 @@ model User {
   vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
   vehicleStatusLogs                          VehicleStatusLog[]
   tiEquipments                               TiEquipment[]
-  documentsCreated                           Document[]                   @relation("DocumentCreatedBy")
-  documentsAssigned                          DocumentAssignment[]         @relation("DocumentAssignedTo")
-  WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                @relation("WorkRefusal_analyzedByIdToUser")
-  WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                @relation("WorkRefusal_createdByIdToUser")
+  documentsCreated                           Document[]                     @relation("DocumentCreatedBy")
+  documentsAssigned                          DocumentAssignment[]           @relation("DocumentAssignedTo")
+  WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                  @relation("WorkRefusal_analyzedByIdToUser")
+  WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                  @relation("WorkRefusal_createdByIdToUser")
   WorkRefusalAttachment                      WorkRefusalAttachment[]
   WorkRefusalHistory                         WorkRefusalHistory[]
-  nonConformitiesAsRequester                 NonConformity[]              @relation("NonConformityRequester")
-  nonConformitiesAsQualityApprover           NonConformity[]              @relation("NonConformityQualityApprover")
-  nonConformitiesAsEffectivenessApprover     NonConformity[]              @relation("NonConformityEffectivenessApprover")
+  nonConformitiesAsRequester                 NonConformity[]                @relation("NonConformityRequester")
+  nonConformitiesAsQualityApprover           NonConformity[]                @relation("NonConformityQualityApprover")
+  nonConformitiesAsEffectivenessApprover     NonConformity[]                @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
-  nonConformityActionItemsCreated            NonConformityActionItem[]    @relation("NonConformityActionItemCreatedBy")
+  nonConformityActionItemsCreated            NonConformityActionItem[]      @relation("NonConformityActionItemCreatedBy")
   nonConformityAttachments                   NonConformityAttachment[]
   nonConformityComments                      NonConformityComment[]
   nonConformityTimelineEvents                NonConformityTimeline[]
-  isoDocumentsAuthored                       IsoDocument[]                @relation("IsoDocumentAuthor")
+  isoDocumentsAuthored                       IsoDocument[]                  @relation("IsoDocumentAuthor")
   isoApproverGroupMemberships                ApproverGroupMember[]
-  isoApprovalsDecided                        DocumentApproval[]           @relation("IsoApprovalDecidedBy")
-  isoAttachmentsUploaded                     DocumentAttachment[]         @relation("IsoAttachmentUploadedBy")
+  isoApprovalsDecided                        DocumentApproval[]             @relation("IsoApprovalDecidedBy")
+  isoAttachmentsUploaded                     DocumentAttachment[]           @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
   isoTermAcceptances                         DocumentTermAcceptance[]
   isoTermActionAcceptances                   DocumentTermActionAcceptance[]
-  isoDistributionsCreated                    Distribution[]               @relation("IsoDistributionCreatedBy")
+  isoDistributionsCreated                    Distribution[]                 @relation("IsoDistributionCreatedBy")
   isoDistributionTargets                     DistributionTarget[]
   isoReadReceipts                            ReadReceipt[]
-  isoPrintCopiesIssued                       PrintCopy[]                  @relation("IsoPrintCopyIssuedBy")
+  isoPrintCopiesIssued                       PrintCopy[]                    @relation("IsoPrintCopyIssuedBy")
   documentApprovalControls                   DocumentApprovalControl[]
   isoDocumentNotificationLogs                DocumentNotificationLog[]
 
@@ -390,12 +397,12 @@ model DocumentTypeCatalog {
 }
 
 model ApproverGroup {
-  id           String                    @id @default(uuid())
+  id           String                     @id @default(uuid())
   name         String
   departmentId String?
-  createdAt    DateTime                  @default(now())
-  updatedAt    DateTime                  @updatedAt
-  department   Department?               @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  department   Department?                @relation(fields: [departmentId], references: [id])
   members      ApproverGroupMember[]
   flowItems    DocumentTypeApprovalFlow[]
 
@@ -413,23 +420,23 @@ model ApproverGroupMember {
 }
 
 model DocumentTypeApprovalFlow {
-  id              String               @id @default(uuid())
-  documentTypeId  String
-  order           Int
-  stepType        DocumentFlowStepType
-  approverGroupId String
-  active          Boolean              @default(true)
-  documentType    DocumentTypeCatalog  @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
-  approverGroup   ApproverGroup        @relation(fields: [approverGroupId], references: [id])
-  approvals       DocumentApproval[]
+  id                String                     @id @default(uuid())
+  documentTypeId    String
+  order             Int
+  stepType          DocumentFlowStepType
+  approverGroupId   String
+  active            Boolean                    @default(true)
+  documentType      DocumentTypeCatalog        @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+  approverGroup     ApproverGroup              @relation(fields: [approverGroupId], references: [id])
+  approvals         DocumentApproval[]
   notificationRules DocumentNotificationRule[]
 
   @@unique([documentTypeId, order])
 }
 
 model IsoDocument {
-  id                 String               @id @default(uuid())
-  code               String               @unique
+  id                 String                    @id @default(uuid())
+  code               String                    @unique
   title              String
   documentTypeId     String
   ownerDepartmentId  String?
@@ -438,14 +445,14 @@ model IsoDocument {
   physicalLocation   String?
   accessType         String
   validityAt         DateTime?
-  summary            String?              @db.LongText
-  affectedAreasNotes String?              @db.LongText
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  documentType       DocumentTypeCatalog  @relation(fields: [documentTypeId], references: [id])
-  ownerDepartment    Department?          @relation(fields: [ownerDepartmentId], references: [id])
-  ownerCostCenter    CostCenter?          @relation(fields: [ownerCostCenterId], references: [id])
-  author             User                 @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
+  summary            String?                   @db.LongText
+  affectedAreasNotes String?                   @db.LongText
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  documentType       DocumentTypeCatalog       @relation(fields: [documentTypeId], references: [id])
+  ownerDepartment    Department?               @relation(fields: [ownerDepartmentId], references: [id])
+  ownerCostCenter    CostCenter?               @relation(fields: [ownerCostCenterId], references: [id])
+  author             User                      @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
   versions           DocumentVersion[]
   downloadLogs       DocumentDownloadLog[]
   auditLogs          DocumentAuditLog[]
@@ -599,14 +606,14 @@ model DocumentApprovalControl {
 }
 
 model Distribution {
-  id          String              @id @default(uuid())
+  id          String               @id @default(uuid())
   documentId  String
   versionId   String
   createdById String
-  createdAt   DateTime            @default(now())
-  document    IsoDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version     DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  createdBy   User                @relation("IsoDistributionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime             @default(now())
+  document    IsoDocument          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version     DocumentVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("IsoDistributionCreatedBy", fields: [createdById], references: [id])
   targets     DistributionTarget[]
 }
 
@@ -637,22 +644,22 @@ model DocumentNotificationRule {
 }
 
 model DocumentNotificationLog {
-  id             String                     @id @default(uuid())
-  documentId     String
-  versionId      String?
-  event          DocumentNotificationEvent
-  ruleId         String?
-  recipientEmail String
+  id              String                              @id @default(uuid())
+  documentId      String
+  versionId       String?
+  event           DocumentNotificationEvent
+  ruleId          String?
+  recipientEmail  String
   recipientUserId String?
   recipientSource DocumentNotificationRecipientSource
-  status         DocumentNotificationStatus
-  error          String?                    @db.LongText
-  sentAt         DateTime?
-  createdAt      DateTime                   @default(now())
-  document       IsoDocument                @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version        DocumentVersion?           @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  rule           DocumentNotificationRule?  @relation(fields: [ruleId], references: [id], onDelete: SetNull)
-  recipientUser  User?                      @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+  status          DocumentNotificationStatus
+  error           String?                             @db.LongText
+  sentAt          DateTime?
+  createdAt       DateTime                            @default(now())
+  document        IsoDocument                         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version         DocumentVersion?                    @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  rule            DocumentNotificationRule?           @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  recipientUser   User?                               @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
 
   @@index([documentId, createdAt])
   @@index([versionId, createdAt])
@@ -1062,13 +1069,13 @@ model NonConformitySequence {
 }
 
 model NonConformityAlertConfig {
-  id                  String                       @id @default(cuid())
-  eventCreatedEnabled Boolean                      @default(true)
-  eventUpdatedEnabled Boolean                      @default(false)
+  id                  String                        @id @default(cuid())
+  eventCreatedEnabled Boolean                       @default(true)
+  eventUpdatedEnabled Boolean                       @default(false)
   subjectTemplate     String
-  bodyTemplate        String                       @db.LongText
-  createdAt           DateTime                     @default(now())
-  updatedAt           DateTime                     @updatedAt
+  bodyTemplate        String                        @db.LongText
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
   recipients          NonConformityAlertRecipient[]
 }
 
@@ -1132,7 +1139,7 @@ model NonConformity {
 }
 
 model NonConformityActionItem {
-  id                       String                         @id @default(cuid())
+  id                       String                        @id @default(cuid())
   nonConformityId          String?
   origemPlano              NonConformityActionPlanOrigin @default(NAO_CONFORMIDADE)
   createdById              String?

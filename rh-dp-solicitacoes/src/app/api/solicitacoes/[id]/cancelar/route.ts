@@ -4,98 +4,62 @@ export const revalidate = 0
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
-import { randomUUID } from 'crypto'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import {
+  CANCELLATION_CLOSED_ERROR,
+  assertRequiredReason,
+  isClosedForCancellation,
+  registerDirectCancellation,
+  resolveCancellationContext,
+} from '@/lib/solicitationCancellation'
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+async function handler(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const me = await requireActiveUser()
     const { id } = await params
 
-    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
-    if (isViewerOnly) {
-      return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
-    }
+    const body = await req.json().catch(() => ({} as { motivo?: string; tipo?: string }))
+    const motivo = assertRequiredReason(body?.motivo)
 
-    if (me.role !== 'ADMIN') {
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id },
+      include: { solicitacaoSetores: { select: { setor: true } } },
+    })
+
+    if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
+    if (isClosedForCancellation(solicitation.status)) return NextResponse.json({ error: CANCELLATION_CLOSED_ERROR }, { status: 400 })
+
+    const isViewerOnly = await isViewerOnlyForSolicitation({ solicitationId: id, userId: me.id })
+    if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
+
+    const { action } = await resolveCancellationContext(me, solicitation)
+    if (action !== 'DIRECT') {
       return NextResponse.json(
-        { error: 'Somente administradores podem cancelar solicitações.' },
+        { error: action === 'REQUEST' ? 'Esta solicitação já está em atendimento. Use a solicitação de cancelamento.' : 'Você não possui permissão para cancelar esta solicitação.' },
         { status: 403 },
       )
     }
 
-    const body = await req.json().catch(() => ({} as { motivo?: string }))
-    const motivo = (body?.motivo ?? '').trim()
-
-    if (!motivo) {
-      return NextResponse.json(
-        { error: 'Informe o motivo do cancelamento.' },
-        { status: 400 },
-      )
-    }
-
-    const solicitation = await prisma.solicitation.findUnique({ where: { id } })
-
-    if (!solicitation) {
-      return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
-    }
-
-    if (solicitation.status === 'CONCLUIDA' || solicitation.status === 'CANCELADA') {
-      return NextResponse.json(
-        { error: 'Solicitação já finalizada ou cancelada.' },
-        { status: 400 },
-      )
-    }
-
-    const agora = new Date()
-
-    const updated = await prisma.solicitation.update({
-      where: { id },
-      data: {
-        status: 'CANCELADA',
-        dataCancelamento: agora,
-        approvalStatus: 'REPROVADO',
-        approvalAt: agora,
-        approvalComment: motivo,
-      },
-    })
-
-    await prisma.solicitationTimeline.create({
-      data: {
-        solicitationId: id,
-        status: 'CANCELADA',
-        message: `Solicitação cancelada pelo administrador ${me.fullName ?? me.id}: ${motivo}`,
-      },
-    })
-
-   
-    await prisma.event.create({
-      data: {
-        id: randomUUID(),
-        solicitationId: id,
-        actorId: me.id,
-        tipo: 'REPROVACAO',
-      },
-    })
-
-    await notifySolicitationEvent({
+    const updated = await registerDirectCancellation({
       solicitationId: id,
-      event: 'CANCELED',
+      previousStatus: solicitation.status,
+      actorId: me.id,
       actorName: me.fullName ?? me.id,
-      reason: motivo,
-      dedupeKey: `CANCELED:${id}` ,
+      motivo,
     })
 
-    return NextResponse.json(updated)
-  } catch (error) {
-    console.error('PATCH /api/solicitacoes/[id]/cancelar error', error)
-    return NextResponse.json(
-      { error: 'Erro ao cancelar solicitação.' },
-      { status: 500 },
-    )
+    return NextResponse.json({ ok: true, solicitation: updated })
+  } catch (error: any) {
+    if (error?.status) return NextResponse.json({ error: error.message }, { status: error.status })
+    console.error('POST/PATCH /api/solicitacoes/[id]/cancelar error', error)
+    return NextResponse.json({ error: 'Erro ao cancelar solicitação.' }, { status: 500 })
   }
+}
+
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return handler(req, ctx)
+}
+
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  return handler(req, ctx)
 }
