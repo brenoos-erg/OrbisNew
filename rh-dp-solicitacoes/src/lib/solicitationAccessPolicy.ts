@@ -1,4 +1,4 @@
-import { Prisma, Role } from '@prisma/client'
+import { ModuleLevel, Prisma, Role } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   buildReceivedSolicitationVisibilityWhere,
@@ -12,6 +12,7 @@ import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
+import { MODULE_KEYS } from '@/lib/featureKeys'
 
 export type UserAccessContext = {
   userId: string
@@ -26,6 +27,7 @@ export type UserAccessContext = {
   viewerTipoIds: string[]
   actionableTipoIds: string[]
   isExperienceEvaluationCoordinator: boolean
+  hasSolicitationsModuleAccess: boolean
 }
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
@@ -73,7 +75,7 @@ export async function resolveUserAccessContext(input: {
   }
 
   const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
-  const [finalizerRows, allowedTipoRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember] = await Promise.all([
+  const [finalizerRows, allowedTipoRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember, solicitationModuleAccess] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
       select: { tipoId: true },
@@ -97,6 +99,14 @@ export async function resolveUserAccessContext(input: {
       },
       select: { userId: true },
     }),
+    prisma.userModuleAccess.findFirst({
+      where: {
+        userId: input.userId,
+        level: { in: [ModuleLevel.NIVEL_1, ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
+        module: { key: MODULE_KEYS.SOLICITACOES },
+      },
+      select: { id: true },
+    }),
   ])
 
   return {
@@ -112,6 +122,7 @@ export async function resolveUserAccessContext(input: {
     viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
+    hasSolicitationsModuleAccess: input.role === 'ADMIN' || Boolean(solicitationModuleAccess),
   }
 }
 
@@ -236,6 +247,11 @@ export function canCommentSolicitation(ctx: UserAccessContext, solicitation: Sol
 }
 
 export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
+  return ctx.hasSolicitationsModuleAccess && canViewSolicitation(ctx, solicitation)
+}
+
+export function canManageCancellationRequest(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (isViewerOnlyByPolicy(ctx, solicitation)) return false
   if (ctx.role === 'ADMIN') return canViewSolicitation(ctx, solicitation)
   return (

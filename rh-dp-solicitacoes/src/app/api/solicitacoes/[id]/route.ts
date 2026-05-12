@@ -14,6 +14,7 @@ import {
   canApproveSolicitation,
   canAssumeSolicitation,
   canCancelSolicitation,
+  canManageCancellationRequest,
   canCommentSolicitation,
   canEditSolicitation,
   canFinalizeSolicitation,
@@ -250,6 +251,7 @@ export async function GET(
       canApprove: canApproveSolicitation(userAccess, solicitationForActions),
       canFinalize: canFinalizeSolicitation(userAccess, solicitationForActions),
       canCancel: canCancelSolicitation(userAccess, solicitationForActions),
+      canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
       canComment: canCommentSolicitation(userAccess, solicitationForActions),
     }
 

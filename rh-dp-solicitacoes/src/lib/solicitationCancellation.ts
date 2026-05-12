@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import {
   canCancelSolicitation,
+  canManageCancellationRequest,
   resolveUserAccessContext,
   type UserAccessContext,
 } from '@/lib/solicitationAccessPolicy'
@@ -44,16 +45,23 @@ export function isClosedForCancellation(status?: string | null) {
   return CLOSED_CANCELLATION_STATUSES.has(String(status ?? '').toUpperCase())
 }
 
-export function requesterCanCancelDirectly(solicitation: SolicitationForCancellation, userId: string) {
+export function canCancelDirectlyByProgress(solicitation: SolicitationForCancellation) {
   return (
-    solicitation.solicitanteId === userId &&
     !solicitation.assumidaPorId &&
     DIRECT_REQUESTER_CANCELLATION_STATUSES.has(String(solicitation.status ?? '').toUpperCase())
   )
 }
 
-export function requesterMustRequestCancellation(solicitation: SolicitationForCancellation, userId: string) {
-  return solicitation.solicitanteId === userId && !requesterCanCancelDirectly(solicitation, userId)
+export function mustRequestCancellationByProgress(solicitation: SolicitationForCancellation) {
+  return !canCancelDirectlyByProgress(solicitation)
+}
+
+export function requesterCanCancelDirectly(solicitation: SolicitationForCancellation, _userId: string) {
+  return canCancelDirectlyByProgress(solicitation)
+}
+
+export function requesterMustRequestCancellation(solicitation: SolicitationForCancellation, _userId: string) {
+  return mustRequestCancellationByProgress(solicitation)
 }
 
 export function resolveCancellationAction(params: {
@@ -62,10 +70,9 @@ export function resolveCancellationAction(params: {
   userAccess: UserAccessContext
 }) : CancellationAction {
   if (isClosedForCancellation(params.solicitation.status)) return 'NONE'
-  if (canCancelSolicitation(params.userAccess, params.solicitation)) return 'DIRECT'
-  if (requesterCanCancelDirectly(params.solicitation, params.userId)) return 'DIRECT'
-  if (requesterMustRequestCancellation(params.solicitation, params.userId)) return 'REQUEST'
-  return 'NONE'
+  if (!canCancelSolicitation(params.userAccess, params.solicitation)) return 'NONE'
+  if (canCancelDirectlyByProgress(params.solicitation)) return 'DIRECT'
+  return 'REQUEST'
 }
 
 export async function resolveCancellationContext(me: SelectedAppUser, solicitation: SolicitationForCancellation) {
@@ -81,7 +88,7 @@ export async function resolveCancellationContext(me: SelectedAppUser, solicitati
   return {
     userAccess,
     action: resolveCancellationAction({ solicitation, userId: me.id, userAccess }),
-    canOperationallyCancel: canCancelSolicitation(userAccess, solicitation),
+    canOperationallyCancel: canManageCancellationRequest(userAccess, solicitation),
   }
 }
 
@@ -135,7 +142,7 @@ export async function registerCancellationRequest(params: {
   motivo: string
 }) {
   const agora = new Date()
-  const message = `Solicitante pediu cancelamento da solicitação. Motivo: ${params.motivo}.`
+  const message = `Cancelamento solicitado. Motivo: ${params.motivo}.`
   return prisma.$transaction(async (tx) => {
     const row = await tx.solicitation.update({
       where: { id: params.solicitationId },
