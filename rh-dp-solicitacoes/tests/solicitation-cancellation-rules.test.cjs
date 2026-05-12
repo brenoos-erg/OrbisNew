@@ -77,12 +77,12 @@ test('solicitação EM_ATENDIMENTO gera mode REQUEST e label Solicitar cancelame
   assert.strictEqual(resolveCancellationAction({ solicitation: solicitation({ status: 'EM_ATENDIMENTO' }), userId: 'user-common', userAccess: ctx() }), 'REQUEST')
 })
 
-test('solicitação assumida gera mode REQUEST mesmo com status inicial', () => {
+test('protocolo com assumidaPorId define ação REQUEST', () => {
   assert.strictEqual(resolveSentCancellationAction({ status: 'ABERTA', assumidaPorId: 'agent-1' }).mode, 'REQUEST')
   assert.strictEqual(resolveCancellationAction({ solicitation: solicitation({ status: 'ABERTA', assumidaPorId: 'agent-1' }), userId: 'user-common', userAccess: ctx() }), 'REQUEST')
 })
 
-test('solicitação CONCLUIDA/CANCELADA deixa botão desabilitado e backend sem ação', () => {
+test('protocolo CANCELADA/CONCLUIDA bloqueia cancelamento', () => {
   for (const status of ['CONCLUIDA', 'CANCELADA']) {
     const action = resolveSentCancellationAction({ status })
     assert.strictEqual(action.enabled, false)
@@ -91,7 +91,10 @@ test('solicitação CONCLUIDA/CANCELADA deixa botão desabilitado e backend sem 
   }
 })
 
-test('sem selectedRow o botão fica desabilitado com título de seleção', () => {
+test('botão Cancelar não depende de selectedRow', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /disabled=\{sessionExpired \|\| !sessionData\?\.appUser\}/, 'botão só depende da sessão')
+  assert.doesNotMatch(source, /disabled=\{!cancellationAction\.enabled\}/, 'botão não depende mais da ação da linha selecionada')
   assert.deepStrictEqual(resolveSentCancellationAction(null), {
     enabled: false,
     label: 'Cancelar',
@@ -100,26 +103,44 @@ test('sem selectedRow o botão fica desabilitado com título de seleção', () =
   })
 })
 
+test('modal abre sem selectedRow e com protocolo vazio', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /setCancelProtocol\(selectedRow\?\.protocolo \?\? ''\)/, 'protocolo começa vazio sem selectedRow')
+  assert.doesNotMatch(source, /if \(!selectedRow \|\| !cancellationAction\.enabled\)/, 'abertura do modal não exige selectedRow')
+})
+
+test('modal abre preenchido com selectedRow.protocolo quando há seleção', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /setCancelProtocol\(selectedRow\?\.protocolo \?\? ''\)/, 'usa protocolo da linha selecionada')
+  assert.match(source, /\/api\/solicitacoes\/lookup\?protocolo=\$\{encodeURIComponent\(protocolo\)\}/, 'localiza automaticamente quando o protocolo é preenchido')
+})
+
 test('modal mostra protocolo, ação, solicitação e placeholder correto', () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
   assert.match(source, /Protocolo:/)
   assert.match(source, /Solicitação:/)
-  assert.match(source, /Ação:/)
+  assert.match(source, /Ação que será executada:/)
+  assert.match(source, /Status atual:/)
   assert.match(source, /Justificativa obrigatória/)
   assert.match(source, /Descreva o motivo do cancelamento/)
 })
 
-test('justificativa vazia bloqueia envio', () => {
+test('campos protocolo e justificativa são obrigatórios no modal', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /Informe o protocolo\./, 'protocolo vazio é bloqueado')
+  assert.match(source, /Informe a justificativa\./, 'justificativa vazia é bloqueada')
+  assert.match(source, /!cancelProtocol\.trim\(\)/, 'confirmar exige protocolo')
+  assert.match(source, /!cancelReason\.trim\(\)/, 'confirmar exige justificativa')
   assert.throws(() => assertRequiredReason('   '), /Informe o motivo do cancelamento/)
   assert.throws(() => assertRequiredReason('', 'justificativa'), /Informe a justificativa/)
 })
 
-test('endpoint cancelar permite DIRECT para usuário com acesso mínimo e visibilidade', () => {
+test('protocolo ABERTA sem assumidaPorId define ação DIRECT', () => {
   const action = resolveCancellationAction({ solicitation: solicitation({ status: 'ABERTA' }), userId: 'user-common', userAccess: ctx() })
   assert.strictEqual(action, 'DIRECT')
 })
 
-test('endpoint solicitar-cancelamento permite REQUEST para usuário com acesso mínimo e visibilidade', () => {
+test('protocolo EM_ATENDIMENTO define ação REQUEST', () => {
   const action = resolveCancellationAction({ solicitation: solicitation({ status: 'EM_ATENDIMENTO' }), userId: 'user-common', userAccess: ctx() })
   assert.strictEqual(action, 'REQUEST')
 })
@@ -214,4 +235,32 @@ test('API de solicitações retorna campos necessários para decidir cancelament
   for (const field of ['id', 'status', 'protocolo', 'titulo', 'tipo', 'assumidaPorId', 'cancelamentoStatus']) {
     assert.match(source, new RegExp(`${field}:`), `campo ${field} deve estar no payload da lista`)
   }
+})
+
+test('lookup por protocolo retorna solicitação permitida e payload mínimo', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/api/solicitacoes/lookup/route.ts'), 'utf8')
+  assert.match(source, /withModuleLevel\([\s\S]*'solicitacoes'[\s\S]*ModuleLevel\.NIVEL_1/, 'lookup exige acesso ao módulo Solicitações')
+  assert.match(source, /where: \{ protocolo \}/, 'lookup busca protocolo exato normalizado')
+  assert.match(source, /canViewSolicitation\(userAccess, solicitation\)/, 'lookup valida visibilidade')
+  for (const field of ['id', 'protocolo', 'titulo', 'status', 'assumidaPorId', 'cancelamentoStatus', 'tipo', 'setorDestino', 'responsavel']) {
+    assert.match(source, new RegExp(`${field}:`), `lookup retorna ${field}`)
+  }
+})
+
+test('lookup retorna 404 para protocolo inexistente e 403 para usuário sem visibilidade', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/api/solicitacoes/lookup/route.ts'), 'utf8')
+  assert.match(source, /Solicitação não encontrada\.[\s\S]*status: 404/, 'lookup retorna 404')
+  assert.match(source, /Você não possui permissão para visualizar\/cancelar esta solicitação\.[\s\S]*status: 403/, 'lookup retorna 403')
+})
+
+test('submit DIRECT chama cancelar e submit REQUEST chama solicitar-cancelamento', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /cancelLookupAction\.mode === 'REQUEST'[\s\S]*\/solicitar-cancelamento/, 'REQUEST chama solicitação de cancelamento')
+  assert.match(source, /:\s*`\/api\/solicitacoes\/\$\{cancelLookup\.id\}\/cancelar`/, 'DIRECT chama cancelar')
+  assert.match(source, /motivo, tipo: 'DIRETO'/, 'DIRECT envia tipo DIRETO')
+})
+
+test('sucesso fecha modal, limpa campos e recarrega lista', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/app/dashboard/solicitacoes/enviadas/page.tsx'), 'utf8')
+  assert.match(source, /resetCancellationModal\(\)[\s\S]*await load\(currentSearchState\)/, 'sucesso reseta modal e recarrega')
 })

@@ -21,6 +21,7 @@ import { resolveSentCancellationAction } from '@/lib/sentCancellationAction'
 export const dynamic = 'force-dynamic'
 
 type ApiResponse = { rows: Row[]; total: number }
+type CancellationLookup = Pick<Row, 'id' | 'protocolo' | 'titulo' | 'status' | 'assumidaPorId' | 'cancelamentoStatus' | 'tipo' | 'setorDestino' | 'responsavel'>
 type DepartmentOption = { id: string; label: string; description?: string | null }
 type CostCenterOption = { id: string; description: string; code?: string | null; externalCode?: string | null }
 type TipoOption = { id: string; nome: string }
@@ -136,6 +137,9 @@ export default function SentRequestsPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [sessionExpiredToastShown, setSessionExpiredToastShown] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelProtocol, setCancelProtocol] = useState('')
+  const [cancelLookup, setCancelLookup] = useState<CancellationLookup | null>(null)
+  const [cancelLookupLoading, setCancelLookupLoading] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelSubmitting, setCancelSubmitting] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -157,7 +161,7 @@ export default function SentRequestsPage() {
   ], [])
 
   const currentSearchState = useMemo<SearchState>(() => ({ ...appliedFilters, page, pageSize }), [appliedFilters, page, pageSize])
-  const cancellationAction = useMemo(() => resolveSentCancellationAction(selectedRow), [selectedRow])
+  const cancelLookupAction = useMemo(() => resolveSentCancellationAction(cancelLookup), [cancelLookup])
 
   const showSessionExpiredToastOnce = useCallback(() => {
     if (sessionExpiredToastShownRef.current) return
@@ -174,6 +178,59 @@ export default function SentRequestsPage() {
     setTotal(0)
     if (showToast === true) showSessionExpiredToastOnce()
   }, [showSessionExpiredToastOnce])
+
+
+  useEffect(() => {
+    if (!cancelModalOpen) return
+
+    const protocolo = cancelProtocol.trim()
+    setCancelLookup(null)
+
+    if (!protocolo) {
+      setCancelLookupLoading(false)
+      setCancelError('Informe o protocolo.')
+      return
+    }
+
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setCancelLookupLoading(true)
+      setCancelError(null)
+      try {
+        const res = await fetch(`/api/solicitacoes/lookup?protocolo=${encodeURIComponent(protocolo)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          if (res.status === 404) throw new Error('Solicitação não encontrada.')
+          if (res.status === 403) throw new Error('Você não possui permissão para visualizar/cancelar esta solicitação.')
+          throw new Error(json?.error ?? 'Não foi possível localizar a solicitação.')
+        }
+
+        const solicitation = (json?.solicitation ?? json) as CancellationLookup
+        const action = resolveSentCancellationAction(solicitation)
+        if (!action.enabled) {
+          setCancelLookup(solicitation)
+          setCancelError('Esta solicitação já está encerrada e não pode ser cancelada.')
+          return
+        }
+
+        setCancelLookup(solicitation)
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return
+        setCancelLookup(null)
+        setCancelError(error?.message ?? 'Não foi possível localizar a solicitação.')
+      } finally {
+        if (!controller.signal.aborted) setCancelLookupLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [cancelModalOpen, cancelProtocol])
 
   useEffect(() => {
     if (sessionLoading) return
@@ -432,39 +489,55 @@ export default function SentRequestsPage() {
     window.open(`/solicitacoes/impressao/${selectedRow.id}`, '_blank', 'noopener,noreferrer')
   }
 
-  const openCancellationModal = () => {
-    if (!selectedRow || !cancellationAction.enabled) {
-      pushToast('Selecione uma solicitação cancelável.', 'info')
-      return
-    }
+  const resetCancellationModal = () => {
+    setCancelModalOpen(false)
+    setCancelProtocol('')
+    setCancelLookup(null)
     setCancelReason('')
     setCancelError(null)
+    setCancelLookupLoading(false)
+  }
+
+  const openCancellationModal = () => {
+    setCancelProtocol(selectedRow?.protocolo ?? '')
+    setCancelLookup(null)
+    setCancelReason('')
+    setCancelError(selectedRow?.protocolo ? null : 'Informe o protocolo.')
     setCancelModalOpen(true)
   }
 
   const submitCancellation = async () => {
-    if (!selectedRow) return
+    const protocolo = cancelProtocol.trim()
     const motivo = cancelReason.trim()
-    if (!motivo) {
-      setCancelError('Informe o motivo do cancelamento.')
+
+    if (!protocolo) {
+      setCancelError('Informe o protocolo.')
       return
     }
+    if (!motivo) {
+      setCancelError('Informe a justificativa.')
+      return
+    }
+    if (!cancelLookup || !cancelLookupAction.enabled) {
+      setCancelError(cancelLookup ? 'Esta solicitação já está encerrada e não pode ser cancelada.' : 'Solicitação não encontrada.')
+      return
+    }
+
     setCancelSubmitting(true)
     setCancelError(null)
     try {
-      const endpoint = cancellationAction.mode === 'REQUEST'
-        ? `/api/solicitacoes/${selectedRow.id}/solicitar-cancelamento`
-        : `/api/solicitacoes/${selectedRow.id}/cancelar`
+      const endpoint = cancelLookupAction.mode === 'REQUEST'
+        ? `/api/solicitacoes/${cancelLookup.id}/solicitar-cancelamento`
+        : `/api/solicitacoes/${cancelLookup.id}/cancelar`
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cancellationAction.mode === 'REQUEST' ? { motivo } : { motivo, tipo: 'DIRETO' }),
+        body: JSON.stringify(cancelLookupAction.mode === 'REQUEST' ? { motivo } : { motivo, tipo: 'DIRETO' }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error ?? 'Não foi possível concluir a ação.')
-      pushToast(cancellationAction.mode === 'REQUEST' ? 'Pedido de cancelamento enviado.' : 'Solicitação cancelada.', 'success')
-      setCancelModalOpen(false)
-      setCancelReason('')
+      pushToast(cancelLookupAction.mode === 'REQUEST' ? 'Pedido de cancelamento enviado.' : 'Solicitação cancelada.', 'success')
+      resetCancellationModal()
       await load(currentSearchState)
     } catch (err: any) {
       setCancelError(err?.message ?? 'Não foi possível concluir a ação.')
@@ -519,11 +592,11 @@ export default function SentRequestsPage() {
 
           <button
             onClick={openCancellationModal}
-            disabled={!cancellationAction.enabled}
-            title={cancellationAction.title}
+            disabled={sessionExpired || !sessionData?.appUser}
+            title="Cancelar ou solicitar cancelamento por protocolo"
             className="app-button-danger w-full sm:w-auto"
           >
-            {cancellationAction.label}
+            Cancelar
           </button>
 
           <button onClick={exportCsv} className="app-button-secondary w-full sm:w-auto">
@@ -695,35 +768,63 @@ export default function SentRequestsPage() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--foreground)]">
-                  {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}
+                  Cancelar ou solicitar cancelamento por protocolo
                 </h2>
                 <p className="mt-1 text-sm app-muted-text">
-                  {selectedRow?.protocolo ? `Protocolo: ${selectedRow.protocolo}` : 'Informe a justificativa obrigatória.'}
+                  Informe o protocolo e a justificativa para o sistema decidir a ação automaticamente.
                 </p>
               </div>
-              <button type="button" onClick={() => setCancelModalOpen(false)} className="app-button-ghost rounded p-1"><X size={18} /></button>
+              <button type="button" onClick={resetCancellationModal} className="app-button-ghost rounded p-1"><X size={18} /></button>
             </div>
-            <div className="mb-4 rounded-md border border-[var(--border-subtle)] bg-[var(--muted)]/30 p-3 text-sm">
-              <p><span className="font-semibold">Protocolo:</span> {selectedRow?.protocolo ?? '-'}</p>
-              <p><span className="font-semibold">Solicitação:</span> {selectedRow?.titulo ?? selectedRow?.tipo?.nome ?? '-'}</p>
-              <p><span className="font-semibold">Ação:</span> {cancellationAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="app-label">Protocolo da solicitação</label>
+                <input
+                  value={cancelProtocol}
+                  onChange={(event) => setCancelProtocol(event.target.value)}
+                  className="app-input mt-2"
+                  placeholder="RQ2026-00000"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="app-label">Justificativa obrigatória</label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  className="app-textarea mt-2 min-h-[120px]"
+                  placeholder="Descreva o motivo do cancelamento"
+                />
+              </div>
             </div>
-            <label className="app-label">
-              Justificativa obrigatória
-            </label>
-            <textarea
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              className="app-textarea mt-2 min-h-[120px]"
-              placeholder="Descreva o motivo do cancelamento"
-            />
+
+            <div className="mt-4 rounded-md border border-[var(--border-subtle)] bg-[var(--muted)]/30 p-3 text-sm">
+              {cancelLookup ? (
+                <div className="space-y-1">
+                  <p><span className="font-semibold">Protocolo:</span> {cancelLookup.protocolo ?? '-'}</p>
+                  <p><span className="font-semibold">Solicitação:</span> {cancelLookup.titulo ?? cancelLookup.tipo?.nome ?? '-'}</p>
+                  <p><span className="font-semibold">Status atual:</span> {getStatusPresentation(cancelLookup.status).label}</p>
+                  <p><span className="font-semibold">Ação que será executada:</span> {cancelLookupAction.mode === 'REQUEST' ? 'Solicitar cancelamento' : 'Cancelar solicitação'}</p>
+                </div>
+              ) : (
+                <p>{cancelLookupLoading ? 'Localizando protocolo...' : 'Informe o protocolo para continuar.'}</p>
+              )}
+            </div>
+
             {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setCancelModalOpen(false)} className="app-button-secondary">Voltar</button>
-              <button type="button" onClick={submitCancellation} disabled={cancelSubmitting || !cancelReason.trim()} className="app-button-danger">
+              <button type="button" onClick={resetCancellationModal} className="app-button-secondary">Voltar</button>
+              <button
+                type="button"
+                onClick={submitCancellation}
+                disabled={cancelSubmitting || cancelLookupLoading || !cancelProtocol.trim() || !cancelReason.trim() || !cancelLookup || !cancelLookupAction.enabled}
+                className="app-button-danger"
+              >
                 {cancelSubmitting
                   ? 'Enviando...'
-                  : cancellationAction.mode === 'REQUEST'
+                  : cancelLookupAction.mode === 'REQUEST'
                     ? 'Enviar solicitação de cancelamento'
                     : 'Confirmar cancelamento'}
               </button>
