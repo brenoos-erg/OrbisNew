@@ -1,6 +1,206 @@
 type Dict = Record<string, unknown>
 
+export type NormalizedExperienceEvaluationPayload = {
+  colaboradorAvaliado: string
+  contratoSetor: string
+  gestorImediatoAvaliador: string
+  cargoColaborador: string
+  dataAdmissao: string
+  cargoAvaliador: string
+  relacionamentoNota: string
+  comunicacaoNota: string
+  atitudeNota: string
+  saudeSegurancaNota: string
+  dominioTecnicoProcessosNota: string
+  adaptacaoMudancaNota: string
+  autogestaoGestaoPessoasNota: string
+  comentarioFinal: string
+  avaliadoEm: string
+}
+
+const EXPERIENCE_EVALUATION_NORMALIZED_KEYS = [
+  'colaboradorAvaliado',
+  'contratoSetor',
+  'gestorImediatoAvaliador',
+  'cargoColaborador',
+  'dataAdmissao',
+  'cargoAvaliador',
+  'relacionamentoNota',
+  'comunicacaoNota',
+  'atitudeNota',
+  'saudeSegurancaNota',
+  'dominioTecnicoProcessosNota',
+  'adaptacaoMudancaNota',
+  'autogestaoGestaoPessoasNota',
+  'comentarioFinal',
+  'avaliadoEm',
+] as const
+
+type ExperienceEvaluationNormalizedKey = (typeof EXPERIENCE_EVALUATION_NORMALIZED_KEYS)[number]
+
+function readDisplayString(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return value.map(readDisplayString).filter(Boolean).join(', ')
+  return ''
+}
+
+function firstStringFromSources(sources: Dict[], keys: string[]) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = readDisplayString(source[key])
+      if (value) return value
+    }
+  }
+  return ''
+}
+
+function recordFromKeyValueArray(value: unknown): Dict {
+  if (!Array.isArray(value)) return {}
+
+  return value.reduce<Dict>((acc, item) => {
+    const row = asRecord(item)
+    const key = readDisplayString(row.key || row.name || row.campo || row.field)
+    if (!key) return acc
+    acc[key] = row.value ?? row.nota ?? row.resposta ?? row.valor ?? ''
+    return acc
+  }, {})
+}
+
+export function isExperienceEvaluationTipoLike(tipo?: {
+  id?: string | null
+  codigo?: string | null
+  nome?: string | null
+} | null) {
+  const id = normalize(tipo?.id).replace(/[._]/g, '')
+  const codigo = normalize(tipo?.codigo).replace(/[._]/g, '')
+  const nome = normalize(tipo?.nome)
+
+  return (
+    id === 'rqrh103' ||
+    codigo === 'rqrh103' ||
+    (nome.includes('avaliacao') && nome.includes('periodo') && nome.includes('experiencia'))
+  )
+}
+
+export function normalizeExperienceEvaluationPayload(
+  payload: unknown,
+): NormalizedExperienceEvaluationPayload {
+  const root = asRecord(payload)
+  const campos = asRecord(root.campos)
+  const formData = asRecord(root.formData)
+  const dadosFormulario = asRecord(root.dadosFormulario)
+  const form = asRecord(root.form)
+  const formulario = asRecord(root.formulario)
+  const metadata = asRecord(root.metadata)
+  const requestData = asRecord(root.requestData)
+  const dynamicForm = asRecord(root.dynamicForm)
+  const answers = asRecord(root.answers)
+  const fields = asRecord(root.fields)
+  const respostas = asRecord(root.respostas)
+  const data = asRecord(root.data)
+  const avaliacao = asRecord(root.avaliacao)
+  const avaliacaoGestor = asRecord(root.avaliacaoGestor)
+
+  const baseSources = [
+    campos,
+    formData,
+    dadosFormulario,
+    formulario,
+    form,
+    fields,
+    answers,
+    respostas,
+    data,
+    dynamicForm,
+    requestData,
+    metadata,
+    root,
+  ]
+  const evaluationSources = [
+    avaliacaoGestor,
+    avaliacao,
+    asRecord(avaliacaoGestor.notas),
+    asRecord(avaliacao.notas),
+    asRecord(respostas.notas),
+    asRecord(data.notas),
+    recordFromKeyValueArray(avaliacaoGestor.notas),
+    recordFromKeyValueArray(avaliacao.notas),
+    recordFromKeyValueArray(respostas.notas),
+    recordFromKeyValueArray(data.notas),
+    ...baseSources,
+  ]
+
+  const result = {} as NormalizedExperienceEvaluationPayload
+  const directKeys: Record<ExperienceEvaluationNormalizedKey, string[]> = {
+    colaboradorAvaliado: ['colaboradorAvaliado', 'colaborador', 'nomeColaborador'],
+    contratoSetor: ['contratoSetor', 'setorContrato', 'setor', 'departmentName'],
+    gestorImediatoAvaliador: [
+      'gestorImediatoAvaliador',
+      'gestorImediato',
+      'avaliador',
+      'gestor',
+      'leaderName',
+    ],
+    cargoColaborador: ['cargoColaborador', 'cargo', 'positionName'],
+    dataAdmissao: ['dataAdmissao', 'admissaoData', 'dataAdmissaoPrevista'],
+    cargoAvaliador: ['cargoAvaliador', 'cargoGestor', 'cargoAvaliadorGestor'],
+    relacionamentoNota: ['relacionamentoNota'],
+    comunicacaoNota: ['comunicacaoNota'],
+    atitudeNota: ['atitudeNota'],
+    saudeSegurancaNota: ['saudeSegurancaNota'],
+    dominioTecnicoProcessosNota: ['dominioTecnicoProcessosNota'],
+    adaptacaoMudancaNota: ['adaptacaoMudancaNota'],
+    autogestaoGestaoPessoasNota: ['autogestaoGestaoPessoasNota'],
+    comentarioFinal: ['comentarioFinal', 'comentarios', 'observacoes'],
+    avaliadoEm: ['avaliadoEm', 'dataAvaliacao', 'avaliacaoEm'],
+  }
+
+  for (const key of EXPERIENCE_EVALUATION_NORMALIZED_KEYS) {
+    const sources = key.endsWith('Nota') || key === 'comentarioFinal' || key === 'avaliadoEm' ? evaluationSources : baseSources
+    result[key] = firstStringFromSources(sources, directKeys[key])
+  }
+
+  if (!result.gestorImediatoAvaliador) {
+    result.gestorImediatoAvaliador = firstStringFromSources(baseSources, [
+      'gestorImediatoAvaliadorId',
+      'avaliadorId',
+      'gestorId',
+    ])
+  }
+
+  return result
+}
+
+export function hasExperienceEvaluationPrintableData(payload: unknown) {
+  const normalized = normalizeExperienceEvaluationPayload(payload)
+  return [
+    normalized.relacionamentoNota,
+    normalized.comunicacaoNota,
+    normalized.atitudeNota,
+    normalized.saudeSegurancaNota,
+    normalized.dominioTecnicoProcessosNota,
+    normalized.adaptacaoMudancaNota,
+    normalized.autogestaoGestaoPessoasNota,
+    normalized.comentarioFinal,
+    normalized.avaliadoEm,
+  ].some((value) => value.trim().length > 0)
+}
+
+
 const asRecord = (value: unknown): Dict => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return {}
+    try {
+      const parsed = JSON.parse(trimmed)
+      return asRecord(parsed)
+    } catch {
+      return {}
+    }
+  }
+
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return value as Dict
 }

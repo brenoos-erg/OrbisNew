@@ -8,6 +8,8 @@ import {
 import {
   EXPERIENCE_EVALUATOR_GROUP_NAME,
   isExperienceEvaluationEvaluator,
+  hasExperienceEvaluationPrintableData,
+  isExperienceEvaluationTipoLike,
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
@@ -43,6 +45,7 @@ type SolicitationLike = {
   departmentId?: string | null
   solicitacaoSetores?: { setor?: string | null }[]
   payload?: unknown
+  tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null
 }
 
 export async function resolveUserAccessContext(input: {
@@ -154,6 +157,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
 export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
   return (
     canUserViewSolicitationByDepartment(ctx, solicitation) ||
+    canUserViewExperienceEvaluationForPrint(ctx, solicitation) ||
     canUserActAsExperienceEvaluator(ctx, solicitation) ||
     canUserActAsFinalizerForCurrentStage(ctx, solicitation)
   )
@@ -187,6 +191,59 @@ function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitati
       ctx.isExperienceEvaluationCoordinator ||
       ctx.isRhAuthorizedForExperienceEvaluation)
   )
+}
+
+
+function isExperienceEvaluationSolicitation(solicitation: SolicitationLike) {
+  return (
+    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID ||
+    isExperienceEvaluationTipoLike({
+      id: solicitation.tipo?.id ?? solicitation.tipoId,
+      codigo: solicitation.tipo?.codigo,
+      nome: solicitation.tipo?.nome,
+    })
+  )
+}
+
+function isExperienceEvaluationPdfEligibleStatus(solicitation: SolicitationLike) {
+  if (solicitation.status === 'CANCELADA') return false
+  return (
+    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS ||
+    solicitation.status === 'CONCLUIDA' ||
+    solicitation.status === 'FINALIZADA' ||
+    hasExperienceEvaluationPrintableData(solicitation.payload)
+  )
+}
+
+function isAssignedExperienceEvaluationEvaluator(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  return isExperienceEvaluationEvaluator(
+    { payload: solicitation.payload, approverId: solicitation.approverId },
+    {
+      id: ctx.userId,
+      login: ctx.userLogin,
+      email: ctx.userEmail,
+      fullName: ctx.userFullName,
+    },
+  )
+}
+
+function canUserViewExperienceEvaluationForPrint(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (!isExperienceEvaluationSolicitation(solicitation)) return false
+  if (solicitation.status === 'CANCELADA') return false
+  if (ctx.role === 'ADMIN') return true
+  if (solicitation.solicitanteId === ctx.userId) return true
+  if (solicitation.assumidaPorId === ctx.userId) return true
+  if (ctx.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)) return true
+  if (ctx.isExperienceEvaluationCoordinator) return true
+  if (ctx.isRhAuthorizedForExperienceEvaluation) return true
+  if (isAssignedExperienceEvaluationEvaluator(ctx, solicitation)) return true
+  return Boolean(solicitation.tipoId && ctx.viewerTipoIds.includes(solicitation.tipoId))
+}
+
+export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (!isExperienceEvaluationSolicitation(solicitation)) return false
+  if (!isExperienceEvaluationPdfEligibleStatus(solicitation)) return false
+  return canUserViewExperienceEvaluationForPrint(ctx, solicitation)
 }
 
 export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {

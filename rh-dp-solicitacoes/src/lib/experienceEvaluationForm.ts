@@ -1,3 +1,5 @@
+import { isExperienceEvaluationTipoLike, normalizeExperienceEvaluationPayload } from '@/lib/experienceEvaluation.shared'
+
 export const EXPERIENCE_EVALUATION_COMPETENCIES = [
   {
     key: 'relacionamentoNota',
@@ -56,13 +58,11 @@ const readString = (obj: Dict, key: string): string => {
 }
 
 export function isExperienceEvaluationTipo(tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null) {
-  const id = (tipo?.id ?? '').trim().toUpperCase()
-  const codigo = (tipo?.codigo ?? '').trim().toUpperCase()
-  const nome = (tipo?.nome ?? '').trim().toUpperCase()
-  return id === 'RQ_RH_103' || codigo === 'RQ.RH.103' || nome.includes('AVALIAÇÃO DO PERÍODO DE EXPERIÊNCIA')
+  return isExperienceEvaluationTipoLike(tipo)
 }
 
 export function extractExperienceEvaluationData(payload: unknown) {
+  const normalized = normalizeExperienceEvaluationPayload(payload)
   const payloadObj = asRecord(payload)
   const campos = asRecord(payloadObj.campos)
   const form = asRecord(payloadObj.form)
@@ -95,20 +95,18 @@ export function extractExperienceEvaluationData(payload: unknown) {
 
   const notas = EXPERIENCE_EVALUATION_COMPETENCIES.map((item) => ({
     ...item,
-    value: readString(merged, item.key) || '-',
+    value: normalized[item.key] || '-',
   }))
 
-
- return {
-    colaboradorAvaliado: readString(merged, 'colaboradorAvaliado'),
-    cargoColaborador: readString(merged, 'cargoColaborador'),
-    contratoSetor: readString(merged, 'contratoSetor'),
-    gestorImediatoAvaliador: readString(merged, 'gestorImediatoAvaliador'),
-    cargoAvaliador: readString(merged, 'cargoAvaliador'),
-    comentarioFinal:
-      readString(merged, 'comentarioFinal') ||
-      readString(merged, 'comentarios') ||
-      readString(merged, 'observacoes'),
+  return {
+    colaboradorAvaliado: normalized.colaboradorAvaliado,
+    cargoColaborador: normalized.cargoColaborador,
+    contratoSetor: normalized.contratoSetor,
+    gestorImediatoAvaliador: normalized.gestorImediatoAvaliador,
+    dataAdmissao: normalized.dataAdmissao,
+    cargoAvaliador: normalized.cargoAvaliador,
+    comentarioFinal: normalized.comentarioFinal,
+    avaliadoEm: normalized.avaliadoEm,
     historicoRelacionado: historyCandidates[0] ?? '',
     notas,
   }

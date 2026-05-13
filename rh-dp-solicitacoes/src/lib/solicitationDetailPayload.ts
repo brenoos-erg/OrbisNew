@@ -7,6 +7,7 @@ export type DetailPermissionFlags = {
   canCancel: boolean
   canManageCancellationRequest: boolean
   canComment: boolean
+  canPrintExperienceEvaluationPdf?: boolean
 }
 
 type AnyRecord = Record<string, any>

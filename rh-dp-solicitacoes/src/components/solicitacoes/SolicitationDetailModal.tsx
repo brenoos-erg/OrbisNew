@@ -268,6 +268,7 @@ export type SolicitationDetail = {
   canCancel?: boolean
   canManageCancellationRequest?: boolean
   canComment?: boolean
+  canPrintExperienceEvaluationPdf?: boolean
   dataAbertura: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -1098,16 +1099,20 @@ export function SolicitationDetailModal({
   const userIsCurrentDepartmentResponsible =
     !!detail?.department?.id && currentUserDepartmentIds.has(detail.department.id)
   const isExperienceEvaluationPdfAvailableStatus =
-    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' || effectiveStatus === 'CONCLUIDA'
+    isAvaliacaoExperiencia && effectiveStatus !== 'CANCELADA'
   const canFinalizeExperienceByRh =
     apiCanFinalize &&
     isAvaliacaoExperiencia &&
     effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' &&
     (userIsAdmin || userIsCurrentDepartmentResponsible)
   const canDownloadExperiencePdf =
-    isAvaliacaoExperiencia &&
     isExperienceEvaluationPdfAvailableStatus &&
-    (userIsAdmin || userIsCurrentDepartmentResponsible)
+    Boolean(detail?.canPrintExperienceEvaluationPdf)
+  const experiencePdfUnavailableMessage =
+    isExperienceEvaluationPdfAvailableStatus &&
+    !canDownloadExperiencePdf
+      ? 'Você pode visualizar este chamado, mas não possui permissão para imprimir a avaliação.'
+      : null
   const canShowApprovalActions =
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
@@ -1792,7 +1797,7 @@ async function handleEncaminharAprovacaoComAnexo() {
       const objectUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = objectUrl
-      link.download = `avaliacao-experiencia-${detail?.protocolo ?? row?.protocolo ?? solicitationId}.pdf`
+      link.download = `avaliacao-periodo-experiencia-${detail?.protocolo ?? row?.protocolo ?? solicitationId}.pdf`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -3268,15 +3273,25 @@ async function handleEncaminharAprovacaoComAnexo() {
                   >
                     Imprimir solicitação
                   </button>
-                  {canDownloadExperiencePdf && (
+                  {canDownloadExperiencePdf ? (
                     <button
                       onClick={handleBaixarPdfAvaliacaoExperiencia}
                       disabled={closing}
+                      title="Gerar PDF da avaliação do período de experiência"
                       className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
-                      {closing ? 'Gerando...' : 'Baixar PDF da avaliação'}
+                      {closing ? 'Gerando...' : 'Imprimir avaliação'}
                     </button>
-                  )}
+                  ) : experiencePdfUnavailableMessage ? (
+                    <button
+                      type="button"
+                      disabled
+                      title={experiencePdfUnavailableMessage}
+                      className="w-full rounded-md bg-slate-500 px-4 py-3 text-base font-semibold text-white opacity-60 lg:w-auto lg:text-sm"
+                    >
+                      Imprimir avaliação
+                    </button>
+                  ) : null}
                   {canFinalizeExperienceByRh && (
                     <button
                       onClick={handleFinalizarUltimaEtapa}

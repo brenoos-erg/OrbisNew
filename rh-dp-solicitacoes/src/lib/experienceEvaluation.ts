@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma'
 import { EXPERIENCE_EVALUATOR_GROUP_NAME } from '@/lib/experienceEvaluation.constants'
 import {
   isExperienceEvaluationEvaluator,
+  hasExperienceEvaluationPrintableData,
+  normalizeExperienceEvaluationPayload,
+  isExperienceEvaluationTipoLike,
   patchExperienceEvaluationEvaluatorPayload,
   patchExperienceEvaluationEvaluatorFields,
   resolveExperienceEvaluationEvaluatorFromDirectory,
@@ -67,6 +70,9 @@ export async function resolveRhDepartmentForExperienceEvaluation() {
 
 export {
   isExperienceEvaluationEvaluator,
+  hasExperienceEvaluationPrintableData,
+  normalizeExperienceEvaluationPayload,
+  isExperienceEvaluationTipoLike,
   patchExperienceEvaluationEvaluatorPayload,
   patchExperienceEvaluationEvaluatorFields,
   resolveExperienceEvaluationEvaluatorFromDirectory,

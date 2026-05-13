@@ -15,6 +15,7 @@ import {
   canAssumeSolicitation,
   canCancelSolicitation,
   canManageCancellationRequest,
+  canPrintExperienceEvaluationPdf,
   canCommentSolicitation,
   canEditSolicitation,
   canFinalizeSolicitation,
@@ -98,6 +99,7 @@ export async function GET(
       departmentId: item.departmentId,
       solicitacaoSetores: [] as { setor?: string | null }[],
       payload: item.payload ?? {},
+      tipo: tipo ? { id: tipo.id, codigo: tipo.codigo, nome: tipo.nome } : null,
     }
 
     stage = 'setores-para-politica'
@@ -253,6 +255,7 @@ export async function GET(
       canCancel: canCancelSolicitation(userAccess, solicitationForActions),
       canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
       canComment: canCommentSolicitation(userAccess, solicitationForActions),
+      canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
     }
 
     stage = 'montar-payload-resposta'

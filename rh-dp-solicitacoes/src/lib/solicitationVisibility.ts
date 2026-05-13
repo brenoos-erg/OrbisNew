@@ -110,12 +110,22 @@ export function buildReceivedSolicitationVisibilityWhere(
 
   if (
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+    input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
     input.isExperienceEvaluationCoordinator ||
     input.isRhAuthorizedForExperienceEvaluation
   ) {
     orFilters.push({
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-      status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+      status: { not: 'CANCELADA' },
+    })
+  }
+
+
+  if (evaluatorPayloadFilters.length > 0) {
+    orFilters.push({
+      tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+      status: { not: 'CANCELADA' },
+      OR: [{ approverId: input.userId }, ...evaluatorPayloadFilters],
     })
   }
   return {
