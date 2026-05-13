@@ -268,6 +268,7 @@ export type SolicitationDetail = {
   canCancel?: boolean
   canManageCancellationRequest?: boolean
   canComment?: boolean
+  canPrintExperienceEvaluationPdf?: boolean
   dataAbertura: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -1107,7 +1108,13 @@ export function SolicitationDetailModal({
   const canDownloadExperiencePdf =
     isAvaliacaoExperiencia &&
     isExperienceEvaluationPdfAvailableStatus &&
-    (userIsAdmin || userIsCurrentDepartmentResponsible)
+    Boolean(detail?.canPrintExperienceEvaluationPdf)
+  const experiencePdfUnavailableMessage =
+    isAvaliacaoExperiencia &&
+    isExperienceEvaluationPdfAvailableStatus &&
+    !canDownloadExperiencePdf
+      ? 'Você pode visualizar este chamado, mas não possui permissão para imprimir a avaliação.'
+      : null
   const canShowApprovalActions =
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
@@ -3268,15 +3275,25 @@ async function handleEncaminharAprovacaoComAnexo() {
                   >
                     Imprimir solicitação
                   </button>
-                  {canDownloadExperiencePdf && (
+                  {canDownloadExperiencePdf ? (
                     <button
                       onClick={handleBaixarPdfAvaliacaoExperiencia}
                       disabled={closing}
+                      title="Gerar PDF da avaliação do período de experiência"
                       className="w-full rounded-md bg-slate-700 px-4 py-3 text-base font-semibold text-white hover:bg-slate-600 disabled:opacity-60 lg:w-auto lg:text-sm"
                     >
                       {closing ? 'Gerando...' : 'Baixar PDF da avaliação'}
                     </button>
-                  )}
+                  ) : experiencePdfUnavailableMessage ? (
+                    <button
+                      type="button"
+                      disabled
+                      title={experiencePdfUnavailableMessage}
+                      className="w-full rounded-md bg-slate-500 px-4 py-3 text-base font-semibold text-white opacity-60 lg:w-auto lg:text-sm"
+                    >
+                      Baixar PDF da avaliação
+                    </button>
+                  ) : null}
                   {canFinalizeExperienceByRh && (
                     <button
                       onClick={handleFinalizarUltimaEtapa}
