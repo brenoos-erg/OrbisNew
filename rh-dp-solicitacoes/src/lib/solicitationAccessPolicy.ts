@@ -189,6 +189,48 @@ function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitati
   )
 }
 
+
+export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
+  if (
+    solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
+    solicitation.status !== 'CONCLUIDA'
+  ) {
+    return false
+  }
+
+  if (ctx.role === 'ADMIN') return true
+  if (
+    ctx.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+    ctx.isExperienceEvaluationCoordinator ||
+    ctx.isRhAuthorizedForExperienceEvaluation
+  ) {
+    return true
+  }
+
+  if (
+    isExperienceEvaluationEvaluator(
+      { payload: solicitation.payload, approverId: solicitation.approverId },
+      {
+        id: ctx.userId,
+        login: ctx.userLogin,
+        email: ctx.userEmail,
+        fullName: ctx.userFullName,
+      },
+    )
+  ) {
+    return true
+  }
+
+  if (solicitation.solicitanteId === ctx.userId && canViewSolicitation(ctx, solicitation)) return true
+
+  return Boolean(
+    solicitation.tipoId &&
+      ctx.viewerTipoIds.includes(solicitation.tipoId) &&
+      canViewSolicitation(ctx, solicitation),
+  )
+}
+
 export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
   return canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation)
 }

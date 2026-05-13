@@ -15,6 +15,7 @@ import {
   canAssumeSolicitation,
   canCancelSolicitation,
   canManageCancellationRequest,
+  canPrintExperienceEvaluationPdf,
   canCommentSolicitation,
   canEditSolicitation,
   canFinalizeSolicitation,
@@ -253,6 +254,7 @@ export async function GET(
       canCancel: canCancelSolicitation(userAccess, solicitationForActions),
       canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
       canComment: canCommentSolicitation(userAccess, solicitationForActions),
+      canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
     }
 
     stage = 'montar-payload-resposta'

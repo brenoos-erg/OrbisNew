@@ -8,9 +8,13 @@ import { prisma } from '@/lib/prisma'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
-  listExperienceEvaluators,
+  hasExperienceEvaluationPrintableData,
+  normalizeExperienceEvaluationPayload,
 } from '@/lib/experienceEvaluation'
-import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import {
+  canPrintExperienceEvaluationPdf,
+  resolveUserAccessContext,
+} from '@/lib/solicitationAccessPolicy'
 
 function escapeHtml(input: unknown) {
   return String(input ?? '')
@@ -21,12 +25,10 @@ function escapeHtml(input: unknown) {
     .replaceAll("'", '&#039;')
 }
 
-function toDisplayValue(input: unknown) {
-  if (input === null || input === undefined) return ''
-  if (typeof input === 'string') return input.trim()
-  if (typeof input === 'number' || typeof input === 'boolean') return String(input)
-  if (Array.isArray(input)) return input.filter(Boolean).map((item) => String(item)).join(', ')
-  return String(input)
+function toPdfDisplayValue(input: unknown) {
+  if (input === null || input === undefined) return '-'
+  const value = String(input).trim()
+  return value || '-'
 }
 
 export async function GET(
@@ -42,7 +44,7 @@ export async function GET(
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
       include: {
-        tipo: { select: { nome: true, schemaJson: true } },
+        tipo: { select: { nome: true } },
         solicitante: { select: { fullName: true } },
         solicitacaoSetores: { select: { setor: true } },
       },
@@ -52,12 +54,25 @@ export async function GET(
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     }
 
-    const isExperienceEvaluation = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+    if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) {
+      return NextResponse.json(
+        { error: 'PDF disponível somente para Avaliação do Período de Experiência.' },
+        { status: 400 },
+      )
+    }
+
+    if (solicitation.status === 'CANCELADA') {
+      return NextResponse.json(
+        { error: 'A avaliação cancelada não pode ser impressa.' },
+        { status: 400 },
+      )
+    }
+
     const isAllowedStatus =
       solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS ||
       solicitation.status === 'CONCLUIDA'
 
-    if (!isExperienceEvaluation || !isAllowedStatus) {
+    if (!isAllowedStatus) {
       return NextResponse.json(
         {
           error:
@@ -69,83 +84,46 @@ export async function GET(
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
       role: me.role,
       primaryDepartmentId: me.departmentId,
       primaryDepartment: me.department,
     })
 
-    const canDownload =
-      me.role === 'ADMIN' ||
-      (Boolean(solicitation.departmentId) &&
-        userAccess.userDepartmentIds.includes(solicitation.departmentId as string))
-
-    if (!canDownload) {
+    if (!canPrintExperienceEvaluationPdf(userAccess, solicitation)) {
       return NextResponse.json(
-        { error: 'Somente RH (ou admin) pode gerar o PDF na etapa final e após conclusão.' },
+        { error: 'Você não tem permissão para imprimir esta avaliação.' },
         { status: 403 },
       )
     }
 
-     const payload = (solicitation.payload ?? {}) as Record<string, any>
-    const campos = ((payload.campos ?? payload.formData ?? payload.dadosFormulario ?? {}) ??
-      {}) as Record<string, any>
-    const avaliacao = (payload.avaliacaoGestor ?? {}) as Record<string, any>
-    let gestorAvaliador = toDisplayValue(campos.gestorImediatoAvaliador)
-
-    if (!gestorAvaliador && toDisplayValue(campos.gestorImediatoAvaliadorId)) {
-      const coordenadores = await listExperienceEvaluators()
-      gestorAvaliador =
-        coordenadores.find((coordenador) => coordenador.id === campos.gestorImediatoAvaliadorId)
-          ?.fullName ?? ''
+    if (!hasExperienceEvaluationPrintableData(solicitation.payload)) {
+      return NextResponse.json(
+        { error: 'A avaliação ainda não possui dados suficientes para impressão.' },
+        { status: 400 },
+      )
     }
 
-    const baseRows: Array<[string, string]> = [
-      ['Colaborador avaliado', toDisplayValue(campos.colaboradorAvaliado)],
-      ['Contrato / setor', toDisplayValue(campos.contratoSetor)],
-      ['Gestor imediato avaliador', gestorAvaliador],
-      ['Cargo do colaborador', toDisplayValue(campos.cargoColaborador)],
-      ['Data de admissão', toDisplayValue(campos.dataAdmissao)],
-      ['Cargo do avaliador', toDisplayValue(campos.cargoAvaliador)],
-      ['Relacionamento', toDisplayValue(avaliacao.relacionamentoNota)],
-      ['Comunicação', toDisplayValue(avaliacao.comunicacaoNota)],
-      ['Atitude', toDisplayValue(avaliacao.atitudeNota)],
-      ['Saúde e segurança', toDisplayValue(avaliacao.saudeSegurancaNota)],
-      [
-        'Domínio técnico e processos',
-        toDisplayValue(avaliacao.dominioTecnicoProcessosNota),
-      ],
-      ['Adaptação à mudança', toDisplayValue(avaliacao.adaptacaoMudancaNota)],
-      [
-        'Autogestão e gestão de pessoas',
-        toDisplayValue(avaliacao.autogestaoGestaoPessoasNota),
-      ],
-      ['Comentário final', toDisplayValue(avaliacao.comentarioFinal)],
-      ['Avaliado em', toDisplayValue(avaliacao.avaliadoEm)],
+    const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload)
+
+    const rows: Array<[string, string]> = [
+      ['Colaborador avaliado', evaluation.colaboradorAvaliado],
+      ['Contrato / setor', evaluation.contratoSetor],
+      ['Gestor imediato avaliador', evaluation.gestorImediatoAvaliador],
+      ['Cargo do colaborador', evaluation.cargoColaborador],
+      ['Data de admissão', evaluation.dataAdmissao],
+      ['Cargo do avaliador', evaluation.cargoAvaliador],
+      ['Relacionamento', evaluation.relacionamentoNota],
+      ['Comunicação', evaluation.comunicacaoNota],
+      ['Atitude', evaluation.atitudeNota],
+      ['Saúde e segurança', evaluation.saudeSegurancaNota],
+      ['Domínio técnico e processos', evaluation.dominioTecnicoProcessosNota],
+      ['Adaptação à mudança', evaluation.adaptacaoMudancaNota],
+      ['Autogestão e gestão de pessoas', evaluation.autogestaoGestaoPessoasNota],
+      ['Comentário final', evaluation.comentarioFinal],
     ]
-
-    const schemaFields = (
-      (solicitation.tipo?.schemaJson as { camposEspecificos?: Array<{ name?: string; label?: string }> })
-        ?.camposEspecificos ?? []
-    )
-      .filter((field) => field?.name && field?.label)
-      .map((field) => ({ name: String(field.name), label: String(field.label) }))
-
-    const includedFieldNames = new Set([
-      'colaboradorAvaliado',
-      'contratoSetor',
-      'gestorImediatoAvaliador',
-      'cargoColaborador',
-      'dataAdmissao',
-      'cargoAvaliador',
-    ])
-
-   const dynamicRows: Array<[string, string]> = schemaFields
-      .filter((field) => !includedFieldNames.has(field.name))
-      .map<[string, string]>((field) => [field.label, toDisplayValue(campos[field.name])])
-      .filter(([, value]) => Boolean(value))
-
-    const rows = [...baseRows, ...dynamicRows]
-    const hasAnyDataRow = rows.some(([, value]) => Boolean(value))
 
     const html = `<!doctype html>
       <html lang="pt-BR">
@@ -170,16 +148,11 @@ export async function GET(
         <table>
           ${rows
             .map(
-                ([label, value]) =>
-                `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`,
+              ([label, value]) =>
+                `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(toPdfDisplayValue(value))}</td></tr>`,
             )
             .join('')}
         </table>
-        ${
-          hasAnyDataRow
-            ? ''
-            : '<p style="margin-top:16px;font-size:12px;color:#64748b">Sem dados preenchidos para exibir no momento da geração.</p>'
-        }
       </body>
       </html>`
     browser = await chromium.launch({ headless: true })

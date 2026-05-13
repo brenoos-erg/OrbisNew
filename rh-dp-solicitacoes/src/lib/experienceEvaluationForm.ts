@@ -1,3 +1,5 @@
+import { normalizeExperienceEvaluationPayload } from '@/lib/experienceEvaluation.shared'
+
 export const EXPERIENCE_EVALUATION_COMPETENCIES = [
   {
     key: 'relacionamentoNota',
@@ -63,6 +65,7 @@ export function isExperienceEvaluationTipo(tipo?: { id?: string | null; codigo?:
 }
 
 export function extractExperienceEvaluationData(payload: unknown) {
+  const normalized = normalizeExperienceEvaluationPayload(payload)
   const payloadObj = asRecord(payload)
   const campos = asRecord(payloadObj.campos)
   const form = asRecord(payloadObj.form)
@@ -95,20 +98,17 @@ export function extractExperienceEvaluationData(payload: unknown) {
 
   const notas = EXPERIENCE_EVALUATION_COMPETENCIES.map((item) => ({
     ...item,
-    value: readString(merged, item.key) || '-',
+    value: normalized[item.key] || '-',
   }))
 
-
- return {
-    colaboradorAvaliado: readString(merged, 'colaboradorAvaliado'),
-    cargoColaborador: readString(merged, 'cargoColaborador'),
-    contratoSetor: readString(merged, 'contratoSetor'),
-    gestorImediatoAvaliador: readString(merged, 'gestorImediatoAvaliador'),
-    cargoAvaliador: readString(merged, 'cargoAvaliador'),
-    comentarioFinal:
-      readString(merged, 'comentarioFinal') ||
-      readString(merged, 'comentarios') ||
-      readString(merged, 'observacoes'),
+  return {
+    colaboradorAvaliado: normalized.colaboradorAvaliado,
+    cargoColaborador: normalized.cargoColaborador,
+    contratoSetor: normalized.contratoSetor,
+    gestorImediatoAvaliador: normalized.gestorImediatoAvaliador,
+    dataAdmissao: normalized.dataAdmissao,
+    cargoAvaliador: normalized.cargoAvaliador,
+    comentarioFinal: normalized.comentarioFinal,
     historicoRelacionado: historyCandidates[0] ?? '',
     notas,
   }
