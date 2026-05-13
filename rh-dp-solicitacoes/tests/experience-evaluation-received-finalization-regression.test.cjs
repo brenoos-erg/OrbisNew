@@ -9,6 +9,31 @@ const receivedRouteSource = fs.readFileSync('src/app/api/solicitacoes/recebidas/
 const finalizeRouteSource = fs.readFileSync('src/app/api/solicitacoes/[id]/finalizar/route.ts', 'utf8')
 const countsRouteSource = fs.readFileSync('src/app/api/solicitacoes/counts/route.ts', 'utf8')
 
+
+assert.match(
+  accessSource,
+  /isRhAuthorizedForExperienceEvaluation[\s\S]*hasSolicitationsModuleAccess[\s\S]*input\.role === 'RH'[\s\S]*isRhDepartment/s,
+  'O contexto deve identificar RH autorizado por módulo Solicitações e vínculo RH.',
+)
+
+assert.match(
+  visibilitySource,
+  /input\.finalizerTipoIds\.includes\(EXPERIENCE_EVALUATION_TIPO_ID\) \|\|[\s\S]*input\.isExperienceEvaluationCoordinator \|\|[\s\S]*input\.isRhAuthorizedForExperienceEvaluation[\s\S]*status:\s*EXPERIENCE_EVALUATION_FINALIZATION_STATUS/s,
+  'AGUARDANDO_FINALIZACAO_AVALIACAO deve aparecer também para RH autorizado.',
+)
+
+assert.match(
+  sensitiveSource,
+  /finalizerTipoIds\?: string\[\][\s\S]*isRhAuthorizedForExperienceEvaluation\?: boolean[\s\S]*finalizerTipoIds\.includes\('RQ_RH_103'\) \|\|[\s\S]*input\.isRhAuthorizedForExperienceEvaluation[\s\S]*status:\s*'AGUARDANDO_FINALIZACAO_AVALIACAO'/s,
+  'A trava sensível deve liberar a etapa final para finalizadores RQ_RH_103 e RH autorizado.',
+)
+
+assert.match(
+  accessSource,
+  /ctx\.finalizerTipoIds\.includes\(solicitation\.tipoId\) \|\|[\s\S]*ctx\.isExperienceEvaluationCoordinator \|\|[\s\S]*ctx\.isRhAuthorizedForExperienceEvaluation/s,
+  'Finalização deve aceitar finalizador configurado, coordenador de avaliação ou RH autorizado.',
+)
+
 assert.match(
   accessSource,
   /EXPERIENCE_EVALUATOR_GROUP_NAME[\s\S]*prisma\.approverGroupMember\.findFirst\([\s\S]*group:\s*\{ name: EXPERIENCE_EVALUATOR_GROUP_NAME \}/s,
@@ -35,7 +60,7 @@ assert.match(
 
 assert.match(
   accessSource,
-  /function canUserActAsFinalizerForCurrentStage[\s\S]*ctx\.finalizerTipoIds\.includes\(solicitation\.tipoId\) \|\| ctx\.isExperienceEvaluationCoordinator/s,
+  /function canUserActAsFinalizerForCurrentStage[\s\S]*ctx\.finalizerTipoIds\.includes\(solicitation\.tipoId\) \|\|\s*ctx\.isExperienceEvaluationCoordinator/s,
   'Finalização deve aceitar finalizador configurado ou coordenador de avaliação.',
 )
 
@@ -59,13 +84,13 @@ assert.match(
 
 assert.match(
   receivedRouteSource,
-  /isExperienceEvaluationCoordinator: userAccess\.isExperienceEvaluationCoordinator/,
+  /isExperienceEvaluationCoordinator:\s*userAccess\.isExperienceEvaluationCoordinator[\s\S]*isRhAuthorizedForExperienceEvaluation:[\s\S]*userAccess\.isRhAuthorizedForExperienceEvaluation/,
   'Recebidas deve passar a permissão de coordenador para a trava sensível.',
 )
 
 assert.match(
   countsRouteSource,
-  /isExperienceEvaluationCoordinator: userAccess\.isExperienceEvaluationCoordinator/,
+  /isExperienceEvaluationCoordinator:\s*userAccess\.isExperienceEvaluationCoordinator[\s\S]*isRhAuthorizedForExperienceEvaluation:[\s\S]*userAccess\.isRhAuthorizedForExperienceEvaluation/,
   'Contagens devem usar a mesma visibilidade de coordenador que a listagem.',
 )
 

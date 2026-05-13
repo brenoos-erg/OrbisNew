@@ -19,6 +19,7 @@ type SolicitationVisibilityInput = {
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
   isExperienceEvaluationCoordinator: boolean
+  isRhAuthorizedForExperienceEvaluation: boolean
 }
 
 type SolicitationLike = {
@@ -109,7 +110,8 @@ export function buildReceivedSolicitationVisibilityWhere(
 
   if (
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
-    input.isExperienceEvaluationCoordinator
+    input.isExperienceEvaluationCoordinator ||
+    input.isRhAuthorizedForExperienceEvaluation
   ) {
     orFilters.push({
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
@@ -219,7 +221,8 @@ export function canUserViewSolicitationByDepartment(
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
     (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
-      input.isExperienceEvaluationCoordinator)
+      input.isExperienceEvaluationCoordinator ||
+      input.isRhAuthorizedForExperienceEvaluation)
   ) {
     return true
   }

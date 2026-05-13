@@ -24,6 +24,7 @@ function ctx(overrides = {}) {
     viewerTipoIds: [],
     actionableTipoIds: [],
     isExperienceEvaluationCoordinator: false,
+    isRhAuthorizedForExperienceEvaluation: false,
     hasSolicitationsModuleAccess: true,
     ...overrides,
   }

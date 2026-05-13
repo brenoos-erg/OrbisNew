@@ -282,7 +282,10 @@ export const GET = withModuleLevel(
             role: me.role,
             departmentIds: userDepartmentIdsForSensitive,
             allowedTipoIds: userAccess.allowedTipoIds,
+            finalizerTipoIds: userAccess.finalizerTipoIds,
             isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
+            isRhAuthorizedForExperienceEvaluation:
+              userAccess.isRhAuthorizedForExperienceEvaluation,
           }),
         ]
 

@@ -91,6 +91,8 @@ const viewerCtx = {
   viewerTipoIds: ['TIPO_VIEW'],
   actionableTipoIds: [],
   isExperienceEvaluationCoordinator: false,
+  isRhAuthorizedForExperienceEvaluation: false,
+  hasSolicitationsModuleAccess: true,
 }
 const viewerSolicitation = { tipoId: 'TIPO_VIEW', status: 'ABERTA', solicitanteId: 'other', payload: {} }
 assert.equal(policy.canViewSolicitation(viewerCtx, viewerSolicitation), true, 'visualizador deve abrir detalhe completo')
@@ -100,6 +102,52 @@ assert.equal(policy.canEditSolicitation(viewerCtx, viewerSolicitation), false, '
 assert.equal(policy.canApproveSolicitation(viewerCtx, viewerSolicitation), false, 'visualizador não aprova')
 assert.equal(policy.canFinalizeSolicitation(viewerCtx, viewerSolicitation), false, 'visualizador não finaliza')
 assert.equal(policy.canCommentSolicitation(viewerCtx, viewerSolicitation), false, 'visualizador não comenta')
+
+
+const experienceFinalizationSolicitation = {
+  tipoId: 'RQ_RH_103',
+  status: 'AGUARDANDO_FINALIZACAO_AVALIACAO',
+  solicitanteId: 'requester',
+  approverId: 'manager',
+  payload: {},
+}
+assert.equal(
+  policy.canViewSolicitation(
+    { ...viewerCtx, isExperienceEvaluationCoordinator: true },
+    experienceFinalizationSolicitation,
+  ),
+  true,
+  'coordenador de avaliação vê finalização de experiência em recebidas',
+)
+assert.equal(
+  policy.canFinalizeSolicitation(
+    { ...viewerCtx, isExperienceEvaluationCoordinator: true },
+    experienceFinalizationSolicitation,
+  ),
+  true,
+  'coordenador de avaliação finaliza experiência',
+)
+assert.equal(
+  policy.canFinalizeSolicitation(
+    { ...viewerCtx, finalizerTipoIds: ['RQ_RH_103'] },
+    experienceFinalizationSolicitation,
+  ),
+  true,
+  'finalizador configurado em RQ_RH_103 finaliza experiência',
+)
+assert.equal(
+  policy.canFinalizeSolicitation(
+    { ...viewerCtx, isRhAuthorizedForExperienceEvaluation: true },
+    experienceFinalizationSolicitation,
+  ),
+  true,
+  'RH autorizado no módulo Solicitações finaliza experiência',
+)
+assert.equal(
+  policy.canFinalizeSolicitation(viewerCtx, experienceFinalizationSolicitation),
+  false,
+  'usuário comum não finaliza experiência',
+)
 
 const approverCtx = { ...viewerCtx, viewerTipoIds: [], allowedTipoIds: ['TIPO_VIEW'], actionableTipoIds: ['TIPO_VIEW'] }
 assert.equal(policy.canAssumeSolicitation(approverCtx, viewerSolicitation), true, 'aprovador continua podendo agir')
