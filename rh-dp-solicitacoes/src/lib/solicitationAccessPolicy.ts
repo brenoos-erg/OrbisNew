@@ -13,6 +13,7 @@ import {
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
 import { MODULE_KEYS } from '@/lib/featureKeys'
+import { isRhDepartment } from '@/lib/rhAccess'
 
 export type UserAccessContext = {
   userId: string
@@ -27,10 +28,11 @@ export type UserAccessContext = {
   viewerTipoIds: string[]
   actionableTipoIds: string[]
   isExperienceEvaluationCoordinator: boolean
+  isRhAuthorizedForExperienceEvaluation: boolean
   hasSolicitationsModuleAccess: boolean
 }
 
-type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
+type DepartmentLike = { id?: string | null; code?: string | null; sigla?: string | null; name?: string | null }
 
 type SolicitationLike = {
   tipoId?: string | null
@@ -56,7 +58,7 @@ export async function resolveUserAccessContext(input: {
     where: { userId: input.userId },
     select: {
       departmentId: true,
-      department: { select: { id: true, code: true, name: true } },
+      department: { select: { id: true, code: true, sigla: true, name: true } },
     },
   })
 
@@ -74,7 +76,8 @@ export async function resolveUserAccessContext(input: {
     }
   }
 
-  const userSetorKeys = resolveUserSetorKeysFromDepartments(Array.from(departmentRecords.values()))
+  const userDepartments = Array.from(departmentRecords.values())
+  const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
   const [finalizerRows, allowedTipoRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember, solicitationModuleAccess] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
@@ -109,6 +112,11 @@ export async function resolveUserAccessContext(input: {
     }),
   ])
 
+  const hasSolicitationsModuleAccess = input.role === 'ADMIN' || Boolean(solicitationModuleAccess)
+  const isRhAuthorizedForExperienceEvaluation =
+    hasSolicitationsModuleAccess &&
+    (input.role === 'RH' || userDepartments.some((department) => isRhDepartment(department)))
+
   return {
     userId: input.userId,
     userLogin: input.userLogin,
@@ -122,7 +130,8 @@ export async function resolveUserAccessContext(input: {
     viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
-    hasSolicitationsModuleAccess: input.role === 'ADMIN' || Boolean(solicitationModuleAccess),
+    isRhAuthorizedForExperienceEvaluation,
+    hasSolicitationsModuleAccess,
   }
 }
 
@@ -138,6 +147,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     finalizerTipoIds: ctx.finalizerTipoIds,
     allowedTipoIds: ctx.allowedTipoIds,
     isExperienceEvaluationCoordinator: ctx.isExperienceEvaluationCoordinator,
+    isRhAuthorizedForExperienceEvaluation: ctx.isRhAuthorizedForExperienceEvaluation,
   })
 }
 
@@ -173,7 +183,9 @@ function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitati
   return (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    (ctx.finalizerTipoIds.includes(solicitation.tipoId) || ctx.isExperienceEvaluationCoordinator)
+    (ctx.finalizerTipoIds.includes(solicitation.tipoId) ||
+      ctx.isExperienceEvaluationCoordinator ||
+      ctx.isRhAuthorizedForExperienceEvaluation)
   )
 }
 

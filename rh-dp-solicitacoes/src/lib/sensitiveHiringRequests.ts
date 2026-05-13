@@ -32,7 +32,9 @@ export function buildSensitiveHiringVisibilityWhere(input: {
   role?: Role | null
   departmentIds?: string[]
   allowedTipoIds?: string[]
+  finalizerTipoIds?: string[]
   isExperienceEvaluationCoordinator?: boolean
+  isRhAuthorizedForExperienceEvaluation?: boolean
 }) {
   const isAdmin = input.role === 'ADMIN'
   const isRh = input.role === 'RH'
@@ -49,6 +51,7 @@ export function buildSensitiveHiringVisibilityWhere(input: {
   }
 
   const allowedTipoIds = (input.allowedTipoIds ?? []).filter(Boolean)
+  const finalizerTipoIds = (input.finalizerTipoIds ?? []).filter(Boolean)
   if (allowedTipoIds.length > 0) {
     participantFilters.push({ tipoId: { in: allowedTipoIds } })
   }
@@ -66,6 +69,18 @@ export function buildSensitiveHiringVisibilityWhere(input: {
             in: ['AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
           },
         },
+      ],
+    })
+  }
+
+  if (
+    finalizerTipoIds.includes('RQ_RH_103') ||
+    input.isRhAuthorizedForExperienceEvaluation
+  ) {
+    participantFilters.push({
+      AND: [
+        { tipoId: 'RQ_RH_103' },
+        { status: 'AGUARDANDO_FINALIZACAO_AVALIACAO' },
       ],
     })
   }

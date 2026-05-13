@@ -95,8 +95,13 @@ export async function GET(req: NextRequest) {
       tipoId: where.tipoId ?? null,
       finalizerTipoIds: userAccess.finalizerTipoIds,
       allowedTipoIds: userAccess.allowedTipoIds,
+      userDepartmentIds: userAccess.userDepartmentIds,
+      userSetorKeys: userAccess.userSetorKeys,
+      hasSolicitationsModuleAccess: userAccess.hasSolicitationsModuleAccess,
       isExperienceEvaluationCoordinator:
         userAccess.isExperienceEvaluationCoordinator,
+      isRhAuthorizedForExperienceEvaluation:
+        userAccess.isRhAuthorizedForExperienceEvaluation,
       visibilityWhere: receivedVisibilityWhere,
     });
 
@@ -114,8 +119,11 @@ export async function GET(req: NextRequest) {
         role: me.role,
         departmentIds: userDepartmentIdsForSensitive,
         allowedTipoIds: userAccess.allowedTipoIds,
+        finalizerTipoIds: userAccess.finalizerTipoIds,
         isExperienceEvaluationCoordinator:
           userAccess.isExperienceEvaluationCoordinator,
+        isRhAuthorizedForExperienceEvaluation:
+          userAccess.isRhAuthorizedForExperienceEvaluation,
       }),
     ];
 
@@ -165,6 +173,34 @@ export async function GET(req: NextRequest) {
       ? filteredSolicitations.slice(skip, skip + pageSize)
       : filteredSolicitations;
 
+    const debugProtocols = [
+      "RQ2026-00189",
+      "RQ2026-00190",
+      "RQ2026-00345",
+      "RQ2026-00196",
+      "RQ2026-00197",
+    ];
+    const debugProtocolRows =
+      process.env.DEBUG_SOLICITACOES_RECEBIDAS === "true"
+        ? await prisma.solicitation.findMany({
+            where: { protocolo: { in: debugProtocols } },
+            select: {
+              protocolo: true,
+              status: true,
+              tipoId: true,
+              approverId: true,
+              assumidaPorId: true,
+              departmentId: true,
+            },
+          })
+        : [];
+    const returnedProtocols = new Set(
+      pagedSolicitations.map((item) => item.protocolo).filter(Boolean),
+    );
+    const existingDebugProtocols = new Set(
+      debugProtocolRows.map((item) => item.protocolo).filter(Boolean),
+    );
+
     debugReceivedSolicitations("query-result", {
       userId: me.id,
       total,
@@ -178,6 +214,19 @@ export async function GET(req: NextRequest) {
         assumidaPorId: item.assumidaPorId,
         departmentId: item.departmentId,
       })),
+      testProtocolDiagnostics: debugProtocols.map((protocolo) => {
+        const candidate = debugProtocolRows.find((item) => item.protocolo === protocolo);
+        return {
+          protocolo,
+          status: candidate?.status ?? null,
+          tipoId: candidate?.tipoId ?? null,
+          motivo: returnedProtocols.has(protocolo)
+            ? "incluido_no_resultado"
+            : existingDebugProtocols.has(protocolo)
+              ? "nao_retornado_por_where_filtros_ou_paginacao"
+              : "protocolo_nao_encontrado",
+        };
+      }),
     });
 
     const rows = pagedSolicitations.map((s) => {
