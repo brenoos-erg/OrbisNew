@@ -11,6 +11,7 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
+  EXPERIENCE_EVALUATION_VISIBLE_STATUSES,
 } from '@/lib/experienceEvaluation'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { isRhDepartment } from '@/lib/rhAccess'
@@ -146,6 +147,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     userSetorKeys: ctx.userSetorKeys,
     finalizerTipoIds: ctx.finalizerTipoIds,
     allowedTipoIds: ctx.allowedTipoIds,
+    viewerTipoIds: ctx.viewerTipoIds,
     isExperienceEvaluationCoordinator: ctx.isExperienceEvaluationCoordinator,
     isRhAuthorizedForExperienceEvaluation: ctx.isRhAuthorizedForExperienceEvaluation,
   })
@@ -162,7 +164,7 @@ export function canViewSolicitation(ctx: UserAccessContext, solicitation: Solici
 function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationLike) {
   if (ctx.role === 'ADMIN') return true
   if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
-  if (solicitation.status !== EXPERIENCE_EVALUATION_STATUS) return false
+  if (!EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as any)) return false
   if (ctx.isExperienceEvaluationCoordinator) return true
 
   return isExperienceEvaluationEvaluator(
@@ -194,7 +196,8 @@ export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicita
   if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (
     solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    solicitation.status !== 'CONCLUIDA'
+    solicitation.status !== 'CONCLUIDA' &&
+    solicitation.status !== 'FINALIZADA'
   ) {
     return false
   }
@@ -222,13 +225,7 @@ export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicita
     return true
   }
 
-  if (solicitation.solicitanteId === ctx.userId && canViewSolicitation(ctx, solicitation)) return true
-
-  return Boolean(
-    solicitation.tipoId &&
-      ctx.viewerTipoIds.includes(solicitation.tipoId) &&
-      canViewSolicitation(ctx, solicitation),
-  )
+  return canViewSolicitation(ctx, solicitation)
 }
 
 export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {

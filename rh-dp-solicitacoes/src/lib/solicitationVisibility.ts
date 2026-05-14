@@ -4,6 +4,7 @@ import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
+  EXPERIENCE_EVALUATION_VISIBLE_STATUSES,
 } from '@/lib/experienceEvaluation'
 
 type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
@@ -18,6 +19,7 @@ type SolicitationVisibilityInput = {
   userSetorKeys: string[]
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
+  viewerTipoIds?: string[]
   isExperienceEvaluationCoordinator: boolean
   isRhAuthorizedForExperienceEvaluation: boolean
 }
@@ -93,11 +95,12 @@ export function buildReceivedSolicitationVisibilityWhere(
     },
     {
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-      status: EXPERIENCE_EVALUATION_STATUS,
+      status: { in: [...EXPERIENCE_EVALUATION_VISIBLE_STATUSES] as any },
       OR: [
         { solicitanteId: input.userId },
         { approverId: input.userId },
-        ...(input.isExperienceEvaluationCoordinator ? [{ id: { not: '' } }] : []),
+        ...(input.isExperienceEvaluationCoordinator || input.isRhAuthorizedForExperienceEvaluation ? [{ id: { not: '' } }] : []),
+        ...(input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) || (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID) ? [{ id: { not: '' } }] : []),
         {
           AND: [
             { OR: [{ approverId: null }, { approverId: '' }] },
@@ -110,12 +113,14 @@ export function buildReceivedSolicitationVisibilityWhere(
 
   if (
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+    input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+    (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
     input.isExperienceEvaluationCoordinator ||
     input.isRhAuthorizedForExperienceEvaluation
   ) {
     orFilters.push({
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-      status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+      status: { in: [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA', 'FINALIZADA'] as any },
     })
   }
   return {
@@ -219,10 +224,12 @@ export function canUserViewSolicitationByDepartment(
   if (solicitation.assumidaPorId === input.userId) return true
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
-    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
+    [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA', 'FINALIZADA'].includes(String(solicitation.status)) &&
     (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
       input.isExperienceEvaluationCoordinator ||
-      input.isRhAuthorizedForExperienceEvaluation)
+      input.isRhAuthorizedForExperienceEvaluation ||
+      input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+      (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID))
   ) {
     return true
   }

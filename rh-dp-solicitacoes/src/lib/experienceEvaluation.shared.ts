@@ -15,6 +15,7 @@ export type NormalizedExperienceEvaluationPayload = {
   adaptacaoMudancaNota: string
   autogestaoGestaoPessoasNota: string
   comentarioFinal: string
+  avaliadoEm: string
 }
 
 const EXPERIENCE_EVALUATION_NORMALIZED_KEYS = [
@@ -32,6 +33,7 @@ const EXPERIENCE_EVALUATION_NORMALIZED_KEYS = [
   'adaptacaoMudancaNota',
   'autogestaoGestaoPessoasNota',
   'comentarioFinal',
+  'avaliadoEm',
 ] as const
 
 type ExperienceEvaluationNormalizedKey = (typeof EXPERIENCE_EVALUATION_NORMALIZED_KEYS)[number]
@@ -42,6 +44,25 @@ function readDisplayString(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return value.map(readDisplayString).filter(Boolean).join(', ')
   return ''
+}
+
+function parsePayloadRoot(payload: unknown): Dict {
+  if (typeof payload === 'string') {
+    try {
+      return asRecord(JSON.parse(payload))
+    } catch {
+      return {}
+    }
+  }
+  return asRecord(payload)
+}
+
+function isBlankDisplayValue(value: string) {
+  return value.trim().length === 0
+}
+
+function withFallback(value: string) {
+  return isBlankDisplayValue(value) ? '-' : value
 }
 
 function firstStringFromSources(sources: Dict[], keys: string[]) {
@@ -57,7 +78,7 @@ function firstStringFromSources(sources: Dict[], keys: string[]) {
 export function normalizeExperienceEvaluationPayload(
   payload: unknown,
 ): NormalizedExperienceEvaluationPayload {
-  const root = asRecord(payload)
+  const root = parsePayloadRoot(payload)
   const campos = asRecord(root.campos)
   const formData = asRecord(root.formData)
   const dadosFormulario = asRecord(root.dadosFormulario)
@@ -67,7 +88,9 @@ export function normalizeExperienceEvaluationPayload(
   const requestData = asRecord(root.requestData)
   const dynamicForm = asRecord(root.dynamicForm)
   const answers = asRecord(root.answers)
+  const respostas = asRecord(root.respostas)
   const fields = asRecord(root.fields)
+  const avaliacao = asRecord(root.avaliacao)
   const avaliacaoGestor = asRecord(root.avaliacaoGestor)
 
   const baseSources = [
@@ -78,12 +101,14 @@ export function normalizeExperienceEvaluationPayload(
     form,
     fields,
     answers,
+    respostas,
+    avaliacao,
     dynamicForm,
     requestData,
     metadata,
     root,
   ]
-  const evaluationSources = [avaliacaoGestor, ...baseSources]
+  const evaluationSources = [avaliacaoGestor, avaliacao, respostas, ...baseSources]
 
   const result = {} as NormalizedExperienceEvaluationPayload
   const directKeys: Record<ExperienceEvaluationNormalizedKey, string[]> = {
@@ -99,27 +124,28 @@ export function normalizeExperienceEvaluationPayload(
     cargoColaborador: ['cargoColaborador', 'cargo', 'positionName'],
     dataAdmissao: ['dataAdmissao', 'admissaoData', 'dataAdmissaoPrevista'],
     cargoAvaliador: ['cargoAvaliador', 'cargoGestor', 'cargoAvaliadorGestor'],
-    relacionamentoNota: ['relacionamentoNota'],
-    comunicacaoNota: ['comunicacaoNota'],
-    atitudeNota: ['atitudeNota'],
-    saudeSegurancaNota: ['saudeSegurancaNota'],
-    dominioTecnicoProcessosNota: ['dominioTecnicoProcessosNota'],
-    adaptacaoMudancaNota: ['adaptacaoMudancaNota'],
-    autogestaoGestaoPessoasNota: ['autogestaoGestaoPessoasNota'],
-    comentarioFinal: ['comentarioFinal', 'comentarios', 'observacoes'],
+    relacionamentoNota: ['relacionamentoNota', 'relacionamento', 'notaRelacionamento'],
+    comunicacaoNota: ['comunicacaoNota', 'comunicacao', 'notaComunicacao'],
+    atitudeNota: ['atitudeNota', 'atitude', 'notaAtitude'],
+    saudeSegurancaNota: ['saudeSegurancaNota', 'saudeSeguranca', 'notaSaudeSeguranca'],
+    dominioTecnicoProcessosNota: ['dominioTecnicoProcessosNota', 'dominioTecnicoProcessos', 'notaDominioTecnicoProcessos'],
+    adaptacaoMudancaNota: ['adaptacaoMudancaNota', 'adaptacaoMudanca', 'notaAdaptacaoMudanca'],
+    autogestaoGestaoPessoasNota: ['autogestaoGestaoPessoasNota', 'autogestaoGestaoPessoas', 'notaAutogestaoGestaoPessoas'],
+    comentarioFinal: ['comentarioFinal', 'comentarios', 'observacoes', 'parecerFinal'],
+    avaliadoEm: ['avaliadoEm', 'dataAvaliacao', 'avaliacaoEm', 'finalizadoEm', 'dataFinalizacao'],
   }
 
   for (const key of EXPERIENCE_EVALUATION_NORMALIZED_KEYS) {
     const sources = key.endsWith('Nota') || key === 'comentarioFinal' ? evaluationSources : baseSources
-    result[key] = firstStringFromSources(sources, directKeys[key])
+    result[key] = withFallback(firstStringFromSources(sources, directKeys[key]))
   }
 
-  if (!result.gestorImediatoAvaliador) {
-    result.gestorImediatoAvaliador = firstStringFromSources(baseSources, [
+  if (result.gestorImediatoAvaliador === '-') {
+    result.gestorImediatoAvaliador = withFallback(firstStringFromSources(baseSources, [
       'gestorImediatoAvaliadorId',
       'avaliadorId',
       'gestorId',
-    ])
+    ]))
   }
 
   return result
@@ -136,7 +162,7 @@ export function hasExperienceEvaluationPrintableData(payload: unknown) {
     normalized.adaptacaoMudancaNota,
     normalized.autogestaoGestaoPessoasNota,
     normalized.comentarioFinal,
-  ].some((value) => value.trim().length > 0)
+  ].some((value) => value.trim().length > 0 && value !== '-')
 }
 
 
