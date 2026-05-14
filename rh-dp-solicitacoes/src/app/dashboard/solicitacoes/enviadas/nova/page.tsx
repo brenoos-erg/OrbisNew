@@ -30,6 +30,10 @@ import {
   useSolicitacoesToast,
 } from '@/components/solicitacoes/SolicitacoesToast';
 import { fetchOfficialCostCenters } from '@/lib/costCentersDataSource';
+import {
+  getDepartmentDisplayLabel,
+  getDepartmentsWithAvailableSolicitationTypes,
+} from '@/lib/availableDepartments';
 /* ================================================================
    TYPES
 ================================================================ */
@@ -97,7 +101,21 @@ type TipoSolicitacao = {
     templateDownload?: string;
     requiresAttachment?: boolean;
     destinos?: Array<{ value: string; label: string }>;
+    departamentos?: string[];
+    departmentIds?: string[];
+    departmentId?: string;
+    hiddenFromCreate?: boolean;
+    internalOnly?: boolean;
+    hiddenFromManualOpening?: boolean;
   };
+  schemaJson?: {
+    meta?: TipoSolicitacao['meta'];
+  };
+  active?: boolean;
+  enabled?: boolean;
+  departments?: Array<string | { id: string }>;
+  departmentIds?: string[];
+  departmentId?: string;
   camposEspecificos?: CampoEspecifico[];
 };
 
@@ -274,6 +292,9 @@ export default function NovaSolicitacaoPage() {
 
 // ---------- CAMPOS DO CABEÇALHO ----------
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [departamentosLoading, setDepartamentosLoading] = useState(true);
+  const [tiposCatalogo, setTiposCatalogo] = useState<TipoSolicitacao[]>([]);
+  const [tiposCatalogoLoading, setTiposCatalogoLoading] = useState(true);
   const [tipos, setTipos] = useState<TipoSolicitacao[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenterOption[]>([]);
   const [coordinators, setCoordinators] = useState<CoordinatorOption[]>([]);
@@ -338,6 +359,7 @@ export default function NovaSolicitacaoPage() {
   useEffect(() => {
     async function loadDepartments() {
       try {
+        setDepartamentosLoading(true);
         const res = await fetch('/api/departments');
         if (!res.ok) throw new Error('Erro ao buscar departamentos');
 
@@ -346,11 +368,40 @@ export default function NovaSolicitacaoPage() {
       } catch (err) {
         console.error(err);
         setDepartamentos([]);
+      } finally {
+        setDepartamentosLoading(false);
       }
     }
 
      loadDepartments();
   }, []);
+
+
+  useEffect(() => {
+    async function loadTiposCatalogo() {
+      try {
+        setTiposCatalogoLoading(true);
+        const res = await fetch('/api/tipos-solicitacao', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Erro ao buscar catálogo de tipos de solicitação');
+
+        const data = (await res.json()) as TipoSolicitacao[];
+        setTiposCatalogo(data);
+      } catch (err) {
+        console.error(err);
+        setTiposCatalogo([]);
+      } finally {
+        setTiposCatalogoLoading(false);
+      }
+    }
+
+    loadTiposCatalogo();
+  }, []);
+
+  const departamentosVisiveis = useMemo(
+    () => getDepartmentsWithAvailableSolicitationTypes(departamentos, tiposCatalogo),
+    [departamentos, tiposCatalogo],
+  );
+  const departamentosDisponiveisLoading = departamentosLoading || tiposCatalogoLoading;
 
   useEffect(() => {
     if (prefillFromNc.departamentoId) {
@@ -378,8 +429,8 @@ export default function NovaSolicitacaoPage() {
 
   useEffect(() => {
     async function resolveTipoByCodigo() {
-      if (!prefillFromNc.tipoCodigo || prefillFromNc.departamentoId || !departamentos.length || tipoId) return;
-      for (const dep of departamentos) {
+      if (!prefillFromNc.tipoCodigo || prefillFromNc.departamentoId || !departamentosVisiveis.length || tipoId) return;
+      for (const dep of departamentosVisiveis) {
         const res = await fetch(`/api/tipos-solicitacao?departamentoId=${dep.id}`);
         if (!res.ok) continue;
         const data = (await res.json()) as TipoSolicitacao[];
@@ -391,7 +442,7 @@ export default function NovaSolicitacaoPage() {
       }
     }
     resolveTipoByCodigo();
-  }, [departamentos, prefillFromNc.departamentoId, prefillFromNc.tipoCodigo, tipoId]);
+  }, [departamentosVisiveis, prefillFromNc.departamentoId, prefillFromNc.tipoCodigo, tipoId]);
 
   useEffect(() => {
     if (!departamentoId) {
@@ -440,7 +491,10 @@ export default function NovaSolicitacaoPage() {
   }, [tipoId]);
 
   const selectedDepartamento =
-    departamentos.find((d) => d.id === departamentoId)?.label ?? '';
+    departamentos.find((d) => d.id === departamentoId) ?? null;
+  const selectedDepartamentoLabel = selectedDepartamento
+    ? getDepartmentDisplayLabel(selectedDepartamento)
+    : '';
   const getTipoOptionLabel = (tipo: TipoSolicitacao) => {
     const parts = [tipo.codigo, getTipoDisplayName(tipo.nome)].filter(Boolean);
 
@@ -1420,9 +1474,10 @@ useEffect(() => {
                       setTipoId('');
                     }}
                     required
+                    disabled={departamentosDisponiveisLoading || departamentosVisiveis.length === 0}
                   >
                    <Select.Trigger
-                      title={selectedDepartamento}
+                      title={selectedDepartamentoLabel}
                       className="inline-flex w-full items-center justify-between gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-left text-sm shadow-lg transition focus:outline-none focus:ring-2 focus:ring-orange-500/70 disabled:cursor-not-allowed disabled:bg-slate-100"
                     >
                       <span className="min-w-0 flex-1 whitespace-nowrap overflow-hidden text-ellipsis text-[var(--foreground)]">
@@ -1448,7 +1503,7 @@ useEffect(() => {
                         </Select.ScrollUpButton>
                         <div className="relative">
                           <Select.Viewport className="max-h-56 w-full overflow-y-auto p-1 pr-4 text-sm">
-                            {departamentos.map((d) => (
+                            {departamentosVisiveis.map((d) => (
                               <Select.Item
                                 key={d.id}
                                 value={d.id}
@@ -1456,7 +1511,7 @@ useEffect(() => {
                               >
                                 <Select.ItemText>
                                   <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {d.label}
+                                    {getDepartmentDisplayLabel(d)}
                                   </span>
                                 </Select.ItemText>
                                 <Select.ItemIndicator className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-700">
@@ -1476,6 +1531,11 @@ useEffect(() => {
                       </Select.Content>
                     </Select.Portal>
                   </Select.Root>
+                  {!departamentosDisponiveisLoading && departamentosVisiveis.length === 0 && (
+                    <p className="mt-2 text-xs font-medium text-amber-700">
+                      Nenhum departamento com solicitação disponível.
+                    </p>
+                  )}
                   <input
                     type="text"
                     tabIndex={-1}
