@@ -1,69 +1,76 @@
-import { Prisma, Role } from '@prisma/client'
-import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
+import { Prisma, Role } from "@prisma/client";
+import { resolveNadaConstaSetoresByDepartment } from "@/lib/solicitationTypes";
 import {
   EXPERIENCE_EVALUATION_STATUS,
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
   EXPERIENCE_EVALUATION_VISIBLE_STATUSES,
-} from '@/lib/experienceEvaluation'
+} from "@/lib/experienceEvaluation";
+import { onlyValidSolicitationStatuses } from "@/lib/solicitationStatuses";
 
-type DepartmentLike = { id?: string | null; code?: string | null; name?: string | null }
+type DepartmentLike = {
+  id?: string | null;
+  code?: string | null;
+  name?: string | null;
+};
 
 type SolicitationVisibilityInput = {
-  userId: string
-  userLogin?: string | null
-  userEmail?: string | null
-  userFullName?: string | null
-  role: Role
-  userDepartmentIds: string[]
-  userSetorKeys: string[]
-  finalizerTipoIds: string[]
-  allowedTipoIds: string[]
-  viewerTipoIds?: string[]
-  isExperienceEvaluationCoordinator: boolean
-  isRhAuthorizedForExperienceEvaluation: boolean
-}
+  userId: string;
+  userLogin?: string | null;
+  userEmail?: string | null;
+  userFullName?: string | null;
+  role: Role;
+  userDepartmentIds: string[];
+  userSetorKeys: string[];
+  finalizerTipoIds: string[];
+  allowedTipoIds: string[];
+  viewerTipoIds?: string[];
+  isExperienceEvaluationCoordinator: boolean;
+  isRhAuthorizedForExperienceEvaluation: boolean;
+};
 
 type SolicitationLike = {
-  tipoId?: string | null
-  status?: string | null
-  solicitanteId: string
-  approverId?: string | null
-  assumidaPorId?: string | null
-  departmentId?: string | null
-  solicitacaoSetores?: { setor?: string | null }[]
-}
+  tipoId?: string | null;
+  status?: string | null;
+  solicitanteId: string;
+  approverId?: string | null;
+  assumidaPorId?: string | null;
+  departmentId?: string | null;
+  solicitacaoSetores?: { setor?: string | null }[];
+};
 
-export function resolveUserSetorKeysFromDepartments(departments: DepartmentLike[]) {
-  const setorKeys = new Set<string>()
+export function resolveUserSetorKeysFromDepartments(
+  departments: DepartmentLike[],
+) {
+  const setorKeys = new Set<string>();
 
   for (const department of departments) {
     for (const setor of resolveNadaConstaSetoresByDepartment(department)) {
-      setorKeys.add(setor)
+      setorKeys.add(setor);
     }
   }
 
-  return [...setorKeys]
+  return [...setorKeys];
 }
 
 export function buildReceivedSolicitationVisibilityWhere(
   input: SolicitationVisibilityInput,
 ): Prisma.SolicitationWhereInput {
-  if (input.role === 'ADMIN') {
-    return {}
+  if (input.role === "ADMIN") {
+    return {};
   }
 
   const regularSolicitationOrFilters: Prisma.SolicitationWhereInput[] = [
     { assumidaPorId: input.userId },
     { solicitanteId: input.userId },
-  ]
+  ];
 
   if (input.userDepartmentIds.length > 0) {
     regularSolicitationOrFilters.push({
       departmentId: {
         in: input.userDepartmentIds,
       },
-    })
+    });
   }
 
   if (input.userSetorKeys.length > 0) {
@@ -75,7 +82,7 @@ export function buildReceivedSolicitationVisibilityWhere(
           },
         },
       },
-    })
+    });
   }
 
   if (input.allowedTipoIds.length > 0) {
@@ -83,10 +90,17 @@ export function buildReceivedSolicitationVisibilityWhere(
       tipoId: {
         in: input.allowedTipoIds,
       },
-    })
+    });
   }
 
-  const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input)
+  const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input);
+  const experienceEvaluationVisibleStatuses =
+    EXPERIENCE_EVALUATION_VISIBLE_STATUSES;
+  const experienceEvaluationFinalizedStatuses = onlyValidSolicitationStatuses([
+    EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+    "CONCLUIDA",
+    "FINALIZADA",
+  ]);
 
   const orFilters: Prisma.SolicitationWhereInput[] = [
     {
@@ -95,21 +109,31 @@ export function buildReceivedSolicitationVisibilityWhere(
     },
     {
       tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-      status: { in: [...EXPERIENCE_EVALUATION_VISIBLE_STATUSES] as any },
+      ...(experienceEvaluationVisibleStatuses.length > 0
+        ? { status: { in: experienceEvaluationVisibleStatuses } }
+        : {}),
       OR: [
         { solicitanteId: input.userId },
         { approverId: input.userId },
-        ...(input.isExperienceEvaluationCoordinator || input.isRhAuthorizedForExperienceEvaluation ? [{ id: { not: '' } }] : []),
-        ...(input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) || (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID) ? [{ id: { not: '' } }] : []),
+        ...(input.isExperienceEvaluationCoordinator ||
+        input.isRhAuthorizedForExperienceEvaluation
+          ? [{ id: { not: "" } }]
+          : []),
+        ...(input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+        (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID)
+          ? [{ id: { not: "" } }]
+          : []),
         {
           AND: [
-            { OR: [{ approverId: null }, { approverId: '' }] },
-            ...(evaluatorPayloadFilters.length > 0 ? [{ OR: evaluatorPayloadFilters }] : []),
+            { OR: [{ approverId: null }, { approverId: "" }] },
+            ...(evaluatorPayloadFilters.length > 0
+              ? [{ OR: evaluatorPayloadFilters }]
+              : []),
           ],
         },
       ],
     },
-  ]
+  ];
 
   if (
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
@@ -118,152 +142,168 @@ export function buildReceivedSolicitationVisibilityWhere(
     input.isExperienceEvaluationCoordinator ||
     input.isRhAuthorizedForExperienceEvaluation
   ) {
-    orFilters.push({
-      tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-      status: { in: [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA', 'FINALIZADA'] as any },
-    })
+    if (experienceEvaluationFinalizedStatuses.length > 0) {
+      orFilters.push({
+        tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+        status: { in: experienceEvaluationFinalizedStatuses },
+      });
+    }
   }
   return {
     OR: orFilters,
-  }
+  };
 }
 
 function buildExperienceEvaluatorPayloadFilters(
-  input: Pick<SolicitationVisibilityInput, 'userId' | 'userLogin' | 'userEmail' | 'userFullName'>,
+  input: Pick<
+    SolicitationVisibilityInput,
+    "userId" | "userLogin" | "userEmail" | "userFullName"
+  >,
 ) {
-
-  const userLogin = input.userLogin?.trim()
-  const userEmail = input.userEmail?.trim()
-  const userFullName = input.userFullName?.trim()
+  const userLogin = input.userLogin?.trim();
+  const userEmail = input.userEmail?.trim();
+  const userFullName = input.userFullName?.trim();
 
   const idPaths = [
-    '$.campos.gestorImediatoAvaliadorId',
-    '$.metadata.gestorImediatoAvaliadorId',
-    '$.requestData.gestorImediatoAvaliadorId',
-    '$.dynamicForm.gestorImediatoAvaliadorId',
-    '$.campos.avaliadorId',
-    '$.metadata.avaliadorId',
-    '$.requestData.avaliadorId',
-    '$.dynamicForm.avaliadorId',
-    '$.campos.gestorId',
-    '$.metadata.gestorId',
-    '$.requestData.gestorId',
-    '$.dynamicForm.gestorId',
-  ]
+    "$.campos.gestorImediatoAvaliadorId",
+    "$.metadata.gestorImediatoAvaliadorId",
+    "$.requestData.gestorImediatoAvaliadorId",
+    "$.dynamicForm.gestorImediatoAvaliadorId",
+    "$.campos.avaliadorId",
+    "$.metadata.avaliadorId",
+    "$.requestData.avaliadorId",
+    "$.dynamicForm.avaliadorId",
+    "$.campos.gestorId",
+    "$.metadata.gestorId",
+    "$.requestData.gestorId",
+    "$.dynamicForm.gestorId",
+  ];
 
   const filters: Prisma.SolicitationWhereInput[] = idPaths.map((path) => ({
     payload: { path, equals: input.userId },
-  }))
+  }));
 
   if (userLogin) {
     for (const path of [
-      '$.campos.gestorImediatoAvaliadorLogin',
-      '$.metadata.gestorImediatoAvaliadorLogin',
-      '$.requestData.gestorImediatoAvaliadorLogin',
-      '$.dynamicForm.gestorImediatoAvaliadorLogin',
-      '$.campos.avaliadorLogin',
-      '$.metadata.avaliadorLogin',
-      '$.requestData.avaliadorLogin',
-      '$.dynamicForm.avaliadorLogin',
-      '$.campos.gestorLogin',
-      '$.metadata.gestorLogin',
-      '$.requestData.gestorLogin',
-      '$.dynamicForm.gestorLogin',
+      "$.campos.gestorImediatoAvaliadorLogin",
+      "$.metadata.gestorImediatoAvaliadorLogin",
+      "$.requestData.gestorImediatoAvaliadorLogin",
+      "$.dynamicForm.gestorImediatoAvaliadorLogin",
+      "$.campos.avaliadorLogin",
+      "$.metadata.avaliadorLogin",
+      "$.requestData.avaliadorLogin",
+      "$.dynamicForm.avaliadorLogin",
+      "$.campos.gestorLogin",
+      "$.metadata.gestorLogin",
+      "$.requestData.gestorLogin",
+      "$.dynamicForm.gestorLogin",
     ]) {
-      filters.push({ payload: { path, equals: userLogin } })
+      filters.push({ payload: { path, equals: userLogin } });
     }
   }
 
   if (userEmail) {
     for (const path of [
-      '$.campos.gestorImediatoAvaliadorEmail',
-      '$.metadata.gestorImediatoAvaliadorEmail',
-      '$.requestData.gestorImediatoAvaliadorEmail',
-      '$.dynamicForm.gestorImediatoAvaliadorEmail',
-      '$.campos.avaliadorEmail',
-      '$.metadata.avaliadorEmail',
-      '$.requestData.avaliadorEmail',
-      '$.dynamicForm.avaliadorEmail',
-      '$.campos.gestorEmail',
-      '$.metadata.gestorEmail',
-      '$.requestData.gestorEmail',
-      '$.dynamicForm.gestorEmail',
+      "$.campos.gestorImediatoAvaliadorEmail",
+      "$.metadata.gestorImediatoAvaliadorEmail",
+      "$.requestData.gestorImediatoAvaliadorEmail",
+      "$.dynamicForm.gestorImediatoAvaliadorEmail",
+      "$.campos.avaliadorEmail",
+      "$.metadata.avaliadorEmail",
+      "$.requestData.avaliadorEmail",
+      "$.dynamicForm.avaliadorEmail",
+      "$.campos.gestorEmail",
+      "$.metadata.gestorEmail",
+      "$.requestData.gestorEmail",
+      "$.dynamicForm.gestorEmail",
     ]) {
-      filters.push({ payload: { path, equals: userEmail } })
+      filters.push({ payload: { path, equals: userEmail } });
     }
   }
 
   if (userFullName) {
     for (const path of [
-      '$.campos.gestorImediatoAvaliador',
-      '$.metadata.gestorImediatoAvaliador',
-      '$.requestData.gestorImediatoAvaliador',
-      '$.dynamicForm.gestorImediatoAvaliador',
-      '$.campos.avaliador',
-      '$.metadata.avaliador',
-      '$.requestData.avaliador',
-      '$.dynamicForm.avaliador',
-      '$.campos.gestor',
-      '$.metadata.gestor',
-      '$.requestData.gestor',
-      '$.dynamicForm.gestor',
+      "$.campos.gestorImediatoAvaliador",
+      "$.metadata.gestorImediatoAvaliador",
+      "$.requestData.gestorImediatoAvaliador",
+      "$.dynamicForm.gestorImediatoAvaliador",
+      "$.campos.avaliador",
+      "$.metadata.avaliador",
+      "$.requestData.avaliador",
+      "$.dynamicForm.avaliador",
+      "$.campos.gestor",
+      "$.metadata.gestor",
+      "$.requestData.gestor",
+      "$.dynamicForm.gestor",
     ]) {
-      filters.push({ payload: { path, equals: userFullName } })
+      filters.push({ payload: { path, equals: userFullName } });
     }
   }
 
-  return filters
+  return filters;
 }
 
 export function canUserViewSolicitationByDepartment(
   input: SolicitationVisibilityInput,
   solicitation: SolicitationLike,
 ) {
-  if (input.role === 'ADMIN') return true
-  if (solicitation.solicitanteId === input.userId) return true
-  if (solicitation.assumidaPorId === input.userId) return true
+  if (input.role === "ADMIN") return true;
+  if (solicitation.solicitanteId === input.userId) return true;
+  if (solicitation.assumidaPorId === input.userId) return true;
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
-    [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA', 'FINALIZADA'].includes(String(solicitation.status)) &&
+    onlyValidSolicitationStatuses([
+      EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+      "CONCLUIDA",
+      "FINALIZADA",
+    ]).includes(solicitation.status as never) &&
     (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
       input.isExperienceEvaluationCoordinator ||
       input.isRhAuthorizedForExperienceEvaluation ||
       input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
       (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID))
   ) {
-    return true
+    return true;
   }
   if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) {
-    return false
+    return false;
   }
 
-  if (isUserInResponsibleDepartment(input.userDepartmentIds, solicitation.departmentId)) {
-    return true
+  if (
+    isUserInResponsibleDepartment(
+      input.userDepartmentIds,
+      solicitation.departmentId,
+    )
+  ) {
+    return true;
   }
 
   const solicitationSetores = new Set(
     (solicitation.solicitacaoSetores ?? [])
       .map((setor) => setor.setor)
       .filter((setor): setor is string => Boolean(setor)),
-  )
+  );
 
   if (solicitationSetores.size > 0) {
     for (const userSetor of input.userSetorKeys) {
-      if (solicitationSetores.has(userSetor)) return true
+      if (solicitationSetores.has(userSetor)) return true;
     }
   }
 
-  if (solicitation.tipoId && input.allowedTipoIds.includes(solicitation.tipoId)) {
-    return true
+  if (
+    solicitation.tipoId &&
+    input.allowedTipoIds.includes(solicitation.tipoId)
+  ) {
+    return true;
   }
 
-  return false
+  return false;
 }
 
 export function isUserInResponsibleDepartment(
   userDepartmentIds: string[],
   solicitationDepartmentId?: string | null,
 ) {
-  if (!solicitationDepartmentId) return false
-  return userDepartmentIds.includes(solicitationDepartmentId)
+  if (!solicitationDepartmentId) return false;
+  return userDepartmentIds.includes(solicitationDepartmentId);
 }

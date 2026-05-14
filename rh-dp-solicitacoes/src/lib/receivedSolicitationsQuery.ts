@@ -5,6 +5,10 @@ import {
   normalizeFilterText,
 } from "./solicitationFilters";
 import { resolvePrimaryResponsibleForList } from "./solicitationResponsibility";
+import {
+  isValidSolicitationStatus,
+  onlyValidSolicitationStatuses,
+} from "./solicitationStatuses";
 
 export type ReceivedAdvancedTextFilters = {
   protocolo: string;
@@ -295,8 +299,8 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
     if (closedRange) where.dataFechamento = closedRange;
   }
 
-  if (status) {
-    where.status = status as any;
+  if (isValidSolicitationStatus(status)) {
+    where.status = status;
   } else if (situacao) {
     const statusBySituacao: Record<string, string[]> = {
       PENDENTE: ["ABERTA", "AGUARDANDO_APROVACAO", "AGUARDANDO_TERMO"],
@@ -309,7 +313,10 @@ export function buildWhereFromSearchParams(searchParams: URLSearchParams) {
       REJEITADO: ["CANCELADA"],
     };
     if (statusBySituacao[situacao]) {
-      where.status = { in: statusBySituacao[situacao] as any };
+      const validStatuses = onlyValidSolicitationStatuses(
+        statusBySituacao[situacao],
+      );
+      if (validStatuses.length > 0) where.status = { in: validStatuses };
     }
   }
 

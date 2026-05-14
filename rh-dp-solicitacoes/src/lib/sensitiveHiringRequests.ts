@@ -1,118 +1,149 @@
-import { Prisma, Role } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
-import { isSolicitacaoAdmissao, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
+import { Prisma, Role } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import {
+  isSolicitacaoAdmissao,
+  isSolicitacaoPessoal,
+} from "@/lib/solicitationTypes";
+import { onlyValidSolicitationStatuses } from "@/lib/solicitationStatuses";
 
 type TipoLike = {
-  id?: string | null
-  codigo?: string | null
-  nome?: string | null
-}
+  id?: string | null;
+  codigo?: string | null;
+  nome?: string | null;
+};
 
 export function isSensitiveHiringRequest(tipo?: TipoLike | null) {
-  if (!tipo) return false
-  return isSolicitacaoPessoal(tipo) || isSolicitacaoAdmissao(tipo)
+  if (!tipo) return false;
+  return isSolicitacaoPessoal(tipo) || isSolicitacaoAdmissao(tipo);
 }
 
 export function buildSensitiveHiringTipoWhere(): Prisma.TipoSolicitacaoWhereInput {
   return {
     OR: [
-      { id: { in: ['RQ_063', 'SOLICITACAO_ADMISSAO'] } },
-      { codigo: { in: ['RQ.RH.063', 'RQ.063', 'RQ.RH.001', 'RQ.RH.103'] } },
-      { nome: { contains: 'Solicitação de pessoal' } },
-      { nome: { contains: 'Solicitação de admissão' } },
+      { id: { in: ["RQ_063", "SOLICITACAO_ADMISSAO"] } },
+      { codigo: { in: ["RQ.RH.063", "RQ.063", "RQ.RH.001", "RQ.RH.103"] } },
+      { nome: { contains: "Solicitação de pessoal" } },
+      { nome: { contains: "Solicitação de admissão" } },
     ],
-  }
+  };
 }
 
 export function buildSensitiveHiringVisibilityWhere(input: {
-  userId: string
-  userLogin?: string | null
-  userEmail?: string | null
-  userFullName?: string | null
-  role?: Role | null
-  departmentIds?: string[]
-  allowedTipoIds?: string[]
-  finalizerTipoIds?: string[]
-  isExperienceEvaluationCoordinator?: boolean
-  isRhAuthorizedForExperienceEvaluation?: boolean
+  userId: string;
+  userLogin?: string | null;
+  userEmail?: string | null;
+  userFullName?: string | null;
+  role?: Role | null;
+  departmentIds?: string[];
+  allowedTipoIds?: string[];
+  finalizerTipoIds?: string[];
+  isExperienceEvaluationCoordinator?: boolean;
+  isRhAuthorizedForExperienceEvaluation?: boolean;
 }) {
-  const isAdmin = input.role === 'ADMIN'
-  const isRh = input.role === 'RH'
-  const relatedDepartments = (input.departmentIds ?? []).filter(Boolean)
+  const isAdmin = input.role === "ADMIN";
+  const isRh = input.role === "RH";
+  const relatedDepartments = (input.departmentIds ?? []).filter(Boolean);
 
   const participantFilters: Prisma.SolicitationWhereInput[] = [
     { solicitanteId: input.userId },
     { assumidaPorId: input.userId },
     { approverId: input.userId },
-  ]
+  ];
 
   if (relatedDepartments.length > 0) {
-    participantFilters.push({ departmentId: { in: relatedDepartments } })
+    participantFilters.push({ departmentId: { in: relatedDepartments } });
   }
 
-  const allowedTipoIds = (input.allowedTipoIds ?? []).filter(Boolean)
-  const finalizerTipoIds = (input.finalizerTipoIds ?? []).filter(Boolean)
+  const allowedTipoIds = (input.allowedTipoIds ?? []).filter(Boolean);
+  const finalizerTipoIds = (input.finalizerTipoIds ?? []).filter(Boolean);
   if (allowedTipoIds.length > 0) {
-    participantFilters.push({ tipoId: { in: allowedTipoIds } })
+    participantFilters.push({ tipoId: { in: allowedTipoIds } });
   }
 
   if (isAdmin || isRh) {
-    participantFilters.push({ id: { not: '' } })
+    participantFilters.push({ id: { not: "" } });
   }
 
   if (input.isExperienceEvaluationCoordinator) {
-    participantFilters.push({
-      AND: [
-        { tipoId: 'RQ_RH_103' },
-        {
-          status: {
-            in: ['AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO', 'CONCLUIDA', 'FINALIZADA'] as any,
+    const experienceEvaluationVisibleStatuses = onlyValidSolicitationStatuses([
+      "AGUARDANDO_AVALIACAO_GESTOR",
+      "AGUARDANDO_FINALIZACAO_AVALIACAO",
+      "CONCLUIDA",
+      "FINALIZADA",
+    ]);
+
+    if (experienceEvaluationVisibleStatuses.length > 0) {
+      participantFilters.push({
+        AND: [
+          { tipoId: "RQ_RH_103" },
+          {
+            status: { in: experienceEvaluationVisibleStatuses },
           },
-        },
-      ],
-    })
+        ],
+      });
+    }
   }
 
   if (
-    finalizerTipoIds.includes('RQ_RH_103') ||
+    finalizerTipoIds.includes("RQ_RH_103") ||
     input.isRhAuthorizedForExperienceEvaluation
   ) {
-    participantFilters.push({
-      AND: [
-        { tipoId: 'RQ_RH_103' },
-        { status: { in: ['AGUARDANDO_FINALIZACAO_AVALIACAO', 'CONCLUIDA', 'FINALIZADA'] as any } },
-      ],
-    })
+    const experienceEvaluationFinalizedStatuses = onlyValidSolicitationStatuses(
+      ["AGUARDANDO_FINALIZACAO_AVALIACAO", "CONCLUIDA", "FINALIZADA"],
+    );
+
+    if (experienceEvaluationFinalizedStatuses.length > 0) {
+      participantFilters.push({
+        AND: [
+          { tipoId: "RQ_RH_103" },
+          {
+            status: { in: experienceEvaluationFinalizedStatuses },
+          },
+        ],
+      });
+    }
   }
 
-  const normalizedLogin = normalizeParticipantValue(input.userLogin)
-  const normalizedEmail = normalizeParticipantValue(input.userEmail)
-  const normalizedFullName = normalizeParticipantValue(input.userFullName)
+  const normalizedLogin = normalizeParticipantValue(input.userLogin);
+  const normalizedEmail = normalizeParticipantValue(input.userEmail);
+  const normalizedFullName = normalizeParticipantValue(input.userFullName);
 
   for (const path of EXPERIENCE_EVALUATOR_ID_PATHS) {
     participantFilters.push({
-      AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: input.userId } }],
-    })
+      AND: [
+        { tipoId: "RQ_RH_103" },
+        { payload: { path, equals: input.userId } },
+      ],
+    });
   }
   if (normalizedLogin) {
     for (const path of EXPERIENCE_EVALUATOR_LOGIN_PATHS) {
       participantFilters.push({
-        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedLogin } }],
-      })
+        AND: [
+          { tipoId: "RQ_RH_103" },
+          { payload: { path, equals: normalizedLogin } },
+        ],
+      });
     }
   }
   if (normalizedEmail) {
     for (const path of EXPERIENCE_EVALUATOR_EMAIL_PATHS) {
       participantFilters.push({
-        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedEmail } }],
-      })
+        AND: [
+          { tipoId: "RQ_RH_103" },
+          { payload: { path, equals: normalizedEmail } },
+        ],
+      });
     }
   }
   if (normalizedFullName) {
     for (const path of EXPERIENCE_EVALUATOR_NAME_PATHS) {
       participantFilters.push({
-        AND: [{ tipoId: 'RQ_RH_103' }, { payload: { path, equals: normalizedFullName } }],
-      })
+        AND: [
+          { tipoId: "RQ_RH_103" },
+          { payload: { path, equals: normalizedFullName } },
+        ],
+      });
     }
   }
 
@@ -126,124 +157,144 @@ export function buildSensitiveHiringVisibilityWhere(input: {
         ],
       },
     ],
-  } satisfies Prisma.SolicitationWhereInput
+  } satisfies Prisma.SolicitationWhereInput;
 }
 
 const EXPERIENCE_EVALUATOR_ID_PATHS = [
-  '$.campos.gestorImediatoAvaliadorId',
-  '$.metadata.gestorImediatoAvaliadorId',
-  '$.requestData.gestorImediatoAvaliadorId',
-  '$.dynamicForm.gestorImediatoAvaliadorId',
-  '$.campos.avaliadorId',
-  '$.metadata.avaliadorId',
-  '$.requestData.avaliadorId',
-  '$.dynamicForm.avaliadorId',
-  '$.campos.gestorId',
-  '$.metadata.gestorId',
-  '$.requestData.gestorId',
-  '$.dynamicForm.gestorId',
-] as const
+  "$.campos.gestorImediatoAvaliadorId",
+  "$.metadata.gestorImediatoAvaliadorId",
+  "$.requestData.gestorImediatoAvaliadorId",
+  "$.dynamicForm.gestorImediatoAvaliadorId",
+  "$.campos.avaliadorId",
+  "$.metadata.avaliadorId",
+  "$.requestData.avaliadorId",
+  "$.dynamicForm.avaliadorId",
+  "$.campos.gestorId",
+  "$.metadata.gestorId",
+  "$.requestData.gestorId",
+  "$.dynamicForm.gestorId",
+] as const;
 
 const EXPERIENCE_EVALUATOR_LOGIN_PATHS = [
-  '$.campos.gestorImediatoAvaliadorLogin',
-  '$.metadata.gestorImediatoAvaliadorLogin',
-  '$.requestData.gestorImediatoAvaliadorLogin',
-  '$.dynamicForm.gestorImediatoAvaliadorLogin',
-  '$.campos.avaliadorLogin',
-  '$.metadata.avaliadorLogin',
-  '$.requestData.avaliadorLogin',
-  '$.dynamicForm.avaliadorLogin',
-  '$.campos.gestorLogin',
-  '$.metadata.gestorLogin',
-  '$.requestData.gestorLogin',
-  '$.dynamicForm.gestorLogin',
-] as const
+  "$.campos.gestorImediatoAvaliadorLogin",
+  "$.metadata.gestorImediatoAvaliadorLogin",
+  "$.requestData.gestorImediatoAvaliadorLogin",
+  "$.dynamicForm.gestorImediatoAvaliadorLogin",
+  "$.campos.avaliadorLogin",
+  "$.metadata.avaliadorLogin",
+  "$.requestData.avaliadorLogin",
+  "$.dynamicForm.avaliadorLogin",
+  "$.campos.gestorLogin",
+  "$.metadata.gestorLogin",
+  "$.requestData.gestorLogin",
+  "$.dynamicForm.gestorLogin",
+] as const;
 
 const EXPERIENCE_EVALUATOR_EMAIL_PATHS = [
-  '$.campos.gestorImediatoAvaliadorEmail',
-  '$.metadata.gestorImediatoAvaliadorEmail',
-  '$.requestData.gestorImediatoAvaliadorEmail',
-  '$.dynamicForm.gestorImediatoAvaliadorEmail',
-  '$.campos.avaliadorEmail',
-  '$.metadata.avaliadorEmail',
-  '$.requestData.avaliadorEmail',
-  '$.dynamicForm.avaliadorEmail',
-  '$.campos.gestorEmail',
-  '$.metadata.gestorEmail',
-  '$.requestData.gestorEmail',
-  '$.dynamicForm.gestorEmail',
-] as const
+  "$.campos.gestorImediatoAvaliadorEmail",
+  "$.metadata.gestorImediatoAvaliadorEmail",
+  "$.requestData.gestorImediatoAvaliadorEmail",
+  "$.dynamicForm.gestorImediatoAvaliadorEmail",
+  "$.campos.avaliadorEmail",
+  "$.metadata.avaliadorEmail",
+  "$.requestData.avaliadorEmail",
+  "$.dynamicForm.avaliadorEmail",
+  "$.campos.gestorEmail",
+  "$.metadata.gestorEmail",
+  "$.requestData.gestorEmail",
+  "$.dynamicForm.gestorEmail",
+] as const;
 
 const EXPERIENCE_EVALUATOR_NAME_PATHS = [
-  '$.campos.gestorImediatoAvaliador',
-  '$.metadata.gestorImediatoAvaliador',
-  '$.requestData.gestorImediatoAvaliador',
-  '$.dynamicForm.gestorImediatoAvaliador',
-  '$.campos.avaliador',
-  '$.metadata.avaliador',
-  '$.requestData.avaliador',
-  '$.dynamicForm.avaliador',
-  '$.campos.gestor',
-  '$.metadata.gestor',
-  '$.requestData.gestor',
-  '$.dynamicForm.gestor',
-] as const
+  "$.campos.gestorImediatoAvaliador",
+  "$.metadata.gestorImediatoAvaliador",
+  "$.requestData.gestorImediatoAvaliador",
+  "$.dynamicForm.gestorImediatoAvaliador",
+  "$.campos.avaliador",
+  "$.metadata.avaliador",
+  "$.requestData.avaliador",
+  "$.dynamicForm.avaliador",
+  "$.campos.gestor",
+  "$.metadata.gestor",
+  "$.requestData.gestor",
+  "$.dynamicForm.gestor",
+] as const;
 
 function normalizeParticipantValue(value?: string | null) {
-  return String(value ?? '').trim() || null
+  return String(value ?? "").trim() || null;
 }
 
 export function canViewSensitiveHiringRequest(input: {
-  user: { id: string; role?: Role | null }
+  user: { id: string; role?: Role | null };
   solicitation: {
-    solicitanteId?: string | null
-    assumidaPorId?: string | null
-    approverId?: string | null
-    departmentId?: string | null
-    tipo?: TipoLike | null
-  }
-  isAdmin?: boolean
-  isRequester?: boolean
-  isAssigned?: boolean
-  isResponsibleDepartmentMember?: boolean
-  isExplicitRecipient?: boolean
-  isRh?: boolean
-  isExperienceEvaluationCoordinator?: boolean
-  isRhAuthorizedForExperienceEvaluation?: boolean
-  allowedTipoIds?: string[]
-  finalizerTipoIds?: string[]
+    solicitanteId?: string | null;
+    assumidaPorId?: string | null;
+    approverId?: string | null;
+    departmentId?: string | null;
+    tipo?: TipoLike | null;
+  };
+  isAdmin?: boolean;
+  isRequester?: boolean;
+  isAssigned?: boolean;
+  isResponsibleDepartmentMember?: boolean;
+  isExplicitRecipient?: boolean;
+  isRh?: boolean;
+  isExperienceEvaluationCoordinator?: boolean;
+  isRhAuthorizedForExperienceEvaluation?: boolean;
+  allowedTipoIds?: string[];
+  finalizerTipoIds?: string[];
 }) {
-  if (!isSensitiveHiringRequest(input.solicitation.tipo)) return true
+  if (!isSensitiveHiringRequest(input.solicitation.tipo)) return true;
 
-  const isAdmin = input.isAdmin ?? input.user.role === 'ADMIN'
-  const isRequester = input.isRequester ?? input.solicitation.solicitanteId === input.user.id
+  const isAdmin = input.isAdmin ?? input.user.role === "ADMIN";
+  const isRequester =
+    input.isRequester ?? input.solicitation.solicitanteId === input.user.id;
   const isAssigned =
     input.isAssigned ??
     (input.solicitation.assumidaPorId === input.user.id ||
-      input.solicitation.approverId === input.user.id)
-  const isResponsibleDepartmentMember = input.isResponsibleDepartmentMember ?? false
-  const isExplicitRecipient = input.isExplicitRecipient ?? input.solicitation.approverId === input.user.id
-  const isRh = input.isRh ?? input.user.role === 'RH'
+      input.solicitation.approverId === input.user.id);
+  const isResponsibleDepartmentMember =
+    input.isResponsibleDepartmentMember ?? false;
+  const isExplicitRecipient =
+    input.isExplicitRecipient ??
+    input.solicitation.approverId === input.user.id;
+  const isRh = input.isRh ?? input.user.role === "RH";
 
-  const tipoId = input.solicitation.tipo?.id
-  const isExperienceEvaluation = tipoId === 'RQ_RH_103' || input.solicitation.tipo?.codigo === 'RQ.RH.103'
+  const tipoId = input.solicitation.tipo?.id;
+  const isExperienceEvaluation =
+    tipoId === "RQ_RH_103" || input.solicitation.tipo?.codigo === "RQ.RH.103";
   const isExperiencePrivileged =
     isExperienceEvaluation &&
     (input.isExperienceEvaluationCoordinator ||
       input.isRhAuthorizedForExperienceEvaluation ||
-      (input.allowedTipoIds ?? []).includes('RQ_RH_103') ||
-      (input.finalizerTipoIds ?? []).includes('RQ_RH_103'))
+      (input.allowedTipoIds ?? []).includes("RQ_RH_103") ||
+      (input.finalizerTipoIds ?? []).includes("RQ_RH_103"));
 
-  return isAdmin || isRequester || isAssigned || isResponsibleDepartmentMember || isExplicitRecipient || isRh || Boolean(isExperiencePrivileged)
+  return (
+    isAdmin ||
+    isRequester ||
+    isAssigned ||
+    isResponsibleDepartmentMember ||
+    isExplicitRecipient ||
+    isRh ||
+    Boolean(isExperiencePrivileged)
+  );
 }
 
-export async function getUserDepartmentIds(userId: string, primaryDepartmentId?: string | null) {
+export async function getUserDepartmentIds(
+  userId: string,
+  primaryDepartmentId?: string | null,
+) {
   const links = await prisma.userDepartment.findMany({
     where: { userId },
     select: { departmentId: true },
-  })
+  });
 
   return Array.from(
-    new Set([primaryDepartmentId, ...links.map((link) => link.departmentId)].filter((v): v is string => Boolean(v))),
-  )
+    new Set(
+      [primaryDepartmentId, ...links.map((link) => link.departmentId)].filter(
+        (v): v is string => Boolean(v),
+      ),
+    ),
+  );
 }

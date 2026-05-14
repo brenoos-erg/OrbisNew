@@ -5,6 +5,7 @@ require("ts-node").register({
 require("tsconfig-paths/register");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const path = require("node:path");
 
 const {
   applyReceivedInMemoryFilters,
@@ -15,6 +16,9 @@ const {
   getAdvancedTextFilters,
   hasReceivedInMemoryFilters,
 } = require("../src/lib/receivedSolicitationsQuery");
+const {
+  onlyValidSolicitationStatuses,
+} = require("../src/lib/solicitationStatuses");
 
 const receivedRouteSource = fs.readFileSync(
   "src/app/api/solicitacoes/recebidas/route.ts",
@@ -27,6 +31,34 @@ const receivedPageSource = fs.readFileSync(
 
 function makeParams(entries) {
   return new URLSearchParams(entries);
+}
+
+function collectStatusInValues(value, results = []) {
+  if (!value || typeof value !== "object") return results;
+  if (
+    Object.prototype.hasOwnProperty.call(value, "status") &&
+    value.status &&
+    typeof value.status === "object" &&
+    Array.isArray(value.status.in)
+  ) {
+    results.push(value.status.in);
+  }
+  for (const child of Object.values(value)) {
+    if (Array.isArray(child)) {
+      child.forEach((item) => collectStatusInValues(item, results));
+    } else {
+      collectStatusInValues(child, results);
+    }
+  }
+  return results;
+}
+
+function listSourceFiles(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return listSourceFiles(full);
+    return /\.(ts|tsx)$/.test(entry.name) ? [full] : [];
+  });
 }
 
 const baseRow = {
@@ -306,6 +338,16 @@ assert.equal(
   "CONCLUIDA",
   "12. filtro status deve continuar no Prisma.",
 );
+assert.equal(
+  buildWhereFromSearchParams(makeParams({ status: "FINALIZADA" })).status,
+  undefined,
+  "12. filtro status inválido deve ser ignorado antes do Prisma.",
+);
+assert.deepEqual(
+  onlyValidSolicitationStatuses(["CONCLUIDA", "FINALIZADA"]),
+  ["CONCLUIDA"],
+  "12. helper central remove FINALIZADA quando ela não existe no enum Prisma.",
+);
 assert.deepEqual(
   buildWhereFromSearchParams(makeParams({ situacao: "EM_ATENDIMENTO" })).status
     .in,
@@ -493,5 +535,55 @@ assert.doesNotMatch(
   /fullName:\s*\{\s*contains:\s*responsavel\s*\}/,
   "Responsável deve ser filtrado em memória, sem contains no Prisma.",
 );
+
+const rq092Where = buildWhereFromSearchParams(makeParams({ tipoId: "RQ_092" }));
+assert.equal(
+  rq092Where.tipoId,
+  "RQ_092",
+  "24. recebidas com tipo RQ_092 não quebra.",
+);
+assert.equal(
+  buildWhereFromSearchParams(makeParams({})).tipoId,
+  undefined,
+  "25. recebidas sem tipo selecionado não quebra.",
+);
+
+const rqRh103Where = buildWhereFromSearchParams(
+  makeParams({ tipoId: "RQ_RH_103" }),
+);
+const rqRh103Args = buildListAndCountArgs(rqRh103Where, {
+  skip: 0,
+  pageSize: 10,
+  orderBy: [{ dataAbertura: "desc" }],
+});
+assert.doesNotThrow(
+  () => JSON.stringify(rqRh103Args),
+  "26. GET /api/solicitacoes/recebidas não monta filtro inválido quando envolve RQ_RH_103.",
+);
+assert.equal(
+  rqRh103Args.findManyArgs.where,
+  rqRh103Args.countArgs.where,
+  "27. count() e findMany() usam exatamente o mesmo objeto where já sanitizado.",
+);
+
+for (const statusList of collectStatusInValues(
+  rqRh103Args.findManyArgs.where,
+)) {
+  assert.deepEqual(
+    onlyValidSolicitationStatuses(statusList),
+    statusList,
+    "28. nenhum status.in montado para Prisma contém status inválido.",
+  );
+}
+
+const sourceFiles = listSourceFiles("src");
+for (const file of sourceFiles) {
+  const source = fs.readFileSync(file, "utf8");
+  assert.doesNotMatch(
+    source,
+    /status:\s*\{\s*in:\s*\[[^\]]*FINALIZADA/s,
+    `28. ${file} não deve enviar FINALIZADA diretamente em status.in do Prisma.`,
+  );
+}
 
 console.log("✅ received-solicitations-filters.test.cjs passed");
