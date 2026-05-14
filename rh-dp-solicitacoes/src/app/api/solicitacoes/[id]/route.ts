@@ -126,6 +126,10 @@ export async function GET(
           : null,
       },
       isResponsibleDepartmentMember: item.departmentId ? userDepartmentIds.includes(item.departmentId) : false,
+      isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
+      isRhAuthorizedForExperienceEvaluation: userAccess.isRhAuthorizedForExperienceEvaluation,
+      allowedTipoIds: userAccess.allowedTipoIds,
+      finalizerTipoIds: userAccess.finalizerTipoIds,
     })
 
     const canViewByDepartment = canViewSolicitation(userAccess, solicitationForPolicy)

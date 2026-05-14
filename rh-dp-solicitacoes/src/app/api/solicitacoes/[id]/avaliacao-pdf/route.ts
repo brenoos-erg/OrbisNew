@@ -69,8 +69,7 @@ export async function GET(
     }
 
     const isAllowedStatus =
-      solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS ||
-      solicitation.status === 'CONCLUIDA'
+      [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA', 'FINALIZADA'].includes(String(solicitation.status))
 
     if (!isAllowedStatus) {
       return NextResponse.json(
@@ -123,6 +122,7 @@ export async function GET(
       ['Adaptação à mudança', evaluation.adaptacaoMudancaNota],
       ['Autogestão e gestão de pessoas', evaluation.autogestaoGestaoPessoasNota],
       ['Comentário final', evaluation.comentarioFinal],
+      ['Avaliado/finalizado em', evaluation.avaliadoEm],
     ]
 
     const html = `<!doctype html>

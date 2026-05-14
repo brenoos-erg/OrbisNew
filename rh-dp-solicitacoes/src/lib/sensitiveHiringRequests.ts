@@ -66,7 +66,7 @@ export function buildSensitiveHiringVisibilityWhere(input: {
         { tipoId: 'RQ_RH_103' },
         {
           status: {
-            in: ['AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO'],
+            in: ['AGUARDANDO_AVALIACAO_GESTOR', 'AGUARDANDO_FINALIZACAO_AVALIACAO', 'CONCLUIDA', 'FINALIZADA'] as any,
           },
         },
       ],
@@ -80,7 +80,7 @@ export function buildSensitiveHiringVisibilityWhere(input: {
     participantFilters.push({
       AND: [
         { tipoId: 'RQ_RH_103' },
-        { status: 'AGUARDANDO_FINALIZACAO_AVALIACAO' },
+        { status: { in: ['AGUARDANDO_FINALIZACAO_AVALIACAO', 'CONCLUIDA', 'FINALIZADA'] as any } },
       ],
     })
   }
@@ -208,6 +208,10 @@ export function canViewSensitiveHiringRequest(input: {
   isResponsibleDepartmentMember?: boolean
   isExplicitRecipient?: boolean
   isRh?: boolean
+  isExperienceEvaluationCoordinator?: boolean
+  isRhAuthorizedForExperienceEvaluation?: boolean
+  allowedTipoIds?: string[]
+  finalizerTipoIds?: string[]
 }) {
   if (!isSensitiveHiringRequest(input.solicitation.tipo)) return true
 
@@ -221,7 +225,16 @@ export function canViewSensitiveHiringRequest(input: {
   const isExplicitRecipient = input.isExplicitRecipient ?? input.solicitation.approverId === input.user.id
   const isRh = input.isRh ?? input.user.role === 'RH'
 
-  return isAdmin || isRequester || isAssigned || isResponsibleDepartmentMember || isExplicitRecipient || isRh
+  const tipoId = input.solicitation.tipo?.id
+  const isExperienceEvaluation = tipoId === 'RQ_RH_103' || input.solicitation.tipo?.codigo === 'RQ.RH.103'
+  const isExperiencePrivileged =
+    isExperienceEvaluation &&
+    (input.isExperienceEvaluationCoordinator ||
+      input.isRhAuthorizedForExperienceEvaluation ||
+      (input.allowedTipoIds ?? []).includes('RQ_RH_103') ||
+      (input.finalizerTipoIds ?? []).includes('RQ_RH_103'))
+
+  return isAdmin || isRequester || isAssigned || isResponsibleDepartmentMember || isExplicitRecipient || isRh || Boolean(isExperiencePrivileged)
 }
 
 export async function getUserDepartmentIds(userId: string, primaryDepartmentId?: string | null) {

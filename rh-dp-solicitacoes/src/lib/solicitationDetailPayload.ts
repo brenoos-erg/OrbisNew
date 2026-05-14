@@ -62,7 +62,14 @@ function safeSchemaJson(value: unknown) {
 }
 
 export function normalizeSolicitationPayload(payload: unknown): AnyRecord {
-  const root = asRecord(payload)
+  const parsedPayload = typeof payload === 'string' ? (() => {
+    try {
+      return JSON.parse(payload)
+    } catch {
+      return {}
+    }
+  })() : payload
+  const root = asRecord(parsedPayload)
   return {
     ...root,
     campos: asRecord(root.campos),

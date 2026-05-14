@@ -109,6 +109,7 @@ export function extractExperienceEvaluationData(payload: unknown) {
     dataAdmissao: normalized.dataAdmissao,
     cargoAvaliador: normalized.cargoAvaliador,
     comentarioFinal: normalized.comentarioFinal,
+    avaliadoEm: normalized.avaliadoEm,
     historicoRelacionado: historyCandidates[0] ?? '',
     notas,
   }
