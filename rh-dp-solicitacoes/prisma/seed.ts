@@ -4,6 +4,11 @@ import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES, validateOfficialDepartments } from '@/lib/officialDepartment'
 import { randomUUID } from 'node:crypto'
+import {
+  EXPERIENCE_EVALUATION_COMMENT_QUESTION,
+  EXPERIENCE_EVALUATION_QUESTIONS,
+  EXPERIENCE_EVALUATION_SCORE_OPTIONS,
+} from '@/lib/experienceEvaluationQuestions'
 import bcrypt from 'bcryptjs'
 
 
@@ -276,68 +281,22 @@ async function main() {
       { name: 'cargoColaborador', label: 'Cargo do colaborador', type: 'text', stage: 'solicitante', section: 'Dados' },
       { name: 'dataAdmissao', label: 'Data de admissão', type: 'date', stage: 'solicitante', section: 'Dados' },
       { name: 'cargoAvaliador', label: 'Cargo do avaliador', type: 'text', stage: 'solicitante', section: 'Dados' },
-      {
-        name: 'relacionamentoNota',
-        label: 'Relacionamento',
+      ...EXPERIENCE_EVALUATION_QUESTIONS.map((question) => ({
+        name: question.field,
+        label: question.title,
+        description: question.description,
+        helpText: question.description,
         type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
+        options: [...EXPERIENCE_EVALUATION_SCORE_OPTIONS],
+        stage: 'avaliacao',
         section: 'Avaliação',
-      },
+      })),
       {
-        name: 'comunicacaoNota',
-        label: 'Comunicação',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'atitudeNota',
-        label: 'Atitude',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'saudeSegurancaNota',
-        label: 'Saúde e Segurança',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'dominioTecnicoProcessosNota',
-        label: 'Domínio técnico/processos',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'adaptacaoMudancaNota',
-        label: 'Adaptação à mudança',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'autogestaoGestaoPessoasNota',
-        label: 'Autogestão/Gestão de pessoas',
-        type: 'select',
-        options: ['INSUFICIENTE', 'PARCIAL', 'PLENA', 'ACIMA DA MÉDIA'],
-        stage: 'solicitante',
-        section: 'Avaliação',
-      },
-      {
-        name: 'comentarioFinal',
-        label: 'Comentário final',
+        name: EXPERIENCE_EVALUATION_COMMENT_QUESTION.field,
+        label: EXPERIENCE_EVALUATION_COMMENT_QUESTION.label,
         type: 'textarea',
-        stage: 'solicitante',
-        section: 'Comentários',
+        stage: 'avaliacao',
+        section: 'Avaliação',
       },
     ],
   }

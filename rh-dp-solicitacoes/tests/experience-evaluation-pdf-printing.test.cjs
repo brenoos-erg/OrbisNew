@@ -44,7 +44,8 @@ assert.deepEqual(normalizeExperienceEvaluationPayload(oldPayload), {
   dominioTecnicoProcessosNota: 'PLENA',
   adaptacaoMudancaNota: 'PLENA',
   autogestaoGestaoPessoasNota: 'PARCIAL',
-  comentarioFinal: '',
+  comentarioFinal: '-',
+  avaliadoEm: '-',
 }, 'PDF de RQ_RH_103 deve aceitar payload antigo, inclusive comentário final vazio')
 assert.equal(hasExperienceEvaluationPrintableData(oldPayload), true, 'payload antigo preenchido deve ser imprimível')
 
@@ -53,8 +54,8 @@ const missingFieldsPayload = {
   avaliacaoGestor: { relacionamentoNota: 'PLENA' },
 }
 const missingNormalized = normalizeExperienceEvaluationPayload(missingFieldsPayload)
-assert.equal(missingNormalized.comunicacaoNota, '', 'campo de nota ausente normaliza vazio para o PDF exibir hífen')
-assert.equal(missingNormalized.comentarioFinal, '', 'comentário final ausente não quebra a normalização')
+assert.equal(missingNormalized.comunicacaoNota, '-', 'campo de nota ausente normaliza hífen para o PDF')
+assert.equal(missingNormalized.comentarioFinal, '-', 'comentário final ausente usa hífen sem quebrar a normalização')
 assert.equal(hasExperienceEvaluationPrintableData(missingFieldsPayload), true, 'campos faltantes não bloqueiam quando há ao menos uma nota')
 assert.equal(hasExperienceEvaluationPrintableData({ campos: { colaboradorAvaliado: 'Sem avaliação' } }), false, 'sem dados de avaliação deve retornar mensagem clara')
 
@@ -76,6 +77,10 @@ assert.equal(
   detailData.notas.find((item) => item.key === 'relacionamentoNota').value,
   normalizeExperienceEvaluationPayload(oldPayload).relacionamentoNota,
   'nota exibida no detalhe deve ser a mesma usada no PDF',
+)
+assert.ok(
+  detailData.notas.find((item) => item.key === 'relacionamentoNota').description.includes('Relaciona-se bem'),
+  'detalhe deve exibir descrição padrão para payload antigo sem schema novo',
 )
 
 const solicitation = {
@@ -111,6 +116,8 @@ assert.equal(canPrintExperienceEvaluationPdf({ ...baseCtx, role: 'ADMIN' }, canc
 const pdfRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/avaliacao-pdf/route.ts', 'utf8')
 const detailModal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
 assert.match(pdfRoute, /normalizeExperienceEvaluationPayload\(solicitation\.payload\)/, 'rota PDF deve usar a normalização compartilhada')
+assert.match(pdfRoute, /question\.description/, 'rota PDF deve renderizar descrições das competências')
+assert.match(pdfRoute, /<strong>Nota:<\/strong>/, 'rota PDF deve renderizar as notas das competências')
 assert.match(pdfRoute, /A avaliação ainda não possui dados suficientes para impressão\./, 'rota PDF deve retornar mensagem clara quando sem avaliação')
 assert.match(pdfRoute, /A avaliação cancelada não pode ser impressa\./, 'rota PDF deve bloquear cancelada com mensagem clara')
 assert.match(detailModal, /canPrintExperienceEvaluationPdf/, 'detalhe deve consumir a permissão calculada pela API')

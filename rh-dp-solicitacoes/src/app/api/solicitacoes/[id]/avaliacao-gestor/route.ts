@@ -10,6 +10,7 @@ import {
   isExperienceEvaluationEvaluator,
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
+import { EXPERIENCE_EVALUATION_SCORE_OPTIONS } from '@/lib/experienceEvaluationQuestions'
 
 export async function POST(
   req: NextRequest,
@@ -58,6 +59,20 @@ export async function POST(
         {
           error: 'Preencha todos os campos da avaliação.',
           missingFields,
+        },
+        { status: 400 },
+      )
+    }
+
+    const invalidScoreFields = EXPERIENCE_EVALUATION_REQUIRED_FIELDS.filter(
+      (field) => field !== 'comentarioFinal',
+    ).filter((field) => !EXPERIENCE_EVALUATION_SCORE_OPTIONS.includes(avaliacao[field] as any))
+
+    if (invalidScoreFields.length > 0) {
+      return NextResponse.json(
+        {
+          error: 'Selecione uma opção válida para todos os campos de nota.',
+          invalidFields: invalidScoreFields,
         },
         { status: 400 },
       )

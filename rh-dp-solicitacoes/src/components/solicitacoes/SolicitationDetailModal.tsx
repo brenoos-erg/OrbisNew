@@ -28,7 +28,10 @@ import {
 import { EXPERIENCE_EVALUATION_REQUIRED_FIELDS } from '@/lib/experienceEvaluation.constants'
 import { isExperienceEvaluationEvaluator } from '@/lib/experienceEvaluation.shared'
 import {
+  EXPERIENCE_EVALUATION_COMMENT_QUESTION,
   EXPERIENCE_EVALUATION_COMPETENCIES,
+  EXPERIENCE_EVALUATION_INTRO_TEXT,
+  EXPERIENCE_EVALUATION_SCORE_OPTIONS,
   extractExperienceEvaluationData,
   isExperienceEvaluationTipo,
 } from '@/lib/experienceEvaluationForm'
@@ -140,12 +143,7 @@ type AvaliacaoGestorForm = {
 }
 
 
-const AVALIACAO_GESTOR_NOTA_OPTIONS = [
-  'INSUFICIENTE',
-  'PARCIAL',
-  'PLENA',
-  'ACIMA DA MÉDIA',
-] as const
+const AVALIACAO_GESTOR_NOTA_OPTIONS = EXPERIENCE_EVALUATION_SCORE_OPTIONS
 
 const EMPTY_AVALIACAO_GESTOR_FORM: AvaliacaoGestorForm = {
   relacionamentoNota: '',
@@ -2682,19 +2680,22 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                     <div className="md:col-span-2">
                       <label className={LABEL_RO}>Competências / notas</label>
-                      <div className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-2">
+                      <div className="mt-1 space-y-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-3">
+                        <p className="text-xs leading-5 text-[var(--foreground)]">{EXPERIENCE_EVALUATION_INTRO_TEXT}</p>
                         {experienceData.notas.map((item) => (
-                          <div key={item.key} className="flex items-center justify-between border-b border-[var(--border-subtle)] py-2 text-xs last:border-b-0">
-                            <span className="font-medium text-[var(--foreground)]">{item.label}</span>
-                            <span className="font-semibold text-[var(--foreground)]">{item.value || '-'}</span>
-                           </div>
+                          <div key={item.key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3 text-xs">
+                            <p className="font-bold uppercase tracking-wide text-[var(--foreground)]">{item.label}</p>
+                            <p className="mt-1 whitespace-pre-wrap break-words leading-5 text-[var(--muted-foreground)]">{item.description}</p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="font-semibold text-[var(--foreground)]">Nota:</span>
+                              <span className="font-semibold text-[var(--foreground)]">{item.value || '-'}</span>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
                     <div className="md:col-span-2">
-                      <label className={LABEL_RO}>
-                        Deseja realizar algum comentário sobre o colaborador em questão?
-                      </label>
+                      <label className={LABEL_RO}>{EXPERIENCE_EVALUATION_COMMENT_QUESTION.label}</label>
                       <textarea
                         className={`${INPUT_RO} min-h-[90px]`}
                            readOnly
@@ -2724,7 +2725,7 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                   <div className="mb-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)]/80 p-3">
                     <p className="text-xs leading-5 text-[var(--foreground)]">
-                      1 - Avalie o colaborador nas questões conforme a legenda abaixo e utilize como parâmetro as competências mapeadas para o seu cargo no Gesto.Com.
+                      {EXPERIENCE_EVALUATION_INTRO_TEXT}
                     </p>
                   </div>
 
@@ -2778,7 +2779,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   </div>
 
                   <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3 shadow-sm">
-                    <label className={LABEL_RO}>Deseja realizar algum comentário sobre o colaborador em questão?</label>
+                    <label className={LABEL_RO}>{EXPERIENCE_EVALUATION_COMMENT_QUESTION.label}</label>
                     <textarea
                       className="mt-1 min-h-[160px] w-full rounded-md border border-[var(--input-border)] px-3 py-3 text-sm"
                       value={gestorAvaliacaoForm.comentarioFinal}

@@ -1,3 +1,8 @@
+import {
+  EXPERIENCE_EVALUATION_COMMENT_QUESTION,
+  EXPERIENCE_EVALUATION_QUESTIONS,
+} from '@/lib/experienceEvaluationQuestions'
+
 export const EXPERIENCE_EVALUATOR_GROUP_NAME = 'COORDENADORES_AVALIACAO_EXPERIENCIA'
 export const EXPERIENCE_EVALUATION_TIPO_ID = 'RQ_RH_103'
 export const EXPERIENCE_EVALUATION_STATUS = 'AGUARDANDO_AVALIACAO_GESTOR' as const
@@ -9,12 +14,6 @@ export const EXPERIENCE_EVALUATION_VISIBLE_STATUSES = [
   ...EXPERIENCE_EVALUATION_CLOSED_STATUSES,
 ] as const
 export const EXPERIENCE_EVALUATION_REQUIRED_FIELDS = [
-  'relacionamentoNota',
-  'comunicacaoNota',
-  'atitudeNota',
-  'saudeSegurancaNota',
-  'dominioTecnicoProcessosNota',
-  'adaptacaoMudancaNota',
-  'autogestaoGestaoPessoasNota',
-  'comentarioFinal',
+  ...EXPERIENCE_EVALUATION_QUESTIONS.map((question) => question.field),
+  EXPERIENCE_EVALUATION_COMMENT_QUESTION.field,
 ] as const
