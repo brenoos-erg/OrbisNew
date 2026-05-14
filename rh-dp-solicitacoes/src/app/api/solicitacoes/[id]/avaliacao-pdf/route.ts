@@ -12,6 +12,11 @@ import {
   normalizeExperienceEvaluationPayload,
 } from '@/lib/experienceEvaluation'
 import {
+  EXPERIENCE_EVALUATION_COMMENT_QUESTION,
+  EXPERIENCE_EVALUATION_INTRO_TEXT,
+  EXPERIENCE_EVALUATION_QUESTIONS,
+} from '@/lib/experienceEvaluationQuestions'
+import {
   canPrintExperienceEvaluationPdf,
   resolveUserAccessContext,
 } from '@/lib/solicitationAccessPolicy'
@@ -107,23 +112,25 @@ export async function GET(
 
     const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload)
 
-    const rows: Array<[string, string]> = [
+    const baseRows: Array<[string, string]> = [
       ['Colaborador avaliado', evaluation.colaboradorAvaliado],
       ['Contrato / setor', evaluation.contratoSetor],
       ['Gestor imediato avaliador', evaluation.gestorImediatoAvaliador],
       ['Cargo do colaborador', evaluation.cargoColaborador],
       ['Data de admissão', evaluation.dataAdmissao],
       ['Cargo do avaliador', evaluation.cargoAvaliador],
-      ['Relacionamento', evaluation.relacionamentoNota],
-      ['Comunicação', evaluation.comunicacaoNota],
-      ['Atitude', evaluation.atitudeNota],
-      ['Saúde e segurança', evaluation.saudeSegurancaNota],
-      ['Domínio técnico e processos', evaluation.dominioTecnicoProcessosNota],
-      ['Adaptação à mudança', evaluation.adaptacaoMudancaNota],
-      ['Autogestão e gestão de pessoas', evaluation.autogestaoGestaoPessoasNota],
-      ['Comentário final', evaluation.comentarioFinal],
       ['Avaliado/finalizado em', evaluation.avaliadoEm],
     ]
+
+    const evaluationCards = EXPERIENCE_EVALUATION_QUESTIONS.map((question) => {
+      const note = evaluation[question.field]
+      return `
+        <section class="question-card">
+          <h2>${escapeHtml(question.title)}</h2>
+          <p>${escapeHtml(question.description)}</p>
+          <div class="note"><strong>Nota:</strong> ${escapeHtml(toPdfDisplayValue(note))}</div>
+        </section>`
+    }).join('')
 
     const html = `<!doctype html>
       <html lang="pt-BR">
@@ -133,9 +140,15 @@ export async function GET(
           body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
           h1 { margin: 0 0 4px 0; font-size: 20px; }
           .meta { margin-bottom: 18px; color: #334155; font-size: 12px; }
-          table { width: 100%; border-collapse: collapse; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; vertical-align: top; }
           th { background: #f1f5f9; width: 35%; text-align: left; }
+          .intro { border: 1px solid #cbd5e1; background: #f8fafc; padding: 10px; font-size: 12px; line-height: 1.5; margin-bottom: 12px; }
+          .question-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+          .question-card h2 { margin: 0 0 6px 0; font-size: 12px; letter-spacing: .03em; text-transform: uppercase; }
+          .question-card p { margin: 0 0 8px 0; font-size: 12px; line-height: 1.45; color: #334155; }
+          .note { font-size: 12px; }
+          .comment { white-space: pre-wrap; }
         </style>
       </head>
       <body>
@@ -146,13 +159,19 @@ export async function GET(
           <div><strong>Tipo:</strong> ${escapeHtml(solicitation.tipo?.nome ?? '')}</div>
         </div>
         <table>
-          ${rows
+          ${baseRows
             .map(
               ([label, value]) =>
                 `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(toPdfDisplayValue(value))}</td></tr>`,
             )
             .join('')}
         </table>
+        <div class="intro">${escapeHtml(EXPERIENCE_EVALUATION_INTRO_TEXT)}</div>
+        ${evaluationCards}
+        <section class="question-card">
+          <h2>${escapeHtml(EXPERIENCE_EVALUATION_COMMENT_QUESTION.label)}</h2>
+          <div class="note comment">${escapeHtml(toPdfDisplayValue(evaluation.comentarioFinal))}</div>
+        </section>
       </body>
       </html>`
     browser = await chromium.launch({ headless: true })
