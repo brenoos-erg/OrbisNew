@@ -2202,7 +2202,7 @@ async function handleEncaminharAprovacaoComAnexo() {
   if (!isOpen || !row) return null
 
   return (
-    <div className="app-modal-overlay z-50">
+    <div className="app-modal-overlay z-50" data-enter-as-tab="true">
       <button
         type="button"
         aria-label="Fechar tudo"

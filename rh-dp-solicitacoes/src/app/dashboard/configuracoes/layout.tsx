@@ -30,5 +30,5 @@ export default async function ConfiguracoesLayout({
   }
 
   // ✅ Passou na regra: NIVEL_1+ em CONFIGURACOES
-  return <>{children}</>
+  return <div data-enter-as-tab="true">{children}</div>
 }

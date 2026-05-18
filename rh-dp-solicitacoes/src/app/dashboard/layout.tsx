@@ -9,6 +9,7 @@ import { Action, ModuleLevel, Prisma } from '@prisma/client'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { canFeature } from '@/lib/permissions'
 import { SessionProvider } from '@/components/session/SessionProvider'
+import { EnterAsTabProvider } from '@/components/forms/EnterAsTabProvider'
 import { canAccessApprovalDocuments, canAccessQualityReviewDocuments, isAdmin } from '@/lib/documentApprovalControl'
 import { userHasRhAccess } from '@/lib/rhAccess'
 
@@ -379,6 +380,7 @@ export default async function DashboardLayout({
 
   return (
     <SessionProvider>
+      <EnterAsTabProvider />
       <div className="dashboard-shell flex min-h-screen bg-[var(--panel)]">
         <Sidebar
           showSolic={showSolic}
