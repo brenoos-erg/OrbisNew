@@ -18,5 +18,5 @@ export default async function SstLayout({ children }: { children: ReactNode }) {
     redirect('/dashboard')
   }
 
-  return <>{children}</>
+  return <div data-enter-as-tab="true">{children}</div>
 }

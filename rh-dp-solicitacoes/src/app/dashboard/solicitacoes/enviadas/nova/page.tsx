@@ -1380,15 +1380,8 @@ useEffect(() => {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 lg:px-0">
         <form
           id="form-solicitacao"
+          data-enter-as-tab="true"
           onSubmit={handleSubmit}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-
-            const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
-            if (tag !== 'textarea') {
-              e.preventDefault()
-            }
-          }}
           className="space-y-6"
         >
            {previewFile && (
