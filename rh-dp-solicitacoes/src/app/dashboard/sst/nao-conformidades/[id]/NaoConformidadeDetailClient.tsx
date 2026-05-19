@@ -139,6 +139,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [detailSaving, setDetailSaving] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [estudoError, setEstudoError] = useState<string | null>(null)
+  const [estudoSuccess, setEstudoSuccess] = useState<string | null>(null)
   const [estudoSaving, setEstudoSaving] = useState(false)
   const [activeSection, setActiveSection] = useState<SectionKey>('naoConformidade')
   const [gut, setGut] = useState({ gravidade: 1, urgencia: 1, tendencia: 1 })
@@ -327,6 +328,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     e.preventDefault()
     setEstudoSaving(true)
     setEstudoError(null)
+    setEstudoSuccess(null)
     const res = await fetch(`/api/sst/nao-conformidades/${id}/estudo-causa`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ causaRaiz, items: porques }),
     })
@@ -336,6 +338,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       setEstudoSaving(false)
       return
     }
+    setEstudoSuccess('Estudo de causa salvo com sucesso.')
     setEstudoSaving(false)
     load()
   }
@@ -769,6 +772,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
           <button type="button" disabled={bloqueado} onClick={()=>setPorques((p)=>[...p, { pergunta: `Por quê ${p.length + 1}?`, resposta: '' }])} className="rounded border px-2 py-1 text-sm">Adicionar porquê</button>
             <textarea value={causaRaiz} onChange={(e)=>setCausaRaiz(e.target.value)} disabled={bloqueado} className="w-full rounded border px-2 py-1 text-sm" placeholder="Causa raiz" />
             {estudoError ? <p className="text-sm text-rose-700">{estudoError}</p> : null}
+            {estudoSuccess ? <p className="text-sm text-emerald-700">{estudoSuccess}</p> : null}
             <button disabled={bloqueado || estudoSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{estudoSaving ? 'Salvando...' : 'Salvar estudo de causa'}</button>
           </form>
         </Card>

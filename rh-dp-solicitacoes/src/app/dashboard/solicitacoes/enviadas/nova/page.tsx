@@ -559,6 +559,7 @@ export default function NovaSolicitacaoPage() {
   const isSolicitacaoExamesSst =
     selectedTipo?.id === 'RQ_092' || ['RQ.SST.092', 'RQ.092', 'RQ.SST.002'].includes(selectedTipo?.codigo?.toUpperCase() ?? '');
   const isRQ247 = selectedTipo?.id === 'RQ_247';
+  const isRQ106Dependentes = selectedTipo?.id === 'RQ_106' || selectedTipo?.codigo?.toUpperCase() === 'RQ.106';
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
   const templateDownload = tipoMeta?.templateDownload;
@@ -1187,7 +1188,7 @@ export default function NovaSolicitacaoPage() {
 
 
         if (selectedTipo?.id === 'RQ_106' && (extraFiles.anexosSolicitante?.length ?? 0) < 1) {
-          setSubmitError('Anexe o formulário RQ.106 na solicitação.');
+          setSubmitError('Anexe o formulário RQ.106 preenchido antes de enviar a solicitação.');
           setSubmitting(false);
           return;
         }
@@ -2735,7 +2736,7 @@ useEffect(() => {
                   {selectedTipo.nome}
                 </h2>
 
-                {camposSolicitanteComTi.length === 0 && (
+                {camposSolicitanteComTi.length === 0 && !isRQ106Dependentes && (
                   <p className="text-xs text-gray-500">
                     Este tipo de solicitação não possui campos configurados.
                   </p>
@@ -3042,7 +3043,10 @@ useEffect(() => {
 
                   return (
                     <div className="space-y-6">
-                       {templateDownload && (
+                       {isRQ106Dependentes && (
+                        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Anexe o formulário RQ.106 na solicitação.</p>
+                      )}
+                      {templateDownload && (
                         <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                           <a
                             href={templateDownload}
@@ -3050,13 +3054,13 @@ useEffect(() => {
                             rel="noreferrer"
                             className="font-semibold underline"
                           >
-                            Baixar formulário (RQ.DP.049.xls)
+                            {isRQ106Dependentes ? 'RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontológico.docx' : 'Baixar formulário (RQ.DP.049.xls)'}
                           </a>
                         </div>
                       )}
                       {requiresAttachment && (
                         <p className="text-xs text-orange-700">
-                          Anexe o documento referente à multa para prosseguirmos.
+                          {isRQ106Dependentes ? 'Obrigatório preencher o RQ.106 e enviar em anexo à solicitação.' : 'Anexe o documento referente à multa para prosseguirmos.'}
                         </p>
                       )}
                       {isIncentivoEducacaoTipo && !camposSolicitanteComTi.some((campo) => campo.type === 'file') && (
