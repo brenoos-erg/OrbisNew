@@ -24,8 +24,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json().catch(() => ({} as any))
     const hasCausaRaiz = body?.causaRaiz !== undefined
     const causaRaiz = hasCausaRaiz ? (body?.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined
-    const hasItems = Array.isArray(body?.items)
-    const items = hasItems ? body.items : []
+    const incomingItems = Array.isArray(body?.items)
+      ? body.items
+      : Array.isArray(body?.fiveWhys)
+        ? body.fiveWhys
+        : Array.isArray(body?.whyAnalysis)
+          ? body.whyAnalysis
+          : []
+    const hasItems = incomingItems.length > 0 || Array.isArray(body?.items) || Array.isArray(body?.fiveWhys) || Array.isArray(body?.whyAnalysis)
+    const items = incomingItems
     const id = (await params).id
 
     const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
@@ -43,8 +50,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId: id } })
         for (let idx = 0; idx < items.length; idx += 1) {
           const item = items[idx]
-          const pergunta = String(item?.pergunta || `Por quê ${idx + 1}?`).trim()
-          const resposta = item?.resposta ? String(item.resposta).trim() : null
+          const pergunta = String(item?.pergunta || item?.question || `Por quê ${idx + 1}?`).trim()
+          const respostaRaw = item?.resposta ?? item?.answer ?? item?.why ?? null
+          const resposta = respostaRaw !== null && respostaRaw !== undefined ? String(respostaRaw).trim() : null
 
           rows.push(await tx.nonConformityCauseItem.create({
             data: {
@@ -57,8 +65,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
-      if (hasCausaRaiz) {
-        await tx.nonConformity.update({ where: { id }, data: { causaRaiz } })
+      const normalizedCauseItems = rows.map((row) => ({ ordem: row.ordem, pergunta: row.pergunta, resposta: row.resposta }))
+      const fallbackRootCause = body?.rootCause ?? body?.rootCauseAnalysis ?? body?.observacaoFinal ?? body?.descricaoFinal
+      const normalizedRootCause = hasCausaRaiz
+        ? causaRaiz
+        : fallbackRootCause !== undefined
+          ? (fallbackRootCause ? String(fallbackRootCause).trim() : null)
+          : undefined
+
+      if (normalizedRootCause !== undefined || hasItems) {
+        await tx.nonConformity.update({
+          where: { id },
+          data: {
+            ...(normalizedRootCause !== undefined ? { causaRaiz: normalizedRootCause } : {}),
+            ...(hasItems ? { rootCauseAnalysis: normalizedCauseItems as any } : {}),
+          },
+        })
       }
        await appendNonConformityTimelineEvent(tx, {
         nonConformityId: id,
@@ -66,10 +88,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         tipo: 'ESTUDO_CAUSA',
         message: 'Estudo de causa atualizado',
       })
-      return rows
+      return { rows, rootCauseAnalysis: hasItems ? normalizedCauseItems : [] }
     })
 
-    return NextResponse.json({ items: saved })
+    return NextResponse.json({ ok: true, nonConformityId: id, rootCauseAnalysis: saved.rootCauseAnalysis, items: saved.rows })
   } catch (error) {
     return NextResponse.json({ error: 'Erro ao salvar estudo de causa.', detail: devErrorDetail(error) }, { status: 500 })
   }

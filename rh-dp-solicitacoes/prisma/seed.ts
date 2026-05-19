@@ -2830,12 +2830,12 @@ async function main() {
       where: { id: 'RQ_106' },
       data: {
         schemaJson: {
-          meta: { departamentos: [dpDepartment.id], requiresApproval: false },
+          meta: { departamentos: [dpDepartment.id], requiresApproval: false, requiresAttachment: true, templateDownload: '/templates/solicitacoes/RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontologico.docx' },
           camposEspecificos: [
-            { name: 'nomeSolicitante', label: 'Nome do solicitante', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
-            { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Dados' },
-            { name: 'observacoes', label: 'Observações', type: 'textarea', stage: 'solicitante', section: 'Dados' },
-            { name: 'anexosSolicitante', label: 'Anexos do solicitante', type: 'file', required: true, stage: 'solicitante', section: 'Anexos' },
+            { name: 'nomeSolicitante', label: 'Nome do Solicitante', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },
+            { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },
+            { name: 'observacoes', label: 'Observações', type: 'textarea', stage: 'solicitante', section: 'Formulário' },
+            { name: 'anexosSolicitante', label: 'Anexo(s) do Solicitante', type: 'file', required: true, stage: 'solicitante', section: 'Anexo(s) do Solicitante' },
           ],
         },
         updatedAt: new Date(),
