@@ -123,11 +123,15 @@ export async function POST(
       )
     }
 
+    const nowIso = new Date().toISOString()
     const updatedPayload = {
       ...payload,
+      avaliadoEm: typeof payload.avaliadoEm === 'string' && payload.avaliadoEm.trim() ? payload.avaliadoEm : nowIso,
+      respondidoEm: typeof payload.respondidoEm === 'string' && payload.respondidoEm.trim() ? payload.respondidoEm : nowIso,
       avaliacaoGestor: {
         ...avaliacao,
-        avaliadoEm: new Date().toISOString(),
+        avaliadoEm: nowIso,
+        respondidoEm: nowIso,
         avaliadorId: me.id,
       },
     }
