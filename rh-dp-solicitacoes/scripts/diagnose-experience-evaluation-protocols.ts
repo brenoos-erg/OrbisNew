@@ -49,16 +49,19 @@ async function main() {
   console.log(`Protocolos: ${targetProtocols.join(', ')}`)
 
   const authorizedWhere = buildReceivedSolicitationVisibilityWhere({
-    userId: '__diagnostico_rh__',
-    role: 'RH',
-    userDepartmentIds: [],
-    userSetorKeys: [],
-    finalizerTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
-    allowedTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
-    viewerTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
-    isExperienceEvaluationCoordinator: true,
-    isRhAuthorizedForExperienceEvaluation: true,
-  })
+  userId: '__diagnostico_rh__',
+  role: 'RH',
+  userDepartmentIds: [],
+  userCostCenterIds: [],
+  userDepartmentNamesNormalized: [],
+  userSectorNamesNormalized: [],
+  userSetorKeys: [],
+  finalizerTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
+  allowedTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
+  viewerTipoIds: [EXPERIENCE_EVALUATION_TIPO_ID],
+  isExperienceEvaluationCoordinator: true,
+  isRhAuthorizedForExperienceEvaluation: true,
+})
 
   for (const protocolo of targetProtocols) {
     console.log(`\n${protocolo}`)
