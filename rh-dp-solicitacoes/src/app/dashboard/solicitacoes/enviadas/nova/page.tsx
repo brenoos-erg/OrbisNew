@@ -16,6 +16,7 @@ import { fetchMe } from '@/lib/me-cache';
 import CostCenterSelect from '@/components/solicitacoes/CostCenterSelect';
 import {
   isSolicitacaoAgendamentoFerias,
+  isSolicitacaoExclusaoPlanoDependentes,
   isSolicitacaoEpiUniforme,
   isSolicitacaoEquipamento,
   isSolicitacaoInclusaoPlanoDependentes,
@@ -98,7 +99,7 @@ type TipoSolicitacao = {
   nome: string;
   descricao?: string;
   meta?: {
-    templateDownload?: string;
+    templateDownload?: string | { label?: string; url?: string };
     requiresAttachment?: boolean;
     destinos?: Array<{ value: string; label: string }>;
     departamentos?: string[];
@@ -559,10 +560,12 @@ export default function NovaSolicitacaoPage() {
   const isSolicitacaoExamesSst =
     selectedTipo?.id === 'RQ_092' || ['RQ.SST.092', 'RQ.092', 'RQ.SST.002'].includes(selectedTipo?.codigo?.toUpperCase() ?? '');
   const isRQ247 = selectedTipo?.id === 'RQ_247';
-  const isRQ106Dependentes = selectedTipo?.id === 'RQ_106' || selectedTipo?.codigo?.toUpperCase() === 'RQ.106';
+  const isRQ106Dependentes = isSolicitacaoExclusaoPlanoDependentes(selectedTipo);
   const tipoMeta = selectedTipo?.meta;
   const requiresAttachment = Boolean(tipoMeta?.requiresAttachment);
-  const templateDownload = tipoMeta?.templateDownload;
+  const templateDownloadMeta = tipoMeta?.templateDownload;
+  const templateDownload = typeof templateDownloadMeta === 'string' ? templateDownloadMeta : templateDownloadMeta?.url;
+  const templateDownloadLabel = typeof templateDownloadMeta === 'string' ? null : templateDownloadMeta?.label;
   const destinoOptions = useMemo(
     () => (tipoMeta?.destinos ?? []).map((item) => item.label),
     [tipoMeta?.destinos],
@@ -629,12 +632,22 @@ export default function NovaSolicitacaoPage() {
       }
     }
 
+    if (isRQ106Dependentes && !mergedBaseCampos.some((campo) => campo.name === 'nomeSolicitante')) {
+      mergedBaseCampos.push(
+        { name: 'nomeSolicitante', label: 'Nome do Solicitante', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },
+        { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },
+        { name: 'observacoes', label: 'Observações', type: 'textarea', required: false, stage: 'solicitante', section: 'Formulário' },
+        { name: 'anexosSolicitante', label: 'Anexo(s) Do Solicitante', type: 'file', required: true, stage: 'solicitante', section: 'Anexo(s) Do Solicitante' },
+      );
+    }
+
     return mergedBaseCampos;
   }, [
     camposSolicitante,
     destinoOptions,
     isAvaliacaoExperiencia,
     isSolicitacaoExamesSst,
+    isRQ106Dependentes,
   ]);
 
   const isFieldVisibleByRule = (campo: CampoEspecifico) => {
@@ -1187,6 +1200,13 @@ export default function NovaSolicitacaoPage() {
         }
 
 
+        if (isRQ106Dependentes) {
+          if (!(extras.nomeSolicitante ?? '').trim() || !(extras.cpf ?? '').trim() || (extraFiles.anexosSolicitante?.length ?? 0) < 1) {
+            setSubmitError('Preencha Nome do Solicitante, CPF e anexe o formulário RQ.106 preenchido antes de enviar.');
+            setSubmitting(false);
+            return;
+          }
+        }
         if (selectedTipo?.id === 'RQ_106' && (extraFiles.anexosSolicitante?.length ?? 0) < 1) {
           setSubmitError('Anexe o formulário RQ.106 preenchido antes de enviar a solicitação.');
           setSubmitting(false);
@@ -2968,7 +2988,10 @@ useEffect(() => {
                           )}
 
                            {normalizedType === 'file' && (
-                            <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50/40 p-3">
+                           <div className="rounded-lg border-2 border-dashed border-orange-300 bg-orange-50/40 p-3">
+                              {isRQ106Dependentes && campo.name === 'anexosSolicitante' && (
+                                <p className="mb-2 inline-flex rounded-md bg-orange-500 px-3 py-1 text-xs font-semibold text-white">Adicionar Arquivo</p>
+                              )}
                                <input
                                 id={campo.name}
                                 name={campo.name}
@@ -2985,6 +3008,9 @@ useEffect(() => {
                               <p className="mt-2 text-xs font-medium text-orange-700">
                                 Arraste arquivos ou clique em “Escolher arquivos” para anexar.
                               </p>
+                              {isRQ106Dependentes && campo.name === 'anexosSolicitante' && (extraFiles[campo.name]?.length ?? 0) === 0 && (
+                                <p className="mt-2 text-xs text-[var(--muted-foreground)]">Nenhum arquivo postado.</p>
+                              )}
                               {(extraFiles[campo.name]?.length ?? 0) > 0 && (
                                 <div className="mt-2 space-y-1">
                                   {extraFiles[campo.name].map((file) => (
@@ -3046,7 +3072,9 @@ useEffect(() => {
                        {isRQ106Dependentes && (
                         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Anexe o formulário RQ.106 na solicitação.</p>
                       )}
-                      {templateDownload && (
+                      <section className="space-y-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Anexo(s) Da Solicitação</h3>
+                        {templateDownload && (
                         <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                           <a
                             href={templateDownload}
@@ -3054,9 +3082,15 @@ useEffect(() => {
                             rel="noreferrer"
                             className="font-semibold underline"
                           >
-                            {isRQ106Dependentes ? 'RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontológico.docx' : 'Baixar formulário (RQ.DP.049.xls)'}
+                            {templateDownloadLabel || (isRQ106Dependentes ? 'RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontológico.docx' : 'Baixar formulário (RQ.DP.049.xls)')}
                           </a>
                         </div>
+                        )}
+                      </section>
+                      {!templateDownload && isRQ106Dependentes && (
+                        <p className="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-700">
+                          Modelo RQ.106 temporariamente indisponível para download. Você ainda pode preencher os campos e anexar o documento.
+                        </p>
                       )}
                       {requiresAttachment && (
                         <p className="text-xs text-orange-700">
