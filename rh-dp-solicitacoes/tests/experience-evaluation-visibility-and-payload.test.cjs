@@ -25,6 +25,9 @@ const baseCtx = {
   userFullName: "RH User",
   role: "COLABORADOR",
   userDepartmentIds: [],
+  userCostCenterIds: [],
+  userDepartmentNamesNormalized: [],
+  userSectorNamesNormalized: [],
   userSetorKeys: [],
   finalizerTipoIds: [],
   allowedTipoIds: [],
@@ -90,6 +93,25 @@ assert.equal(
   "concluído não pode ser finalizado novamente",
 );
 
+
+const inAttendance = {
+  ...concluded,
+  status: "EM_ATENDIMENTO",
+};
+assert.equal(
+  policy.canViewSolicitation(
+    { ...baseCtx, isRhAuthorizedForExperienceEvaluation: true },
+    inAttendance,
+  ),
+  true,
+  "RH autorizado consulta RQ_RH_103 em EM_ATENDIMENTO",
+);
+assert.equal(
+  policy.canViewSolicitation(baseCtx, inAttendance),
+  false,
+  "usuário sem relação não consulta RQ_RH_103 em EM_ATENDIMENTO",
+);
+
 const where = buildReceivedSolicitationVisibilityWhere({
   ...baseCtx,
   finalizerTipoIds: ["RQ_RH_103"],
@@ -101,6 +123,11 @@ assert.match(
   JSON.stringify(where),
   /CONCLUIDA/,
   "query de recebidas inclui RQ_RH_103 CONCLUIDA para usuário autorizado",
+);
+assert.match(
+  JSON.stringify(where),
+  /EM_ATENDIMENTO/,
+  "query de recebidas inclui RQ_RH_103 EM_ATENDIMENTO para usuário autorizado",
 );
 assert.doesNotMatch(
   JSON.stringify(where),
