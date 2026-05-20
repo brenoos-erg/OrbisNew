@@ -275,6 +275,15 @@ export function canUserViewSolicitationByDepartment(
     return true;
   }
   if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) {
+    if (
+      EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as never) &&
+      (input.isRhAuthorizedForExperienceEvaluation ||
+        input.isExperienceEvaluationCoordinator ||
+        input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
+        (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID))
+    ) {
+      return true;
+    }
     return false;
   }
 
