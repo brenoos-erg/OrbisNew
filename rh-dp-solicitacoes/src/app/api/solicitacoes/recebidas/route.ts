@@ -17,6 +17,7 @@ import {
 } from "@/lib/solicitationAccessPolicy";
 import {
   applyReceivedInMemoryFilters,
+  applyReceivedSectorVisibilityFilter,
   buildListAndCountArgs,
   buildWhereFromSearchParams,
   getAdvancedTextFilters,
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
     const where = buildWhereFromSearchParams(searchParams);
     const orderBy = resolveOrderBy(searchParams);
     const advancedTextFilters = getAdvancedTextFilters(searchParams);
-    const hasInMemoryFilters = hasReceivedInMemoryFilters(advancedTextFilters);
+    let hasInMemoryFilters = hasReceivedInMemoryFilters(advancedTextFilters);
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
@@ -149,11 +150,16 @@ export async function GET(req: NextRequest) {
       },
     ];
 
+    const hasScopeVisibilityPostFilter =
+      userAccess.userSectorNamesNormalized.length > 0 ||
+      userAccess.userCostCenterIds.length > 0 ||
+      userAccess.userDepartmentIds.length > 0;
+    if (hasScopeVisibilityPostFilter) hasInMemoryFilters = true;
     const { findManyArgs, countArgs } = buildListAndCountArgs(where, {
       skip,
-      pageSize,
+      pageSize: hasScopeVisibilityPostFilter ? 2000 : pageSize,
       orderBy,
-      includeGlobalSearchData: hasInMemoryFilters,
+      includeGlobalSearchData: hasInMemoryFilters || hasScopeVisibilityPostFilter,
     });
 
     const [dbSolicitations, dbTotal] = await Promise.all([
@@ -161,12 +167,22 @@ export async function GET(req: NextRequest) {
       prisma.solicitation.count(countArgs),
     ]);
 
-    const filteredSolicitations = hasInMemoryFilters
-      ? (applyReceivedInMemoryFilters(
+    const scopeFilteredSolicitations = hasScopeVisibilityPostFilter
+      ? (applyReceivedSectorVisibilityFilter(
           dbSolicitations as unknown as Record<string, unknown>[],
-          advancedTextFilters,
+          {
+            normalizedSectorNames: userAccess.userSectorNamesNormalized,
+            departmentIds: userAccess.userDepartmentIds,
+            costCenterIds: userAccess.userCostCenterIds,
+          },
         ) as typeof dbSolicitations)
       : dbSolicitations;
+    const filteredSolicitations = hasInMemoryFilters
+      ? (applyReceivedInMemoryFilters(
+          scopeFilteredSolicitations as unknown as Record<string, unknown>[],
+          advancedTextFilters,
+        ) as typeof dbSolicitations)
+      : scopeFilteredSolicitations;
 
     const total = hasInMemoryFilters ? filteredSolicitations.length : dbTotal;
     const pagedSolicitations = hasInMemoryFilters

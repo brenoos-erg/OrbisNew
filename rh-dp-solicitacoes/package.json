@@ -25,7 +25,8 @@
     "solicitacoes:check-details": "node -r ts-node/register -r tsconfig-paths/register scripts/check-solicitation-details.ts",
     "avaliacoes:diagnose": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' node -r ts-node/register -r tsconfig-paths/register scripts/diagnose-experience-evaluation-protocols.ts",
     "avaliacoes:reassign": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' node -r ts-node/register -r tsconfig-paths/register scripts/reassign-experience-evaluation-coordinator.ts",
-    "test:enter-as-tab": "node -r ts-node/register -r tsconfig-paths/register tests/enter-as-tab.test.cjs"
+    "test:enter-as-tab": "node -r ts-node/register -r tsconfig-paths/register tests/enter-as-tab.test.cjs",
+    "debug:received": "ts-node -r tsconfig-paths/register scripts/debug-received-visibility.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

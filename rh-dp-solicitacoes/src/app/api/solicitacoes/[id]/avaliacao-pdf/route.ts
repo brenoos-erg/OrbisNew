@@ -52,6 +52,7 @@ export async function GET(
         tipo: { select: { nome: true } },
         solicitante: { select: { fullName: true } },
         solicitacaoSetores: { select: { setor: true } },
+        timelines: { select: { status: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
       },
     })
 
@@ -110,7 +111,7 @@ export async function GET(
       )
     }
 
-    const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload)
+    const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload, solicitation)
 
     const baseRows: Array<[string, string]> = [
       ['Colaborador avaliado', evaluation.colaboradorAvaliado],
@@ -119,7 +120,7 @@ export async function GET(
       ['Cargo do colaborador', evaluation.cargoColaborador],
       ['Data de admissão', evaluation.dataAdmissao],
       ['Cargo do avaliador', evaluation.cargoAvaliador],
-      ['Avaliado/finalizado em', evaluation.avaliadoEm],
+      ['Avaliado/finalizado em', evaluation.avaliadoFinalizadoEm],
     ]
 
     const evaluationCards = EXPERIENCE_EVALUATION_QUESTIONS.map((question) => {

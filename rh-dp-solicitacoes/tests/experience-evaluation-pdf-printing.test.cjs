@@ -46,6 +46,7 @@ assert.deepEqual(normalizeExperienceEvaluationPayload(oldPayload), {
   autogestaoGestaoPessoasNota: 'PARCIAL',
   comentarioFinal: '-',
   avaliadoEm: '-',
+  avaliadoFinalizadoEm: '-',
 }, 'PDF de RQ_RH_103 deve aceitar payload antigo, inclusive comentário final vazio')
 assert.equal(hasExperienceEvaluationPrintableData(oldPayload), true, 'payload antigo preenchido deve ser imprimível')
 
@@ -115,7 +116,7 @@ assert.equal(canPrintExperienceEvaluationPdf({ ...baseCtx, role: 'ADMIN' }, canc
 
 const pdfRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/avaliacao-pdf/route.ts', 'utf8')
 const detailModal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
-assert.match(pdfRoute, /normalizeExperienceEvaluationPayload\(solicitation\.payload\)/, 'rota PDF deve usar a normalização compartilhada')
+assert.match(pdfRoute, /normalizeExperienceEvaluationPayload\(solicitation\.payload,\s*solicitation\)/, 'rota PDF deve usar a normalização compartilhada')
 assert.match(pdfRoute, /question\.description/, 'rota PDF deve renderizar descrições das competências')
 assert.match(pdfRoute, /<strong>Nota:<\/strong>/, 'rota PDF deve renderizar as notas das competências')
 assert.match(pdfRoute, /A avaliação ainda não possui dados suficientes para impressão\./, 'rota PDF deve retornar mensagem clara quando sem avaliação')

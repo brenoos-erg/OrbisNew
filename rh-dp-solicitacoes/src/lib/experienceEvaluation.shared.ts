@@ -16,6 +16,7 @@ export type NormalizedExperienceEvaluationPayload = {
   autogestaoGestaoPessoasNota: string
   comentarioFinal: string
   avaliadoEm: string
+  avaliadoFinalizadoEm: string
 }
 
 const EXPERIENCE_EVALUATION_NORMALIZED_KEYS = [
@@ -34,6 +35,7 @@ const EXPERIENCE_EVALUATION_NORMALIZED_KEYS = [
   'autogestaoGestaoPessoasNota',
   'comentarioFinal',
   'avaliadoEm',
+  'avaliadoFinalizadoEm',
 ] as const
 
 type ExperienceEvaluationNormalizedKey = (typeof EXPERIENCE_EVALUATION_NORMALIZED_KEYS)[number]
@@ -77,6 +79,7 @@ function firstStringFromSources(sources: Dict[], keys: string[]) {
 
 export function normalizeExperienceEvaluationPayload(
   payload: unknown,
+  solicitation?: { dataFechamento?: unknown; updatedAt?: unknown; status?: unknown; timelines?: Array<{ status?: unknown; createdAt?: unknown }> } | null,
 ): NormalizedExperienceEvaluationPayload {
   const root = parsePayloadRoot(payload)
   const campos = asRecord(root.campos)
@@ -133,6 +136,7 @@ export function normalizeExperienceEvaluationPayload(
     autogestaoGestaoPessoasNota: ['autogestaoGestaoPessoasNota', 'autogestaoGestaoPessoas', 'notaAutogestaoGestaoPessoas'],
     comentarioFinal: ['comentarioFinal', 'comentarios', 'observacoes', 'parecerFinal'],
     avaliadoEm: ['avaliadoEm', 'dataAvaliacao', 'avaliacaoEm', 'finalizadoEm', 'dataFinalizacao'],
+    avaliadoFinalizadoEm: ['avaliadoEm', 'finalizadoEm', 'avaliacaoFinalizadaEm', 'respondidoEm', 'gestorRespondeuEm', 'submittedAt', 'completedAt', 'dataAvaliacao', 'avaliacaoEm', 'dataFinalizacao'],
   }
 
   for (const key of EXPERIENCE_EVALUATION_NORMALIZED_KEYS) {
@@ -147,6 +151,22 @@ export function normalizeExperienceEvaluationPayload(
       'gestorId',
     ]))
   }
+
+  const closedStatuses = new Set(['CONCLUIDA', 'AGUARDANDO_FINALIZACAO_AVALIACAO', 'FINALIZADA'])
+  const timelineStatuses = new Set(['AVALIACAO_GESTOR_RESPONDIDA', 'AVALIACAO_FINALIZADA', 'FINALIZACAO_AVALIACAO', 'CONCLUIDA'])
+  const timelineDate = (solicitation?.timelines ?? [])
+    .filter((row) => timelineStatuses.has(String(row?.status ?? '').trim()))
+    .map((row) => readDisplayString(row?.createdAt))
+    .filter(Boolean)
+    .sort()
+    .pop()
+  const fallbackDate = firstStringFromSources(
+    [asRecord(solicitation ?? {}), root],
+    ['dataFechamento', 'closedAt'],
+  ) || ((closedStatuses.has(String(solicitation?.status ?? '').trim()) && readDisplayString(solicitation?.updatedAt)) || '') || timelineDate || ''
+  const normalizedFinalizedAt = withFallback(result.avaliadoFinalizadoEm === '-' ? fallbackDate : result.avaliadoFinalizadoEm)
+  result.avaliadoFinalizadoEm = normalizedFinalizedAt
+  result.avaliadoEm = normalizedFinalizedAt
 
   return result
 }

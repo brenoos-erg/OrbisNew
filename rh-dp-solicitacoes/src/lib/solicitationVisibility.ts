@@ -21,6 +21,9 @@ type SolicitationVisibilityInput = {
   userFullName?: string | null;
   role: Role;
   userDepartmentIds: string[];
+  userCostCenterIds: string[];
+  userDepartmentNamesNormalized: string[];
+  userSectorNamesNormalized: string[];
   userSetorKeys: string[];
   finalizerTipoIds: string[];
   allowedTipoIds: string[];
@@ -72,6 +75,13 @@ export function buildReceivedSolicitationVisibilityWhere(
       },
     });
   }
+  if (input.userCostCenterIds.length > 0) {
+    regularSolicitationOrFilters.push({
+      costCenterId: {
+        in: input.userCostCenterIds,
+      },
+    });
+  }
 
   if (input.userSetorKeys.length > 0) {
     regularSolicitationOrFilters.push({
@@ -84,7 +94,6 @@ export function buildReceivedSolicitationVisibilityWhere(
       },
     });
   }
-
   if (input.allowedTipoIds.length > 0) {
     regularSolicitationOrFilters.push({
       tipoId: {

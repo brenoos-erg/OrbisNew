@@ -23,6 +23,9 @@ export type UserAccessContext = {
   userFullName?: string | null
   role: Role
   userDepartmentIds: string[]
+  userCostCenterIds: string[]
+  userDepartmentNamesNormalized: string[]
+  userSectorNamesNormalized: string[]
   userSetorKeys: string[]
   finalizerTipoIds: string[]
   allowedTipoIds: string[]
@@ -114,6 +117,16 @@ export async function resolveUserAccessContext(input: {
   ])
 
   const hasSolicitationsModuleAccess = input.role === 'ADMIN' || Boolean(solicitationModuleAccess)
+  const userCostCenterIds = new Set<string>()
+  const userCostCenterLinks = await prisma.userCostCenter.findMany({ where: { userId: input.userId }, select: { costCenterId: true } })
+  if (input.primaryDepartmentId) {
+    const primaryUser = await prisma.user.findUnique({ where: { id: input.userId }, select: { costCenterId: true } })
+    if (primaryUser?.costCenterId) userCostCenterIds.add(primaryUser.costCenterId)
+  }
+  for (const link of userCostCenterLinks) userCostCenterIds.add(link.costCenterId)
+  const normalizeName = (value: unknown) => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+  const userDepartmentNamesNormalized = userDepartments.map((department) => normalizeName(department.name)).filter(Boolean)
+  const userSectorNamesNormalized = Array.from(new Set([...userSetorKeys.map((key) => normalizeName(key)), ...userDepartmentNamesNormalized]))
   const isRhAuthorizedForExperienceEvaluation =
     hasSolicitationsModuleAccess &&
     (input.role === 'RH' || userDepartments.some((department) => isRhDepartment(department)))
@@ -125,6 +138,9 @@ export async function resolveUserAccessContext(input: {
     userFullName: input.userFullName,
     role: input.role,
     userDepartmentIds: [...userDepartmentIds],
+    userCostCenterIds: [...userCostCenterIds],
+    userDepartmentNamesNormalized,
+    userSectorNamesNormalized,
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
     allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
@@ -144,6 +160,9 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     userFullName: ctx.userFullName,
     role: ctx.role,
     userDepartmentIds: ctx.userDepartmentIds,
+    userCostCenterIds: ctx.userCostCenterIds,
+    userDepartmentNamesNormalized: ctx.userDepartmentNamesNormalized,
+    userSectorNamesNormalized: ctx.userSectorNamesNormalized,
     userSetorKeys: ctx.userSetorKeys,
     finalizerTipoIds: ctx.finalizerTipoIds,
     allowedTipoIds: ctx.allowedTipoIds,
