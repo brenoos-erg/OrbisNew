@@ -22,18 +22,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.ESTUDO_DE_CAUSA, Action.UPDATE)
 
     const body = await req.json().catch(() => ({} as any))
-    const hasCausaRaiz = body?.causaRaiz !== undefined
-    const causaRaiz = hasCausaRaiz ? (body?.causaRaiz ? String(body.causaRaiz).trim() : null) : undefined
-    const incomingItems = Array.isArray(body?.items)
-      ? body.items
-      : Array.isArray(body?.fiveWhys)
-        ? body.fiveWhys
-        : Array.isArray(body?.whyAnalysis)
-          ? body.whyAnalysis
-          : []
-    const hasItems = incomingItems.length > 0 || Array.isArray(body?.items) || Array.isArray(body?.fiveWhys) || Array.isArray(body?.whyAnalysis)
-    const items = incomingItems
+    const normalizeCauseStudyPayload = (payload: any) => {
+      const questions = Array.isArray(payload?.questions) ? payload.questions : []
+      const answers = Array.isArray(payload?.answers) ? payload.answers : []
+      const legacyItems = Array.from({ length: 20 }).map((_, idx) => ({
+        question: payload?.[`porque${idx + 1}`] !== undefined ? `Por quê ${idx + 1}?` : undefined,
+        answer: payload?.[`porque${idx + 1}`],
+      }))
+      const incomingItems = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.fiveWhys)
+          ? payload.fiveWhys
+          : Array.isArray(payload?.whyAnalysis)
+            ? payload.whyAnalysis
+            : questions.length > 0 || answers.length > 0
+              ? Array.from({ length: Math.max(questions.length, answers.length) }).map((_, idx) => ({
+                question: questions[idx],
+                answer: answers[idx],
+              }))
+              : legacyItems
+
+      const hasItems = incomingItems.some((item) => item?.question !== undefined || item?.pergunta !== undefined || item?.answer !== undefined || item?.resposta !== undefined || item?.why !== undefined)
+      const normalizedItems = incomingItems.map((item: any, idx: number) => ({
+        question: String(item?.question ?? item?.pergunta ?? `Por quê ${idx + 1}?`).trim(),
+        answer: item?.answer ?? item?.resposta ?? item?.why ?? null,
+      }))
+      const rootCauseRaw = payload?.causaRaiz ?? payload?.rootCause ?? payload?.rootCauseAnalysis ?? payload?.observacaoFinal ?? payload?.descricaoFinal ?? payload?.notes
+      const hasRootCause = rootCauseRaw !== undefined
+      const rootCause = hasRootCause ? (rootCauseRaw ? String(rootCauseRaw).trim() : null) : undefined
+
+      return { hasItems, normalizedItems, hasRootCause, rootCause }
+    }
+
+    const normalized = normalizeCauseStudyPayload(body)
     const id = (await params).id
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[estudo-causa] payload normalizado', { nonConformityId: id, payload: normalized })
+    }
 
     const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
@@ -46,12 +71,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const saved = await prisma.$transaction(async (tx) => {
       const rows = []
-      if (hasItems) {
+      if (normalized.hasItems) {
         await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId: id } })
-        for (let idx = 0; idx < items.length; idx += 1) {
-          const item = items[idx]
-          const pergunta = String(item?.pergunta || item?.question || `Por quê ${idx + 1}?`).trim()
-          const respostaRaw = item?.resposta ?? item?.answer ?? item?.why ?? null
+        for (let idx = 0; idx < normalized.normalizedItems.length; idx += 1) {
+          const item = normalized.normalizedItems[idx]
+          const pergunta = String(item?.question || `Por quê ${idx + 1}?`).trim()
+          const respostaRaw = item?.answer ?? null
           const resposta = respostaRaw !== null && respostaRaw !== undefined ? String(respostaRaw).trim() : null
 
           rows.push(await tx.nonConformityCauseItem.create({
@@ -66,19 +91,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       const normalizedCauseItems = rows.map((row) => ({ ordem: row.ordem, pergunta: row.pergunta, resposta: row.resposta }))
-      const fallbackRootCause = body?.rootCause ?? body?.rootCauseAnalysis ?? body?.observacaoFinal ?? body?.descricaoFinal
-      const normalizedRootCause = hasCausaRaiz
-        ? causaRaiz
-        : fallbackRootCause !== undefined
-          ? (fallbackRootCause ? String(fallbackRootCause).trim() : null)
-          : undefined
+      const normalizedRootCause = normalized.rootCause
 
-      if (normalizedRootCause !== undefined || hasItems) {
+      if (normalizedRootCause !== undefined || normalized.hasItems) {
         await tx.nonConformity.update({
           where: { id },
           data: {
             ...(normalizedRootCause !== undefined ? { causaRaiz: normalizedRootCause } : {}),
-            ...(hasItems ? { rootCauseAnalysis: normalizedCauseItems as any } : {}),
+            ...(normalized.hasItems ? { rootCauseAnalysis: normalizedCauseItems as any } : {}),
           },
         })
       }
@@ -86,13 +106,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         nonConformityId: id,
         actorId: me.id,
         tipo: 'ESTUDO_CAUSA',
-        message: 'Estudo de causa atualizado',
+        message: 'Estudo de causa atualizado.',
       })
-      return { rows, rootCauseAnalysis: hasItems ? normalizedCauseItems : [] }
+      return { rows, rootCauseAnalysis: normalized.hasItems ? normalizedCauseItems : [] }
     })
 
     return NextResponse.json({ ok: true, nonConformityId: id, rootCauseAnalysis: saved.rootCauseAnalysis, items: saved.rows })
   } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[estudo-causa] erro ao salvar', error)
+    }
     return NextResponse.json({ error: 'Erro ao salvar estudo de causa.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

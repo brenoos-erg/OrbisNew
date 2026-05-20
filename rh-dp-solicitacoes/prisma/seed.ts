@@ -2830,7 +2830,17 @@ async function main() {
       where: { id: 'RQ_106' },
       data: {
         schemaJson: {
-          meta: { departamentos: [dpDepartment.id], requiresApproval: false, requiresAttachment: true, templateDownload: '/templates/solicitacoes/RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontologico.docx' },
+          meta: {
+            departamentos: [dpDepartment.id],
+            requiresApproval: false,
+            requiresAttachment: true,
+            attachmentRequiredMessage: 'Anexe o formulário RQ.106 preenchido antes de enviar a solicitação.',
+            instructions: 'Anexe o formulário RQ.106 na solicitação.',
+            templateDownload: {
+              label: 'RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontológico.docx',
+              url: '/templates/solicitacoes/RQ.106 - Pedido de Exclusao de Dependentes no Plano Medico e Odontologico.docx',
+            },
+          },
           camposEspecificos: [
             { name: 'nomeSolicitante', label: 'Nome do Solicitante', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },
             { name: 'cpf', label: 'CPF', type: 'text', required: true, stage: 'solicitante', section: 'Formulário' },

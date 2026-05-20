@@ -413,6 +413,24 @@ export function isSolicitacaoInclusaoPlanoDependentes(
   )
 }
 
+export function isSolicitacaoExclusaoPlanoDependentes(
+  tipo?: TipoSolicitacaoLike | null,
+) {
+  if (!tipo) return false
+  const id = tipo.id?.trim().toUpperCase()
+  if (id === 'RQ_106' || id === 'RQ_RH_106') return true
+
+  const codigo = normalizeSolicitacaoName(tipo.codigo)
+  if (codigo.includes('RQ.106') || codigo.includes('RQ_106')) return true
+
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return (
+    nome.includes('EXCLUSAO') &&
+    nome.includes('PLANO') &&
+    nome.includes('DEPENDENTE')
+  )
+}
+
 export function isSolicitacaoIncentivoEducacao(
   tipo?: TipoSolicitacaoLike | null,
 ) {
