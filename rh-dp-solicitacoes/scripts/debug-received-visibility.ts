@@ -1,12 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import {
-  buildReceivedWhereByPolicy,
-  canApproveSolicitation,
-  canAssumeSolicitation,
-  canFinalizeSolicitation,
-  canViewSolicitation,
-  resolveUserAccessContext,
-} from '@/lib/solicitationAccessPolicy'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { isNadaConstaSolicitation, normalizeSectorKey, userCanSeeNadaConstaBySector } from '@/lib/solicitationVisibility'
 
 function parseArg(flag: string) {
   const args = process.argv.slice(2)
@@ -17,115 +11,57 @@ function parseArg(flag: string) {
 
 async function main() {
   const userArg = parseArg('--user')
+  const emailArg = parseArg('--email')
   const protocolArg = parseArg('--protocol')
-
-  if (!userArg || !protocolArg) {
-    throw new Error('Uso: --user <login|email> --protocol <RQ...>')
-  }
+  const identity = userArg ?? emailArg
+  if (!identity) throw new Error('Uso: --user <login> ou --email <email> [--protocol RQ2026-XXXXX]')
 
   const user = await prisma.user.findFirst({
-    where: { OR: [{ login: userArg }, { email: userArg }] },
-    include: { department: true },
+    where: { OR: [{ login: identity }, { email: identity }] },
+    include: { department: true, costCenter: true, costCenters: { include: { costCenter: true } }, userDepartments: { include: { department: true } } },
   })
-
-  if (!user) throw new Error(`Usuário não encontrado para ${userArg}`)
-
-  const solicitation = await prisma.solicitation.findFirst({
-    where: { protocolo: protocolArg },
-    include: {
-      department: true,
-      costCenter: true,
-      solicitacaoSetores: true,
-      tipo: { select: { id: true, codigo: true, nome: true } },
-    },
-  })
-
-  if (!solicitation) throw new Error(`Solicitação não encontrada para ${protocolArg}`)
+  if (!user) throw new Error(`Usuário não encontrado: ${identity}`)
 
   const access = await resolveUserAccessContext({
-    userId: user.id,
-    userLogin: user.login,
-    userEmail: user.email,
-    userFullName: user.fullName,
-    role: user.role,
-    primaryDepartmentId: user.departmentId,
-    primaryDepartment: user.department,
+    userId: user.id, userLogin: user.login, userEmail: user.email, userFullName: user.fullName,
+    role: user.role, primaryDepartmentId: user.departmentId, primaryDepartment: user.department,
   })
 
-  const where = buildReceivedWhereByPolicy(access)
-  const appears = await prisma.solicitation.findFirst({
-    where: { AND: [{ id: solicitation.id }, where] },
-    select: { id: true, protocolo: true },
+  const whereProtocol = protocolArg ? { protocolo: protocolArg } : {}
+  const solicitations = await prisma.solicitation.findMany({
+    where: whereProtocol,
+    take: protocolArg ? 1 : 5,
+    orderBy: { dataAbertura: 'desc' },
+    include: { department: true, costCenter: true, solicitacaoSetores: true, tipo: { select: { id: true, codigo: true, nome: true } } },
   })
 
-  const canView = canViewSolicitation(access, solicitation)
-  const canAssume = canAssumeSolicitation(access, solicitation)
-  const canApprove = canApproveSolicitation(access, solicitation)
-  const canFinalize = canFinalizeSolicitation(access, solicitation)
+  const userSectorKeys = new Set([
+    ...access.userDepartmentNamesNormalized.map(normalizeSectorKey),
+    ...access.userSectorNamesNormalized.map(normalizeSectorKey),
+  ])
 
-  const likelyReasons: string[] = []
-  if (!canView) likelyReasons.push('canViewSolicitation=false')
-  if (!appears) likelyReasons.push('findFirst(AND[id, buildReceivedWhereByPolicy]) retornou null')
-  if (!access.hasSolicitationsModuleAccess) likelyReasons.push('usuário sem acesso ao módulo Solicitações')
-  if (solicitation.tipoId === 'RQ_RH_103' && !access.allowedTipoIds.includes('RQ_RH_103')) likelyReasons.push('usuário sem vínculo de tipo/aprovador para RQ_RH_103')
+  const results = solicitations.map((s) => ({
+    protocolo: s.protocolo,
+    tipo: s.tipo,
+    isNadaConsta: isNadaConstaSolicitation(s),
+    setoresEncontrados: Array.from(new Set((JSON.stringify(s.payload ?? '') + ' ' + JSON.stringify(s.solicitacaoSetores ?? '')).split(/[^\p{L}0-9]+/u).map(normalizeSectorKey).filter(Boolean))),
+    matchBySectorRule: userCanSeeNadaConstaBySector(access, s as unknown as Record<string, unknown>),
+    shouldAppearInReceived: userCanSeeNadaConstaBySector(access, s as unknown as Record<string, unknown>) || !isNadaConstaSolicitation(s),
+  }))
 
-  console.log(
-    JSON.stringify(
-      {
-        user: {
-          id: user.id,
-          login: user.login,
-          email: user.email,
-          role: user.role,
-          departmentId: user.departmentId,
-          departmentName: user.department?.name,
-          costCenterId: user.costCenterId,
-        },
-        scope: {
-          userDepartmentIds: access.userDepartmentIds,
-          userCostCenterIds: access.userCostCenterIds,
-          userSetorKeys: access.userSetorKeys,
-          userDepartmentNamesNormalized: access.userDepartmentNamesNormalized,
-          userSectorNamesNormalized: access.userSectorNamesNormalized,
-          allowedTipoIds: access.allowedTipoIds,
-          viewerTipoIds: access.viewerTipoIds,
-          actionableTipoIds: access.actionableTipoIds,
-          finalizerTipoIds: access.finalizerTipoIds,
-          isExperienceEvaluationCoordinator: access.isExperienceEvaluationCoordinator,
-          isRhAuthorizedForExperienceEvaluation: access.isRhAuthorizedForExperienceEvaluation,
-          hasSolicitationsModuleAccess: access.hasSolicitationsModuleAccess,
-        },
-        solicitation: {
-          id: solicitation.id,
-          protocolo: solicitation.protocolo,
-          tipoId: solicitation.tipoId,
-          tipoCodigo: solicitation.tipo?.codigo,
-          tipoNome: solicitation.tipo?.nome,
-          status: solicitation.status,
-          departmentId: solicitation.departmentId,
-          departmentName: solicitation.department?.name,
-          costCenterId: solicitation.costCenterId,
-          costCenterName: solicitation.costCenter?.description,
-          approverId: solicitation.approverId,
-          assumidaPorId: solicitation.assumidaPorId,
-          solicitanteId: solicitation.solicitanteId,
-          solicitacaoSetores: solicitation.solicitacaoSetores,
-          payload: solicitation.payload,
-        },
-        policyResults: {
-          canViewSolicitation: canView,
-          canAssumeSolicitation: canAssume,
-          canApproveSolicitation: canApprove,
-          canFinalizeSolicitation: canFinalize,
-          appearsInReceivedByPolicy: Boolean(appears),
-        },
-        buildReceivedWhereByPolicy: where,
-        likelyReason: likelyReasons.length > 0 ? likelyReasons.join('; ') : 'Sem divergência detectada no backend para este usuário/chamado.',
-      },
-      null,
-      2,
-    ),
-  )
+  console.log(JSON.stringify({
+    user: { id: user.id, nome: user.fullName, login: user.login, email: user.email },
+    departamentosVinculados: user.userDepartments.map((d) => ({ id: d.departmentId, nome: d.department?.name })),
+    centrosCustoVinculados: user.costCenters.map((c) => ({ id: c.costCenterId, nome: c.costCenter?.description })),
+    scope: {
+      userDepartmentIds: access.userDepartmentIds,
+      userDepartmentNamesNormalized: access.userDepartmentNamesNormalized,
+      userCostCenterIds: access.userCostCenterIds,
+      userSectorNamesNormalized: access.userSectorNamesNormalized,
+      userSectorKeysNormalized: Array.from(userSectorKeys),
+    },
+    solicitacoesAnalisadas: results,
+  }, null, 2))
 }
 
 main().finally(() => prisma.$disconnect())
