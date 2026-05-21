@@ -17,13 +17,13 @@ import {
 } from "@/lib/solicitationAccessPolicy";
 import {
   applyReceivedInMemoryFilters,
-  applyReceivedSectorVisibilityFilter,
   buildListAndCountArgs,
   buildWhereFromSearchParams,
   getAdvancedTextFilters,
   hasReceivedInMemoryFilters,
 } from "@/lib/receivedSolicitationsQuery";
 import { resolvePrimaryResponsibleForList } from "@/lib/solicitationResponsibility";
+import { userCanSeeNadaConstaBySector } from "@/lib/solicitationVisibility";
 
 function toAndArray(
   andClause: Prisma.SolicitationWhereInput["AND"],
@@ -150,16 +150,16 @@ export async function GET(req: NextRequest) {
       },
     ];
 
-    const hasScopeVisibilityPostFilter =
+    const hasNadaConstaSectorPostFilter =
       userAccess.userSectorNamesNormalized.length > 0 ||
       userAccess.userCostCenterIds.length > 0 ||
       userAccess.userDepartmentIds.length > 0;
-    if (hasScopeVisibilityPostFilter) hasInMemoryFilters = true;
+    if (hasNadaConstaSectorPostFilter) hasInMemoryFilters = true;
     const { findManyArgs, countArgs } = buildListAndCountArgs(where, {
       skip,
-      pageSize: hasScopeVisibilityPostFilter ? 2000 : pageSize,
+      pageSize: hasNadaConstaSectorPostFilter ? 2000 : pageSize,
       orderBy,
-      includeGlobalSearchData: hasInMemoryFilters || hasScopeVisibilityPostFilter,
+      includeGlobalSearchData: hasInMemoryFilters || hasNadaConstaSectorPostFilter,
     });
 
     const [dbSolicitations, dbTotal] = await Promise.all([
@@ -167,22 +167,18 @@ export async function GET(req: NextRequest) {
       prisma.solicitation.count(countArgs),
     ]);
 
-    const scopeFilteredSolicitations = hasScopeVisibilityPostFilter
-      ? (applyReceivedSectorVisibilityFilter(
-          dbSolicitations as unknown as Record<string, unknown>[],
-          {
-            normalizedSectorNames: userAccess.userSectorNamesNormalized,
-            departmentIds: userAccess.userDepartmentIds,
-            costCenterIds: userAccess.userCostCenterIds,
-          },
-        ) as typeof dbSolicitations)
+    const nadaConstaFilteredSolicitations = hasNadaConstaSectorPostFilter
+      ? dbSolicitations.filter((solicitation) =>
+          userCanSeeNadaConstaBySector(userAccess, solicitation as unknown as Record<string, unknown>) ||
+          !String(solicitation?.tipo?.nome ?? '').toLowerCase().includes('nada consta'),
+        )
       : dbSolicitations;
     const filteredSolicitations = hasInMemoryFilters
       ? (applyReceivedInMemoryFilters(
-          scopeFilteredSolicitations as unknown as Record<string, unknown>[],
+          nadaConstaFilteredSolicitations as unknown as Record<string, unknown>[],
           advancedTextFilters,
         ) as typeof dbSolicitations)
-      : scopeFilteredSolicitations;
+      : nadaConstaFilteredSolicitations;
 
     const total = hasInMemoryFilters ? filteredSolicitations.length : dbTotal;
     const pagedSolicitations = hasInMemoryFilters

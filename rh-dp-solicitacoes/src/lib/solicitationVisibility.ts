@@ -56,6 +56,95 @@ export function resolveUserSetorKeysFromDepartments(
   return [...setorKeys];
 }
 
+
+export function normalizeSectorKey(value: string): string {
+  const normalized = String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+
+  if (!normalized) return ''
+
+  if (['saude ocupacional', 'saude'].includes(normalized)) return 'saude ocupacional'
+  if (['seguranca do trabalho', 'sst', 'seguranca'].includes(normalized)) return 'seguranca do trabalho'
+  if (['tecnologia da informacao', 'ti', 'informatica'].includes(normalized)) return 'tecnologia da informacao'
+  if (['departamento pessoal', 'dp'].includes(normalized)) return 'departamento pessoal'
+  if (['recursos humanos', 'rh'].includes(normalized)) return 'recursos humanos'
+  if (['logistica'].includes(normalized)) return 'logistica'
+  if (['almoxarifado'].includes(normalized)) return 'almoxarifado'
+
+  return normalized
+}
+
+export function isNadaConstaSolicitation(solicitationOrTipo: unknown): boolean {
+  const record = (solicitationOrTipo ?? {}) as Record<string, unknown>
+  const tipo = (record.tipo && typeof record.tipo === 'object' ? record.tipo : record) as Record<string, unknown>
+  const tipoNome = String(tipo.nome ?? record.tipoNome ?? '').toLowerCase()
+  const tipoCodigo = String(tipo.codigo ?? record.tipoCodigo ?? '').toLowerCase()
+  const tipoId = String(tipo.id ?? record.tipoId ?? '').toLowerCase()
+  const payloadText = JSON.stringify(record.payload ?? {}).toLowerCase()
+
+  return tipoNome.includes('nada consta') ||
+    tipoCodigo.includes('nada') ||
+    tipoId.includes('rq_300') ||
+    tipoId.includes('nada_consta') ||
+    payloadText.includes('nada consta') ||
+    payloadText.includes('nadaconsta')
+}
+
+function collectSectorCandidates(value: unknown, found = new Set<string>()) {
+  if (typeof value === 'string') {
+    const key = normalizeSectorKey(value)
+    if (key) found.add(key)
+    return found
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectSectorCandidates(item, found)
+    return found
+  }
+  if (!value || typeof value !== 'object') return found
+  const rec = value as Record<string, unknown>
+  for (const [k,v] of Object.entries(rec)) {
+    const lk = k.toLowerCase()
+    if (['setor','departamento','setordestino','departamentoresponsavel','name','nome','descricao','description','centrocusto','costcenter'].includes(lk) && typeof v === 'string') {
+      const key = normalizeSectorKey(v)
+      if (key) found.add(key)
+    }
+    collectSectorCandidates(v, found)
+  }
+  return found
+}
+
+export function userCanSeeNadaConstaBySector(
+  userScope: Pick<SolicitationVisibilityInput, 'userDepartmentNamesNormalized' | 'userSectorNamesNormalized' | 'userCostCenterIds' | 'userDepartmentIds'>,
+  solicitation: Record<string, unknown>,
+): boolean {
+  if (!isNadaConstaSolicitation(solicitation)) return false
+  const solicitationDepartmentId = String(solicitation.departmentId ?? '')
+  const solicitationCostCenterId = String(solicitation.costCenterId ?? '')
+  if (solicitationDepartmentId && userScope.userDepartmentIds.includes(solicitationDepartmentId)) return true
+  if (solicitationCostCenterId && userScope.userCostCenterIds.includes(solicitationCostCenterId)) return true
+
+  const names = new Set<string>([
+    ...userScope.userDepartmentNamesNormalized.map(normalizeSectorKey),
+    ...userScope.userSectorNamesNormalized.map(normalizeSectorKey),
+  ].filter(Boolean))
+  if (names.size === 0) return false
+
+  const sectors = collectSectorCandidates({
+    solicitacaoSetores: solicitation.solicitacaoSetores,
+    setorDestino: solicitation.setorDestino,
+    departamentoResponsavel: solicitation.departamentoResponsavel,
+    payload: solicitation.payload,
+  })
+
+  for (const s of sectors) {
+    if (names.has(s)) return true
+  }
+  return false
+}
 export function buildReceivedSolicitationVisibilityWhere(
   input: SolicitationVisibilityInput,
 ): Prisma.SolicitationWhereInput {
