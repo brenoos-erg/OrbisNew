@@ -348,6 +348,17 @@ export const GET = withModuleLevel(
   departamentoResponsavel: s.department?.name ?? null,
   departmentId: s.departmentId,
   approverId: s.approver?.id ?? s.approverId ?? null,
+  viewerOnly:
+    me.role === 'RH' &&
+    s.departmentId !== me.departmentId &&
+    (Boolean(s.parentId) ||
+      Boolean((s.payload as Record<string, any> | null)?.origem?.rhSolicitationId) ||
+      Boolean((s.payload as Record<string, any> | null)?.origem?.rhProtocolo)),
+  acompanhamentoLabel:
+    me.role === 'RH' &&
+    s.department?.name?.toUpperCase().includes('PESSOAL')
+      ? 'Em atendimento no DP'
+      : null,
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,

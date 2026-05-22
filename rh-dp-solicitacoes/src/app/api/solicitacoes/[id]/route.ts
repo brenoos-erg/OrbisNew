@@ -8,7 +8,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
-import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { canViewLinkedHiringFlow, canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 import {
   canApproveSolicitation,
@@ -41,7 +41,21 @@ export async function GET(
 
   try {
     stage = 'buscar-solicitacao'
-    const item = await prisma.solicitation.findUnique({ where: { id } })
+    const item = await prisma.solicitation.findUnique({
+      where: { id },
+      include: {
+        parent: {
+          select: {
+            id: true,
+            solicitanteId: true,
+            assumidaPorId: true,
+            approverId: true,
+            tipoId: true,
+            departmentId: true,
+          },
+        },
+      },
+    })
 
     if (!item) {
       return NextResponse.json(
@@ -133,6 +147,27 @@ export async function GET(
     })
 
     const canViewByDepartment = canViewSolicitation(userAccess, solicitationForPolicy)
+    const canViewLinkedFlow = canViewLinkedHiringFlow({
+      user: { id: me.id, role: me.role },
+      solicitation: {
+        id: item.id,
+        parentId: item.parentId,
+        payload: item.payload ?? {},
+        tipoId: item.tipoId,
+        tipo: tipo
+          ? {
+              id: tipo.id,
+              nome: tipo.nome,
+              codigo: (tipo as { codigo?: string | null }).codigo ?? null,
+            }
+          : null,
+        solicitanteId: item.solicitanteId,
+        assumidaPorId: item.assumidaPorId,
+        approverId: item.approverId,
+        departmentId: item.departmentId,
+        parent: item.parent,
+      },
+    })
 
     const canViewNadaConsta = canUserViewNadaConsta(
       {
@@ -161,7 +196,9 @@ export async function GET(
       },
     )
 
-    if (!canViewSensitive || !canViewNadaConsta || !canViewByDepartment) {
+    const canViewByLinkedRhDp = canViewSensitive && canViewNadaConsta && canViewLinkedFlow
+
+    if (!canViewByLinkedRhDp && (!canViewSensitive || !canViewNadaConsta || !canViewByDepartment)) {
       return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
     }
 
@@ -248,16 +285,17 @@ export async function GET(
 
     stage = 'montar-permissoes'
     const solicitationForActions = { ...solicitationForPolicy, solicitacaoSetores }
-    const viewerOnly = isViewerOnlyByPolicy(userAccess, solicitationForActions)
+    const viewerOnlyByLinkedRhDp = canViewByLinkedRhDp && !canViewByDepartment
+    const viewerOnly = viewerOnlyByLinkedRhDp || isViewerOnlyByPolicy(userAccess, solicitationForActions)
     const permissions = {
       viewerOnly,
-      canAssume: canAssumeSolicitation(userAccess, solicitationForActions),
-      canEdit: canEditSolicitation(userAccess, solicitationForActions),
-      canApprove: canApproveSolicitation(userAccess, solicitationForActions),
-      canFinalize: canFinalizeSolicitation(userAccess, solicitationForActions),
+      canAssume: viewerOnlyByLinkedRhDp ? false : canAssumeSolicitation(userAccess, solicitationForActions),
+      canEdit: viewerOnlyByLinkedRhDp ? false : canEditSolicitation(userAccess, solicitationForActions),
+      canApprove: viewerOnlyByLinkedRhDp ? false : canApproveSolicitation(userAccess, solicitationForActions),
+      canFinalize: viewerOnlyByLinkedRhDp ? false : canFinalizeSolicitation(userAccess, solicitationForActions),
       canCancel: canCancelSolicitation(userAccess, solicitationForActions),
-      canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
-      canComment: canCommentSolicitation(userAccess, solicitationForActions),
+      canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : canManageCancellationRequest(userAccess, solicitationForActions),
+      canComment: viewerOnlyByLinkedRhDp ? false : canCommentSolicitation(userAccess, solicitationForActions),
       canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
     }
 
