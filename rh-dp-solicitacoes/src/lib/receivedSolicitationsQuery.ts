@@ -1,5 +1,9 @@
 import { Prisma } from "@prisma/client";
-import { EXPERIENCE_EVALUATION_FINALIZATION_STATUS } from "./experienceEvaluation.constants";
+import {
+  EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from "./experienceEvaluation.constants";
 import {
   buildUtcDateRangeFilter,
   normalizeFilterText,
@@ -254,16 +258,44 @@ export function applyReceivedInMemoryFilters<T extends Record<string, unknown>>(
 
 export function applyReceivedSectorVisibilityFilter<T extends Record<string, unknown>>(
   rows: T[],
-  scope: { normalizedSectorNames: string[]; departmentIds: string[]; costCenterIds: string[]; viewerTipoIds?: string[] },
+  scope: {
+    normalizedSectorNames: string[]
+    departmentIds: string[]
+    costCenterIds: string[]
+    viewerTipoIds?: string[]
+    userId?: string
+    finalizerTipoIds?: string[]
+    isExperienceEvaluationCoordinator?: boolean
+    isRhAuthorizedForExperienceEvaluation?: boolean
+  },
 ): T[] {
   const names = scope.normalizedSectorNames.filter(Boolean)
   const viewerTipoIds = (scope.viewerTipoIds ?? []).filter(Boolean)
+  const finalizerTipoIds = (scope.finalizerTipoIds ?? []).filter(Boolean)
   if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0 && viewerTipoIds.length === 0) return rows
 
   return rows.filter((solicitation) => {
+    const tipoId = String(solicitation.tipoId ?? "")
+    const status = String(solicitation.status ?? "")
+    const approverId = String(solicitation.approverId ?? "")
+    const solicitanteId = String(solicitation.solicitanteId ?? "")
+    const isExperienceEvaluation = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+
+    if (isExperienceEvaluation) {
+      if (scope.userId && (approverId === scope.userId || solicitanteId === scope.userId)) return true
+
+      if (status === EXPERIENCE_EVALUATION_STATUS) {
+        if (scope.isExperienceEvaluationCoordinator || scope.isRhAuthorizedForExperienceEvaluation) return true
+      }
+
+      if (status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS) {
+        if (scope.isExperienceEvaluationCoordinator || scope.isRhAuthorizedForExperienceEvaluation) return true
+        if (finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)) return true
+        if (viewerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID)) return true
+      }
+    }
     const departmentId = String(solicitation.departmentId ?? '')
     const costCenterId = String(solicitation.costCenterId ?? '')
-    const tipoId = String(solicitation.tipoId ?? '')
     if (departmentId && scope.departmentIds.includes(departmentId)) return true
     if (costCenterId && scope.costCenterIds.includes(costCenterId)) return true
     if (tipoId && viewerTipoIds.includes(tipoId)) return true

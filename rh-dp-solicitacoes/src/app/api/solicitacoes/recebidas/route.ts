@@ -175,6 +175,12 @@ export async function GET(req: NextRequest) {
             departmentIds: userAccess.userDepartmentIds,
             costCenterIds: userAccess.userCostCenterIds,
             viewerTipoIds: userAccess.viewerTipoIds,
+            userId: me.id,
+            finalizerTipoIds: userAccess.finalizerTipoIds,
+            isExperienceEvaluationCoordinator:
+              userAccess.isExperienceEvaluationCoordinator,
+            isRhAuthorizedForExperienceEvaluation:
+              userAccess.isRhAuthorizedForExperienceEvaluation,
           },
         ) as typeof dbSolicitations)
       : dbSolicitations;
