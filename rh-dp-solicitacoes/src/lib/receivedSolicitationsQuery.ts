@@ -254,16 +254,19 @@ export function applyReceivedInMemoryFilters<T extends Record<string, unknown>>(
 
 export function applyReceivedSectorVisibilityFilter<T extends Record<string, unknown>>(
   rows: T[],
-  scope: { normalizedSectorNames: string[]; departmentIds: string[]; costCenterIds: string[] },
+  scope: { normalizedSectorNames: string[]; departmentIds: string[]; costCenterIds: string[]; viewerTipoIds?: string[] },
 ): T[] {
   const names = scope.normalizedSectorNames.filter(Boolean)
-  if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0) return rows
+  const viewerTipoIds = (scope.viewerTipoIds ?? []).filter(Boolean)
+  if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0 && viewerTipoIds.length === 0) return rows
 
   return rows.filter((solicitation) => {
     const departmentId = String(solicitation.departmentId ?? '')
     const costCenterId = String(solicitation.costCenterId ?? '')
+    const tipoId = String(solicitation.tipoId ?? '')
     if (departmentId && scope.departmentIds.includes(departmentId)) return true
     if (costCenterId && scope.costCenterIds.includes(costCenterId)) return true
+    if (tipoId && viewerTipoIds.includes(tipoId)) return true
 
     const searchable = buildReceivedFilterText(solicitation)
     return names.some((name) => searchable.includes(name))

@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
             normalizedSectorNames: userAccess.userSectorNamesNormalized,
             departmentIds: userAccess.userDepartmentIds,
             costCenterIds: userAccess.userCostCenterIds,
+            viewerTipoIds: userAccess.viewerTipoIds,
           },
         ) as typeof dbSolicitations)
       : dbSolicitations;
