@@ -12,6 +12,26 @@ type TipoLike = {
   nome?: string | null;
 };
 
+type HiringFlowLike = {
+  id?: string | null;
+  parentId?: string | null;
+  tipoId?: string | null;
+  tipo?: TipoLike | null;
+  solicitanteId?: string | null;
+  assumidaPorId?: string | null;
+  approverId?: string | null;
+  departmentId?: string | null;
+  payload?: Prisma.JsonValue | null;
+  parent?: {
+    id?: string | null;
+    solicitanteId?: string | null;
+    assumidaPorId?: string | null;
+    approverId?: string | null;
+    tipoId?: string | null;
+    departmentId?: string | null;
+  } | null;
+};
+
 export function isSensitiveHiringRequest(tipo?: TipoLike | null) {
   if (!tipo) return false;
   return isSolicitacaoPessoal(tipo) || isSolicitacaoAdmissao(tipo);
@@ -153,11 +173,60 @@ export function buildSensitiveHiringVisibilityWhere(input: {
       {
         AND: [
           { tipo: buildSensitiveHiringTipoWhere() },
-          { OR: participantFilters },
+          {
+            OR: [
+              ...participantFilters,
+              {
+                parent: {
+                  OR: [
+                    { solicitanteId: input.userId },
+                    { assumidaPorId: input.userId },
+                    { approverId: input.userId },
+                  ],
+                },
+              },
+              ...(isRh
+                ? [
+                    {
+                      parentId: { not: null },
+                    },
+                  ]
+                : []),
+            ],
+          },
         ],
       },
     ],
   } satisfies Prisma.SolicitationWhereInput;
+}
+
+export function canViewLinkedHiringFlow(input: {
+  user: { id: string; role?: Role | null };
+  solicitation: HiringFlowLike;
+}) {
+  const { user, solicitation } = input;
+  const isRh = user.role === "RH";
+  const isRequester = solicitation.solicitanteId === user.id;
+  const isParticipant =
+    solicitation.assumidaPorId === user.id || solicitation.approverId === user.id;
+  const parent = solicitation.parent;
+  const isParentRequester = parent?.solicitanteId === user.id;
+  const isParentParticipant =
+    parent?.assumidaPorId === user.id || parent?.approverId === user.id;
+  const tipo = solicitation.tipo;
+  const isAdmission = isSolicitacaoAdmissao(tipo);
+  const isPessoal = isSolicitacaoPessoal(tipo);
+  const payload = (solicitation.payload ?? {}) as Record<string, unknown>;
+  const origem = (payload.origem ?? {}) as Record<string, unknown>;
+  const hasRhOrigin =
+    Boolean(solicitation.parentId) ||
+    typeof origem.rhSolicitationId === "string" ||
+    typeof origem.rhProtocolo === "string";
+
+  if (isRequester || isParticipant || isParentRequester || isParentParticipant) return true;
+  if (isRh && isAdmission && hasRhOrigin) return true;
+  if (isRh && isPessoal && hasRhOrigin) return true;
+  return false;
 }
 
 const EXPERIENCE_EVALUATOR_ID_PATHS = [
