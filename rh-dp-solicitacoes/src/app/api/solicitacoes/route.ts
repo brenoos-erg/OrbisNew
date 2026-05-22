@@ -293,6 +293,7 @@ export const GET = withModuleLevel(
               approver: { select: { id: true, fullName: true } },
               assumidaPor: { select: { id: true, fullName: true } },
               solicitante: { select: { id: true, fullName: true } },
+              solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
               eventos: {
                 where: {
                   tipo: {

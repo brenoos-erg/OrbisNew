@@ -263,6 +263,7 @@ export function applyReceivedSectorVisibilityFilter<T extends Record<string, unk
     departmentIds: string[]
     costCenterIds: string[]
     viewerTipoIds?: string[]
+    userSetorKeys?: string[]
     userId?: string
     finalizerTipoIds?: string[]
     isExperienceEvaluationCoordinator?: boolean
@@ -272,6 +273,7 @@ export function applyReceivedSectorVisibilityFilter<T extends Record<string, unk
   const names = scope.normalizedSectorNames.filter(Boolean)
   const viewerTipoIds = (scope.viewerTipoIds ?? []).filter(Boolean)
   const finalizerTipoIds = (scope.finalizerTipoIds ?? []).filter(Boolean)
+  const userSetorKeys = new Set((scope.userSetorKeys ?? []).map((item) => String(item ?? '').trim().toUpperCase()).filter(Boolean))
   if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0 && viewerTipoIds.length === 0) return rows
 
   return rows.filter((solicitation) => {
@@ -299,6 +301,14 @@ export function applyReceivedSectorVisibilityFilter<T extends Record<string, unk
     if (departmentId && scope.departmentIds.includes(departmentId)) return true
     if (costCenterId && scope.costCenterIds.includes(costCenterId)) return true
     if (tipoId && viewerTipoIds.includes(tipoId)) return true
+
+    const solicitacaoSetores = Array.isArray(solicitation.solicitacaoSetores)
+      ? solicitation.solicitacaoSetores
+      : []
+
+    if (solicitacaoSetores.some((item) => userSetorKeys.has(String((item as { setor?: unknown })?.setor ?? '').trim().toUpperCase()))) {
+      return true
+    }
 
     const searchable = buildReceivedFilterText(solicitation)
     return names.some((name) => searchable.includes(name))
@@ -444,7 +454,7 @@ export function buildListAndCountArgs(
             department: { select: { name: true, sigla: true, code: true } },
           },
         },
-        solicitacaoSetores: { select: { status: true, constaFlag: true } },
+        solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
         comentarios: {
           select: {
             texto: true,

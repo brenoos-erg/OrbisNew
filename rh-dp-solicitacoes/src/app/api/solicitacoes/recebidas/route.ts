@@ -175,6 +175,7 @@ export async function GET(req: NextRequest) {
             departmentIds: userAccess.userDepartmentIds,
             costCenterIds: userAccess.userCostCenterIds,
             viewerTipoIds: userAccess.viewerTipoIds,
+            userSetorKeys: userAccess.userSetorKeys,
             userId: me.id,
             finalizerTipoIds: userAccess.finalizerTipoIds,
             isExperienceEvaluationCoordinator:
