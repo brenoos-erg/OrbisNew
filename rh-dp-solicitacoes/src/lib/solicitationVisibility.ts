@@ -65,7 +65,6 @@ export function buildReceivedSolicitationVisibilityWhere(
 
   const regularSolicitationOrFilters: Prisma.SolicitationWhereInput[] = [
     { assumidaPorId: input.userId },
-    { solicitanteId: input.userId },
   ];
 
   if (input.userDepartmentIds.length > 0) {
@@ -75,14 +74,6 @@ export function buildReceivedSolicitationVisibilityWhere(
       },
     });
   }
-  if (input.userCostCenterIds.length > 0) {
-    regularSolicitationOrFilters.push({
-      costCenterId: {
-        in: input.userCostCenterIds,
-      },
-    });
-  }
-
   if (input.userSetorKeys.length > 0) {
     regularSolicitationOrFilters.push({
       solicitacaoSetores: {
@@ -94,10 +85,10 @@ export function buildReceivedSolicitationVisibilityWhere(
       },
     });
   }
-  if (input.allowedTipoIds.length > 0) {
+  if ((input.viewerTipoIds ?? []).length > 0) {
     regularSolicitationOrFilters.push({
       tipoId: {
-        in: input.allowedTipoIds,
+        in: input.viewerTipoIds,
       },
     });
   }
@@ -128,8 +119,7 @@ export function buildReceivedSolicitationVisibilityWhere(
         input.isRhAuthorizedForExperienceEvaluation
           ? [{ id: { not: "" } }]
           : []),
-        ...(input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
-        (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID)
+        ...((input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID)
           ? [{ id: { not: "" } }]
           : []),
         {
@@ -146,7 +136,6 @@ export function buildReceivedSolicitationVisibilityWhere(
 
   if (
     input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
-    input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
     (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
     input.isExperienceEvaluationCoordinator ||
     input.isRhAuthorizedForExperienceEvaluation
@@ -269,7 +258,6 @@ export function canUserViewSolicitationByDepartment(
     (input.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
       input.isExperienceEvaluationCoordinator ||
       input.isRhAuthorizedForExperienceEvaluation ||
-      input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
       (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID))
   ) {
     return true;
@@ -279,7 +267,6 @@ export function canUserViewSolicitationByDepartment(
       EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as never) &&
       (input.isRhAuthorizedForExperienceEvaluation ||
         input.isExperienceEvaluationCoordinator ||
-        input.allowedTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
         (input.viewerTipoIds ?? []).includes(EXPERIENCE_EVALUATION_TIPO_ID))
     ) {
       return true;
@@ -308,10 +295,7 @@ export function canUserViewSolicitationByDepartment(
     }
   }
 
-  if (
-    solicitation.tipoId &&
-    input.allowedTipoIds.includes(solicitation.tipoId)
-  ) {
+  if (solicitation.tipoId && (input.viewerTipoIds ?? []).includes(solicitation.tipoId)) {
     return true;
   }
 

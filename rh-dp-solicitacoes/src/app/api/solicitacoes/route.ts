@@ -231,19 +231,9 @@ export const GET = withModuleLevel(
         if (scope === 'sent') {
           where.solicitanteId = me.id
         } else if (scope === 'received') {
-          const gestorAvaliadorFilter = {
-            approverId: me.id,
-            status: EXPERIENCE_EVALUATION_STATUS,
-          }
-
           where.AND = [
             ...(where.AND ?? []),
-            {
-              OR: [
-                buildReceivedWhereByPolicy(userAccess),
-                gestorAvaliadorFilter,
-              ],
-            },
+            buildReceivedWhereByPolicy(userAccess),
           ]
 
           // RQ_063 só deve chegar na fila após aprovação (nível 3)

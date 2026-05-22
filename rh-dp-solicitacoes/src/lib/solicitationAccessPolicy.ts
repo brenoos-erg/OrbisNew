@@ -82,13 +82,9 @@ export async function resolveUserAccessContext(input: {
 
   const userDepartments = Array.from(departmentRecords.values())
   const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
-  const [finalizerRows, allowedTipoRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember, solicitationModuleAccess] = await Promise.all([
+  const [finalizerRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember, solicitationModuleAccess] = await Promise.all([
     prisma.tipoSolicitacaoApprover.findMany({
       where: { userId: input.userId, role: 'FINALIZER' },
-      select: { tipoId: true },
-    }),
-    prisma.tipoSolicitacaoApprover.findMany({
-      where: { userId: input.userId },
       select: { tipoId: true },
     }),
     prisma.tipoSolicitacaoApprover.findMany({
@@ -143,7 +139,7 @@ export async function resolveUserAccessContext(input: {
     userSectorNamesNormalized,
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
-    allowedTipoIds: Array.from(new Set(allowedTipoRows.map((row) => row.tipoId))),
+    allowedTipoIds: [],
     viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),

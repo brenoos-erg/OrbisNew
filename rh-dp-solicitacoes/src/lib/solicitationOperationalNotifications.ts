@@ -106,24 +106,21 @@ async function resolveRecipients(
   event: SolicitationNotificationEvent,
 ) {
   const deptEmails = await getDepartmentMemberEmails(solicitation.departmentId)
-  const watchers = Array.isArray((solicitation.payload as any)?.notificationWatchers)
-    ? ((solicitation.payload as any).notificationWatchers as string[])
-    : []
 
   switch (event) {
     case 'OPENED':
     case 'STEP_CHANGED':
-      return [...deptEmails, solicitation.assumidaPor?.email, solicitation.approver?.email]
+      return [...deptEmails]
     case 'AWAITING_APPROVAL':
-      return [solicitation.approver?.email, ...deptEmails]
+      return [solicitation.approver?.email]
     case 'UPDATED':
-      return [solicitation.assumidaPor?.email, solicitation.approver?.email, ...deptEmails, ...watchers]
+      return [solicitation.assumidaPor?.email, solicitation.approver?.email, ...deptEmails]
     case 'APPROVED':
     case 'REJECTED':
-      return [solicitation.solicitante?.email, solicitation.assumidaPor?.email, ...deptEmails]
+      return [solicitation.solicitante?.email]
     case 'FINALIZED':
     case 'CANCELED':
-      return [solicitation.solicitante?.email, ...deptEmails, solicitation.assumidaPor?.email]
+      return [solicitation.solicitante?.email]
     default:
       return []
   }
