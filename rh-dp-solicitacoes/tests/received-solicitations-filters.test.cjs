@@ -9,6 +9,7 @@ const path = require("node:path");
 
 const {
   applyReceivedInMemoryFilters,
+  applyReceivedSectorVisibilityFilter,
   buildListAndCountArgs,
   buildReceivedFilterText,
   buildReceivedResponsibleFilterText,
@@ -587,3 +588,40 @@ for (const file of sourceFiles) {
 }
 
 console.log("✅ received-solicitations-filters.test.cjs passed");
+
+
+const setorRows = [
+  { ...baseRow, id: 'saude', solicitacaoSetores: [{ setor: 'SAUDE', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'sst', solicitacaoSetores: [{ setor: 'SST', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'dp', solicitacaoSetores: [{ setor: 'DP', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'ti', solicitacaoSetores: [{ setor: 'TI', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'logistica', solicitacaoSetores: [{ setor: 'LOGISTICA', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'almox', solicitacaoSetores: [{ setor: 'ALMOX', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'financeiro', solicitacaoSetores: [{ setor: 'FINANCEIRO', status: 'PENDENTE', constaFlag: null }] },
+  { ...baseRow, id: 'fiscal', solicitacaoSetores: [{ setor: 'FISCAL', status: 'PENDENTE', constaFlag: null }] },
+]
+
+for (const [setor, expected] of [['SAUDE','saude'],['SST','sst'],['DP','dp'],['TI','ti'],['LOGISTICA','logistica'],['ALMOX','almox'],['FINANCEIRO','financeiro'],['FISCAL','fiscal']]) {
+  const visible = applyReceivedSectorVisibilityFilter(setorRows, {
+    normalizedSectorNames: [],
+    departmentIds: [],
+    costCenterIds: [],
+    viewerTipoIds: [],
+    userSetorKeys: [setor],
+  })
+  assert(visible.some((r) => r.id === expected), `setor ${setor} deve enxergar protocolo com solicitacaoSetores.setor correspondente`)
+}
+
+const postFilterGuard = applyReceivedSectorVisibilityFilter([
+  { ...baseRow, id: 'guard-1', solicitacaoSetores: [{ setor: 'SAUDE', status: 'PENDENTE', constaFlag: null }], titulo: 'Sem texto nada consta' },
+], {
+  normalizedSectorNames: ['inexistente'],
+  departmentIds: [],
+  costCenterIds: [],
+  viewerTipoIds: [],
+  userSetorKeys: ['SAUDE'],
+})
+assert.equal(postFilterGuard.length, 1, 'i/k. pós-filtro não pode remover linha autorizada por solicitacaoSetores.setor, mesmo sem texto')
+
+const argsCheck = buildListAndCountArgs({}, { skip: 0, pageSize: 10, orderBy: [{ updatedAt: 'desc' }] })
+assert.equal(argsCheck.findManyArgs.include.solicitacaoSetores.select.setor, true, 'j. buildListAndCountArgs deve incluir solicitacaoSetores.setor')
