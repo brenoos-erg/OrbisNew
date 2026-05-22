@@ -1,67 +1,28 @@
 import { prisma } from '@/lib/prisma'
-import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { isNadaConstaSolicitation, normalizeSectorKey, userCanSeeNadaConstaBySector } from '@/lib/solicitationVisibility'
+import { getUserReceivedVisibilityScope, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { extractNadaConstaSectorKeys, isNadaConstaSolicitation, userCanSeeNadaConstaBySector } from '@/lib/solicitationVisibility'
 
-function parseArg(flag: string) {
-  const args = process.argv.slice(2)
-  const idx = args.indexOf(flag)
-  if (idx === -1) return null
-  return args[idx + 1] ?? null
-}
+const arg=(f:string)=>{const a=process.argv.slice(2);const i=a.indexOf(f);return i>=0?a[i+1]??null:null}
 
-async function main() {
-  const userArg = parseArg('--user')
-  const emailArg = parseArg('--email')
-  const protocolArg = parseArg('--protocol')
-  const identity = userArg ?? emailArg
-  if (!identity) throw new Error('Uso: --user <login> ou --email <email> [--protocol RQ2026-XXXXX]')
-
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ login: identity }, { email: identity }] },
-    include: { department: true, costCenter: true, costCenters: { include: { costCenter: true } }, userDepartments: { include: { department: true } } },
-  })
-  if (!user) throw new Error(`Usuário não encontrado: ${identity}`)
-
-  const access = await resolveUserAccessContext({
-    userId: user.id, userLogin: user.login, userEmail: user.email, userFullName: user.fullName,
-    role: user.role, primaryDepartmentId: user.departmentId, primaryDepartment: user.department,
-  })
-
-  const whereProtocol = protocolArg ? { protocolo: protocolArg } : {}
-  const solicitations = await prisma.solicitation.findMany({
-    where: whereProtocol,
-    take: protocolArg ? 1 : 5,
-    orderBy: { dataAbertura: 'desc' },
-    include: { department: true, costCenter: true, solicitacaoSetores: true, tipo: { select: { id: true, codigo: true, nome: true } } },
-  })
-
-  const userSectorKeys = new Set([
-    ...access.userDepartmentNamesNormalized.map(normalizeSectorKey),
-    ...access.userSectorNamesNormalized.map(normalizeSectorKey),
-  ])
-
-  const results = solicitations.map((s) => ({
-    protocolo: s.protocolo,
-    tipo: s.tipo,
-    isNadaConsta: isNadaConstaSolicitation(s),
-    setoresEncontrados: Array.from(new Set((JSON.stringify(s.payload ?? '') + ' ' + JSON.stringify(s.solicitacaoSetores ?? '')).split(/[^\p{L}0-9]+/u).map(normalizeSectorKey).filter(Boolean))),
-    matchBySectorRule: userCanSeeNadaConstaBySector(access, s as unknown as Record<string, unknown>),
-    shouldAppearInReceived: userCanSeeNadaConstaBySector(access, s as unknown as Record<string, unknown>) || !isNadaConstaSolicitation(s),
-  }))
+async function main(){
+  const userArg=arg('--user'); const protocolArg=arg('--protocol');
+  if(!userArg) throw new Error('Uso: npm run debug:received-visibility -- --user <login> [--protocol RQ...]')
+  const user=await prisma.user.findFirst({where:{login:userArg},include:{department:true}})
+  if(!user) throw new Error(`Usuário não encontrado: ${userArg}`)
+  const scope=await getUserReceivedVisibilityScope(user.id)
+  const access=await resolveUserAccessContext({userId:user.id,userLogin:user.login,userEmail:user.email,userFullName:user.fullName,role:user.role,primaryDepartmentId:user.departmentId,primaryDepartment:user.department})
+  const where:any={ tipo:{ nome:{ contains:'nada consta', mode:'insensitive' } } }
+  if(protocolArg) where.protocolo=protocolArg
+  const solicitacoes=await prisma.solicitation.findMany({where,orderBy:{dataAbertura:'desc'},take:protocolArg?1:100,include:{tipo:true,solicitacaoSetores:true,department:true,costCenter:true}})
 
   console.log(JSON.stringify({
-    user: { id: user.id, nome: user.fullName, login: user.login, email: user.email },
-    departamentosVinculados: user.userDepartments.map((d) => ({ id: d.departmentId, nome: d.department?.name })),
-    centrosCustoVinculados: user.costCenters.map((c) => ({ id: c.costCenterId, nome: c.costCenter?.description })),
-    scope: {
-      userDepartmentIds: access.userDepartmentIds,
-      userDepartmentNamesNormalized: access.userDepartmentNamesNormalized,
-      userCostCenterIds: access.userCostCenterIds,
-      userSectorNamesNormalized: access.userSectorNamesNormalized,
-      userSectorKeysNormalized: Array.from(userSectorKeys),
-    },
-    solicitacoesAnalisadas: results,
-  }, null, 2))
+    usuario:{id:user.id,nome:user.fullName,login:user.login,email:user.email},
+    departamentosVinculados:scope?.linkedDepartments??[],
+    centrosCustoVinculados:scope?.linkedCostCenters??[],
+    sectorKeysNormalizadas:scope?.sectorKeys??[],
+    protocolosNadaConstaEncontrados:solicitacoes.map(s=>s.protocolo),
+    diagnostico:solicitacoes.map((s)=>{const setorKeys=extractNadaConstaSectorKeys(s as any);const matched=userCanSeeNadaConstaBySector(access,s as any);return{protocolo:s.protocolo,isNadaConsta:isNadaConstaSolicitation(s),setoresExtraidos:setorKeys,shouldAppear:matched,motivo:matched?'match em setor/departamento/centro':'sem interseção com escopo do usuário'}})
+  },null,2))
 }
 
-main().finally(() => prisma.$disconnect())
+main().finally(()=>prisma.$disconnect())

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
               }))
               : legacyItems
 
-      const hasItems = incomingItems.some((item) => item?.question !== undefined || item?.pergunta !== undefined || item?.answer !== undefined || item?.resposta !== undefined || item?.why !== undefined)
+      const hasItems = incomingItems.some((item: any) => item?.question !== undefined || item?.pergunta !== undefined || item?.answer !== undefined || item?.resposta !== undefined || item?.why !== undefined)
       const normalizedItems = incomingItems.map((item: any, idx: number) => ({
         question: String(item?.question ?? item?.pergunta ?? `Por quê ${idx + 1}?`).trim(),
         answer: item?.answer ?? item?.resposta ?? item?.why ?? null,

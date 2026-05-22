@@ -15,6 +15,7 @@ import {
 } from '@/lib/experienceEvaluation'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { isRhDepartment } from '@/lib/rhAccess'
+import { normalizeSectorKey } from '@/lib/solicitationVisibility'
 
 export type UserAccessContext = {
   userId: string
@@ -149,6 +150,56 @@ export async function resolveUserAccessContext(input: {
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
     isRhAuthorizedForExperienceEvaluation,
     hasSolicitationsModuleAccess,
+  }
+}
+
+export async function getUserReceivedVisibilityScope(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      department: true,
+      costCenter: true,
+      userDepartments: { include: { department: true } },
+      costCenters: { include: { costCenter: true } },
+    },
+  })
+  if (!user) return null
+
+  const access = await resolveUserAccessContext({
+    userId: user.id,
+    userLogin: user.login,
+    userEmail: user.email,
+    userFullName: user.fullName,
+    role: user.role,
+    primaryDepartmentId: user.departmentId,
+    primaryDepartment: user.department,
+  })
+
+  const sectorKeys = Array.from(
+    new Set(
+      [
+        ...access.userDepartmentNamesNormalized,
+        ...access.userSectorNamesNormalized,
+        ...access.userCostCenterIds,
+        ...user.costCenters.map((c) => c.costCenter?.description ?? ''),
+      ]
+        .map((v) => normalizeSectorKey(v))
+        .filter(Boolean),
+    ),
+  )
+
+  return {
+    userId: user.id,
+    role: user.role,
+    principalDepartment: user.department ? { id: user.department.id, nome: user.department.name } : null,
+    principalCostCenter: user.costCenter ? { id: user.costCenter.id, nome: user.costCenter.description } : null,
+    departmentIds: access.userDepartmentIds,
+    costCenterIds: access.userCostCenterIds,
+    departmentNamesNormalized: access.userDepartmentNamesNormalized,
+    sectorNamesNormalized: access.userSectorNamesNormalized,
+    sectorKeys,
+    linkedDepartments: user.userDepartments.map((link) => ({ id: link.departmentId, nome: link.department?.name ?? null })),
+    linkedCostCenters: user.costCenters.map((link) => ({ id: link.costCenterId, nome: link.costCenter?.description ?? null })),
   }
 }
 

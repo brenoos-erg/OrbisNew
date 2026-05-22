@@ -57,7 +57,7 @@ export function resolveUserSetorKeysFromDepartments(
 }
 
 
-export function normalizeSectorKey(value: string): string {
+export function normalizeSectorKey(value: unknown): string {
   const normalized = String(value ?? '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -76,6 +76,20 @@ export function normalizeSectorKey(value: string): string {
   if (['almoxarifado'].includes(normalized)) return 'almoxarifado'
 
   return normalized
+}
+
+export function extractNadaConstaSectorKeys(
+  solicitation: Record<string, unknown>,
+): string[] {
+  const sectors = collectSectorCandidates({
+    solicitacaoSetores: solicitation.solicitacaoSetores,
+    setorDestino: solicitation.setorDestino,
+    departamentoResponsavel: solicitation.departamentoResponsavel,
+    centroCusto: solicitation.centroCusto,
+    costCenter: solicitation.costCenter,
+    payload: solicitation.payload,
+  });
+  return [...sectors];
 }
 
 export function isNadaConstaSolicitation(solicitationOrTipo: unknown): boolean {
@@ -133,12 +147,7 @@ export function userCanSeeNadaConstaBySector(
   ].filter(Boolean))
   if (names.size === 0) return false
 
-  const sectors = collectSectorCandidates({
-    solicitacaoSetores: solicitation.solicitacaoSetores,
-    setorDestino: solicitation.setorDestino,
-    departamentoResponsavel: solicitation.departamentoResponsavel,
-    payload: solicitation.payload,
-  })
+  const sectors = extractNadaConstaSectorKeys(solicitation)
 
   for (const s of sectors) {
     if (names.has(s)) return true

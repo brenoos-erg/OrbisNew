@@ -23,7 +23,11 @@ import {
   hasReceivedInMemoryFilters,
 } from "@/lib/receivedSolicitationsQuery";
 import { resolvePrimaryResponsibleForList } from "@/lib/solicitationResponsibility";
-import { userCanSeeNadaConstaBySector } from "@/lib/solicitationVisibility";
+import {
+  extractNadaConstaSectorKeys,
+  isNadaConstaSolicitation,
+  userCanSeeNadaConstaBySector,
+} from "@/lib/solicitationVisibility";
 
 function toAndArray(
   andClause: Prisma.SolicitationWhereInput["AND"],
@@ -74,6 +78,9 @@ export async function GET(req: NextRequest) {
     const orderBy = resolveOrderBy(searchParams);
     const advancedTextFilters = getAdvancedTextFilters(searchParams);
     let hasInMemoryFilters = hasReceivedInMemoryFilters(advancedTextFilters);
+    const debugVisibility =
+      process.env.NODE_ENV !== "production" &&
+      searchParams.get("debugVisibility") === "1";
 
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
@@ -173,6 +180,30 @@ export async function GET(req: NextRequest) {
           !String(solicitation?.tipo?.nome ?? '').toLowerCase().includes('nada consta'),
         )
       : dbSolicitations;
+    if (debugVisibility) {
+      debugReceivedSolicitations("debug-visibility", {
+        userId: me.id,
+        userSectorKeys: userAccess.userSectorNamesNormalized,
+        rows: dbSolicitations.slice(0, 100).map((solicitation) => {
+          const isNadaConsta = isNadaConstaSolicitation(solicitation);
+          return {
+            protocolo: solicitation.protocolo,
+            isNadaConsta,
+            nadaConstaSectorKeys: isNadaConsta
+              ? extractNadaConstaSectorKeys(
+                  solicitation as unknown as Record<string, unknown>,
+                )
+              : [],
+            matched: isNadaConsta
+              ? userCanSeeNadaConstaBySector(
+                  userAccess,
+                  solicitation as unknown as Record<string, unknown>,
+                )
+              : true,
+          };
+        }),
+      });
+    }
     const filteredSolicitations = hasInMemoryFilters
       ? (applyReceivedInMemoryFilters(
           nadaConstaFilteredSolicitations as unknown as Record<string, unknown>[],
