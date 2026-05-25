@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         question: String(item?.question ?? item?.pergunta ?? `Por quê ${idx + 1}?`).trim(),
         answer: item?.answer ?? item?.resposta ?? item?.why ?? null,
       }))
-      const rootCauseRaw = payload?.causaRaiz ?? payload?.rootCause ?? payload?.rootCauseAnalysis ?? payload?.observacaoFinal ?? payload?.descricaoFinal ?? payload?.notes
+      const rootCauseRaw = payload?.causaRaiz ?? payload?.rootCause ?? payload?.observacaoFinal ?? payload?.descricaoFinal ?? payload?.notes
       const hasRootCause = rootCauseRaw !== undefined
       const rootCause = hasRootCause ? (rootCauseRaw ? String(rootCauseRaw).trim() : null) : undefined
 
@@ -112,6 +112,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (process.env.NODE_ENV !== 'production') {
       console.error('[estudo-causa] erro ao salvar', error)
     }
-    return NextResponse.json({ error: 'Erro ao salvar estudo de causa.', detail: devErrorDetail(error) }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Erro ao salvar estudo de causa.', ...(process.env.NODE_ENV !== 'production' ? { detail: devErrorDetail(error) } : {}) },
+      { status: 500 },
+    )
   }
 }
