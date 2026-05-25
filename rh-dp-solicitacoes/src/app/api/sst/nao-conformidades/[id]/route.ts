@@ -6,7 +6,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature, canFeature } from '@/lib/permissions'
+import { assertCanFeature, canFeature, getUserModuleLevel } from '@/lib/permissions'
 import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
@@ -48,6 +48,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
+    const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
+    const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
@@ -95,8 +97,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Sem permissão para visualizar esta NC.' }, { status: 403 })
     }
 
-    const hasSgiQualidadeLevel3 = hasMinLevel(level, ModuleLevel.NIVEL_3)
-
     return NextResponse.json({
       item: {
         ...nc,
@@ -125,6 +125,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
+    const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
+    const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Permissão insuficiente para editar.' }, { status: 403 })
     }

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
               }))
               : legacyItems
 
-      const hasItems = incomingItems.some((item) => item?.question !== undefined || item?.pergunta !== undefined || item?.answer !== undefined || item?.resposta !== undefined || item?.why !== undefined)
+      const hasItems = incomingItems.some((item: any) => item?.question !== undefined || item?.pergunta !== undefined || item?.answer !== undefined || item?.resposta !== undefined || item?.why !== undefined)
       const normalizedItems = incomingItems.map((item: any, idx: number) => ({
         question: String(item?.question ?? item?.pergunta ?? `Por quê ${idx + 1}?`).trim(),
         answer: item?.answer ?? item?.resposta ?? item?.why ?? null,
@@ -90,16 +90,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
-      const normalizedCauseItems = rows.map((row) => ({ ordem: row.ordem, pergunta: row.pergunta, resposta: row.resposta }))
       const normalizedRootCause = normalized.rootCause
 
-      if (normalizedRootCause !== undefined || normalized.hasItems) {
+      if (normalizedRootCause !== undefined) {
         await tx.nonConformity.update({
           where: { id },
-          data: {
-            ...(normalizedRootCause !== undefined ? { causaRaiz: normalizedRootCause } : {}),
-            ...(normalized.hasItems ? { rootCauseAnalysis: normalizedCauseItems as any } : {}),
-          },
+          data: { causaRaiz: normalizedRootCause },
         })
       }
        await appendNonConformityTimelineEvent(tx, {
@@ -108,10 +104,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         tipo: 'ESTUDO_CAUSA',
         message: 'Estudo de causa atualizado.',
       })
-      return { rows, rootCauseAnalysis: normalized.hasItems ? normalizedCauseItems : [] }
+      return { rows }
     })
 
-    return NextResponse.json({ ok: true, nonConformityId: id, rootCauseAnalysis: saved.rootCauseAnalysis, items: saved.rows })
+    return NextResponse.json({ ok: true, nonConformityId: id, items: saved.rows })
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('[estudo-causa] erro ao salvar', error)
