@@ -7,7 +7,7 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature, canFeature, getUserModuleLevel } from '@/lib/permissions'
-import { canApproveNc, canManageAllNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
+import { canApproveNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
@@ -50,6 +50,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const level = normalizeSstLevel(levels)
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
     const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
+    const hasNcManagementLevel = hasSgiQualidadeLevel3
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
     }
@@ -105,7 +106,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           totalAcoes: nc.planoDeAcao.length,
         },
         permissions: {
-          canManageAllNc: canManageAllNc(level),
+          canManageAllNc: hasNcManagementLevel,
           canApproveQuality: canApproveNc(level),
           canEditFirstScreen: hasSgiQualidadeLevel3 && canUpdateNc,
         },
@@ -127,6 +128,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const level = normalizeSstLevel(levels)
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
     const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
+    const hasNcManagementLevel = hasSgiQualidadeLevel3
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Permissão insuficiente para editar.' }, { status: 403 })
     }
@@ -168,7 +170,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Status inválido.' }, { status: 400 })
     }
 
-    if (!approved && !canManageAllNc(level)) {
+    if (!approved && !hasNcManagementLevel) {
       const onlyBasic = ['descricao', 'evidenciaObjetiva']
       const touched = Object.keys(body).filter((key) => body[key] !== undefined)
       if (touched.some((key) => !onlyBasic.includes(key))) {
@@ -177,15 +179,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const touchedFields = Object.keys(body).filter((key) => body[key] !== undefined)
-    if (!canEditFirstScreen(canManageAllNc(level), touchedFields)) {
-
+    const canEditFirstScreenFields = canEditFirstScreen(hasSgiQualidadeLevel3, touchedFields)
+    if (!canEditFirstScreenFields) {
       return NextResponse.json({ error: 'Somente usuários com nível 3 podem editar os dados da 1ª tela da NC.' }, { status: 403 })
     }
-    if (nextStatus === NonConformityStatus.ENCERRADA && !canManageAllNc(level)) {
+    if (nextStatus === NonConformityStatus.ENCERRADA && !hasNcManagementLevel) {
       return NextResponse.json({ error: 'Somente nível 3 pode encerrar.' }, { status: 403 })
     }
 
-     if (nextStatus === NonConformityStatus.CANCELADA && !canManageAllNc(level)) {
+     if (nextStatus === NonConformityStatus.CANCELADA && !hasNcManagementLevel) {
       return NextResponse.json({ error: 'Somente nível 3 pode cancelar.' }, { status: 403 })
     }
 
@@ -193,7 +195,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       (current.status === NonConformityStatus.ENCERRADA || current.status === NonConformityStatus.CANCELADA) &&
       nextStatus === NonConformityStatus.EM_TRATATIVA
 
-    if (isReopen && !canManageAllNc(level)) {
+    if (isReopen && !hasNcManagementLevel) {
       return NextResponse.json({ error: 'Somente nível 3 pode reabrir.' }, { status: 403 })
     }
 

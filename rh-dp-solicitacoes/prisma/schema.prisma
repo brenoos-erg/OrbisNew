@@ -1194,7 +1194,7 @@ model NonConformityCauseItem {
   id              String        @id @default(cuid())
   nonConformityId String
   ordem           Int
-  pergunta        String
+  pergunta        String        @db.LongText
   resposta        String?       @db.LongText
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
