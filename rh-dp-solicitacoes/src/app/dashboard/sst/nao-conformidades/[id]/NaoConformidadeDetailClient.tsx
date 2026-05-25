@@ -334,7 +334,10 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setEstudoError(data?.error || data?.detail || 'Erro ao salvar estudo de causa.')
+      if (process.env.NODE_ENV !== 'production' && data?.detail) {
+        console.error('Erro detalhado ao salvar estudo de causa:', data.detail)
+      }
+      setEstudoError(data?.error || 'Erro ao salvar estudo de causa.')
       setEstudoSaving(false)
       return
     }
