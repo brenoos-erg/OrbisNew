@@ -21,6 +21,9 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
   const [pageCount, setPageCount] = useState(0)
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null)
   const [nativeMode, setNativeMode] = useState(false)
+  const [nativeUrl, setNativeUrl] = useState<string | null>(null)
+  const [nativeMimeType, setNativeMimeType] = useState<string>('')
+  const [nativeFileName, setNativeFileName] = useState<string>('')
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const initialIntentRef = useRef<'view' | 'print'>(initialIntent)
 
@@ -85,6 +88,18 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
     if (basicMatch?.[1]) return basicMatch[1]
     return `documento-${versionId}.pdf`
   }
+
+  const revokeNativeUrl = () => {
+    if (!nativeUrl) return
+    URL.revokeObjectURL(nativeUrl)
+    setNativeUrl(null)
+  }
+
+  const getNativeExtension = () => nativeFileName.split('.').pop()?.trim().toLowerCase() ?? ''
+  const isImageNative = () => nativeMimeType.startsWith('image/')
+  const isHtmlNative = () => nativeMimeType.includes('text/html') || getNativeExtension() === 'html' || getNativeExtension() === 'htm'
+  const isPdfNative = () => nativeMimeType.includes('application/pdf') || getNativeExtension() === 'pdf'
+  const isOfficeNative = () => ['doc', 'docx', 'xls', 'xlsx'].includes(getNativeExtension())
   const loadPdf = async () => {
     setLoading(true)
     setError(null)
@@ -104,7 +119,13 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
 
       const buffer = await response.arrayBuffer()
       const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+      const nativeName = getSuggestedFileName(response)
+      setNativeFileName(nativeName)
+      setNativeMimeType(contentType)
       if (!contentType.includes('application/pdf')) {
+        revokeNativeUrl()
+        const blob = new Blob([buffer], { type: contentType || 'application/octet-stream' })
+        setNativeUrl(URL.createObjectURL(blob))
         setNativeMode(true)
         setPdf((current) => {
           current?.destroy().catch(() => null)
@@ -116,6 +137,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
       }
 
       setNativeMode(false)
+      revokeNativeUrl()
       const bytes = new Uint8Array(buffer)
       setSourceBytes(bytes)
 
@@ -133,6 +155,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
       })
       setPageCount(0)
       setNativeMode(false)
+      revokeNativeUrl()
     } finally {
       setLoading(false)
     }
@@ -146,6 +169,7 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
         current?.destroy().catch(() => null)
         return null
       })
+      revokeNativeUrl()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpointBase])
@@ -258,12 +282,53 @@ export default function ControlledPdfViewer({ versionId, initialIntent = 'view',
 
   if (!sourceBytes || pageCount < 1) {
     if (nativeMode) {
+      const openNativeFile = () => {
+        if (!nativeUrl) return
+        window.open(nativeUrl, '_blank', 'noopener,noreferrer')
+      }
+
       return (
         <div className="space-y-3">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            Este documento está no modo nativo (sem conversão para PDF controlado).
-          </div>
-          <iframe className="h-[calc(100vh-180px)] w-full rounded-lg border border-slate-200 bg-white" src={`${endpointBase}?action=view`} title="Visualização nativa do documento" />
+          {isOfficeNative() ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-medium">Este documento está em formato nativo.</p>
+              <p className="mt-1">Baixe ou abra o arquivo original para imprimir.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700"
+                  onClick={() => void downloadFile()}
+                >
+                  <Download size={14} /> Baixar documento
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                  onClick={openNativeFile}
+                >
+                  Abrir arquivo original
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {isImageNative() && nativeUrl ? (
+            <div className="overflow-auto rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+              <img src={nativeUrl} alt="Visualização do documento" className="mx-auto h-auto max-w-full" />
+            </div>
+          ) : null}
+
+          {isHtmlNative() && nativeUrl ? (
+            <iframe className="h-[calc(100vh-180px)] w-full rounded-lg border border-slate-200 bg-white" src={nativeUrl} title="Visualização HTML do documento" />
+          ) : null}
+
+          {isPdfNative() && nativeUrl ? (
+            <iframe className="h-[calc(100vh-180px)] w-full rounded-lg border border-slate-200 bg-white" src={`${nativeUrl}#toolbar=0&navpanes=0`} title="Visualização do PDF original" />
+          ) : null}
+
+          {!isOfficeNative() && !isImageNative() && !isHtmlNative() && !isPdfNative() ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+              Este documento não pode ser renderizado no navegador. Use o download para abrir o arquivo original.
+            </div>
+          ) : null}
         </div>
       )
     }
