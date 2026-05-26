@@ -989,6 +989,16 @@ export default function NovaSolicitacaoPage() {
           setSubmitting(false);
           return;
         }
+        if (!String(extras.vagaSigilosa ?? '').trim()) {
+          setSubmitError('Informe se a vaga é sigilosa.');
+          setSubmitting(false);
+          return;
+        }
+        if (!String(extras.podeDivulgarVaga ?? '').trim()) {
+          setSubmitError('Informe se a vaga pode ser divulgada.');
+          setSubmitting(false);
+          return;
+        }
 
 
         const tipoContrParts: string[] = [];
@@ -1018,6 +1028,9 @@ export default function NovaSolicitacaoPage() {
           vagaPrevistaContrato: extras.vagaPrevista ?? '',
           motivoVaga: motivoSelecionado,
           motivoDaVaga: motivoSelecionado,
+          vagaSigilosa: extras.vagaSigilosa ?? '',
+          podeDivulgarVaga: extras.podeDivulgarVaga ?? '',
+          observacaoSigiloDivulgacao: extras.observacaoSigiloDivulgacao ?? '',
           tipoContratacao: tipoContrParts.join(' / '),
           principaisAtividades: extras.principaisAtividades ?? '',
           atividadesComplementares: extras.atividadesComplementares ?? '',
@@ -1833,6 +1846,48 @@ useEffect(() => {
                         handleExtraChange('cargo', e.target.value)
                       }
                       required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className={labelClass}>
+                        Vaga sigilosa? <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        className={inputClass}
+                        value={extras.vagaSigilosa ?? ''}
+                        onChange={(e) => handleExtraChange('vagaSigilosa', e.target.value)}
+                        required
+                      >
+                        <option value="">Selecione</option>
+                        <option value="Sim">Sim</option>
+                        <option value="Não">Não</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>
+                        Pode divulgar a vaga? <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        className={inputClass}
+                        value={extras.podeDivulgarVaga ?? ''}
+                        onChange={(e) => handleExtraChange('podeDivulgarVaga', e.target.value)}
+                        required
+                      >
+                        <option value="">Selecione</option>
+                        <option value="Sim">Sim</option>
+                        <option value="Não">Não</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Observação sobre sigilo/divulgação</label>
+                    <textarea
+                      className={textareaClass}
+                      value={extras.observacaoSigiloDivulgacao ?? ''}
+                      onChange={(e: TextAreaChange) => handleExtraChange('observacaoSigiloDivulgacao', e.target.value)}
                     />
                   </div>
 
