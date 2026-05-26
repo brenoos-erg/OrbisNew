@@ -121,6 +121,26 @@ function normalizeSimpleText(value: string) {
     .toUpperCase()
 }
 
+function normalizeSimNao(value: unknown): 'Sim' | 'Não' | null {
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
+  if (typeof value === 'number') {
+    if (value === 1) return 'Sim'
+    if (value === 0) return 'Não'
+  }
+  if (typeof value !== 'string') return null
+
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+
+  if (!normalized) return null
+  if (['sim', 's', 'true', '1'].includes(normalized)) return 'Sim'
+  if (['nao', 'n', 'false', '0'].includes(normalized)) return 'Não'
+  return null
+}
+
 function parseDateOnly(value: unknown) {
   if (typeof value !== 'string' || !value.trim()) return null
   const date = new Date(`${value}T00:00:00`)
@@ -798,11 +818,34 @@ export const POST = withModuleLevel(
             )
           }
 
+          const vagaSigilosa = normalizeSimNao(campos.vagaSigilosa)
+          if (!vagaSigilosa) {
+            return NextResponse.json(
+              {
+                error: 'Informe se a vaga é sigilosa.',
+              },
+              { status: 400 },
+            )
+          }
+
+          const podeDivulgarVaga = normalizeSimNao(campos.podeDivulgarVaga)
+          if (!podeDivulgarVaga) {
+            return NextResponse.json(
+              {
+                error: 'Informe se a vaga pode ser divulgada.',
+              },
+              { status: 400 },
+            )
+          }
+
           payload.campos = {
             ...(payload.campos ?? {}),
             previstoContrato,
             motivoVaga: motivoNormalizado,
             motivoDaVaga: motivoNormalizado,
+            vagaSigilosa,
+            podeDivulgarVaga,
+            observacaoSigiloDivulgacao: String(campos.observacaoSigiloDivulgacao ?? '').trim(),
           }
         }
 
