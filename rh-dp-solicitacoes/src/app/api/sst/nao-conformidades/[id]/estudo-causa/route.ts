@@ -6,8 +6,7 @@ import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature } from '@/lib/permissions'
-import { canManageAllNc } from '@/lib/sst/nonConformity'
+import { assertCanFeature, getUserModuleLevel } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,11 +14,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const me = await requireActiveUser()
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
+    const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
+    const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Sem permissão no módulo SST.' }, { status: 403 })
     }
-    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.ESTUDO_DE_CAUSA, Action.UPDATE)
+    try {
+      await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.ESTUDO_DE_CAUSA, Action.UPDATE)
+    } catch {
+      return NextResponse.json({ error: 'Sem permissão para editar estudo de causa.' }, { status: 403 })
+    }
 
     const body = await req.json().catch(() => ({} as any))
     const normalizeCauseStudyPayload = (payload: any) => {
@@ -62,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
-    if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !canManageAllNc(level)) {
+    if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !hasSgiQualidadeLevel3) {
       return NextResponse.json({ error: 'Estudo de causa só pode ser preenchido após aprovação da qualidade.' }, { status: 403 })
     }
     if (nc.solicitanteId !== me.id && !hasMinLevel(level, ModuleLevel.NIVEL_2)) {
