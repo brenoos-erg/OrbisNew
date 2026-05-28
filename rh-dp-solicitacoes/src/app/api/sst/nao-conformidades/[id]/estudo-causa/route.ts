@@ -8,10 +8,17 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature, getUserModuleLevel } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
+import { registerAppError } from '@/lib/errorRegistry'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let id: string | undefined
+  let userId: string | undefined
+  let userLogin: string | null | undefined
+
   try {
     const me = await requireActiveUser()
+    userId = me.id
+    userLogin = me.login
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
@@ -60,12 +67,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const normalized = normalizeCauseStudyPayload(body)
-    const id = (await params).id
+    id = (await params).id
+    const nonConformityId = id
     if (process.env.NODE_ENV !== 'production') {
-      console.info('[estudo-causa] payload normalizado', { nonConformityId: id, payload: normalized })
+      console.info('[estudo-causa] payload normalizado', { nonConformityId, payload: normalized })
     }
 
-    const nc = await prisma.nonConformity.findUnique({ where: { id }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
+    const nc = await prisma.nonConformity.findUnique({ where: { id: nonConformityId }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
     if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !hasSgiQualidadeLevel3) {
       return NextResponse.json({ error: 'Estudo de causa só pode ser preenchido após aprovação da qualidade.' }, { status: 403 })
@@ -77,7 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const saved = await prisma.$transaction(async (tx) => {
       const rows = []
       if (normalized.hasItems) {
-        await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId: id } })
+        await tx.nonConformityCauseItem.deleteMany({ where: { nonConformityId } })
         for (let idx = 0; idx < normalized.normalizedItems.length; idx += 1) {
           const item = normalized.normalizedItems[idx]
           const pergunta = String(item?.question || `Por quê ${idx + 1}?`).trim()
@@ -86,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
           rows.push(await tx.nonConformityCauseItem.create({
             data: {
-              nonConformityId: id,
+              nonConformityId,
               ordem: idx + 1,
               pergunta,
               resposta,
@@ -99,12 +107,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (normalizedRootCause !== undefined) {
         await tx.nonConformity.update({
-          where: { id },
+          where: { id: nonConformityId },
           data: { causaRaiz: normalizedRootCause },
         })
       }
        await appendNonConformityTimelineEvent(tx, {
-        nonConformityId: id,
+        nonConformityId,
         actorId: me.id,
         tipo: 'ESTUDO_CAUSA',
         message: 'Estudo de causa atualizado.',
@@ -112,8 +120,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return { rows }
     })
 
-    return NextResponse.json({ ok: true, nonConformityId: id, items: saved.rows })
+    return NextResponse.json({ ok: true, nonConformityId, items: saved.rows })
   } catch (error) {
+    await registerAppError({
+      area: 'sst',
+      route: '/api/sst/nao-conformidades/[id]/estudo-causa',
+      method: 'POST',
+      userId,
+      userLogin,
+      message: 'Erro ao salvar estudo de causa',
+      error,
+      statusCode: 500,
+      metadata: { nonConformityId: id },
+    })
+
     if (process.env.NODE_ENV !== 'production') {
       console.error('[estudo-causa] erro ao salvar', error)
     }
