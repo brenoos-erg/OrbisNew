@@ -121,6 +121,24 @@ export async function GET(
       approverId: item.approverId,
       assumidaPorId: item.assumidaPorId,
       departmentId: item.departmentId,
+      parentId: item.parentId,
+      parent: item.parent
+        ? {
+            tipoId: item.parent.tipoId,
+            tipo: item.parent.tipo
+              ? {
+                  codigo: item.parent.tipo.codigo,
+                  nome: item.parent.tipo.nome,
+                }
+              : null,
+          }
+        : null,
+      tipo: tipo
+        ? {
+            codigo: (tipo as { codigo?: string | null }).codigo ?? null,
+            nome: tipo.nome,
+          }
+        : null,
       solicitacaoSetores: [] as { setor?: string | null }[],
       payload: item.payload ?? {},
     }
@@ -152,6 +170,7 @@ export async function GET(
       isResponsibleDepartmentMember: item.departmentId ? userDepartmentIds.includes(item.departmentId) : false,
       isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
       isRhAuthorizedForExperienceEvaluation: userAccess.isRhAuthorizedForExperienceEvaluation,
+      isRhAuthorizedForSharedHiringFlow: userAccess.isRhAuthorizedForSharedHiringFlow,
       allowedTipoIds: userAccess.allowedTipoIds,
       finalizerTipoIds: userAccess.finalizerTipoIds,
     })
@@ -159,6 +178,7 @@ export async function GET(
     const canViewByDepartment = canViewSolicitation(userAccess, solicitationForPolicy)
     const canViewLinkedFlow = canViewLinkedHiringFlow({
       user: { id: me.id, role: me.role },
+      isRhAuthorized: userAccess.isRhAuthorizedForSharedHiringFlow,
       solicitation: {
         id: item.id,
         parentId: item.parentId,

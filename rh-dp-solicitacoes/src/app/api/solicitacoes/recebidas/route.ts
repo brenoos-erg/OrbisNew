@@ -125,6 +125,8 @@ export async function GET(req: NextRequest) {
           userAccess.isExperienceEvaluationCoordinator,
         isRhAuthorizedForExperienceEvaluation:
           userAccess.isRhAuthorizedForExperienceEvaluation,
+        isRhAuthorizedForSharedHiringFlow:
+          userAccess.isRhAuthorizedForSharedHiringFlow,
       }),
     ];
 
@@ -182,6 +184,8 @@ export async function GET(req: NextRequest) {
               userAccess.isExperienceEvaluationCoordinator,
             isRhAuthorizedForExperienceEvaluation:
               userAccess.isRhAuthorizedForExperienceEvaluation,
+            isRhAuthorizedForSharedHiringFlow:
+              userAccess.isRhAuthorizedForSharedHiringFlow,
           },
         ) as typeof dbSolicitations)
       : dbSolicitations;

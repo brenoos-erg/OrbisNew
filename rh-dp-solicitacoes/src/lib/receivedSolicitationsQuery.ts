@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { isLinkedAdmissionFromSharedHiringFlow, isSolicitacaoPessoalSharedFlowRecord } from "@/lib/solicitationVisibility";
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_STATUS,
@@ -268,13 +269,14 @@ export function applyReceivedSectorVisibilityFilter<T extends Record<string, unk
     finalizerTipoIds?: string[]
     isExperienceEvaluationCoordinator?: boolean
     isRhAuthorizedForExperienceEvaluation?: boolean
+    isRhAuthorizedForSharedHiringFlow?: boolean
   },
 ): T[] {
   const names = scope.normalizedSectorNames.filter(Boolean)
   const viewerTipoIds = (scope.viewerTipoIds ?? []).filter(Boolean)
   const finalizerTipoIds = (scope.finalizerTipoIds ?? []).filter(Boolean)
   const userSetorKeys = new Set((scope.userSetorKeys ?? []).map((item) => String(item ?? '').trim().toUpperCase()).filter(Boolean))
-  if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0 && viewerTipoIds.length === 0) return rows
+  if (names.length === 0 && scope.departmentIds.length === 0 && scope.costCenterIds.length === 0 && viewerTipoIds.length === 0 && !scope.isRhAuthorizedForSharedHiringFlow) return rows
 
   return rows.filter((solicitation) => {
     const tipoId = String(solicitation.tipoId ?? "")
@@ -282,6 +284,24 @@ export function applyReceivedSectorVisibilityFilter<T extends Record<string, unk
     const approverId = String(solicitation.approverId ?? "")
     const solicitanteId = String(solicitation.solicitanteId ?? "")
     const isExperienceEvaluation = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
+
+    if (scope.isRhAuthorizedForSharedHiringFlow) {
+      const tipo = (solicitation.tipo ?? {}) as { codigo?: string | null; nome?: string | null }
+      const parent = (solicitation.parent ?? null) as { tipoId?: string | null; tipo?: { codigo?: string | null; nome?: string | null } | null } | null
+      const sharedFlowSolicitation = {
+        ...solicitation,
+        tipoId,
+        tipo,
+        parentId: String(solicitation.parentId ?? "") || (parent ? "parent" : null),
+        parent,
+      }
+      if (
+        isSolicitacaoPessoalSharedFlowRecord(sharedFlowSolicitation) ||
+        isLinkedAdmissionFromSharedHiringFlow(sharedFlowSolicitation)
+      ) {
+        return true
+      }
+    }
 
     if (isExperienceEvaluation) {
       if (scope.userId && (approverId === scope.userId || solicitanteId === scope.userId)) return true
@@ -455,6 +475,13 @@ export function buildListAndCountArgs(
           },
         },
         solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
+        parent: {
+          select: {
+            id: true,
+            tipoId: true,
+            tipo: { select: { codigo: true, nome: true } },
+          },
+        },
         comentarios: {
           select: {
             texto: true,

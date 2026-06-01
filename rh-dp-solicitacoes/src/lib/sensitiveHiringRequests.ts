@@ -29,6 +29,7 @@ type HiringFlowLike = {
     approverId?: string | null;
     tipoId?: string | null;
     departmentId?: string | null;
+    tipo?: TipoLike | null;
   } | null;
 };
 
@@ -59,9 +60,10 @@ export function buildSensitiveHiringVisibilityWhere(input: {
   finalizerTipoIds?: string[];
   isExperienceEvaluationCoordinator?: boolean;
   isRhAuthorizedForExperienceEvaluation?: boolean;
+  isRhAuthorizedForSharedHiringFlow?: boolean;
 }) {
   const isAdmin = input.role === "ADMIN";
-  const isRh = input.role === "RH";
+  const isRh = input.isRhAuthorizedForSharedHiringFlow ?? input.role === "RH";
   const relatedDepartments = (input.departmentIds ?? []).filter(Boolean);
 
   const participantFilters: Prisma.SolicitationWhereInput[] = [
@@ -203,9 +205,10 @@ export function buildSensitiveHiringVisibilityWhere(input: {
 export function canViewLinkedHiringFlow(input: {
   user: { id: string; role?: Role | null };
   solicitation: HiringFlowLike;
+  isRhAuthorized?: boolean;
 }) {
   const { user, solicitation } = input;
-  const isRh = user.role === "RH";
+  const isRh = input.isRhAuthorized ?? user.role === "RH";
   const isRequester = solicitation.solicitanteId === user.id;
   const isParticipant =
     solicitation.assumidaPorId === user.id || solicitation.approverId === user.id;
@@ -219,13 +222,15 @@ export function canViewLinkedHiringFlow(input: {
   const payload = (solicitation.payload ?? {}) as Record<string, unknown>;
   const origem = (payload.origem ?? {}) as Record<string, unknown>;
   const hasRhOrigin =
-    Boolean(solicitation.parentId) ||
     typeof origem.rhSolicitationId === "string" ||
     typeof origem.rhProtocolo === "string";
+  const hasPessoalParent =
+    Boolean(solicitation.parentId) &&
+    (parent?.tipoId === "RQ_063" || isSolicitacaoPessoal(parent?.tipo));
 
   if (isRequester || isParticipant || isParentRequester || isParentParticipant) return true;
-  if (isRh && isAdmission && hasRhOrigin) return true;
-  if (isRh && isPessoal && hasRhOrigin) return true;
+  if (isRh && isAdmission && (hasPessoalParent || hasRhOrigin)) return true;
+  if (isRh && isPessoal) return true;
   return false;
 }
 
@@ -310,6 +315,7 @@ export function canViewSensitiveHiringRequest(input: {
   isRh?: boolean;
   isExperienceEvaluationCoordinator?: boolean;
   isRhAuthorizedForExperienceEvaluation?: boolean;
+  isRhAuthorizedForSharedHiringFlow?: boolean;
   allowedTipoIds?: string[];
   finalizerTipoIds?: string[];
 }) {
@@ -327,7 +333,10 @@ export function canViewSensitiveHiringRequest(input: {
   const isExplicitRecipient =
     input.isExplicitRecipient ??
     input.solicitation.approverId === input.user.id;
-  const isRh = input.isRh ?? input.user.role === "RH";
+  const isRh =
+    input.isRh ??
+    input.isRhAuthorizedForSharedHiringFlow ??
+    input.user.role === "RH";
 
   const tipoId = input.solicitation.tipo?.id;
   const isExperienceEvaluation =

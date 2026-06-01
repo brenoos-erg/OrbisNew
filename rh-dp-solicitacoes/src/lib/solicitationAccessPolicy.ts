@@ -33,6 +33,7 @@ export type UserAccessContext = {
   actionableTipoIds: string[]
   isExperienceEvaluationCoordinator: boolean
   isRhAuthorizedForExperienceEvaluation: boolean
+  isRhAuthorizedForSharedHiringFlow: boolean
   hasSolicitationsModuleAccess: boolean
 }
 
@@ -123,9 +124,10 @@ export async function resolveUserAccessContext(input: {
   const normalizeName = (value: unknown) => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
   const userDepartmentNamesNormalized = userDepartments.map((department) => normalizeName(department.name)).filter(Boolean)
   const userSectorNamesNormalized = Array.from(new Set([...userSetorKeys.map((key) => normalizeName(key)), ...userDepartmentNamesNormalized]))
-  const isRhAuthorizedForExperienceEvaluation =
+  const isRhAuthorizedForSharedHiringFlow =
     hasSolicitationsModuleAccess &&
     (input.role === 'RH' || userDepartments.some((department) => isRhDepartment(department)))
+  const isRhAuthorizedForExperienceEvaluation = isRhAuthorizedForSharedHiringFlow
 
   return {
     userId: input.userId,
@@ -144,6 +146,7 @@ export async function resolveUserAccessContext(input: {
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
     isRhAuthorizedForExperienceEvaluation,
+    isRhAuthorizedForSharedHiringFlow,
     hasSolicitationsModuleAccess,
   }
 }
@@ -165,6 +168,7 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
     viewerTipoIds: ctx.viewerTipoIds,
     isExperienceEvaluationCoordinator: ctx.isExperienceEvaluationCoordinator,
     isRhAuthorizedForExperienceEvaluation: ctx.isRhAuthorizedForExperienceEvaluation,
+    isRhAuthorizedForSharedHiringFlow: ctx.isRhAuthorizedForSharedHiringFlow,
   })
 }
 

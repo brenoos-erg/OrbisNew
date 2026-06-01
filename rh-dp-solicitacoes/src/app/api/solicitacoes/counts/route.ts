@@ -39,6 +39,7 @@ export async function GET() {
           finalizerTipoIds: userAccess.finalizerTipoIds,
           isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
           isRhAuthorizedForExperienceEvaluation: userAccess.isRhAuthorizedForExperienceEvaluation,
+          isRhAuthorizedForSharedHiringFlow: userAccess.isRhAuthorizedForSharedHiringFlow,
         }),
       ],
       OR: [
@@ -81,6 +82,7 @@ export async function GET() {
           finalizerTipoIds: userAccess.finalizerTipoIds,
           isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
           isRhAuthorizedForExperienceEvaluation: userAccess.isRhAuthorizedForExperienceEvaluation,
+          isRhAuthorizedForSharedHiringFlow: userAccess.isRhAuthorizedForSharedHiringFlow,
         }),
       ],
       requiresApproval: true,
