@@ -187,6 +187,15 @@ type ChildSolicitation = {
   tipo?: { id?: string; codigo?: string; nome: string } | null
   setorDestino?: string | null
 }
+
+type ParentSolicitation = {
+  id: string
+  protocolo?: string | null
+  titulo?: string | null
+  tipoId?: string | null
+  tipo?: { id?: string; codigo?: string | null; nome?: string | null } | null
+  payload?: Payload
+}
 type SolicitacaoSetor = {
   id: string
   setor: string
@@ -301,6 +310,7 @@ export type SolicitationDetail = {
     code?: string | null
   } | null
  payload?: Payload
+  parent?: ParentSolicitation | null
   anexos?: Attachment[]
   comentarios?: Comment[]
   children?: ChildSolicitation[]
@@ -795,6 +805,16 @@ export function SolicitationDetailModal({
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
+  const isParentSolicitacaoPessoal = isSolicitacaoPessoal(detail?.parent?.tipo)
+  const parentPayloadCampos = detail?.parent?.payload?.campos ?? {}
+  const rq063PayloadCampos = isSolicitacaoAdmissaoTipo && isParentSolicitacaoPessoal
+    ? {
+        ...parentPayloadCampos,
+        ...Object.fromEntries(
+          Object.entries(payloadCampos).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ''),
+        ),
+      }
+    : payloadCampos
   const isAvaliacaoExperiencia = isExperienceEvaluationTipo(detail?.tipo)
   const canEditAvaliacaoGestor =
     Boolean(currentUser?.id) &&
@@ -2590,7 +2610,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   )}
                 </div>
               ) : isSolicitacaoPessoalTipo || isSolicitacaoAdmissaoTipo ? (
-                 <RQ063ResumoCampos payloadCampos={payloadCampos} costCenterLabel={costCenterLabel} />
+                 <RQ063ResumoCampos payloadCampos={rq063PayloadCampos} costCenterLabel={costCenterLabel} />
                   ) : isDesligamento ? (
                 <RQ247ResumoCampos
                   payloadCampos={payloadCampos}
@@ -3718,6 +3738,11 @@ function RQ063ResumoCampos({
         ? 'Em andamento'
         : ''
 
+  const getSigiloDivulgacao = (key: 'vagaSigilosa' | 'podeDivulgarVaga' | 'observacaoSigiloDivulgacao') => {
+    const value = get(key)
+    return value || 'Não informado'
+  }
+
   const tabClass = (tab: string) =>
     `rounded-md border px-3 py-1.5 text-xs font-medium transition ${
       activeTab === tab
@@ -3763,6 +3788,9 @@ function RQ063ResumoCampos({
             <div><label className={LABEL_RO}>Chefia imediata</label><input className={INPUT_RO} readOnly value={get('chefiaImediata')} /></div>
             <div><label className={LABEL_RO}>Coordenador do contrato</label><input className={INPUT_RO} readOnly value={get('coordenadorContrato')} /></div>
             <div><label className={LABEL_RO}>Motivo da vaga</label><input className={INPUT_RO} readOnly value={motivoVaga || get('motivoVaga')} /></div>
+            <div><label className={LABEL_RO}>Vaga sigilosa?</label><input className={INPUT_RO} readOnly value={getSigiloDivulgacao('vagaSigilosa')} /></div>
+            <div><label className={LABEL_RO}>Pode divulgar a vaga?</label><input className={INPUT_RO} readOnly value={getSigiloDivulgacao('podeDivulgarVaga')} /></div>
+            <div className="lg:col-span-3"><label className={LABEL_RO}>Observação sobre sigilo/divulgação</label><textarea className={`${INPUT_RO} min-h-[80px]`} readOnly value={getSigiloDivulgacao('observacaoSigiloDivulgacao')} /></div>
           </div>
         </section>
       )}

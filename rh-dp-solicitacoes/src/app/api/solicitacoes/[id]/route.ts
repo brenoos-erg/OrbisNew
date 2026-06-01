@@ -47,11 +47,21 @@ export async function GET(
         parent: {
           select: {
             id: true,
+            protocolo: true,
+            titulo: true,
             solicitanteId: true,
             assumidaPorId: true,
             approverId: true,
             tipoId: true,
             departmentId: true,
+            payload: true,
+            tipo: {
+              select: {
+                id: true,
+                codigo: true,
+                nome: true,
+              },
+            },
           },
         },
       },

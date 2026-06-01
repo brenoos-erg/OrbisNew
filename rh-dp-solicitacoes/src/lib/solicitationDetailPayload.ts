@@ -164,6 +164,22 @@ export function buildSolicitationDetailPayload(input: {
           code: input.department.code ?? null,
         }
       : null,
+    parent: item.parent
+      ? {
+          id: item.parent.id,
+          protocolo: item.parent.protocolo ?? null,
+          titulo: item.parent.titulo ?? '',
+          tipoId: item.parent.tipoId ?? null,
+          tipo: item.parent.tipo
+            ? {
+                id: item.parent.tipo.id,
+                codigo: item.parent.tipo.codigo ?? null,
+                nome: item.parent.tipo.nome ?? '-',
+              }
+            : null,
+          payload: normalizeSolicitationPayload(item.parent.payload),
+        }
+      : null,
     payload: normalizedPayload,
     dataSources: { experienceEvaluators },
     nonConformity: input.nonConformity
