@@ -30,15 +30,21 @@ type SolicitationVisibilityInput = {
   viewerTipoIds?: string[];
   isExperienceEvaluationCoordinator: boolean;
   isRhAuthorizedForExperienceEvaluation: boolean;
+  isRhAuthorizedForSharedHiringFlow?: boolean;
 };
 
 type SolicitationLike = {
   tipoId?: string | null;
   status?: string | null;
-  solicitanteId: string;
+  solicitanteId?: string | null;
   approverId?: string | null;
   assumidaPorId?: string | null;
   departmentId?: string | null;
+  costCenterId?: string | null;
+  parentId?: string | null;
+  payload?: unknown;
+  parent?: { tipoId?: string | null; tipo?: { codigo?: string | null; nome?: string | null } | null } | null;
+  tipo?: { codigo?: string | null; nome?: string | null } | null;
   solicitacaoSetores?: { setor?: string | null }[];
 };
 
@@ -54,6 +60,119 @@ export function resolveUserSetorKeysFromDepartments(
   }
 
   return [...setorKeys];
+}
+
+export const SOLICITACAO_PESSOAL_TIPO_IDS = ["RQ_063"] as const;
+export const SOLICITACAO_PESSOAL_CODIGOS = ["RQ.RH.063", "RQ.063", "RQ.RH.001"] as const;
+export const SOLICITACAO_ADMISSAO_TIPO_IDS = ["SOLICITACAO_ADMISSAO"] as const;
+export const SOLICITACAO_ADMISSAO_CODIGOS = ["RQ.DP.001"] as const;
+
+function normalizeText(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+export function isSolicitacaoPessoalSharedFlowRecord(solicitation: SolicitationLike) {
+  const tipoId = normalizeText(solicitation.tipoId);
+  const codigo = normalizeText(solicitation.tipo?.codigo);
+  const nome = normalizeText(solicitation.tipo?.nome);
+
+  return (
+    SOLICITACAO_PESSOAL_TIPO_IDS.includes(tipoId as never) ||
+    SOLICITACAO_PESSOAL_CODIGOS.includes(codigo as never) ||
+    nome.includes("RQ_063") ||
+    nome.includes("RQ.063") ||
+    nome.includes("RQ.RH.063") ||
+    nome.includes("SOLICITACAO DE PESSOAL")
+  );
+}
+
+function isSolicitacaoAdmissaoRecord(solicitation: SolicitationLike) {
+  const tipoId = normalizeText(solicitation.tipoId);
+  const codigo = normalizeText(solicitation.tipo?.codigo);
+  const nome = normalizeText(solicitation.tipo?.nome);
+
+  return (
+    SOLICITACAO_ADMISSAO_TIPO_IDS.includes(tipoId as never) ||
+    SOLICITACAO_ADMISSAO_CODIGOS.includes(codigo as never) ||
+    nome.includes("SOLICITACAO DE ADMISSAO")
+  );
+}
+
+function hasRhSolicitationOrigin(payload: unknown) {
+  if (!payload || typeof payload !== "object") return false;
+  const origem = (payload as { origem?: unknown }).origem;
+  if (!origem || typeof origem !== "object") return false;
+  return Boolean(
+    (origem as { rhSolicitationId?: unknown }).rhSolicitationId ||
+      (origem as { rhProtocolo?: unknown }).rhProtocolo,
+  );
+}
+
+export function isLinkedAdmissionFromSharedHiringFlow(solicitation: SolicitationLike) {
+  if (!isSolicitacaoAdmissaoRecord(solicitation)) return false;
+  if (hasRhSolicitationOrigin(solicitation.payload)) return true;
+  if (solicitation.parentId && isSolicitacaoPessoalSharedFlowRecord({
+    tipoId: solicitation.parent?.tipoId,
+    tipo: solicitation.parent?.tipo ?? null,
+    solicitanteId: solicitation.solicitanteId,
+  })) {
+    return true;
+  }
+
+  return false;
+}
+
+function buildSolicitacaoPessoalSharedFlowWhere(): Prisma.SolicitationWhereInput {
+  return {
+    OR: [
+      { tipoId: { in: [...SOLICITACAO_PESSOAL_TIPO_IDS] } },
+      { tipo: { codigo: { in: [...SOLICITACAO_PESSOAL_CODIGOS] } } },
+      { tipo: { nome: { contains: "Solicitação de Pessoal" } } },
+    ],
+  };
+}
+
+function buildSolicitacaoAdmissaoWhere(): Prisma.SolicitationWhereInput {
+  return {
+    OR: [
+      { tipoId: { in: [...SOLICITACAO_ADMISSAO_TIPO_IDS] } },
+      { tipo: { codigo: { in: [...SOLICITACAO_ADMISSAO_CODIGOS] } } },
+      { tipo: { nome: { contains: "Solicitação de Admissão" } } },
+      { tipo: { nome: { contains: "Solicitação de admissão" } } },
+    ],
+  };
+}
+
+function buildLinkedAdmissionFromSharedHiringFlowWhere(): Prisma.SolicitationWhereInput {
+  return {
+    AND: [
+      buildSolicitacaoAdmissaoWhere(),
+      {
+        OR: [
+          { parent: buildSolicitacaoPessoalSharedFlowWhere() },
+          { payload: { path: "$.origem.rhSolicitationId", not: Prisma.JsonNull } },
+          { payload: { path: "$.origem.rhProtocolo", not: Prisma.JsonNull } },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildRhSharedHiringFlowVisibilityWhere(): Prisma.SolicitationWhereInput {
+  return {
+    OR: [
+      buildSolicitacaoPessoalSharedFlowWhere(),
+      buildLinkedAdmissionFromSharedHiringFlowWhere(),
+    ],
+  };
+}
+
+function isRhAuthorizedForSharedHiringFlow(input: SolicitationVisibilityInput) {
+  return Boolean(input.isRhAuthorizedForSharedHiringFlow);
 }
 
 export function buildReceivedSolicitationVisibilityWhere(
@@ -91,6 +210,10 @@ export function buildReceivedSolicitationVisibilityWhere(
         in: input.viewerTipoIds,
       },
     });
+  }
+
+  if (isRhAuthorizedForSharedHiringFlow(input)) {
+    regularSolicitationOrFilters.push(buildRhSharedHiringFlowVisibilityWhere());
   }
 
   const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input);
@@ -248,6 +371,13 @@ export function canUserViewSolicitationByDepartment(
   if (input.role === "ADMIN") return true;
   if (solicitation.solicitanteId === input.userId) return true;
   if (solicitation.assumidaPorId === input.userId) return true;
+  if (
+    isRhAuthorizedForSharedHiringFlow(input) &&
+    (isSolicitacaoPessoalSharedFlowRecord(solicitation) ||
+      isLinkedAdmissionFromSharedHiringFlow(solicitation))
+  ) {
+    return true;
+  }
   if (
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     onlyValidSolicitationStatuses([

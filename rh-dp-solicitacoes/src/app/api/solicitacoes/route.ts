@@ -296,6 +296,8 @@ export const GET = withModuleLevel(
             isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
             isRhAuthorizedForExperienceEvaluation:
               userAccess.isRhAuthorizedForExperienceEvaluation,
+            isRhAuthorizedForSharedHiringFlow:
+              userAccess.isRhAuthorizedForSharedHiringFlow,
           }),
         ]
 
