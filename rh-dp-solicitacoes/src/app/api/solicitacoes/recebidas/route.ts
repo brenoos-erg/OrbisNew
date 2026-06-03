@@ -24,6 +24,21 @@ import {
   hasReceivedInMemoryFilters,
 } from "@/lib/receivedSolicitationsQuery";
 import { resolvePrimaryResponsibleForList } from "@/lib/solicitationResponsibility";
+import {
+  isLinkedAdmissionFromSharedHiringFlow,
+  isSolicitacaoPessoalSharedFlowRecord,
+} from "@/lib/solicitationVisibility";
+
+type ProtocolFilterDiagnostic =
+  | { status: "not_checked" }
+  | { status: "not_visible_or_not_found"; message: string }
+  | {
+      status: "visible_type_mismatch";
+      protocolo: string;
+      selectedTipoId: string;
+      foundTipo: { id: string; codigo: string | null; nome: string };
+      solicitationId: string;
+    };
 
 function toAndArray(
   andClause: Prisma.SolicitationWhereInput["AND"],
@@ -38,6 +53,76 @@ function debugReceivedSolicitations(
 ) {
   if (process.env.DEBUG_SOLICITACOES_RECEBIDAS !== "true") return;
   console.debug(`[solicitacoes:recebidas] ${message}`, details);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function hasDpResponsibleTarget(value: unknown) {
+  const normalized = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+
+  return (
+    normalized === "DP" ||
+    normalized.includes("DEPARTAMENTO PESSOAL") ||
+    normalized.includes("DEPTO PESSOAL")
+  );
+}
+
+function resolveSharedHiringFlowLabel(
+  solicitation: {
+    tipoId?: string | null;
+    status?: string | null;
+    payload?: unknown;
+    department?: { name?: string | null; sigla?: string | null; code?: string | null } | null;
+    costCenter?: { description?: string | null; externalCode?: string | null; code?: string | null; abbreviation?: string | null } | null;
+    parentId?: string | null;
+    parent?: { tipoId?: string | null; tipo?: { codigo?: string | null; nome?: string | null } | null } | null;
+    tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null;
+  },
+  isRhAuthorizedForSharedHiringFlow: boolean,
+) {
+  if (!isRhAuthorizedForSharedHiringFlow) return null;
+
+  const sharedFlowSolicitation = {
+    ...solicitation,
+    tipoId: solicitation.tipoId ?? undefined,
+    tipo: solicitation.tipo ?? null,
+    parentId: solicitation.parentId ?? null,
+    parent: solicitation.parent ?? null,
+  };
+  const isSharedPessoal = isSolicitacaoPessoalSharedFlowRecord(sharedFlowSolicitation);
+  const isLinkedAdmission = isLinkedAdmissionFromSharedHiringFlow(sharedFlowSolicitation);
+  if (!isSharedPessoal && !isLinkedAdmission) return null;
+
+  const payload = asRecord(solicitation.payload);
+  const dpStatus = String(payload.dpStatus ?? "").trim().toUpperCase();
+  const hasDpHandoff = Boolean(payload.dpHandoffAt);
+  const isDpTarget = [
+    solicitation.department?.name,
+    solicitation.department?.sigla,
+    solicitation.department?.code,
+    solicitation.costCenter?.description,
+    solicitation.costCenter?.externalCode,
+    solicitation.costCenter?.code,
+    solicitation.costCenter?.abbreviation,
+  ].some(hasDpResponsibleTarget);
+
+  if (dpStatus === "CONCLUIDO" || solicitation.status === "CONCLUIDA") {
+    return "Concluído pelo DP — acompanhamento RH";
+  }
+
+  if (isLinkedAdmission || dpStatus === "PENDENTE" || hasDpHandoff || isDpTarget) {
+    return "Em etapa do DP — acompanhamento RH";
+  }
+
+  return null;
 }
 
 function resolveOrderBy(
@@ -56,6 +141,144 @@ function resolveOrderBy(
   if (sortBy === "atendente") return [{ assumidaPor: { fullName: sortDir } }];
   if (sortBy === "status") return [{ status: sortDir }];
   return [{ dataAbertura: sortDir }];
+}
+
+function applyReceivedSecurityWhere(
+  where: Prisma.SolicitationWhereInput,
+  {
+    me,
+    userAccess,
+    receivedVisibilityWhere,
+    userDepartmentIdsForSensitive,
+  }: {
+    me: Awaited<ReturnType<typeof requireActiveUser>>;
+    userAccess: Awaited<ReturnType<typeof resolveUserAccessContext>>;
+    receivedVisibilityWhere: Prisma.SolicitationWhereInput;
+    userDepartmentIdsForSensitive: string[];
+  },
+) {
+  where.AND = [...toAndArray(where.AND), receivedVisibilityWhere];
+  where.AND = [
+    ...toAndArray(where.AND),
+    buildSensitiveHiringVisibilityWhere({
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
+      role: me.role,
+      departmentIds: userDepartmentIdsForSensitive,
+      allowedTipoIds: userAccess.allowedTipoIds,
+      finalizerTipoIds: userAccess.finalizerTipoIds,
+      isExperienceEvaluationCoordinator:
+        userAccess.isExperienceEvaluationCoordinator,
+      isRhAuthorizedForExperienceEvaluation:
+        userAccess.isRhAuthorizedForExperienceEvaluation,
+      isRhAuthorizedForSharedHiringFlow:
+        userAccess.isRhAuthorizedForSharedHiringFlow,
+    }),
+  ];
+
+  where.AND = [
+    ...toAndArray(where.AND),
+    {
+      NOT: {
+        AND: [
+          { requiresApproval: true },
+          { approvalStatus: "PENDENTE" },
+          {
+            OR: [
+              { tipo: { id: "RQ_063" } },
+              {
+                tipo: {
+                  codigo: { in: ["RQ.RH.063", "RQ.063", "RQ.RH.001"] },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ];
+
+  return where;
+}
+
+async function resolveProtocolFilterDiagnostic({
+  protocolo,
+  selectedTipoId,
+  me,
+  userAccess,
+  receivedVisibilityWhere,
+  userDepartmentIdsForSensitive,
+  hasScopeVisibilityPostFilter,
+}: {
+  protocolo: string;
+  selectedTipoId: string;
+  me: Awaited<ReturnType<typeof requireActiveUser>>;
+  userAccess: Awaited<ReturnType<typeof resolveUserAccessContext>>;
+  receivedVisibilityWhere: Prisma.SolicitationWhereInput;
+  userDepartmentIdsForSensitive: string[];
+  hasScopeVisibilityPostFilter: boolean;
+}): Promise<ProtocolFilterDiagnostic> {
+  const normalizedProtocol = protocolo.trim();
+  if (!normalizedProtocol || !selectedTipoId) return { status: "not_checked" };
+
+  const diagnosticWhere = applyReceivedSecurityWhere(
+    { protocolo: { contains: normalizedProtocol } },
+    { me, userAccess, receivedVisibilityWhere, userDepartmentIdsForSensitive },
+  );
+  const { findManyArgs } = buildListAndCountArgs(diagnosticWhere, {
+    skip: 0,
+    pageSize: 25,
+    orderBy: [{ dataAbertura: "desc" }],
+    includeGlobalSearchData: true,
+  });
+
+  const candidates = await prisma.solicitation.findMany(findManyArgs);
+  const visibleCandidates = hasScopeVisibilityPostFilter
+    ? (applyReceivedSectorVisibilityFilter(
+        candidates as unknown as Record<string, unknown>[],
+        {
+          normalizedSectorNames: userAccess.userSectorNamesNormalized,
+          departmentIds: userAccess.userDepartmentIds,
+          costCenterIds: userAccess.userCostCenterIds,
+          viewerTipoIds: userAccess.viewerTipoIds,
+          userSetorKeys: userAccess.userSetorKeys,
+          userId: me.id,
+          finalizerTipoIds: userAccess.finalizerTipoIds,
+          isExperienceEvaluationCoordinator:
+            userAccess.isExperienceEvaluationCoordinator,
+          isRhAuthorizedForExperienceEvaluation:
+            userAccess.isRhAuthorizedForExperienceEvaluation,
+          isRhAuthorizedForSharedHiringFlow:
+            userAccess.isRhAuthorizedForSharedHiringFlow,
+        },
+      ) as typeof candidates)
+    : candidates;
+
+  const found = visibleCandidates.find(
+    (item) => item.protocolo?.toUpperCase() === normalizedProtocol.toUpperCase(),
+  ) ?? visibleCandidates[0];
+
+  if (!found || found.tipoId === selectedTipoId) {
+    return {
+      status: "not_visible_or_not_found",
+      message:
+        "Existe uma divergência nos filtros ou você não possui permissão para visualizar este protocolo.",
+    };
+  }
+
+  return {
+    status: "visible_type_mismatch",
+    protocolo: found.protocolo ?? normalizedProtocol,
+    selectedTipoId,
+    foundTipo: {
+      id: found.tipo?.id ?? found.tipoId,
+      codigo: found.tipo?.codigo ?? null,
+      nome: found.tipo?.nome ?? "Tipo não identificado",
+    },
+    solicitationId: found.id,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -85,7 +308,6 @@ export async function GET(req: NextRequest) {
       primaryDepartment: me.department,
     });
     const receivedVisibilityWhere = buildReceivedWhereByPolicy(userAccess);
-    where.AND = [...toAndArray(where.AND), receivedVisibilityWhere];
 
     debugReceivedSolicitations("policy-context", {
       userId: me.id,
@@ -110,47 +332,12 @@ export async function GET(req: NextRequest) {
       me.id,
       me.departmentId,
     );
-    where.AND = [
-      ...toAndArray(where.AND),
-      buildSensitiveHiringVisibilityWhere({
-        userId: me.id,
-        userLogin: me.login,
-        userEmail: me.email,
-        userFullName: me.fullName,
-        role: me.role,
-        departmentIds: userDepartmentIdsForSensitive,
-        allowedTipoIds: userAccess.allowedTipoIds,
-        finalizerTipoIds: userAccess.finalizerTipoIds,
-        isExperienceEvaluationCoordinator:
-          userAccess.isExperienceEvaluationCoordinator,
-        isRhAuthorizedForExperienceEvaluation:
-          userAccess.isRhAuthorizedForExperienceEvaluation,
-        isRhAuthorizedForSharedHiringFlow:
-          userAccess.isRhAuthorizedForSharedHiringFlow,
-      }),
-    ];
-
-    where.AND = [
-      ...toAndArray(where.AND),
-      {
-        NOT: {
-          AND: [
-            { requiresApproval: true },
-            { approvalStatus: "PENDENTE" },
-            {
-              OR: [
-                { tipo: { id: "RQ_063" } },
-                {
-                  tipo: {
-                    codigo: { in: ["RQ.RH.063", "RQ.063", "RQ.RH.001"] },
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      },
-    ];
+    applyReceivedSecurityWhere(where, {
+      me,
+      userAccess,
+      receivedVisibilityWhere,
+      userDepartmentIdsForSensitive,
+    });
 
     const hasScopeVisibilityPostFilter =
       userAccess.userSectorNamesNormalized.length > 0 ||
@@ -282,7 +469,7 @@ export async function GET(req: NextRequest) {
         status: s.status,
         protocolo: s.protocolo,
         createdAt: s.dataAbertura ? s.dataAbertura.toISOString() : null,
-        tipo: s.tipo ? { codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
+        tipo: s.tipo ? { id: s.tipo.id, codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
         responsavelId: responsible.responsavelId,
         responsavel: responsible.responsavel,
         finalizadorId: finalizadorEvent?.actor?.id ?? null,
@@ -299,6 +486,19 @@ export async function GET(req: NextRequest) {
         approvalStatus: s.approvalStatus,
         costCenterId: s.costCenterId ?? null,
         approverId: s.approver?.id ?? s.approverId ?? null,
+        sharedHiringFlowLabel: resolveSharedHiringFlowLabel(
+          {
+            tipoId: s.tipoId,
+            status: s.status,
+            payload: s.payload,
+            department: s.department,
+            costCenter: s.costCenter,
+            parentId: s.parentId,
+            parent: s.parent,
+            tipo: s.tipo,
+          },
+          userAccess.isRhAuthorizedForSharedHiringFlow,
+        ),
         nadaConstaStatus:
           s.solicitacaoSetores.length === 0
             ? null
@@ -311,7 +511,20 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ rows, total });
+    const protocolFilterDiagnostic =
+      total === 0 && searchParams.get("protocolo") && searchParams.get("tipoId")
+        ? await resolveProtocolFilterDiagnostic({
+            protocolo: searchParams.get("protocolo") ?? "",
+            selectedTipoId: searchParams.get("tipoId") ?? "",
+            me,
+            userAccess,
+            receivedVisibilityWhere,
+            userDepartmentIdsForSensitive,
+            hasScopeVisibilityPostFilter,
+          })
+        : { status: "not_checked" as const };
+
+    return NextResponse.json({ rows, total, protocolFilterDiagnostic });
   } catch (err) {
     console.error("GET /api/solicitacoes/recebidas error", err);
     if (err instanceof Error && err.message === "Usuário não autenticado") {

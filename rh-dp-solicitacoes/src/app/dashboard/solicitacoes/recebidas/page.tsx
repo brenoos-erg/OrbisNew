@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Printer } from 'lucide-react'
+import { Printer, X } from 'lucide-react'
 import { SolicitationStatusBadge } from '@/components/solicitacoes/SolicitationStatusBadge'
 import { getStatusPresentation } from '@/lib/solicitationStatusPresentation'
 import { formatDateDDMMYYYY } from '@/lib/date'
@@ -38,14 +38,26 @@ type FilterState = {
   sortDir: 'asc' | 'desc'
 }
 
+type ProtocolFilterDiagnostic =
+  | { status: 'not_checked' }
+  | { status: 'not_visible_or_not_found'; message: string }
+  | {
+      status: 'visible_type_mismatch'
+      protocolo: string
+      selectedTipoId: string
+      foundTipo: { id: string; codigo: string | null; nome: string }
+      solicitationId: string
+    }
+
 type ListResponse = {
   rows: Row[]
   total: number
+  protocolFilterDiagnostic?: ProtocolFilterDiagnostic
 }
 
 type PaginationItem = number | 'ellipsis'
 
-type TipoOption = { id: string; codigo?: string; nome: string }
+type TipoOption = { id: string; codigo?: string | null; nome: string }
 type DepartmentOption = { id: string; label: string; description?: string }
 type CostCenterOption = {
   id: string
@@ -98,6 +110,92 @@ const SITUACAO_OPTIONS = [
   { value: 'REJEITADO', label: 'Rejeitado/Recusado' },
 ]
 
+type ActiveFilterChip = { key: keyof FilterState; label: string; value: string }
+
+const FILTER_KEYS: Array<keyof FilterState> = [
+  'protocolo',
+  'solicitanteNome',
+  'solicitanteLogin',
+  'matricula',
+  'tipoId',
+  'departmentId',
+  'costCenterId',
+  'status',
+  'situacao',
+  'responsavel',
+  'openedDate',
+  'openedStart',
+  'openedEnd',
+  'closedDate',
+  'closedStart',
+  'closedEnd',
+  'text',
+]
+
+function formatTipoLabel(tipo?: TipoOption | null) {
+  if (!tipo) return 'Tipo não identificado'
+  return tipo.codigo ? `${tipo.codigo} - ${tipo.nome}` : tipo.nome
+}
+
+function formatCostCenterOptionLabel(center?: CostCenterOption | null) {
+  if (!center) return 'Centro de custo não identificado'
+  return `${center.externalCode ?? center.code ?? '-'} - ${center.description}`
+}
+
+function formatDateFilterLabel(value: string) {
+  if (!value) return ''
+  return value.split('-').reverse().join('/')
+}
+
+function buildActiveFilterChips(
+  filters: FilterState,
+  {
+    tipos,
+    departments,
+    costCenters,
+  }: {
+    tipos: TipoOption[]
+    departments: DepartmentOption[]
+    costCenters: CostCenterOption[]
+  },
+): ActiveFilterChip[] {
+  const labels: Partial<Record<keyof FilterState, string>> = {
+    protocolo: 'Protocolo',
+    solicitanteNome: 'Nome do solicitante',
+    solicitanteLogin: 'Login',
+    matricula: 'Matrícula',
+    tipoId: 'Tipo de solicitação',
+    departmentId: 'Setor responsável',
+    costCenterId: 'Centro de custo',
+    status: 'Status',
+    situacao: 'Situação',
+    responsavel: 'Responsável',
+    openedDate: 'Data de abertura',
+    openedStart: 'Abertura inicial',
+    openedEnd: 'Abertura final',
+    closedDate: 'Data de fechamento',
+    closedStart: 'Fechamento inicial',
+    closedEnd: 'Fechamento final',
+    text: 'Texto no formulário',
+  }
+
+  return FILTER_KEYS.flatMap((key) => {
+    const rawValue = filters[key]
+    if (!rawValue || typeof rawValue !== 'string') return []
+
+    let value = rawValue
+    if (key === 'tipoId') value = formatTipoLabel(tipos.find((tipo) => tipo.id === rawValue))
+    if (key === 'departmentId') value = departments.find((department) => department.id === rawValue)?.label ?? rawValue
+    if (key === 'costCenterId') value = formatCostCenterOptionLabel(costCenters.find((center) => center.id === rawValue))
+    if (key === 'status') value = STATUS_OPTIONS.find((option) => option.value === rawValue)?.label ?? rawValue
+    if (key === 'situacao') value = SITUACAO_OPTIONS.find((option) => option.value === rawValue)?.label ?? rawValue
+    if (['openedDate', 'openedStart', 'openedEnd', 'closedDate', 'closedStart', 'closedEnd'].includes(key)) {
+      value = formatDateFilterLabel(rawValue)
+    }
+
+    return [{ key, label: labels[key] ?? String(key), value }]
+  })
+}
 
 
 function buildPaginationItems(
@@ -282,13 +380,35 @@ export default function ReceivedRequestsPage() {
     }
   }
 
- const filterCount = useMemo(() => {
-    const keys = Object.keys(DEFAULT_FILTERS) as Array<keyof FilterState>
-    return keys.filter((key) => {
-      if (key === 'page' || key === 'pageSize' || key === 'sortBy' || key === 'sortDir') return false
-      return Boolean(filters[key])
-    }).length
-  }, [filters])
+  const activeFilterChips = useMemo(
+    () => buildActiveFilterChips(filters, { tipos, departments, costCenters }),
+    [costCenters, departments, filters, tipos],
+  )
+  const filterCount = activeFilterChips.length
+  const selectedTipoLabel = filters.tipoId
+    ? formatTipoLabel(tipos.find((tipo) => tipo.id === filters.tipoId))
+    : ''
+
+  function updateFilters(next: FilterState) {
+    setFormFilters(next)
+    setFilters(next)
+  }
+
+  function clearAllFilters() {
+    updateFilters({ ...DEFAULT_FILTERS, pageSize: filters.pageSize })
+  }
+
+  function removeFilter(key: keyof FilterState) {
+    setFilters((prev) => {
+      const next = { ...prev, [key]: '', page: 1 }
+      setFormFilters((formPrev) => ({ ...formPrev, [key]: '', page: 1 }))
+      return next
+    })
+  }
+
+  function removeTipoFilter() {
+    removeFilter('tipoId')
+  }
 
 
   useEffect(() => {
@@ -663,11 +783,7 @@ export default function ReceivedRequestsPage() {
             type="button"
             className="app-button-secondary"
             disabled={loading}
-            onClick={() => {
-              const reset = { ...DEFAULT_FILTERS, pageSize: filters.pageSize }
-              setFormFilters(reset)
-              setFilters(reset)
-            }}
+            onClick={clearAllFilters}
           >
               Limpar filtros
           </button>
@@ -679,7 +795,75 @@ export default function ReceivedRequestsPage() {
             Exportar Excel
           </button>
         </div>
+
+        {activeFilterChips.length > 0 && (
+          <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide app-muted-text">Filtros ativos</span>
+              <button
+                type="button"
+                className="app-button-secondary px-2 py-1 text-xs"
+                onClick={clearAllFilters}
+                disabled={loading}
+              >
+                Limpar todos os filtros
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {activeFilterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-1 text-xs font-medium text-[var(--foreground)]"
+                >
+                  <span className="font-semibold">{chip.label}:</span> {chip.value}
+                  <button
+                    type="button"
+                    className="ml-1 rounded-full p-0.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-50"
+                    aria-label={`Remover filtro ${chip.label}`}
+                    onClick={() => removeFilter(chip.key)}
+                    disabled={loading}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {data?.protocolFilterDiagnostic?.status === 'visible_type_mismatch' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Encontramos este protocolo, mas ele não corresponde ao tipo selecionado.</p>
+          <p className="mt-1">
+            O protocolo {data.protocolFilterDiagnostic.protocolo} é do tipo{' '}
+            {formatTipoLabel(data.protocolFilterDiagnostic.foundTipo)}, enquanto o filtro atual está em {selectedTipoLabel}.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="app-button-secondary" onClick={removeTipoFilter} disabled={loading}>
+              Limpar tipo de solicitação e buscar novamente
+            </button>
+            <button
+              type="button"
+              className="app-button-primary"
+              onClick={() => {
+                const diagnostic = data.protocolFilterDiagnostic
+                if (diagnostic?.status === 'visible_type_mismatch') {
+                  window.open(`/dashboard/solicitacoes/${diagnostic.solicitationId}`, '_blank', 'noopener,noreferrer')
+                }
+              }}
+            >
+              Abrir solicitação encontrada
+            </button>
+          </div>
+        </div>
+      )}
+
+      {data?.protocolFilterDiagnostic?.status === 'not_visible_or_not_found' && filters.protocolo && filters.tipoId && rows.length === 0 && !loading && (
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 text-sm app-muted-text">
+          Existe uma divergência nos filtros ou você não possui permissão para visualizar este protocolo.
+        </div>
+      )}
 
       <div className="app-table-wrapper flex-1 overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2 text-xs font-semibold uppercase tracking-wide app-muted-text">
@@ -729,8 +913,21 @@ export default function ReceivedRequestsPage() {
               <tbody>
                 {rows.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-4 text-center app-subtitle">
-                      Nenhuma solicitação recebida encontrada.
+                    <td colSpan={8} className="px-4 py-6 text-center app-subtitle">
+                      {activeFilterChips.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="font-semibold text-[var(--foreground)]">Nenhuma solicitação encontrada com os filtros atuais.</p>
+                          <p>Verifique se o protocolo informado pertence ao tipo de solicitação selecionado ou limpe os filtros para ampliar a busca.</p>
+                          {filters.protocolo && filters.tipoId && (
+                            <p>Dica: o protocolo informado pode pertencer a outro tipo de solicitação.</p>
+                          )}
+                          <button type="button" className="app-button-secondary mt-2" onClick={clearAllFilters}>
+                            Limpar filtros
+                          </button>
+                        </div>
+                      ) : (
+                        'Nenhuma solicitação recebida encontrada.'
+                      )}
                     </td>
                   </tr>
                 )}
@@ -744,7 +941,14 @@ export default function ReceivedRequestsPage() {
                     <td className="px-4 py-2 text-xs">{row.protocolo}</td>
                     <td className="px-4 py-2 text-xs">{row.solicitanteNome ?? row.autor?.fullName ?? '-'}</td>
                     <td className="px-4 py-2 text-xs">{row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '-'}</td>
-                    <td className="px-4 py-2 text-xs">{row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : row.titulo}</td>
+                    <td className="px-4 py-2 text-xs">
+                      <div>{row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : row.titulo}</div>
+                      {row.sharedHiringFlowLabel && (
+                        <span className="mt-1 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                          {row.sharedHiringFlowLabel}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-xs">{row.setorDestino ?? '-'}</td>
                     <td className="px-4 py-2 text-xs">
                       {row.status === 'ABERTA'

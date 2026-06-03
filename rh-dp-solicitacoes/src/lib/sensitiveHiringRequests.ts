@@ -4,6 +4,7 @@ import {
   isSolicitacaoAdmissao,
   isSolicitacaoPessoal,
 } from "@/lib/solicitationTypes";
+import { buildRhSharedHiringFlowVisibilityWhere } from "@/lib/solicitationVisibility";
 import { onlyValidSolicitationStatuses } from "@/lib/solicitationStatuses";
 
 type TipoLike = {
@@ -82,8 +83,12 @@ export function buildSensitiveHiringVisibilityWhere(input: {
     participantFilters.push({ tipoId: { in: allowedTipoIds } });
   }
 
-  if (isAdmin || isRh) {
+  if (isAdmin) {
     participantFilters.push({ id: { not: "" } });
+  }
+
+  if (isRh) {
+    participantFilters.push(buildRhSharedHiringFlowVisibilityWhere());
   }
 
   if (input.isExperienceEvaluationCoordinator) {
@@ -187,13 +192,6 @@ export function buildSensitiveHiringVisibilityWhere(input: {
                   ],
                 },
               },
-              ...(isRh
-                ? [
-                    {
-                      parentId: { not: null },
-                    },
-                  ]
-                : []),
             ],
           },
         ],
@@ -354,7 +352,6 @@ export function canViewSensitiveHiringRequest(input: {
     isAssigned ||
     isResponsibleDepartmentMember ||
     isExplicitRecipient ||
-    isRh ||
     Boolean(isExperiencePrivileged)
   );
 }
