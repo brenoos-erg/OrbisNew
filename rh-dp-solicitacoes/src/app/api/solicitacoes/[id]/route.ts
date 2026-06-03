@@ -9,6 +9,7 @@ import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotificati
 import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { canViewLinkedHiringFlow, canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { isLinkedAdmissionFromSharedHiringFlow, isSolicitacaoPessoalSharedFlowRecord } from '@/lib/solicitationVisibility'
 import { canUserViewNadaConsta } from '@/lib/nadaConstaAccess'
 import {
   canApproveSolicitation,
@@ -226,7 +227,11 @@ export async function GET(
       },
     )
 
-    const canViewByLinkedRhDp = canViewSensitive && canViewNadaConsta && canViewLinkedFlow
+    const isSharedHiringFlowForRh =
+      userAccess.isRhAuthorizedForSharedHiringFlow &&
+      (isSolicitacaoPessoalSharedFlowRecord(solicitationForPolicy) ||
+        isLinkedAdmissionFromSharedHiringFlow(solicitationForPolicy))
+    const canViewByLinkedRhDp = canViewNadaConsta && isSharedHiringFlowForRh && canViewLinkedFlow
 
     if (!canViewByLinkedRhDp && (!canViewSensitive || !canViewNadaConsta || !canViewByDepartment)) {
       return NextResponse.json({ error: 'Você não possui permissão para visualizar esta solicitação.' }, { status: 403 })
@@ -315,17 +320,26 @@ export async function GET(
 
     stage = 'montar-permissoes'
     const solicitationForActions = { ...solicitationForPolicy, solicitacaoSetores }
-    const viewerOnlyByLinkedRhDp = canViewByLinkedRhDp && !canViewByDepartment
+    const basePermissions = {
+      canAssume: canAssumeSolicitation(userAccess, solicitationForActions),
+      canEdit: canEditSolicitation(userAccess, solicitationForActions),
+      canApprove: canApproveSolicitation(userAccess, solicitationForActions),
+      canFinalize: canFinalizeSolicitation(userAccess, solicitationForActions),
+      canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
+      canComment: canCommentSolicitation(userAccess, solicitationForActions),
+    }
+    const hasOperationalPermission = Object.values(basePermissions).some(Boolean)
+    const viewerOnlyByLinkedRhDp = canViewByLinkedRhDp && !hasOperationalPermission
     const viewerOnly = viewerOnlyByLinkedRhDp || isViewerOnlyByPolicy(userAccess, solicitationForActions)
     const permissions = {
       viewerOnly,
-      canAssume: viewerOnlyByLinkedRhDp ? false : canAssumeSolicitation(userAccess, solicitationForActions),
-      canEdit: viewerOnlyByLinkedRhDp ? false : canEditSolicitation(userAccess, solicitationForActions),
-      canApprove: viewerOnlyByLinkedRhDp ? false : canApproveSolicitation(userAccess, solicitationForActions),
-      canFinalize: viewerOnlyByLinkedRhDp ? false : canFinalizeSolicitation(userAccess, solicitationForActions),
-      canCancel: canCancelSolicitation(userAccess, solicitationForActions),
-      canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : canManageCancellationRequest(userAccess, solicitationForActions),
-      canComment: viewerOnlyByLinkedRhDp ? false : canCommentSolicitation(userAccess, solicitationForActions),
+      canAssume: viewerOnlyByLinkedRhDp ? false : basePermissions.canAssume,
+      canEdit: viewerOnlyByLinkedRhDp ? false : basePermissions.canEdit,
+      canApprove: viewerOnlyByLinkedRhDp ? false : basePermissions.canApprove,
+      canFinalize: viewerOnlyByLinkedRhDp ? false : basePermissions.canFinalize,
+      canCancel: viewerOnlyByLinkedRhDp ? false : canCancelSolicitation(userAccess, solicitationForActions),
+      canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : basePermissions.canManageCancellationRequest,
+      canComment: viewerOnlyByLinkedRhDp ? false : basePermissions.canComment,
       canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
     }
 

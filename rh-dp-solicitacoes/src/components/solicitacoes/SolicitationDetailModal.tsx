@@ -83,6 +83,7 @@ export type Row = {
   assumidaPorId?: string | null
   cancelamentoStatus?: string | null
   cancelamentoSolicitadoEm?: string | null
+  sharedHiringFlowLabel?: string | null
   cancelamentoMotivo?: string | null
 }
 type TiInventoryItem = {
@@ -287,6 +288,7 @@ export type SolicitationDetail = {
   cancelamentoStatus?: string | null
   cancelamentoSolicitadoPorId?: string | null
   cancelamentoSolicitadoEm?: string | null
+  sharedHiringFlowLabel?: string | null
   cancelamentoMotivo?: string | null
   cancelamentoAnalisadoPorId?: string | null
   cancelamentoAnalisadoEm?: string | null

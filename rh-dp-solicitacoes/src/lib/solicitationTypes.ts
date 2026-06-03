@@ -449,6 +449,8 @@ export function isSolicitacaoPessoal(tipo?: TipoSolicitacaoLike | null) {
   const id = tipo.id?.trim().toUpperCase()
   if (id === 'RQ_247') return false
   if (id === 'RQ_063') return true
+  const codigo = tipo.codigo?.trim().toUpperCase()
+  if (codigo === 'RQ.RH.063' || codigo === 'RQ.063' || codigo === 'RQ.RH.001') return true
   const nome = normalizeSolicitacaoName(tipo.nome)
   if (nome.includes('DESLIGAMENTO')) return false
   return (
@@ -462,6 +464,8 @@ export function isSolicitacaoAdmissao(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
   if (id === 'SOLICITACAO_ADMISSAO') return true
+  const codigo = tipo.codigo?.trim().toUpperCase()
+  if (codigo === 'RQ.DP.001') return true
   const nome = normalizeSolicitacaoName(tipo.nome)
   return nome.includes('SOLICITACAO DE ADMISSAO')
 }
