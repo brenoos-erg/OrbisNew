@@ -2767,27 +2767,41 @@ async function handleEncaminharAprovacaoComAnexo() {
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                         Formulário do tipo de solicitação
                       </p>
-                      {isSolicitacaoExames && canRequesterEditRq092 && !editingRq092 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRq092Campos({ ...payloadCampos })
-                            setRq092Justification('')
-                            setRq092Error(null)
-                            setRq092Success(null)
-                            setEditingRq092(true)
-                          }}
-                          className="app-button-secondary px-3 py-2 text-xs"
-                        >
-                          Ativar modo de edição
-                        </button>
-                      )}
-                      {isSolicitacaoExames && !canRequesterEditRq092 && rq092EditUnavailableMessage && !editingRq092 && (
-                        <span className="text-xs text-[var(--muted-foreground)]">{rq092EditUnavailableMessage}</span>
-                      )}
                     </div>
                     {rq092Success && <div className="mb-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{rq092Success}</div>}
                     {rq092Error && <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{rq092Error}</div>}
+                    {isSolicitacaoExames && canRequesterEditRq092 && !editingRq092 && (
+                      <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-orange-900">
+                              Precisa corrigir esta solicitação?
+                            </p>
+                            <p className="mt-1 text-xs text-orange-800">
+                              Você pode ativar o modo de edição para ajustar os dados enviados. As alterações serão registradas no histórico.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRq092Campos({ ...payloadCampos })
+                              setRq092Justification('')
+                              setRq092Error(null)
+                              setRq092Success(null)
+                              setEditingRq092(true)
+                            }}
+                            className="app-button-primary w-full px-4 py-2 text-sm font-semibold md:w-auto md:shrink-0"
+                          >
+                            ✎ Ativar modo de edição
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {isSolicitacaoExames && !canRequesterEditRq092 && rq092EditUnavailableMessage && !editingRq092 && (
+                      <div className="mb-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 text-xs text-[var(--muted-foreground)]">
+                        {rq092EditUnavailableMessage}
+                      </div>
+                    )}
 
                        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                       {camposFormSolicitante.map((campo) => {
