@@ -257,6 +257,8 @@ type SolicitationStatus =
   | 'AGUARDANDO_TERMO'
   | 'AGUARDANDO_AVALIACAO_GESTOR'
   | 'AGUARDANDO_FINALIZACAO_AVALIACAO'
+  | 'FINALIZADA'
+  | 'FINALIZADO'
   | 'CONCLUIDA'
   | 'CANCELADA'
 
@@ -892,9 +894,13 @@ export function SolicitationDetailModal({
     isSolicitacaoExames ||
     isDpChildFromRh
 
-  const isFinalizadaOuCancelada =
-    effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'CANCELADA'
-      const camposNadaConstaSolicitante = camposSchema.filter(
+  const isFinalizadaOuCancelada = (
+    effectiveStatus === 'CONCLUIDA' ||
+    effectiveStatus === 'FINALIZADA' ||
+    effectiveStatus === 'FINALIZADO' ||
+    effectiveStatus === 'CANCELADA'
+  )
+  const camposNadaConstaSolicitante = camposSchema.filter(
     (campo) => campo.stage === 'solicitante',
   )
    const setorMeta = activeSector
