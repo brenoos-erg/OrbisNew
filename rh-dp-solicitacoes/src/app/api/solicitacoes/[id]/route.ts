@@ -344,7 +344,7 @@ export async function GET(
       canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : basePermissions.canManageCancellationRequest,
       canComment: viewerOnlyByLinkedRhDp ? false : basePermissions.canComment,
       canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
-      canRequesterEditRq092: viewerOnlyByLinkedRhDp ? false : canRequesterEditRq092,
+      canRequesterEditRq092,
     }
 
     stage = 'montar-payload-resposta'

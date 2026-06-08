@@ -10,12 +10,14 @@ const rq092Tipo = { id: 'RQ_092', codigo: 'RQ.SST.092', nome: 'Solicitação de 
 
 assert.equal(isSolicitacaoExamesSst(rq092Tipo), true, 'identifica RQ.092 pelos identificadores reais');
 assert.equal(isSolicitacaoExamesSst({ id: 'OUTRO', codigo: 'RQ.092', nome: 'Legado' }), true, 'identifica código legado RQ.092');
+assert.equal(isSolicitacaoExamesSst({ id: 'OUTRO', codigo: 'RQ.SST.002', nome: 'Legado SST' }), true, 'identifica código legado RQ.SST.002 usado antes da padronização');
 assert.equal(isSolicitacaoExamesSst({ id: 'RQ_063', codigo: 'RQ.RH.063', nome: 'Solicitação de Pessoal' }), false, 'não confunde RQ.063 com RQ.092');
 
 assert.equal(isRequesterEditableStatus('ABERTA'), true, 'status aberto permite correção');
 assert.equal(isRequesterEditableStatus('EM_ATENDIMENTO'), true, 'status em atendimento permite correção');
 assert.equal(isRequesterEditableStatus('CONCLUIDA'), false, 'status concluída bloqueia correção');
 assert.equal(isRequesterEditableStatus('FINALIZADA'), false, 'status finalizada bloqueia correção');
+assert.equal(isRequesterEditableStatus('FINALIZADO'), false, 'status finalizado bloqueia correção');
 assert.equal(isRequesterEditableStatus('CANCELADA'), false, 'status cancelada bloqueia correção');
 
 const solicitation = {
@@ -29,6 +31,16 @@ assert.equal(canRequesterEditRq092AfterSubmit('user-a', solicitation), true, 'so
 assert.equal(canRequesterEditRq092AfterSubmit('user-b', solicitation), false, 'outro usuário não edita RQ.092 do solicitante');
 assert.equal(canRequesterEditRq092AfterSubmit('user-a', { ...solicitation, status: 'CONCLUIDA' }), false, 'nem solicitante edita concluída');
 assert.equal(canRequesterEditRq092AfterSubmit('user-a', { ...solicitation, status: 'CANCELADA' }), false, 'nem solicitante edita cancelada');
+assert.equal(canRequesterEditRq092AfterSubmit('user-a', { ...solicitation, status: 'FINALIZADA' }), false, 'nem solicitante edita finalizada');
+assert.equal(
+  canRequesterEditRq092AfterSubmit('user-a', {
+    ...solicitation,
+    tipoId: 'TIPO_LEGADO',
+    tipo: { id: 'TIPO_LEGADO', codigo: 'RQ.SST.002', nome: 'Legado SST' },
+  }),
+  true,
+  'solicitante original edita RQ.092 com código legado RQ.SST.002',
+);
 assert.equal(
   canRequesterEditRq092AfterSubmit('user-a', { ...solicitation, tipoId: 'RQ_063', tipo: { id: 'RQ_063', codigo: 'RQ.RH.063', nome: 'Solicitação de Pessoal' } }),
   false,

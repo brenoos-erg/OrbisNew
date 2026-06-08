@@ -52,6 +52,7 @@ export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
 export const SOLICITACAO_PESSOAL_CODIGO = 'RQ.RH.063'
 export const SOLICITACAO_EXAMES_SST_CODIGO = 'RQ.SST.092'
 export const SOLICITACAO_EXAMES_SST_CODIGO_LEGADO = 'RQ.092'
+export const SOLICITACAO_EXAMES_SST_CODIGO_LEGADO_SST_002 = 'RQ.SST.002'
 export const SOLICITACAO_EPI_UNIFORME_CODIGO = 'RQ.SST.043'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_TIPO_ID = 'RQ_091'
 export const SOLICITACAO_INCENTIVO_EDUCACAO_CODIGO = 'RQ.091'
@@ -382,7 +383,11 @@ export function isSolicitacaoExamesSst(tipo?: TipoSolicitacaoLike | null) {
   if (id === SOLICITACAO_EXAMES_SST_TIPO_ID) return true
 
   const codigo = tipo.codigo?.trim().toUpperCase()
-  if (codigo === SOLICITACAO_EXAMES_SST_CODIGO || codigo === SOLICITACAO_EXAMES_SST_CODIGO_LEGADO) return true
+  if (
+    codigo === SOLICITACAO_EXAMES_SST_CODIGO ||
+    codigo === SOLICITACAO_EXAMES_SST_CODIGO_LEGADO ||
+    codigo === SOLICITACAO_EXAMES_SST_CODIGO_LEGADO_SST_002
+  ) return true
 
   const nome = normalizeSolicitacaoName(tipo.nome)
   return (
