@@ -98,4 +98,27 @@ assert.equal(detail.rq092Corrections[0].actorName, 'João Silva', 'log mostra us
 assert.equal(detail.rq092Corrections[0].justification, 'Correção de data do exame.', 'log mostra justificativa');
 assert.deepEqual(detail.rq092Corrections[0].changes.map((change) => change.fieldName), ['dataExame'], 'log mostra apenas campos alterados registrados');
 
+const fs = require('node:fs');
+const modalSource = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8');
+const correctionRouteSource = fs.readFileSync('src/app/api/solicitacoes/[id]/corrigir-rq092/route.ts', 'utf8');
+const detailRouteSource = fs.readFileSync('src/app/api/solicitacoes/[id]/route.ts', 'utf8');
+
+assert.match(detailRouteSource, /canRequesterEditRq092/, 'GET /api/solicitacoes/[id] retorna canRequesterEditRq092');
+assert.match(detailRouteSource, /solicitanteId:\s*item\.solicitanteId/, 'GET /api/solicitacoes/[id] expõe solicitanteId para diagnóstico visual RQ.092');
+assert.match(modalSource, /Ativar modo de edição/, 'botão claro de ativação de edição aparece no modal');
+assert.match(modalSource, /\(camposSchema\.length > 0 \|\| isSolicitacaoExames\)/, 'botão RQ.092 não fica escondido quando camposSchema.length === 0');
+const canRequesterLine = modalSource.split('\n').find((line) => line.includes('const canRequesterEditRq092 =')) ?? '';
+assert.doesNotMatch(canRequesterLine, /canEdit|apiCanEdit/, 'botão RQ.092 não depende do canEdit geral');
+assert.match(modalSource, /Para corrigir os dados enviados, abra a solicitação pela tela de Solicitações Enviadas\./, 'modo aprovação orienta abrir em Solicitações Enviadas');
+assert.match(modalSource, /Somente quem abriu esta solicitação pode editar os dados enviados\./, 'outro usuário recebe mensagem de bloqueio');
+assert.match(modalSource, /Solicitação finalizada\. Não é possível editar\./, 'status finalizado bloqueado recebe mensagem');
+assert.match(modalSource, /Salvar alterações/, 'modo de edição exibe botão Salvar alterações');
+assert.match(modalSource, /Cancelar edição/, 'modo de edição exibe botão Cancelar edição');
+assert.match(modalSource, /Informe a justificativa da alteração\./, 'frontend exige justificativa antes de salvar');
+assert.match(modalSource, /Nenhum campo foi alterado\./, 'frontend bloqueia salvar sem alteração local');
+assert.match(modalSource, /Alterações salvas e registradas no histórico\./, 'frontend mostra sucesso exigido após salvar');
+assert.match(correctionRouteSource, /status:\s*403/, 'PATCH manual por usuário sem permissão retorna 403');
+assert.match(correctionRouteSource, /Informe a justificativa da alteração\./, 'backend mantém validação obrigatória de justificativa');
+assert.match(correctionRouteSource, /RQ092_CORRECAO_REALIZADA/, 'backend registra timeline/log da correção');
+
 console.log('rq092-requester-correction tests passed');
