@@ -8,6 +8,7 @@ export type DetailPermissionFlags = {
   canManageCancellationRequest: boolean
   canComment: boolean
   canPrintExperienceEvaluationPdf?: boolean
+  canRequesterEditRq092?: boolean
 }
 
 type AnyRecord = Record<string, any>
@@ -49,6 +50,35 @@ function resolvePrimaryResponsible(input: {
   return {
     responsavelId: input.assumidaPor?.id ?? input.assumidaPorId ?? null,
     responsavel: input.assumidaPor?.fullName ? { fullName: input.assumidaPor.fullName } : null,
+  }
+}
+
+
+function parseRq092CorrectionMessage(message: unknown) {
+  if (typeof message !== 'string' || !message.trim()) return null
+  try {
+    const parsed = JSON.parse(message)
+    if (!parsed || typeof parsed !== 'object') return null
+    const record = parsed as AnyRecord
+    if (record.type !== 'RQ092_CORRECAO_REALIZADA') return null
+    return {
+      solicitationId: record.solicitationId ?? null,
+      protocolo: record.protocolo ?? null,
+      actorId: record.actorId ?? null,
+      actorName: record.actorName ?? null,
+      actorLogin: record.actorLogin ?? null,
+      actorEmail: record.actorEmail ?? null,
+      editedAt: iso(record.editedAt) ?? null,
+      justification: record.justification ?? '',
+      changes: asArray(record.changes).map((change) => ({
+        fieldName: change?.fieldName ?? '',
+        label: change?.label ?? change?.fieldName ?? '',
+        oldValue: change?.oldValue ?? null,
+        newValue: change?.newValue ?? null,
+      })).filter((change) => change.fieldName),
+    }
+  } catch {
+    return null
   }
 }
 
@@ -129,6 +159,14 @@ export function buildSolicitationDetailPayload(input: {
     responsavelAtual: primaryResponsible.responsavel ?? null,
     approvalStatus: item.approvalStatus ?? null,
     ...input.permissions,
+    rq092Corrections: asArray(input.timelines)
+      .filter((timeline) => timeline.status === 'RQ092_CORRECAO_REALIZADA' || timeline.status === 'SOLICITACAO_CORRIGIDA')
+      .map((timeline) => ({
+        id: timeline.id,
+        createdAt: iso(timeline.createdAt),
+        ...parseRq092CorrectionMessage(timeline.message),
+      }))
+      .filter((correction) => correction.changes && correction.changes.length > 0),
     dataAbertura: iso(item.dataAbertura),
     dataPrevista: iso(item.dataPrevista),
     dataFechamento: iso(item.dataFechamento),

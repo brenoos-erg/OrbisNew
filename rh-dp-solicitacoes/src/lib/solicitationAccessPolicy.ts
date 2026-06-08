@@ -15,6 +15,7 @@ import {
 } from '@/lib/experienceEvaluation'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { isRhDepartment } from '@/lib/rhAccess'
+import { isSolicitacaoExamesSst } from '@/lib/solicitationTypes'
 
 export type UserAccessContext = {
   userId: string
@@ -41,6 +42,7 @@ type DepartmentLike = { id?: string | null; code?: string | null; sigla?: string
 
 type SolicitationLike = {
   tipoId?: string | null
+  tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null
   status?: string | null
   solicitanteId: string
   approverId?: string | null
@@ -306,6 +308,45 @@ export function canApproveSolicitation(ctx: UserAccessContext, solicitation: Sol
       solicitation.tipoId &&
       (ctx.actionableTipoIds.includes(solicitation.tipoId) || solicitation.approverId === ctx.userId),
   )
+}
+
+
+const REQUESTER_EDIT_BLOCKED_STATUSES = new Set([
+  'CONCLUIDA',
+  'CONCLUÍDA',
+  'FINALIZADA',
+  'FINALIZADO',
+  'CANCELADA',
+  'CANCELADO',
+  'ENCERRADA',
+  'ENCERRADO',
+])
+
+function normalizeStatusForRequesterEdit(status?: string | null) {
+  return (status ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+}
+
+export function isRequesterEditableStatus(status?: string | null) {
+  const normalized = normalizeStatusForRequesterEdit(status)
+  return Boolean(normalized) && !REQUESTER_EDIT_BLOCKED_STATUSES.has(normalized)
+}
+
+export function canRequesterEditRq092AfterSubmit(
+  userId: string | null | undefined,
+  solicitation: Pick<SolicitationLike, 'tipoId' | 'tipo' | 'solicitanteId' | 'status'>,
+) {
+  if (!userId) return false
+  if (!solicitation?.solicitanteId || solicitation.solicitanteId !== userId) return false
+  if (!isSolicitacaoExamesSst({
+    id: solicitation.tipo?.id ?? solicitation.tipoId ?? null,
+    codigo: solicitation.tipo?.codigo ?? null,
+    nome: solicitation.tipo?.nome ?? null,
+  })) return false
+  return isRequesterEditableStatus(solicitation.status)
 }
 
 export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
