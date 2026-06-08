@@ -45,7 +45,7 @@ export async function PATCH(
     const justification = typeof body.justification === 'string' ? body.justification.trim() : ''
 
     if (!justification) {
-      return NextResponse.json({ error: 'Justificativa da correção é obrigatória.' }, { status: 400 })
+      return NextResponse.json({ error: 'Informe a justificativa da alteração.' }, { status: 400 })
     }
 
     const solicitation = await prisma.solicitation.findUnique({
@@ -86,7 +86,7 @@ export async function PATCH(
     }
 
     if (changes.length === 0) {
-      return NextResponse.json({ error: 'Nenhum campo da RQ.092 foi alterado.' }, { status: 400 })
+      return NextResponse.json({ error: 'Nenhum campo foi alterado.' }, { status: 400 })
     }
 
     const editedAt = new Date()

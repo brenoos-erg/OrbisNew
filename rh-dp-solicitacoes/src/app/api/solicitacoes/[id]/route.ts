@@ -367,7 +367,10 @@ export async function GET(
       permissions,
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      ...result,
+      solicitanteId: item.solicitanteId ?? null,
+    })
   } catch (e: any) {
     const stack = e?.stack ?? String(e)
     console.error('❌ GET /api/solicitacoes/[id] error:', {

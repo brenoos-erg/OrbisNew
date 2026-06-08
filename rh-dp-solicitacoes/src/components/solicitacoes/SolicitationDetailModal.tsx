@@ -55,6 +55,21 @@ const formatDisplayValue = (value: unknown, _campoType?: string) => {
   return formatDisplayValueForUser(value)
 }
 
+const normalizeRq092Status = (status?: string | null) =>
+  (status ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+
+const RQ092_BLOCKED_STATUSES = new Set([
+  'CONCLUIDA',
+  'FINALIZADA',
+  'FINALIZADO',
+  'CANCELADA',
+  'CANCELADO',
+])
+
 
 
 // ===== Tipos que a página de lista já usa =====
@@ -269,6 +284,7 @@ export type SolicitationDetail = {
   titulo: string
   descricao: string | null
   status: SolicitationStatus | string
+  solicitanteId?: string | null
   approvalStatus?: ApprovalStatus | null
   viewerOnly?: boolean
   canAssume?: boolean
@@ -830,7 +846,19 @@ export function SolicitationDetailModal({
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
   const isSolicitacaoFerias = isSolicitacaoAgendamentoFerias(detail?.tipo)
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
+  const isRq092BlockedByStatus = RQ092_BLOCKED_STATUSES.has(normalizeRq092Status(effectiveStatus))
+  const currentUserId = currentUser?.id ?? null
+  const isRq092OriginalRequester = Boolean(currentUserId) && (detail?.solicitanteId ?? row?.solicitanteId ?? null) === currentUserId
   const canRequesterEditRq092 = isSolicitacaoExames && detail?.canRequesterEditRq092 === true && !isApprovalMode
+  const rq092EditUnavailableMessage = isSolicitacaoExames
+    ? isApprovalMode
+      ? 'Para corrigir os dados enviados, abra a solicitação pela tela de Solicitações Enviadas.'
+      : isRq092BlockedByStatus
+        ? 'Solicitação finalizada. Não é possível editar.'
+        : !isRq092OriginalRequester
+          ? 'Somente quem abriu esta solicitação pode editar os dados enviados.'
+          : null
+    : null
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
   const isParentSolicitacaoPessoal = isSolicitacaoPessoal(detail?.parent?.tipo)
@@ -1259,7 +1287,18 @@ export function SolicitationDetailModal({
     if (!detail?.id) return
     const justification = rq092Justification.trim()
     if (!justification) {
-      setRq092Error('Informe a justificativa da correção.')
+      setRq092Error('Informe a justificativa da alteração.')
+      return
+    }
+
+    const changedCampos = Object.fromEntries(
+      Object.entries(rq092Campos).filter(([fieldName, newValue]) => {
+        if (!rq092EditableFieldNames.has(fieldName)) return false
+        return JSON.stringify(newValue ?? null) !== JSON.stringify(payloadCampos[fieldName] ?? null)
+      }),
+    )
+    if (Object.keys(changedCampos).length === 0) {
+      setRq092Error('Nenhum campo foi alterado.')
       return
     }
 
@@ -1267,9 +1306,7 @@ export function SolicitationDetailModal({
     setRq092Error(null)
     setRq092Success(null)
     try {
-      const campos = Object.fromEntries(
-        Object.entries(rq092Campos).filter(([fieldName]) => rq092EditableFieldNames.has(fieldName)),
-      )
+      const campos = changedCampos
       const res = await fetch(`/api/solicitacoes/${detail.id}/corrigir-rq092`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1291,7 +1328,7 @@ export function SolicitationDetailModal({
       }
       setEditingRq092(false)
       setRq092Justification('')
-      setRq092Success('Correção registrada no histórico da solicitação.')
+      setRq092Success('Alterações salvas e registradas no histórico.')
     } catch (err) {
       console.error('Erro ao corrigir RQ.092', err)
       setRq092Error('Erro ao salvar a correção.')
@@ -2724,7 +2761,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                   costCenterLabel={costCenterLabel}
                 />
               ) : (
-                camposSchema.length > 0 && (
+                (camposSchema.length > 0 || isSolicitacaoExames) && (
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
@@ -2742,11 +2779,11 @@ async function handleEncaminharAprovacaoComAnexo() {
                           }}
                           className="app-button-secondary px-3 py-2 text-xs"
                         >
-                          Editar solicitação
+                          Ativar modo de edição
                         </button>
                       )}
-                      {isSolicitacaoExames && !canRequesterEditRq092 && isFinalizadaOuCancelada && (
-                        <span className="text-xs text-[var(--muted-foreground)]">Solicitação finalizada. Não é possível editar.</span>
+                      {isSolicitacaoExames && !canRequesterEditRq092 && rq092EditUnavailableMessage && !editingRq092 && (
+                        <span className="text-xs text-[var(--muted-foreground)]">{rq092EditUnavailableMessage}</span>
                       )}
                     </div>
                     {rq092Success && <div className="mb-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{rq092Success}</div>}
@@ -2824,7 +2861,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                     </div>
                     {editingRq092 && isSolicitacaoExames && (
                       <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50/70 p-3">
-                        <label className="app-label text-orange-900">Justificativa da edição</label>
+                        <label className="app-label text-orange-900">Justificativa da alteração <span className="text-red-600">*</span></label>
                         <textarea
                           className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
                           rows={3}
@@ -2834,10 +2871,10 @@ async function handleEncaminharAprovacaoComAnexo() {
                         />
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button type="button" onClick={handleSaveRq092Correction} disabled={savingRq092} className="app-button-primary px-3 py-2 text-xs">
-                            {savingRq092 ? 'Salvando...' : 'Salvar correção'}
+                            {savingRq092 ? 'Salvando...' : 'Salvar alterações'}
                           </button>
                           <button type="button" onClick={handleCancelRq092Edit} disabled={savingRq092} className="app-button-secondary px-3 py-2 text-xs">
-                            Cancelar
+                            Cancelar edição
                           </button>
                         </div>
                       </div>
