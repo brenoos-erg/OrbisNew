@@ -20,6 +20,7 @@ import {
   canCommentSolicitation,
   canEditSolicitation,
   canFinalizeSolicitation,
+  canRequesterEditRq092AfterSubmit,
   canViewSolicitation,
   isViewerOnlyByPolicy,
   resolveUserAccessContext,
@@ -136,6 +137,7 @@ export async function GET(
         : null,
       tipo: tipo
         ? {
+            id: tipo.id,
             codigo: (tipo as { codigo?: string | null }).codigo ?? null,
             nome: tipo.nome,
           }
@@ -328,6 +330,7 @@ export async function GET(
       canManageCancellationRequest: canManageCancellationRequest(userAccess, solicitationForActions),
       canComment: canCommentSolicitation(userAccess, solicitationForActions),
     }
+    const canRequesterEditRq092 = canRequesterEditRq092AfterSubmit(me.id, solicitationForActions)
     const hasOperationalPermission = Object.values(basePermissions).some(Boolean)
     const viewerOnlyByLinkedRhDp = canViewByLinkedRhDp && !hasOperationalPermission
     const viewerOnly = viewerOnlyByLinkedRhDp || isViewerOnlyByPolicy(userAccess, solicitationForActions)
@@ -341,6 +344,7 @@ export async function GET(
       canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : basePermissions.canManageCancellationRequest,
       canComment: viewerOnlyByLinkedRhDp ? false : basePermissions.canComment,
       canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(userAccess, solicitationForActions),
+      canRequesterEditRq092: viewerOnlyByLinkedRhDp ? false : canRequesterEditRq092,
     }
 
     stage = 'montar-payload-resposta'

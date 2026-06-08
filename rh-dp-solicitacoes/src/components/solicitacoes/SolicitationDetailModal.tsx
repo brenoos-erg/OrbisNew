@@ -277,6 +277,18 @@ export type SolicitationDetail = {
   canManageCancellationRequest?: boolean
   canComment?: boolean
   canPrintExperienceEvaluationPdf?: boolean
+  canRequesterEditRq092?: boolean
+  rq092Corrections?: Array<{
+    id?: string
+    createdAt?: string | null
+    editedAt?: string | null
+    actorId?: string | null
+    actorName?: string | null
+    actorLogin?: string | null
+    actorEmail?: string | null
+    justification?: string
+    changes?: Array<{ fieldName: string; label: string; oldValue: unknown; newValue: unknown }>
+  }>
   dataAbertura: string
   approverId?: string | null
   assumidaPorId?: string | null
@@ -557,6 +569,11 @@ export function SolicitationDetailModal({
     setDetail(detailProp)
     setActiveSector(null)
     setIsEditingNadaConstaSetor(false)
+    setEditingRq092(false)
+    setRq092Campos((detailProp?.payload?.campos ?? {}) as Record<string, any>)
+    setRq092Justification('')
+    setRq092Error(null)
+    setRq092Success(null)
   }, [detailProp?.id])
 
 
@@ -689,6 +706,12 @@ export function SolicitationDetailModal({
   const [descricaoSolucaoSst, setDescricaoSolucaoSst] = useState('')
   const [observacaoSst1, setObservacaoSst1] = useState('')
   const [observacaoSst2, setObservacaoSst2] = useState('')
+  const [editingRq092, setEditingRq092] = useState(false)
+  const [rq092Campos, setRq092Campos] = useState<Record<string, any>>({})
+  const [rq092Justification, setRq092Justification] = useState('')
+  const [savingRq092, setSavingRq092] = useState(false)
+  const [rq092Error, setRq092Error] = useState<string | null>(null)
+  const [rq092Success, setRq092Success] = useState<string | null>(null)
   const effectiveStatus = (detail?.status ?? row?.status ?? 'ABERTA') as SolicitationStatus
   const approvalStatus = (detail?.approvalStatus ?? null) as ApprovalStatus | null
 
@@ -805,6 +828,7 @@ export function SolicitationDetailModal({
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(detail?.tipo)
   const isSolicitacaoFerias = isSolicitacaoAgendamentoFerias(detail?.tipo)
   const isSolicitacaoExames = isSolicitacaoExamesSst(detail?.tipo)
+  const canRequesterEditRq092 = isSolicitacaoExames && detail?.canRequesterEditRq092 === true && !isApprovalMode
   const isSolicitacaoEpiUniformeTipo = isSolicitacaoEpiUniforme(detail?.tipo)
   const isDpChildFromRh = Boolean((payload as any)?.origem?.rhSolicitationId)
   const isParentSolicitacaoPessoal = isSolicitacaoPessoal(detail?.parent?.tipo)
@@ -1207,6 +1231,67 @@ export function SolicitationDetailModal({
       return formatDateDDMMYYYY(rawValue)
     }
     return formatDisplayValueForUser(rawValue, campo.name)
+  }
+
+  const rq092EditableFieldNames = useMemo(() => new Set(camposFormSolicitante.map((campo) => campo.name)), [camposFormSolicitante])
+
+  const handleRq092FieldChange = (campo: CampoEspecifico, value: string | boolean) => {
+    if (!rq092EditableFieldNames.has(campo.name)) return
+    setRq092Campos((prev) => ({ ...prev, [campo.name]: value }))
+    setRq092Error(null)
+    setRq092Success(null)
+  }
+
+  const handleCancelRq092Edit = () => {
+    setEditingRq092(false)
+    setRq092Campos({ ...payloadCampos })
+    setRq092Justification('')
+    setRq092Error(null)
+  }
+
+  const handleSaveRq092Correction = async () => {
+    if (!detail?.id) return
+    const justification = rq092Justification.trim()
+    if (!justification) {
+      setRq092Error('Informe a justificativa da correção.')
+      return
+    }
+
+    setSavingRq092(true)
+    setRq092Error(null)
+    setRq092Success(null)
+    try {
+      const campos = Object.fromEntries(
+        Object.entries(rq092Campos).filter(([fieldName]) => rq092EditableFieldNames.has(fieldName)),
+      )
+      const res = await fetch(`/api/solicitacoes/${detail.id}/corrigir-rq092`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campos, justification }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRq092Error(json?.error ?? 'Não foi possível salvar a correção.')
+        return
+      }
+
+      const detailRes = await fetch(`/api/solicitacoes/${detail.id}`, { cache: 'no-store' })
+      if (detailRes.ok) {
+        const refreshed = (await detailRes.json()) as SolicitationDetail
+        setDetail(refreshed)
+        setRq092Campos((refreshed.payload?.campos ?? {}) as Record<string, any>)
+      } else {
+        setDetail((prev) => prev ? { ...prev, payload: { ...(prev.payload ?? {}), campos } } : prev)
+      }
+      setEditingRq092(false)
+      setRq092Justification('')
+      setRq092Success('Correção registrada no histórico da solicitação.')
+    } catch (err) {
+      console.error('Erro ao corrigir RQ.092', err)
+      setRq092Error('Erro ao salvar a correção.')
+    } finally {
+      setSavingRq092(false)
+    }
   }
 
   const hasAttachments = (detail?.anexos?.length ?? 0) > 0
@@ -2635,23 +2720,84 @@ async function handleEncaminharAprovacaoComAnexo() {
               ) : (
                 camposSchema.length > 0 && (
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)]/60 p-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
-                      Formulário do tipo de solicitação
-                    </p>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
+                        Formulário do tipo de solicitação
+                      </p>
+                      {isSolicitacaoExames && canRequesterEditRq092 && !editingRq092 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRq092Campos({ ...payloadCampos })
+                            setRq092Justification('')
+                            setRq092Error(null)
+                            setRq092Success(null)
+                            setEditingRq092(true)
+                          }}
+                          className="app-button-secondary px-3 py-2 text-xs"
+                        >
+                          Editar solicitação
+                        </button>
+                      )}
+                      {isSolicitacaoExames && !canRequesterEditRq092 && isFinalizadaOuCancelada && (
+                        <span className="text-xs text-[var(--muted-foreground)]">Solicitação finalizada. Não é possível editar.</span>
+                      )}
+                    </div>
+                    {rq092Success && <div className="mb-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{rq092Success}</div>}
+                    {rq092Error && <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{rq092Error}</div>}
 
                        <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                       {camposFormSolicitante.map((campo) => {
-                        const value = getCampoDisplayValue(campo)
+                        const displayValue = getCampoDisplayValue(campo)
                         const isTextarea = campo.type === 'textarea'
                         const isBooleanField = isBooleanLikeType(campo.type)
-                        const checkboxValue = getBooleanValue(payloadCampos[campo.name])
+                        const editValue = rq092Campos[campo.name]
+                        const checkboxValue = getBooleanValue(editingRq092 && isSolicitacaoExames ? editValue : payloadCampos[campo.name])
+                        const textValue = editValue === undefined || editValue === null ? '' : String(editValue)
 
                         return (
                           <div key={campo.name} className={isTextarea ? 'md:col-span-2' : ''}>
                             <label className={LABEL_RO}>{campo.label}</label>
-                            {isTextarea ? (
+                            {editingRq092 && isSolicitacaoExames ? (
+                              isTextarea ? (
+                                <textarea
+                                  className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                  rows={4}
+                                  value={textValue}
+                                  onChange={(event) => handleRq092FieldChange(campo, event.target.value)}
+                                />
+                              ) : isBooleanField ? (
+                                <label className={`${INPUT_RO} flex cursor-pointer items-center gap-3`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checkboxValue === true}
+                                    onChange={(event) => handleRq092FieldChange(campo, event.target.checked)}
+                                    aria-label={campo.label}
+                                  />
+                                  <span>{checkboxValue === true ? 'Sim' : 'Não'}</span>
+                                </label>
+                              ) : campo.type === 'select' ? (
+                                <select
+                                  className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                  value={textValue}
+                                  onChange={(event) => handleRq092FieldChange(campo, event.target.value)}
+                                >
+                                  <option value="">Selecione...</option>
+                                  {(campo.options ?? []).map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  className="mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                  type={campo.type === 'date' ? 'date' : campo.type === 'number' ? 'number' : 'text'}
+                                  value={textValue}
+                                  onChange={(event) => handleRq092FieldChange(campo, event.target.value)}
+                                />
+                              )
+                            ) : isTextarea ? (
                               <div className={`${INPUT_RO} min-h-[110px] whitespace-pre-wrap break-words`}>
-                                {value}
+                                {displayValue}
                               </div>
                             ) : isBooleanField ? (
                               <div className={`${INPUT_RO} flex items-center gap-3`}>
@@ -2661,15 +2807,35 @@ async function handleEncaminharAprovacaoComAnexo() {
                                   checked={checkboxValue === true}
                                   aria-label={campo.label}
                                 />
-                            <span>{formatDisplayValueForUser(payloadCampos[campo.name], campo.name)}</span>
+                                <span>{formatDisplayValueForUser(payloadCampos[campo.name], campo.name)}</span>
                               </div>
                             ) : (
-                                <input className={INPUT_RO} readOnly value={value} />
+                                <input className={INPUT_RO} readOnly value={displayValue} />
                             )}
                           </div>
                         )
                       })}
                     </div>
+                    {editingRq092 && isSolicitacaoExames && (
+                      <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50/70 p-3">
+                        <label className="app-label text-orange-900">Justificativa da edição</label>
+                        <textarea
+                          className="mt-1 w-full rounded-md border border-orange-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          rows={3}
+                          value={rq092Justification}
+                          onChange={(event) => setRq092Justification(event.target.value)}
+                          placeholder="Ex.: Correção de data do exame."
+                        />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button type="button" onClick={handleSaveRq092Correction} disabled={savingRq092} className="app-button-primary px-3 py-2 text-xs">
+                            {savingRq092 ? 'Salvando...' : 'Salvar correção'}
+                          </button>
+                          <button type="button" onClick={handleCancelRq092Edit} disabled={savingRq092} className="app-button-secondary px-3 py-2 text-xs">
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               )}
@@ -3077,6 +3243,33 @@ async function handleEncaminharAprovacaoComAnexo() {
 
 
              
+              {isSolicitacaoExames && (detail.rq092Corrections?.length ?? 0) > 0 && (
+                <div>
+                  <label className={LABEL_RO}>Correções da solicitação</label>
+                  <div className="mt-2 space-y-3 rounded border border-[var(--border-subtle)] bg-[var(--card-muted)] px-3 py-2 text-xs">
+                    {detail.rq092Corrections?.map((correction) => (
+                      <div key={correction.id ?? `${correction.editedAt}-${correction.actorId}`} className="space-y-1">
+                        <div className="font-semibold text-[var(--foreground)]">
+                          {formatDateTime(correction.editedAt ?? correction.createdAt)} — {correction.actorName ?? 'Usuário'} corrigiu a solicitação.
+                        </div>
+                        <div>
+                          <span className="font-semibold">Justificativa:</span> {correction.justification || '—'}
+                        </div>
+                        <div className="font-semibold">Campos alterados:</div>
+                        <ul className="ml-4 list-disc space-y-1">
+                          {(correction.changes ?? []).map((change) => (
+                            <li key={change.fieldName}>
+                              <span className="font-semibold">{change.label || change.fieldName}:</span>{' '}
+                              “{formatDisplayValueForUser(change.oldValue, change.fieldName)}” → “{formatDisplayValueForUser(change.newValue, change.fieldName)}”
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Comentários / histórico simples */}
               {detail.comentarios && detail.comentarios.length > 0 && (
                 <div>
