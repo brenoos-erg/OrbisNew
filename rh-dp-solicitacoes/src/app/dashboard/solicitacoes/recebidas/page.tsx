@@ -48,6 +48,20 @@ type ProtocolFilterDiagnostic =
       foundTipo: { id: string; codigo: string | null; nome: string }
       solicitationId: string
     }
+  | {
+      status: 'found_outside_received'
+      protocolo: string
+      statusAtual: string
+      etapaAtual: string
+      setorResponsavelAtual: string
+      flowUrl: string
+      message: string
+    }
+  | {
+      status: 'found_without_permission'
+      protocolo: string
+      message: string
+    }
 
 type ListResponse = {
   rows: Row[]
@@ -856,6 +870,45 @@ export default function ReceivedRequestsPage() {
               Abrir solicitação encontrada
             </button>
           </div>
+        </div>
+      )}
+
+      {data?.protocolFilterDiagnostic?.status === 'found_outside_received' && filters.protocolo && rows.length === 0 && !loading && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-semibold">Este protocolo existe, mas não está nas suas Solicitações Recebidas no momento.</p>
+          <p className="mt-1">{data.protocolFilterDiagnostic.message}</p>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-blue-700">Status atual</dt>
+              <dd>{data.protocolFilterDiagnostic.statusAtual}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-blue-700">Etapa atual</dt>
+              <dd>{data.protocolFilterDiagnostic.etapaAtual}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-blue-700">Setor responsável atual</dt>
+              <dd>{data.protocolFilterDiagnostic.setorResponsavelAtual}</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            className="app-button-primary mt-3"
+            onClick={() => {
+              const diagnostic = data.protocolFilterDiagnostic
+              if (diagnostic?.status === 'found_outside_received') {
+                window.open(diagnostic.flowUrl, '_blank', 'noopener,noreferrer')
+              }
+            }}
+          >
+            Abrir fluxo do chamado
+          </button>
+        </div>
+      )}
+
+      {data?.protocolFilterDiagnostic?.status === 'found_without_permission' && filters.protocolo && rows.length === 0 && !loading && (
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 text-sm app-muted-text">
+          {data.protocolFilterDiagnostic.message}
         </div>
       )}
 

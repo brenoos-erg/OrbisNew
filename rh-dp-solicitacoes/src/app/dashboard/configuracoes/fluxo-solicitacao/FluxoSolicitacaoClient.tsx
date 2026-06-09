@@ -1,6 +1,7 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 type StatusOption = { value: string; label: string }
 type SelectOption = { id: string; name: string }
@@ -246,7 +247,9 @@ function buildCamposPayloadForSubmit(
 }
 
 export default function FluxoSolicitacaoClient() {
-  const [query, setQuery] = useState('')
+  const searchParams = useSearchParams()
+  const initialProtocol = searchParams.get('protocolo') ?? ''
+  const [query, setQuery] = useState(initialProtocol)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -292,16 +295,16 @@ export default function FluxoSolicitacaoClient() {
     setStatusReason('')
   }
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault()
-    if (!query.trim()) return
+  async function fetchFluxoSolicitacao(term: string) {
+    const normalizedTerm = term.trim()
+    if (!normalizedTerm) return
 
     setLoading(true)
     setError(null)
     setSuccess(null)
 
     try {
-      const response = await fetch(`/api/solicitacoes/fluxo/${encodeURIComponent(query.trim())}`, {
+      const response = await fetch(`/api/solicitacoes/fluxo/${encodeURIComponent(normalizedTerm)}`, {
         cache: 'no-store',
       })
 
@@ -325,6 +328,18 @@ export default function FluxoSolicitacaoClient() {
       setLoading(false)
     }
   }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    await fetchFluxoSolicitacao(query)
+  }
+
+  useEffect(() => {
+    if (!initialProtocol.trim()) return
+    setQuery(initialProtocol)
+    void fetchFluxoSolicitacao(initialProtocol)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProtocol])
 
   async function refreshCurrent() {
     if (!result?.solicitacao.id) return

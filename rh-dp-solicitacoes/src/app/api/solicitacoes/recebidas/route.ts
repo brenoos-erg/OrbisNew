@@ -13,6 +13,7 @@ import {
 } from "@/lib/sensitiveHiringRequests";
 import {
   buildReceivedWhereByPolicy,
+  canViewSolicitation,
   resolveUserAccessContext,
 } from "@/lib/solicitationAccessPolicy";
 import {
@@ -38,7 +39,78 @@ type ProtocolFilterDiagnostic =
       selectedTipoId: string;
       foundTipo: { id: string; codigo: string | null; nome: string };
       solicitationId: string;
+    }
+  | {
+      status: "found_outside_received";
+      protocolo: string;
+      statusAtual: string;
+      etapaAtual: string;
+      setorResponsavelAtual: string;
+      flowUrl: string;
+      message: string;
+    }
+  | {
+      status: "found_without_permission";
+      protocolo: string;
+      message: string;
     };
+
+
+const STATUS_LABELS: Record<string, string> = {
+  ABERTA: "Aguardando atendimento",
+  AGUARDANDO_ATENDIMENTO: "Aguardando atendimento",
+  EM_ATENDIMENTO: "Em atendimento",
+  AGUARDANDO_APROVACAO: "Aguardando aprovação",
+  AGUARDANDO_TERMO: "Aguardando termo",
+  AGUARDANDO_AVALIACAO_GESTOR: "Aguardando avaliação gestor",
+  AGUARDANDO_FINALIZACAO_AVALIACAO: "Aguardando finalização RH",
+  CONCLUIDA: "Concluída",
+  CANCELADA: "Cancelada / Recusada",
+};
+
+function formatStatusLabel(status?: string | null) {
+  if (!status) return "Status não informado";
+  return (
+    STATUS_LABELS[status] ??
+    status
+      .trim()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/(^\p{L})|\s+(\p{L})/gu, (match) => match.toLocaleUpperCase("pt-BR"))
+  );
+}
+
+function resolveCurrentStageLabel(solicitation: {
+  status?: string | null;
+  approvalStatus?: string | null;
+  department?: { name?: string | null } | null;
+  costCenter?: Parameters<typeof formatCostCenterLabel>[0] | null;
+}) {
+  if (
+    solicitation.approvalStatus === "PENDENTE" ||
+    solicitation.status === "AGUARDANDO_APROVACAO"
+  ) {
+    return "Aprovadores";
+  }
+
+  return (
+    solicitation.department?.name ??
+    formatCostCenterLabel(solicitation.costCenter, "") ??
+    "Atendimento"
+  );
+}
+
+function resolveCurrentResponsibleSector(solicitation: {
+  department?: { name?: string | null } | null;
+  costCenter?: Parameters<typeof formatCostCenterLabel>[0] | null;
+}) {
+  return (
+    solicitation.department?.name ??
+    formatCostCenterLabel(solicitation.costCenter, "") ??
+    "Não informado"
+  );
+}
 
 function toAndArray(
   andClause: Prisma.SolicitationWhereInput["AND"],
@@ -213,7 +285,7 @@ async function resolveProtocolFilterDiagnostic({
   hasScopeVisibilityPostFilter,
 }: {
   protocolo: string;
-  selectedTipoId: string;
+  selectedTipoId?: string;
   me: Awaited<ReturnType<typeof requireActiveUser>>;
   userAccess: Awaited<ReturnType<typeof resolveUserAccessContext>>;
   receivedVisibilityWhere: Prisma.SolicitationWhereInput;
@@ -221,63 +293,145 @@ async function resolveProtocolFilterDiagnostic({
   hasScopeVisibilityPostFilter: boolean;
 }): Promise<ProtocolFilterDiagnostic> {
   const normalizedProtocol = protocolo.trim();
-  if (!normalizedProtocol || !selectedTipoId) return { status: "not_checked" };
+  if (!normalizedProtocol) return { status: "not_checked" };
 
-  const diagnosticWhere = applyReceivedSecurityWhere(
-    { protocolo: { contains: normalizedProtocol } },
-    { me, userAccess, receivedVisibilityWhere, userDepartmentIdsForSensitive },
-  );
-  const { findManyArgs } = buildListAndCountArgs(diagnosticWhere, {
-    skip: 0,
-    pageSize: 25,
-    orderBy: [{ dataAbertura: "desc" }],
-    includeGlobalSearchData: true,
+  if (selectedTipoId) {
+    const diagnosticWhere = applyReceivedSecurityWhere(
+      { protocolo: { contains: normalizedProtocol } },
+      { me, userAccess, receivedVisibilityWhere, userDepartmentIdsForSensitive },
+    );
+    const { findManyArgs } = buildListAndCountArgs(diagnosticWhere, {
+      skip: 0,
+      pageSize: 25,
+      orderBy: [{ dataAbertura: "desc" }],
+      includeGlobalSearchData: true,
+    });
+
+    const candidates = await prisma.solicitation.findMany(findManyArgs);
+    const visibleCandidates = hasScopeVisibilityPostFilter
+      ? (applyReceivedSectorVisibilityFilter(
+          candidates as unknown as Record<string, unknown>[],
+          {
+            normalizedSectorNames: userAccess.userSectorNamesNormalized,
+            departmentIds: userAccess.userDepartmentIds,
+            costCenterIds: userAccess.userCostCenterIds,
+            viewerTipoIds: userAccess.viewerTipoIds,
+            userSetorKeys: userAccess.userSetorKeys,
+            userId: me.id,
+            finalizerTipoIds: userAccess.finalizerTipoIds,
+            isExperienceEvaluationCoordinator:
+              userAccess.isExperienceEvaluationCoordinator,
+            isRhAuthorizedForExperienceEvaluation:
+              userAccess.isRhAuthorizedForExperienceEvaluation,
+            isRhAuthorizedForSharedHiringFlow:
+              userAccess.isRhAuthorizedForSharedHiringFlow,
+          },
+        ) as typeof candidates)
+      : candidates;
+
+    const found =
+      visibleCandidates.find(
+        (item) => item.protocolo?.toUpperCase() === normalizedProtocol.toUpperCase(),
+      ) ?? visibleCandidates[0];
+
+    if (found && found.tipoId !== selectedTipoId) {
+      return {
+        status: "visible_type_mismatch",
+        protocolo: found.protocolo ?? normalizedProtocol,
+        selectedTipoId,
+        foundTipo: {
+          id: found.tipo?.id ?? found.tipoId,
+          codigo: found.tipo?.codigo ?? null,
+          nome: found.tipo?.nome ?? "Tipo não identificado",
+        },
+        solicitationId: found.id,
+      };
+    }
+  }
+
+  const globalMatch = await prisma.solicitation.findFirst({
+    where: {
+      OR: [
+        { protocolo: normalizedProtocol },
+        { protocolo: normalizedProtocol.toUpperCase() },
+      ],
+    },
+    include: {
+      tipo: { select: { id: true, codigo: true, nome: true } },
+      department: { select: { id: true, name: true, sigla: true, code: true } },
+      costCenter: {
+        select: {
+          id: true,
+          code: true,
+          externalCode: true,
+          abbreviation: true,
+          description: true,
+        },
+      },
+      solicitacaoSetores: { select: { setor: true } },
+      parent: {
+        select: {
+          tipoId: true,
+          tipo: { select: { codigo: true, nome: true } },
+        },
+      },
+    },
   });
 
-  const candidates = await prisma.solicitation.findMany(findManyArgs);
-  const visibleCandidates = hasScopeVisibilityPostFilter
-    ? (applyReceivedSectorVisibilityFilter(
-        candidates as unknown as Record<string, unknown>[],
-        {
-          normalizedSectorNames: userAccess.userSectorNamesNormalized,
-          departmentIds: userAccess.userDepartmentIds,
-          costCenterIds: userAccess.userCostCenterIds,
-          viewerTipoIds: userAccess.viewerTipoIds,
-          userSetorKeys: userAccess.userSetorKeys,
-          userId: me.id,
-          finalizerTipoIds: userAccess.finalizerTipoIds,
-          isExperienceEvaluationCoordinator:
-            userAccess.isExperienceEvaluationCoordinator,
-          isRhAuthorizedForExperienceEvaluation:
-            userAccess.isRhAuthorizedForExperienceEvaluation,
-          isRhAuthorizedForSharedHiringFlow:
-            userAccess.isRhAuthorizedForSharedHiringFlow,
-        },
-      ) as typeof candidates)
-    : candidates;
+  if (!globalMatch) return { status: "not_checked" };
 
-  const found = visibleCandidates.find(
-    (item) => item.protocolo?.toUpperCase() === normalizedProtocol.toUpperCase(),
-  ) ?? visibleCandidates[0];
+  const sensitiveVisibilityWhere = buildSensitiveHiringVisibilityWhere({
+    userId: me.id,
+    userLogin: me.login,
+    userEmail: me.email,
+    userFullName: me.fullName,
+    role: me.role,
+    departmentIds: userDepartmentIdsForSensitive,
+    allowedTipoIds: userAccess.allowedTipoIds,
+    finalizerTipoIds: userAccess.finalizerTipoIds,
+    isExperienceEvaluationCoordinator:
+      userAccess.isExperienceEvaluationCoordinator,
+    isRhAuthorizedForExperienceEvaluation:
+      userAccess.isRhAuthorizedForExperienceEvaluation,
+    isRhAuthorizedForSharedHiringFlow:
+      userAccess.isRhAuthorizedForSharedHiringFlow,
+  });
+  const passesSensitiveVisibility = Boolean(
+    await prisma.solicitation.findFirst({
+      where: { AND: [{ id: globalMatch.id }, sensitiveVisibilityWhere] },
+      select: { id: true },
+    }),
+  );
+  const canViewGlobalMatch =
+    passesSensitiveVisibility && canViewSolicitation(userAccess, globalMatch);
 
-  if (!found || found.tipoId === selectedTipoId) {
+  if (!canViewGlobalMatch) {
     return {
-      status: "not_visible_or_not_found",
+      status: "found_without_permission",
+      protocolo: globalMatch.protocolo ?? normalizedProtocol,
       message:
-        "Existe uma divergência nos filtros ou você não possui permissão para visualizar este protocolo.",
+        "O protocolo existe, mas você não possui permissão para visualizar os detalhes.",
     };
   }
 
+  const statusAtual = formatStatusLabel(globalMatch.status);
+  const etapaAtual = resolveCurrentStageLabel(globalMatch);
+  const setorResponsavelAtual = resolveCurrentResponsibleSector(globalMatch);
+
   return {
-    status: "visible_type_mismatch",
-    protocolo: found.protocolo ?? normalizedProtocol,
-    selectedTipoId,
-    foundTipo: {
-      id: found.tipo?.id ?? found.tipoId,
-      codigo: found.tipo?.codigo ?? null,
-      nome: found.tipo?.nome ?? "Tipo não identificado",
-    },
-    solicitationId: found.id,
+    status: "found_outside_received",
+    protocolo: globalMatch.protocolo ?? normalizedProtocol,
+    statusAtual,
+    etapaAtual,
+    setorResponsavelAtual,
+    flowUrl: `/dashboard/configuracoes/fluxo-solicitacao?protocolo=${encodeURIComponent(
+      globalMatch.protocolo ?? normalizedProtocol,
+    )}`,
+    message:
+      globalMatch.status === "AGUARDANDO_APROVACAO" ||
+      globalMatch.approvalStatus === "PENDENTE"
+        ? "Este chamado ainda está aguardando aprovação e por isso não aparece em Solicitações Recebidas para atendimento."
+        : "Este protocolo existe, mas não está nas suas Solicitações Recebidas no momento.",
   };
 }
 
@@ -512,10 +666,10 @@ export async function GET(req: NextRequest) {
     });
 
     const protocolFilterDiagnostic =
-      total === 0 && searchParams.get("protocolo") && searchParams.get("tipoId")
+      total === 0 && searchParams.get("protocolo")
         ? await resolveProtocolFilterDiagnostic({
             protocolo: searchParams.get("protocolo") ?? "",
-            selectedTipoId: searchParams.get("tipoId") ?? "",
+            selectedTipoId: searchParams.get("tipoId") ?? undefined,
             me,
             userAccess,
             receivedVisibilityWhere,
