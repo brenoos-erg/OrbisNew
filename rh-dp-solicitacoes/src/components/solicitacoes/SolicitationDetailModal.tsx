@@ -305,6 +305,7 @@ export type SolicitationDetail = {
     actorLogin?: string | null
     actorEmail?: string | null
     justification?: string
+    timelineMessage?: string | null
     changes?: Array<{ fieldName: string; label: string; oldValue: unknown; newValue: unknown }>
   }>
   dataAbertura: string
@@ -3309,18 +3310,26 @@ async function handleEncaminharAprovacaoComAnexo() {
                         <div className="font-semibold text-[var(--foreground)]">
                           {formatDateTime(correction.editedAt ?? correction.createdAt)} — {correction.actorName ?? 'Usuário'} corrigiu a solicitação.
                         </div>
-                        <div>
-                          <span className="font-semibold">Justificativa:</span> {correction.justification || '—'}
-                        </div>
-                        <div className="font-semibold">Campos alterados:</div>
-                        <ul className="ml-4 list-disc space-y-1">
-                          {(correction.changes ?? []).map((change) => (
-                            <li key={change.fieldName}>
-                              <span className="font-semibold">{change.label || change.fieldName}:</span>{' '}
-                              “{formatDisplayValueForUser(change.oldValue, change.fieldName)}” → “{formatDisplayValueForUser(change.newValue, change.fieldName)}”
-                            </li>
-                          ))}
-                        </ul>
+                        {correction.justification ? (
+                          <div>
+                            <span className="font-semibold">Justificativa:</span> {correction.justification}
+                          </div>
+                        ) : correction.timelineMessage ? (
+                          <div>{correction.timelineMessage}</div>
+                        ) : null}
+                        {(correction.changes?.length ?? 0) > 0 && (
+                          <>
+                            <div className="font-semibold">Campos alterados:</div>
+                            <ul className="ml-4 list-disc space-y-1">
+                              {(correction.changes ?? []).map((change) => (
+                                <li key={change.fieldName}>
+                                  <span className="font-semibold">{change.label || change.fieldName}:</span>{' '}
+                                  “{formatDisplayValueForUser(change.oldValue, change.fieldName)}” → “{formatDisplayValueForUser(change.newValue, change.fieldName)}”
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
