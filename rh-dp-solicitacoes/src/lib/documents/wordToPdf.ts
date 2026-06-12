@@ -248,9 +248,11 @@ async function runSofficeConvert(args: string[]): Promise<SofficeResult> {
    }
 }
 
-function toDerivedCacheKey(fileUrl: string, sourceStat: Awaited<ReturnType<typeof fs.stat>>) {
+function toDerivedCacheKey(fileUrl: string, sourceStat?: Awaited<ReturnType<typeof fs.stat>>) {
+  const statPart = sourceStat ? `${sourceStat.mtimeMs}:${sourceStat.size}` : 'no-stat'
+
   return createHash('sha1')
-    .update(`${fileUrl}:${sourceStat.mtimeMs}:${sourceStat.size}`)
+    .update(`${fileUrl}:${statPart}`)
     .digest('hex')
     .slice(0, 12)
 }
