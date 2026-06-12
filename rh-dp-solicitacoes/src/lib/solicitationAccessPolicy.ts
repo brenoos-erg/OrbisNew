@@ -143,7 +143,9 @@ export async function resolveUserAccessContext(input: {
     userSectorNamesNormalized,
     userSetorKeys,
     finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
-    allowedTipoIds: [],
+    allowedTipoIds: Array.from(
+      new Set([...finalizerRows, ...viewerTipoRows, ...approverTipoRows].map((row) => row.tipoId)),
+    ),
     viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
     actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
     isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
@@ -174,7 +176,21 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
   })
 }
 
+function hasTipoAccess(tipoIds: string[], solicitation: SolicitationLike) {
+  return Boolean(solicitation.tipoId && tipoIds.includes(solicitation.tipoId))
+}
+
 export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+  if (ctx.role === 'ADMIN') return true
+  if (
+    hasTipoAccess(ctx.allowedTipoIds, solicitation) ||
+    hasTipoAccess(ctx.actionableTipoIds, solicitation) ||
+    hasTipoAccess(ctx.viewerTipoIds, solicitation) ||
+    hasTipoAccess(ctx.finalizerTipoIds, solicitation)
+  ) {
+    return true
+  }
+
   return (
     canUserViewSolicitationByDepartment(ctx, solicitation) ||
     canUserActAsExperienceEvaluator(ctx, solicitation) ||
