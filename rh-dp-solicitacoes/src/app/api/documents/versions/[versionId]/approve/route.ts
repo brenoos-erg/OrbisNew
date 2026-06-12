@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
+import { logDocumentNotificationFailure, resolvePublicationNotificationEvent } from '@/lib/documents/documentPublicationNotification'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -17,6 +18,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
       id: true,
       status: true,
       fileUrl: true,
+      revisionNumber: true,
       document: { select: { code: true } },
     },
   })
@@ -131,11 +133,12 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
 
   if (nextStatus === DocumentVersionStatus.PUBLICADO) {
     if (documentId) {
-      void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+      const publicationEvent = resolvePublicationNotificationEvent(version)
+      void sendDocumentNotification(publicationEvent, {
         documentId,
         versionId,
         actorUserId: me.id,
-      }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
+      }).catch(logDocumentNotificationFailure(publicationEvent))
     }
   }
 

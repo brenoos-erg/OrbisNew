@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
     event: params.get('event')?.trim() || '',
     status: params.get('status')?.trim() || '',
     documentTypeId: params.get('documentTypeId')?.trim() || '',
+    documentId: params.get('documentId')?.trim() || '',
+    versionId: params.get('versionId')?.trim() || '',
   })
   return NextResponse.json({ history: data.history, summary: data.summary })
 }

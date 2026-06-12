@@ -151,6 +151,10 @@ export async function sendMail(
       return { sent: true, provider: 'resend' }
     }
 
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMTP/RESEND não configurados no ambiente de produção.')
+    }
+
     console.info('[DEV] SMTP/RESEND não configurados; e-mail não foi enviado.')
     console.info({ channel, from, to, subject, text, html })
     return { sent: true, provider: 'dev' }
