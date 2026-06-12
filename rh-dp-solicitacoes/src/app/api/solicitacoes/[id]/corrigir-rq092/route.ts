@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { canRequesterEditRq092AfterSubmit } from '@/lib/solicitationAccessPolicy'
 import { isSolicitacaoExamesSst } from '@/lib/solicitationTypes'
 import { normalizeSolicitationPayload } from '@/lib/solicitationDetailPayload'
+import { registerAppError } from '@/lib/errorRegistry'
 
 type CampoSchema = {
   name?: unknown
@@ -57,9 +58,16 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let solicitationId: string | undefined
+  let userId: string | undefined
+  let userLogin: string | null | undefined
+
   try {
     const me = await requireActiveUser()
+    userId = me.id
+    userLogin = me.login
     const { id } = await params
+    solicitationId = id
     const body = await req.json().catch(() => ({}))
     const requestedCampos = asRecord(body.campos)
     const justification = typeof body.justification === 'string' ? body.justification.trim() : ''
@@ -169,6 +177,20 @@ export async function PATCH(
       correction: correctionMetadata,
     })
   } catch (error) {
+    await registerAppError({
+      area: 'solicitacoes',
+      route: '/api/solicitacoes/[id]/corrigir-rq092',
+      method: 'PATCH',
+      userId,
+      userLogin,
+      message: 'Erro ao corrigir RQ.092',
+      error,
+      statusCode: 500,
+      metadata: {
+        solicitationId,
+      },
+    })
+
     console.error('❌ PATCH /api/solicitacoes/[id]/corrigir-rq092 error:', error)
     return NextResponse.json({ error: 'Erro ao corrigir a RQ.092.' }, { status: 500 })
   }
