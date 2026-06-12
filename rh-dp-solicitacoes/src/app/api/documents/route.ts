@@ -15,6 +15,7 @@ import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 import { codeMatchesRequiredPrefix, resolveDocumentCodePrefixFromTypeCode } from '@/lib/documents/documentCodePrefix'
 import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
+import { logDocumentNotificationFailure, resolvePublicationNotificationEvent } from '@/lib/documents/documentPublicationNotification'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
@@ -272,10 +273,11 @@ export async function POST(req: NextRequest)   {
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
       }
       if (initialStatus === DocumentVersionStatus.PUBLICADO) {
-        void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+        const publicationEvent = resolvePublicationNotificationEvent(revisedVersion)
+        void sendDocumentNotification(publicationEvent, {
           documentId: existing.id,
           versionId: revisedVersion.id,
-        }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
+        }).catch(logDocumentNotificationFailure(publicationEvent))
       }
       return NextResponse.json(
         {
@@ -350,10 +352,11 @@ export async function POST(req: NextRequest)   {
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
       }
       if (initialStatus === DocumentVersionStatus.PUBLICADO) {
-        void sendDocumentNotification('DOCUMENT_PUBLISHED', {
+        const publicationEvent = resolvePublicationNotificationEvent(created.versions[0])
+        void sendDocumentNotification(publicationEvent, {
           documentId: created.id,
           versionId: created.versions[0].id,
-        }).catch((error) => console.error('DOCUMENT_PUBLISHED notification failed', error))
+        }).catch(logDocumentNotificationFailure(publicationEvent))
       }
     }
 

@@ -19,9 +19,9 @@ export function getRuleDefaults(event: DocumentNotificationEvent) {
     notifyApproverGroup: event === 'DOCUMENT_SUBMITTED_FOR_APPROVAL' || event === 'DOCUMENT_APPROVED',
     notifyQualityReviewers:
       event === 'DOCUMENT_QUALITY_REVIEW' || event === 'DOCUMENT_EXPIRING' || event === 'DOCUMENT_EXPIRED',
-    notifyOwnerDepartment: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REJECTED',
-    notifyOwnerCostCenter: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REJECTED',
-    notifyDistributionTargets: event === 'DOCUMENT_DISTRIBUTED',
+    notifyOwnerDepartment: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED',
+    notifyOwnerCostCenter: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED',
+    notifyDistributionTargets: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_DISTRIBUTED',
     fixedEmailsJson: [],
     ccEmailsJson: [],
     subjectTemplate: DOCUMENT_NOTIFICATION_DEFAULT_TEMPLATES[event].subject,
@@ -29,7 +29,7 @@ export function getRuleDefaults(event: DocumentNotificationEvent) {
   }
 }
 
-export async function getNotificationsCenterData(filters: { event?: string; status?: string; documentTypeId?: string }) {
+export async function getNotificationsCenterData(filters: { event?: string; status?: string; documentTypeId?: string; documentId?: string; versionId?: string }) {
   const [types, flows, rulesDb, logs] = await Promise.all([
     prisma.documentTypeCatalog.findMany({ select: { id: true, code: true, description: true }, orderBy: { description: 'asc' } }),
     prisma.documentTypeApprovalFlow.findMany({
@@ -45,6 +45,10 @@ export async function getNotificationsCenterData(filters: { event?: string; stat
       orderBy: [{ event: 'asc' }, { updatedAt: 'desc' }],
     }),
     prisma.documentNotificationLog.findMany({
+      where: {
+        ...(filters.documentId ? { documentId: filters.documentId } : {}),
+        ...(filters.versionId ? { versionId: filters.versionId } : {}),
+      },
       include: {
         document: { select: { code: true, title: true } },
         version: { select: { revisionNumber: true } },
@@ -106,6 +110,8 @@ export async function getNotificationsCenterData(filters: { event?: string; stat
       revision: item.version ? `REV${String(item.version.revisionNumber).padStart(2, '0')}` : '-',
       recipientEmail: item.recipientEmail,
       recipientSource: item.recipientSource,
+      documentId: item.documentId,
+      versionId: item.versionId,
       status: item.status,
       error: item.error,
     })),

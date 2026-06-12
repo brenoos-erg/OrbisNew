@@ -5,6 +5,7 @@ export const DOCUMENT_NOTIFICATION_EVENTS = [
   'DOCUMENT_REJECTED',
   'DOCUMENT_QUALITY_REVIEW',
   'DOCUMENT_PUBLISHED',
+  'DOCUMENT_REVISED',
   'DOCUMENT_DISTRIBUTED',
   'DOCUMENT_EXPIRING',
   'DOCUMENT_EXPIRED',
@@ -19,6 +20,7 @@ export const DOCUMENT_NOTIFICATION_EVENT_LABELS: Record<DocumentNotificationEven
   DOCUMENT_REJECTED: 'Documento reprovado/devolvido',
   DOCUMENT_QUALITY_REVIEW: 'Revisão da qualidade',
   DOCUMENT_PUBLISHED: 'Documento publicado',
+  DOCUMENT_REVISED: 'Revisão de documento publicada',
   DOCUMENT_DISTRIBUTED: 'Documento distribuído',
   DOCUMENT_EXPIRING: 'Documento próximo do vencimento',
   DOCUMENT_EXPIRED: 'Documento vencido',
@@ -65,7 +67,11 @@ export const DOCUMENT_NOTIFICATION_DEFAULT_TEMPLATES: Record<DocumentNotificatio
   },
   DOCUMENT_PUBLISHED: {
     subject: '[{documentCode}] Documento publicado',
-    body: 'O documento {documentCode} - {documentTitle} (REV {revisionNumber}) foi publicado em {publishedAt}. Link: {link}',
+    body: 'O documento {documentCode} - {documentTitle} ({revisionNumber}) foi publicado em {publishedAt}. Link: {link}',
+  },
+  DOCUMENT_REVISED: {
+    subject: '[{documentCode}] Revisão publicada ({revisionNumber})',
+    body: 'A revisão {revisionNumber} do documento {documentCode} - {documentTitle} foi publicada e está vigente desde {publishedAt}. Link: {link}',
   },
   DOCUMENT_DISTRIBUTED: {
     subject: '[{documentCode}] Documento distribuído para ciência',

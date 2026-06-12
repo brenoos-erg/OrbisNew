@@ -1,0 +1,22 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const types = fs.readFileSync('src/lib/documents/documentNotificationTypes.ts', 'utf8')
+const center = fs.readFileSync('src/lib/documents/documentNotificationsCenter.ts', 'utf8')
+const migration = fs.readFileSync('prisma/migrations/202606120001_add_document_revised_notification_rule/migration.sql', 'utf8')
+const mailer = fs.readFileSync('src/lib/mailer.ts', 'utf8')
+const historyRoute = fs.readFileSync('src/app/api/documents/notifications/history/route.ts', 'utf8')
+
+assert.match(types, /'DOCUMENT_REVISED'/)
+assert.match(types, /Revisão de documento publicada/)
+assert.match(types, /A revisão \{revisionNumber\}/)
+assert.match(center, /notifyDistributionTargets: event === 'DOCUMENT_PUBLISHED' \|\| event === 'DOCUMENT_REVISED'/)
+assert.match(center, /documentId: filters\.documentId/)
+assert.match(center, /versionId: filters\.versionId/)
+assert.match(historyRoute, /documentId: params\.get\('documentId'\)/)
+assert.match(historyRoute, /versionId: params\.get\('versionId'\)/)
+assert.match(migration, /DOCUMENT_REVISED/)
+assert.match(migration, /'DOCUMENT_PUBLISHED',[\s\S]*true,[\s\S]*true,[\s\S]*true,[\s\S]*JSON_ARRAY\(\)/)
+assert.match(mailer, /SMTP\/RESEND não configurados no ambiente de produção/)
+
+console.info('document-notification-revision-defaults.test.cjs: ok')
