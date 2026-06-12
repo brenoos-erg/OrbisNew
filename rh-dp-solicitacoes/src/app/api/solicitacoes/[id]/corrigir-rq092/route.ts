@@ -33,6 +33,26 @@ function valuesAreEqual(a: unknown, b: unknown) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 }
 
+function truncateTimelineMessage(message: string, maxLength = 190) {
+  return message.length > maxLength ? `${message.slice(0, maxLength - 3)}...` : message
+}
+
+function buildRq092CorrectionTimelineMessage(params: {
+  actorName: string
+  changes: Array<{ label: string }>
+  justification: string
+}) {
+  const changedLabels = params.changes.map((change) => change.label).slice(0, 5).join(', ')
+  const extraCount = Math.max(0, params.changes.length - 5)
+  const fieldsSummary = `${changedLabels}${extraCount > 0 ? ` e mais ${extraCount}` : ''}`
+  const shortJustification =
+    params.justification.length > 80 ? `${params.justification.slice(0, 77)}...` : params.justification
+
+  return truncateTimelineMessage(
+    `Correção da RQ.092 registrada por ${params.actorName}. Campos alterados: ${fieldsSummary}. Justificativa: ${shortJustification}`,
+  )
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -90,18 +110,24 @@ export async function PATCH(
     }
 
     const editedAt = new Date()
+    const actorName = me.fullName ?? me.email ?? me.login ?? me.id
     const correctionMetadata = {
       type: 'RQ092_CORRECAO_REALIZADA',
       solicitationId: solicitation.id,
       protocolo: solicitation.protocolo,
       actorId: me.id,
-      actorName: me.fullName ?? me.email ?? me.login ?? me.id,
+      actorName,
       actorLogin: me.login ?? null,
       actorEmail: me.email ?? null,
       editedAt: editedAt.toISOString(),
       justification,
       changes,
     }
+    const timelineMessage = buildRq092CorrectionTimelineMessage({
+      actorName,
+      changes,
+      justification,
+    })
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedSolicitation = await tx.solicitation.update({
@@ -119,7 +145,7 @@ export async function PATCH(
         data: {
           solicitationId: solicitation.id,
           status: 'RQ092_CORRECAO_REALIZADA',
-          message: JSON.stringify(correctionMetadata),
+          message: timelineMessage,
           createdAt: editedAt,
         },
       })

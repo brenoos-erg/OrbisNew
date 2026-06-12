@@ -161,12 +161,16 @@ export function buildSolicitationDetailPayload(input: {
     ...input.permissions,
     rq092Corrections: asArray(input.timelines)
       .filter((timeline) => timeline.status === 'RQ092_CORRECAO_REALIZADA' || timeline.status === 'SOLICITACAO_CORRIGIDA')
-      .map((timeline) => ({
-        id: timeline.id,
-        createdAt: iso(timeline.createdAt),
-        ...parseRq092CorrectionMessage(timeline.message),
-      }))
-      .filter((correction) => correction.changes && correction.changes.length > 0),
+      .map((timeline) => {
+        const parsedCorrection = parseRq092CorrectionMessage(timeline.message)
+        return {
+          id: timeline.id,
+          createdAt: iso(timeline.createdAt),
+          timelineMessage: typeof timeline.message === 'string' ? timeline.message : null,
+          ...(parsedCorrection ?? {}),
+        }
+      })
+      .filter((correction) => (correction.changes && correction.changes.length > 0) || correction.timelineMessage),
     dataAbertura: iso(item.dataAbertura),
     dataPrevista: iso(item.dataPrevista),
     dataFechamento: iso(item.dataFechamento),
