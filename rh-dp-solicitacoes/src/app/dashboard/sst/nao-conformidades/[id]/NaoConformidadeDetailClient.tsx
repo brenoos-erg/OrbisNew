@@ -141,6 +141,9 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [estudoError, setEstudoError] = useState<string | null>(null)
   const [estudoSuccess, setEstudoSuccess] = useState<string | null>(null)
   const [estudoSaving, setEstudoSaving] = useState(false)
+  const [verificacaoSaving, setVerificacaoSaving] = useState(false)
+  const [verificacaoError, setVerificacaoError] = useState<string | null>(null)
+  const [verificacaoSuccess, setVerificacaoSuccess] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('naoConformidade')
   const [gut, setGut] = useState({ gravidade: 1, urgencia: 1, tendencia: 1 })
   const [porques, setPorques] = useState<Array<{ pergunta: string; resposta: string }>>(
@@ -391,10 +394,30 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
   async function salvarVerificacao(e: FormEvent) {
     e.preventDefault()
-    await fetch(`/api/sst/nao-conformidades/${id}/verificacao-eficacia`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analiseQualidade }),
-    })
-    load()
+    setVerificacaoSaving(true)
+    setVerificacaoError(null)
+    setVerificacaoSuccess(null)
+
+    try {
+      const res = await fetch(`/api/sst/nao-conformidades/${id}/verificacao-eficacia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analiseQualidade }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setVerificacaoError(data?.error || 'Erro ao salvar verificação de eficácia.')
+        return
+      }
+
+      setVerificacaoSuccess('Verificação de eficácia salva com sucesso.')
+      await load()
+    } catch (error) {
+      setVerificacaoError('Erro ao salvar verificação de eficácia.')
+    } finally {
+      setVerificacaoSaving(false)
+    }
   }
   function abrirNovaAcaoModal() {
     if (bloqueado) return
@@ -897,8 +920,26 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
       {activeSection === 'verificacao' ? (
         <Card title="Verificação de eficácia">
           <form onSubmit={salvarVerificacao} className="space-y-2">
-            <textarea value={analiseQualidade} onChange={(e)=>setAnaliseQualidade(e.target.value)} disabled={bloqueado} className="w-full rounded border px-2 py-1 text-sm" rows={4} placeholder="Análise da qualidade" />
-            <button disabled={bloqueado} className="rounded bg-orange-500 px-3 py-2 text-sm text-white">Salvar verificação</button>
+            {verificacaoError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{verificacaoError}</div>
+            ) : null}
+            {verificacaoSuccess ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{verificacaoSuccess}</div>
+            ) : null}
+            <textarea
+              value={analiseQualidade}
+              onChange={(e) => setAnaliseQualidade(e.target.value)}
+              disabled={bloqueado || verificacaoSaving}
+              className="w-full rounded border px-2 py-1 text-sm disabled:bg-slate-100 disabled:text-slate-500"
+              rows={4}
+              placeholder="Análise da qualidade"
+            />
+            <button
+              disabled={bloqueado || verificacaoSaving}
+              className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {verificacaoSaving ? 'Salvando...' : 'Salvar verificação'}
+            </button>
           </form>
         </Card>
       ) : null}

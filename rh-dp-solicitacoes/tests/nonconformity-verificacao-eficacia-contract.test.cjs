@@ -1,0 +1,27 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const schema = fs.readFileSync('prisma/schema.prisma', 'utf8')
+assert.match(schema, /verificacaoEficaciaTexto\s+String\?/, 'schema deve manter campo verificacaoEficaciaTexto')
+
+const route = fs.readFileSync('src/app/api/sst/nao-conformidades/[id]/verificacao-eficacia/route.ts', 'utf8')
+assert.match(route, /requireActiveUser/, 'rota deve validar usuário autenticado')
+assert.match(route, /VERIFICACAO_DE_EFICACIA/, 'rota deve validar permissão da feature de verificação')
+assert.match(route, /Informe a análise da qualidade\./, 'rota deve validar análise obrigatória com erro claro')
+assert.match(route, /Não conformidade não encontrada\./, 'rota deve validar existência da RNC')
+assert.match(route, /verificacaoEficaciaTexto:\s*texto/, 'rota deve persistir no campo correto')
+assert.match(route, /appendNonConformityTimelineEvent/, 'rota deve registrar histórico/timeline')
+assert.match(route, /ok:\s*true/, 'rota deve responder ok=true no sucesso')
+assert.match(route, /Erro ao salvar verificação de eficácia\./, 'rota deve manter mensagem de erro padrão')
+
+const detail = fs.readFileSync('src/app/dashboard/sst/nao-conformidades/[id]/NaoConformidadeDetailClient.tsx', 'utf8')
+assert.match(detail, /verificacaoSaving/, 'frontend deve controlar estado de salvamento')
+assert.match(detail, /verificacaoError/, 'frontend deve controlar mensagem de erro')
+assert.match(detail, /verificacaoSuccess/, 'frontend deve controlar mensagem de sucesso')
+assert.match(detail, /res\.json\(\)\.catch\(\(\) => \(\{\}\)\)/, 'frontend deve tolerar resposta não JSON')
+assert.match(detail, /!res\.ok/, 'frontend deve validar retorno da API')
+assert.match(detail, /Verificação de eficácia salva com sucesso\./, 'frontend deve exibir mensagem de sucesso')
+assert.match(detail, /Salvando\.\.\./, 'frontend deve exibir texto de envio')
+assert.match(detail, /bloqueado \|\| verificacaoSaving/, 'frontend deve bloquear clique duplo durante envio')
+
+console.info('nonconformity-verificacao-eficacia-contract.test.cjs: ok')
