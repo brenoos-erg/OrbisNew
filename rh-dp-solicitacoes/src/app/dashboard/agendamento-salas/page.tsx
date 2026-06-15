@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, XCircle } from 'lucide-react'
 
 type Room = 'OURO' | 'SOLAR' | 'DIAMANTE'
+type UserOption = {
+  id: string
+  fullName: string
+  email: string
+  login?: string | null
+  phone?: string | null
+  costCenterName?: string | null
+}
+
 type Booking = {
   id: string
   room: Room
@@ -36,6 +45,14 @@ export default function MeetingRoomSchedulingPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [scheduleForAnotherUser, setScheduleForAnotherUser] = useState(false)
+  const [currentUser, setCurrentUser] = useState<UserOption | null>(null)
+  const [users, setUsers] = useState<UserOption[]>([])
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [conflictBookings, setConflictBookings] = useState<Booking[]>([])
+  const [conflictLoading, setConflictLoading] = useState(false)
   const [form, setForm] = useState({
     meetingType: 'Interna',
     title: '',
@@ -48,6 +65,28 @@ export default function MeetingRoomSchedulingPage() {
     description: '',
   })
 
+  const loadCurrentUser = async () => {
+    const response = await fetch('/api/agendamento-salas/me', { cache: 'no-store' })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || !data.user) {
+      setMessage(data.error ?? 'Não foi possível carregar o usuário logado.')
+      return
+    }
+    setCurrentUser(data.user)
+    setForm((current) => ({ ...current, requesterName: data.user.fullName ?? '', requesterEmail: data.user.email ?? '' }))
+  }
+
+  const loadUsers = async (search = userSearch) => {
+    setUsersLoading(true)
+    const params = new URLSearchParams()
+    if (search.trim()) params.set('search', search.trim())
+    const response = await fetch(`/api/agendamento-salas/usuarios?${params.toString()}`, { cache: 'no-store' })
+    const data = await response.json().catch(() => ({}))
+    setUsersLoading(false)
+    if (response.ok) setUsers(data.users ?? [])
+    else setMessage(data.error ?? 'Não foi possível carregar usuários.')
+  }
+
   const loadBookings = async () => {
     const params = new URLSearchParams({ date })
     if (roomFilter) params.set('room', roomFilter)
@@ -58,13 +97,69 @@ export default function MeetingRoomSchedulingPage() {
   }
 
   useEffect(() => {
+    loadCurrentUser()
+  }, [])
+
+  useEffect(() => {
     loadBookings()
   }, [date, roomFilter])
 
+  useEffect(() => {
+    if (!scheduleForAnotherUser) return
+    const timeout = window.setTimeout(() => {
+      loadUsers(userSearch)
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [scheduleForAnotherUser, userSearch])
+
+  useEffect(() => {
+    const loadFormDateBookings = async () => {
+      setConflictLoading(true)
+      const params = new URLSearchParams({ date: form.date, room: form.room, status: 'AGENDADA' })
+      const response = await fetch(`/api/agendamento-salas?${params.toString()}`, { cache: 'no-store' })
+      const data = await response.json().catch(() => ({}))
+      setConflictLoading(false)
+      if (response.ok) setConflictBookings(data.bookings ?? [])
+    }
+    loadFormDateBookings()
+  }, [form.date, form.room])
+
   const activeBookings = useMemo(() => bookings.filter((booking) => booking.status === 'AGENDADA'), [bookings])
+
+  const selectedUser = useMemo(() => users.find((user) => user.id === selectedUserId) ?? null, [users, selectedUserId])
+
+  const scheduleConflict = useMemo(() => {
+    const startsAt = new Date(`${form.date}T${form.startTime}:00`)
+    const endsAt = new Date(`${form.date}T${form.endTime}:00`)
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || startsAt >= endsAt) return null
+    return conflictBookings.find((booking) => new Date(booking.startsAt) < endsAt && new Date(booking.endsAt) > startsAt) ?? null
+  }, [conflictBookings, form.date, form.startTime, form.endTime])
+
+  const handleScheduleForAnotherUserChange = (checked: boolean) => {
+    setScheduleForAnotherUser(checked)
+    if (checked) {
+      loadUsers(userSearch)
+      return
+    }
+    setSelectedUserId('')
+    if (currentUser) {
+      setForm((current) => ({ ...current, requesterName: currentUser.fullName, requesterEmail: currentUser.email }))
+    }
+  }
+
+  const handleUserSelection = (userId: string) => {
+    setSelectedUserId(userId)
+    const user = users.find((item) => item.id === userId)
+    if (!user) return
+    setForm((current) => ({ ...current, requesterName: user.fullName, requesterEmail: user.email }))
+  }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (scheduleConflict) {
+      setMessage('Sala já reservada nesse horário. Ajuste a sala ou o horário antes de agendar.')
+      return
+    }
     setLoading(true)
     setMessage('')
     const response = await fetch('/api/agendamento-salas', {
@@ -144,10 +239,19 @@ export default function MeetingRoomSchedulingPage() {
           <label className="space-y-1 text-sm font-medium">Data<input className="app-input" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
           <label className="space-y-1 text-sm font-medium">Hora início<input className="app-input" type="time" required value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} /></label>
           <label className="space-y-1 text-sm font-medium">Hora fim<input className="app-input" type="time" required value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} /></label>
-          <label className="space-y-1 text-sm font-medium">Solicitante/Responsável<input className="app-input" value={form.requesterName} onChange={(e) => setForm({ ...form, requesterName: e.target.value })} /></label>
-          <label className="space-y-1 text-sm font-medium">E-mail do solicitante<input className="app-input" type="email" value={form.requesterEmail} onChange={(e) => setForm({ ...form, requesterEmail: e.target.value })} /></label>
+          <label className="flex items-center gap-2 text-sm font-medium md:col-span-2"><input type="checkbox" checked={scheduleForAnotherUser} onChange={(e) => handleScheduleForAnotherUserChange(e.target.checked)} /> Agendar para outra pessoa</label>
+          {scheduleForAnotherUser && (
+            <>
+              <label className="space-y-1 text-sm font-medium">Pesquisar usuário<input className="app-input" placeholder="Digite nome, e-mail ou login" value={userSearch} onChange={(e) => setUserSearch(e.target.value)} /></label>
+              <label className="space-y-1 text-sm font-medium">Usuário<select className="app-input" value={selectedUserId} onChange={(e) => handleUserSelection(e.target.value)}><option value="">{usersLoading ? 'Carregando usuários...' : 'Selecione um usuário'}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.fullName} · {user.email}{user.login ? ` · ${user.login}` : ''}</option>)}</select></label>
+              {selectedUser && <p className="text-sm text-[var(--muted-foreground)] md:col-span-2">{selectedUser.costCenterName ? `Centro de custo: ${selectedUser.costCenterName}` : ''}{selectedUser.costCenterName && selectedUser.phone ? ' · ' : ''}{selectedUser.phone ? `Telefone: ${selectedUser.phone}` : ''}</p>}
+            </>
+          )}
+          <label className="space-y-1 text-sm font-medium">Solicitante/Responsável<input className="app-input" readOnly value={form.requesterName} /></label>
+          <label className="space-y-1 text-sm font-medium">E-mail do solicitante<input className="app-input" type="email" readOnly value={form.requesterEmail} /></label>
+          {scheduleConflict && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:col-span-2">Sala já reservada neste horário: {scheduleConflict.title} ({timeFmt.format(new Date(scheduleConflict.startsAt))} - {timeFmt.format(new Date(scheduleConflict.endsAt))}).</div>}
           <label className="space-y-1 text-sm font-medium md:col-span-2">Observações<textarea className="app-input min-h-24" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <div className="md:col-span-2"><button disabled={loading} className="app-button-primary" type="submit">{loading ? 'Agendando...' : 'Agendar reunião'}</button></div>
+          <div className="md:col-span-2"><button disabled={loading || conflictLoading || !!scheduleConflict} className="app-button-primary" type="submit">{loading ? 'Agendando...' : 'Agendar reunião'}</button></div>
         </form>
       ) : (
         <div className="space-y-4">
