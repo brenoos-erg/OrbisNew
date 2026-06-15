@@ -32,6 +32,22 @@ type ActionItem = {
   updatedAt?: string | null
 }
 
+type CauseStudyChange = {
+  fieldName: string
+  label: string
+  oldValue: string | null
+  newValue: string | null
+}
+
+type CauseStudyEditLog = {
+  id: string
+  editedAt: string
+  actorName?: string | null
+  actorEmail?: string | null
+  actorLogin?: string | null
+  changes?: CauseStudyChange[]
+}
+
 type Detail = {
   id: string
   numeroRnc: string
@@ -47,6 +63,7 @@ type Detail = {
   tendencia?: number | null
   causaRaiz?: string | null
   estudoCausa?: Array<{ pergunta: string; resposta: string }>
+  estudoCausaEditLogs?: CauseStudyEditLog[]
   verificacaoEficaciaTexto?: string | null
   status: string
   aprovadoQualidadeStatus: string
@@ -141,6 +158,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const [estudoError, setEstudoError] = useState<string | null>(null)
   const [estudoSuccess, setEstudoSuccess] = useState<string | null>(null)
   const [estudoSaving, setEstudoSaving] = useState(false)
+  const [showEstudoHistory, setShowEstudoHistory] = useState(false)
   const [verificacaoSaving, setVerificacaoSaving] = useState(false)
   const [verificacaoError, setVerificacaoError] = useState<string | null>(null)
   const [verificacaoSuccess, setVerificacaoSuccess] = useState<string | null>(null)
@@ -183,6 +201,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   const aprovado = item?.aprovadoQualidadeStatus === 'APROVADO'
   const qualityCanEditBeforeApproval = item?.permissions?.canManageAllNc === true
   const bloqueado = !aprovado && !qualityCanEditBeforeApproval
+  const estudoCausaBloqueado = item?.status === 'CANCELADA' || item?.status === 'ENCERRADA'
   const canEditFirstScreen = item?.permissions?.canEditFirstScreen === true
 
   async function load() {
@@ -329,6 +348,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
   async function salvarEstudoCausa(e: FormEvent) {
     e.preventDefault()
+    if (estudoCausaBloqueado) return
     setEstudoSaving(true)
     setEstudoError(null)
     setEstudoSuccess(null)
@@ -791,16 +811,51 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
           <form onSubmit={salvarEstudoCausa} className="space-y-2">
             {porques.map((p, idx) => (
               <div key={idx} className="grid gap-2 md:grid-cols-2">
-                <input value={p.pergunta} onChange={(e)=>setPorques((prev)=>prev.map((x,i)=>i===idx?{...x, pergunta:e.target.value}:x))} disabled={bloqueado} className="rounded border px-2 py-1 text-sm" />
-                <input value={p.resposta} onChange={(e)=>setPorques((prev)=>prev.map((x,i)=>i===idx?{...x, resposta:e.target.value}:x))} disabled={bloqueado} placeholder="Resposta" className="rounded border px-2 py-1 text-sm" />
+                <input value={p.pergunta} onChange={(e)=>setPorques((prev)=>prev.map((x,i)=>i===idx?{...x, pergunta:e.target.value}:x))} disabled={estudoCausaBloqueado} className="rounded border px-2 py-1 text-sm" />
+                <input value={p.resposta} onChange={(e)=>setPorques((prev)=>prev.map((x,i)=>i===idx?{...x, resposta:e.target.value}:x))} disabled={estudoCausaBloqueado} placeholder="Resposta" className="rounded border px-2 py-1 text-sm" />
               </div>
             ))}
-          <button type="button" disabled={bloqueado} onClick={()=>setPorques((p)=>[...p, { pergunta: `Por quê ${p.length + 1}?`, resposta: '' }])} className="rounded border px-2 py-1 text-sm">Adicionar porquê</button>
-            <textarea value={causaRaiz} onChange={(e)=>setCausaRaiz(e.target.value)} disabled={bloqueado} className="w-full rounded border px-2 py-1 text-sm" placeholder="Causa raiz" />
+          <button type="button" disabled={estudoCausaBloqueado} onClick={()=>setPorques((p)=>[...p, { pergunta: `Por quê ${p.length + 1}?`, resposta: '' }])} className="rounded border px-2 py-1 text-sm">Adicionar porquê</button>
+            <textarea value={causaRaiz} onChange={(e)=>setCausaRaiz(e.target.value)} disabled={estudoCausaBloqueado} className="w-full rounded border px-2 py-1 text-sm" placeholder="Causa raiz" />
             {estudoError ? <p className="text-sm text-rose-700">{estudoError}</p> : null}
             {estudoSuccess ? <p className="text-sm text-emerald-700">{estudoSuccess}</p> : null}
-            <button disabled={bloqueado || estudoSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{estudoSaving ? 'Salvando...' : 'Salvar estudo de causa'}</button>
+            {estudoCausaBloqueado ? <p className="text-sm text-slate-600">RNC em status final. Estudo de causa em modo somente leitura.</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <button disabled={estudoCausaBloqueado || estudoSaving} className="rounded bg-orange-500 px-3 py-2 text-sm text-white disabled:opacity-60">{estudoSaving ? 'Salvando...' : 'Salvar estudo de causa'}</button>
+              <button type="button" onClick={() => setShowEstudoHistory((value) => !value)} className="rounded border px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Histórico de edições</button>
+            </div>
           </form>
+          {showEstudoHistory ? (
+            <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <h3 className="text-sm font-semibold text-slate-800">Histórico de edições do Estudo de causa</h3>
+              {item.estudoCausaEditLogs?.length ? (
+                item.estudoCausaEditLogs.map((log) => (
+                  <div key={log.id} className="rounded border border-slate-200 bg-white p-3 text-sm">
+                    <div className="mb-2 text-xs text-slate-500">
+                      {new Date(log.editedAt).toLocaleString('pt-BR')} · {log.actorName || log.actorLogin || log.actorEmail || 'Usuário não identificado'}
+                    </div>
+                    {log.changes?.length ? (
+                      <ul className="space-y-2">
+                        {log.changes.map((change) => (
+                          <li key={`${log.id}-${change.fieldName}`} className="rounded bg-slate-50 p-2">
+                            <div className="font-medium text-slate-700">{change.label || change.fieldName}</div>
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <span><b>Anterior:</b> {change.oldValue || '-'}</span>
+                              <span><b>Novo:</b> {change.newValue || '-'}</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-500">Nenhum campo alterado nesta edição.</p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Nenhuma edição registrada.</p>
+              )}
+            </div>
+          ) : null}
         </Card>
       ) : null}
        {activeSection === 'planoDeAcao' ? (

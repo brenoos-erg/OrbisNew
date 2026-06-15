@@ -867,20 +867,24 @@ export const POST = withModuleLevel(
             idempotencyKey,
             nonConformityId: isGestaoMudancas ? nonConformityId : null,
             requiresApproval: (() => {
+              if (isAvaliacaoExperiencia) return false
               const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
               if (tiDecision !== null) return tiDecision
               return Boolean(tipoMeta?.requiresApproval)
             })(),
             approvalStatus: (() => {
+              if (isAvaliacaoExperiencia) return 'NAO_PRECISA'
               const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
               if (tiDecision === true) return 'PENDENTE'
               return 'NAO_PRECISA'
             })(),
             status: (() => {
+              if (isAvaliacaoExperiencia) return EXPERIENCE_EVALUATION_STATUS as any
               const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
               if (tiDecision === true) return 'AGUARDANDO_APROVACAO'
               return 'ABERTA'
             })(),
+            approverId: isAvaliacaoExperiencia ? String(payload?.campos?.gestorImediatoAvaliadorId ?? '') : undefined,
           },
         })
 
