@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel } from '@prisma/client'
+import { Action, ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
-import { MODULE_KEYS } from '@/lib/featureKeys'
-import { getUserModuleLevel } from '@/lib/permissions'
+import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
+import { canFeature, getUserModuleLevel } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { registerAppError } from '@/lib/errorRegistry'
-import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 
 type Change = {
   fieldName: string
@@ -44,8 +43,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
     const effectiveLevel = sstLevel ?? level ?? undefined
 
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+    if (!hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Sem permissão no módulo SST.' }, { status: 403 })
+    }
+
+    const canViewNonConformities = await canFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.VIEW)
+    if (!canViewNonConformities) {
+      return NextResponse.json({ error: 'Sem permissão para visualizar Não Conformidades.' }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({} as any))
@@ -91,10 +95,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const nc = await prisma.nonConformity.findUnique({
       where: { id: nonConformityId },
       select: {
-        solicitanteId: true,
-        centroQueDetectouId: true,
-        centroQueOriginouId: true,
-        aprovadoQualidadeStatus: true,
         status: true,
         causaRaiz: true,
         estudoCausa: { orderBy: { ordem: 'asc' } },
@@ -104,19 +104,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (nc.status === 'CANCELADA' || nc.status === 'ENCERRADA') {
       return NextResponse.json({ error: 'Não é possível editar estudo de causa em RNC cancelada ou encerrada.' }, { status: 409 })
     }
-    const userCostCenterIds = hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
-    const canAccess = canUserAccessNc({
-      userId: me.id,
-      level: effectiveLevel,
-      ncSolicitanteId: nc.solicitanteId,
-      centroQueDetectouId: nc.centroQueDetectouId,
-      centroQueOriginouId: nc.centroQueOriginouId,
-      userCostCenterIds,
-    })
-    if (!canAccess) {
-      return NextResponse.json({ error: 'Sem permissão para editar estudo de causa.' }, { status: 403 })
-    }
-
     const changes: Change[] = []
     const maxItems = Math.max(nc.estudoCausa.length, normalized.hasItems ? normalized.normalizedItems.length : 0)
     if (normalized.hasItems) {
