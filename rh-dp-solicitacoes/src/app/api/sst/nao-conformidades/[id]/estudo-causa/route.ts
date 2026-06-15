@@ -29,6 +29,28 @@ function pushChange(changes: Change[], fieldName: string, label: string, oldValu
   if (oldText !== newText) changes.push({ fieldName, label, oldValue: oldText, newValue: newText })
 }
 
+function debugCauseStudy(message: string, metadata: Record<string, unknown>) {
+  if (process.env.DEBUG_NC_CAUSE_STUDY === 'true') {
+    console.info(`[estudo-causa] ${message}`, metadata)
+  }
+}
+
+function canEditCauseStudyFromVisibleNc({
+  effectiveLevel,
+  canViewNonConformities,
+  ncStatus,
+}: {
+  userId: string
+  effectiveLevel: ModuleLevel | undefined
+  canViewNonConformities: boolean
+  ncStatus: string
+}) {
+  if (!hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_1)) return { allowed: false, reason: 'missing_minimum_sst_level' }
+  if (!canViewNonConformities) return { allowed: false, reason: 'missing_non_conformities_view' }
+  if (ncStatus === 'CANCELADA' || ncStatus === 'ENCERRADA') return { allowed: false, reason: 'final_status' }
+  return { allowed: true, reason: 'allowed' }
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let id: string | undefined
   let userId: string | undefined
@@ -43,13 +65,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
     const effectiveLevel = sstLevel ?? level ?? undefined
 
-    if (!hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_1)) {
-      return NextResponse.json({ error: 'Sem permissão no módulo SST.' }, { status: 403 })
+    const hasSstModuleAccess = hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_1)
+    debugCauseStudy('contexto de permissão inicial', {
+      userId: me.id,
+      userLogin: me.login,
+      effectiveLevel,
+      hasSstModuleAccess,
+    })
+
+    if (!hasSstModuleAccess) {
+      debugCauseStudy('bloqueio de permissão', {
+        userId: me.id,
+        userLogin: me.login,
+        effectiveLevel,
+        hasSstModuleAccess,
+        reason: 'missing_minimum_sst_level',
+      })
+      return NextResponse.json({ error: 'Sem permissão no módulo SST.', reason: 'missing_minimum_sst_level' }, { status: 403 })
     }
 
     const canViewNonConformities = await canFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.NAO_CONFORMIDADES, Action.VIEW)
+    debugCauseStudy('acesso à tela de não conformidades verificado', {
+      userId: me.id,
+      userLogin: me.login,
+      effectiveLevel,
+      hasSstModuleAccess,
+      canViewNonConformities,
+    })
     if (!canViewNonConformities) {
-      return NextResponse.json({ error: 'Sem permissão para visualizar Não Conformidades.' }, { status: 403 })
+      debugCauseStudy('bloqueio de permissão', {
+        userId: me.id,
+        userLogin: me.login,
+        effectiveLevel,
+        hasSstModuleAccess,
+        canViewNonConformities,
+        reason: 'missing_non_conformities_view',
+      })
+      return NextResponse.json({ error: 'Sem permissão para visualizar Não Conformidades.', reason: 'missing_non_conformities_view' }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({} as any))
@@ -88,9 +140,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const normalized = normalizeCauseStudyPayload(body)
     id = (await params).id
     const nonConformityId = id
-    if (process.env.NODE_ENV !== 'production') {
-      console.info('[estudo-causa] payload normalizado', { nonConformityId, payload: normalized })
-    }
+    debugCauseStudy('payload normalizado', {
+      userId: me.id,
+      userLogin: me.login,
+      effectiveLevel,
+      hasSstModuleAccess,
+      canViewNonConformities,
+      nonConformityId,
+      hasItems: normalized.hasItems,
+      itemsCount: normalized.normalizedItems.length,
+      hasRootCause: normalized.hasRootCause,
+    })
 
     const nc = await prisma.nonConformity.findUnique({
       where: { id: nonConformityId },
@@ -100,9 +160,49 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         estudoCausa: { orderBy: { ordem: 'asc' } },
       },
     })
-    if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
-    if (nc.status === 'CANCELADA' || nc.status === 'ENCERRADA') {
-      return NextResponse.json({ error: 'Não é possível editar estudo de causa em RNC cancelada ou encerrada.' }, { status: 409 })
+    if (!nc) {
+      debugCauseStudy('bloqueio de permissão', {
+        userId: me.id,
+        userLogin: me.login,
+        effectiveLevel,
+        hasSstModuleAccess,
+        canViewNonConformities,
+        nonConformityId,
+        reason: 'not_found',
+      })
+      return NextResponse.json({ error: 'Não conformidade não encontrada.', reason: 'not_found' }, { status: 404 })
+    }
+
+    const hasFinalStatus = nc.status === 'CANCELADA' || nc.status === 'ENCERRADA'
+    const editAccess = canEditCauseStudyFromVisibleNc({
+      userId: me.id,
+      effectiveLevel,
+      canViewNonConformities,
+      ncStatus: nc.status,
+    })
+    debugCauseStudy('decisão de permissão', {
+      userId: me.id,
+      userLogin: me.login,
+      effectiveLevel,
+      hasSstModuleAccess,
+      canViewNonConformities,
+      nonConformityId,
+      status: nc.status,
+      hasFinalStatus,
+      allowed: editAccess.allowed,
+      reason: editAccess.reason,
+    })
+    if (!editAccess.allowed) {
+      const isFinalStatus = editAccess.reason === 'final_status'
+      return NextResponse.json(
+        {
+          error: isFinalStatus
+            ? 'Não é possível editar estudo de causa em RNC cancelada ou encerrada.'
+            : 'Sem permissão para editar estudo de causa.',
+          reason: editAccess.reason,
+        },
+        { status: isFinalStatus ? 409 : 403 },
+      )
     }
     const changes: Change[] = []
     const maxItems = Math.max(nc.estudoCausa.length, normalized.hasItems ? normalized.normalizedItems.length : 0)
@@ -158,17 +258,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             changes,
           },
         })
+        await appendNonConformityTimelineEvent(tx, {
+          nonConformityId,
+          actorId: me.id,
+          tipo: 'ESTUDO_CAUSA',
+          message: `Estudo de causa editado por ${me.fullName ?? me.login ?? 'usuário'}. Campos alterados: ${changes.length}.`,
+        })
       }
-      await appendNonConformityTimelineEvent(tx, {
-        nonConformityId,
-        actorId: me.id,
-        tipo: 'ESTUDO_CAUSA',
-        message: `Estudo de causa editado por ${me.fullName ?? me.login ?? 'usuário'}. Campos alterados: ${changes.length}.`,
-      })
       return { rows }
     })
 
-    return NextResponse.json({ ok: true, nonConformityId, items: saved.rows })
+    return NextResponse.json({ ok: true, unchanged: changes.length === 0, nonConformityId, items: saved.rows })
   } catch (error) {
     await registerAppError({
       area: 'sst',
