@@ -1,6 +1,6 @@
 /* prisma/seed.ts */
 
-import { Action, ModuleLevel, PrismaClient, UserStatus } from '@prisma/client'
+import { Action, ModuleLevel, Prisma, PrismaClient, UserStatus } from '@prisma/client'
 import { ALL_ACTIONS, FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { OFFICIAL_DEPARTMENTS, OFFICIAL_DEPARTMENT_CODES, validateOfficialDepartments } from '@/lib/officialDepartment'
 import { randomUUID } from 'node:crypto'
@@ -61,7 +61,88 @@ async function main() {
     return total > 0
   }
 
-  
+
+  type SafeTipoSolicitacaoFallback = (tipo: {
+    id: string
+    codigo: string
+    nome: string
+    descricao: string | null
+    schemaJson: Prisma.JsonValue
+  }) => Prisma.TipoSolicitacaoUpdateInput
+
+  const buildLegacyTipoSolicitacaoUpdate = (reason: string): SafeTipoSolicitacaoFallback => (tipo) => {
+    const schemaJson = tipo.schemaJson && typeof tipo.schemaJson === 'object' && !Array.isArray(tipo.schemaJson)
+      ? (tipo.schemaJson as Prisma.JsonObject)
+      : {}
+    const currentMeta = schemaJson.meta && typeof schemaJson.meta === 'object' && !Array.isArray(schemaJson.meta)
+      ? (schemaJson.meta as Prisma.JsonObject)
+      : {}
+
+    return {
+      codigo: `LEGACY.${tipo.id}`,
+      nome: tipo.nome.startsWith('[Legado]') ? tipo.nome : `[Legado] ${tipo.nome} (${tipo.id})`,
+      descricao: tipo.descricao?.includes('Registro legado mantido por possuir vínculos históricos')
+        ? tipo.descricao
+        : `${tipo.descricao ?? 'Tipo de solicitação legado.'} Registro legado mantido por possuir vínculos históricos (${reason}); indisponível para novos cadastros.`,
+      schemaJson: {
+        ...schemaJson,
+        meta: {
+          ...currentMeta,
+          legacy: true,
+          legacyReason: reason,
+          hiddenFromCreate: true,
+          hiddenFromManualOpening: true,
+          disabledForNewRequests: true,
+        },
+      },
+      updatedAt: new Date(),
+    }
+  }
+
+  async function safeDeleteTipoSolicitacao(
+    where: Prisma.TipoSolicitacaoWhereInput,
+    fallbackUpdate: SafeTipoSolicitacaoFallback,
+  ) {
+    const tipos = await prisma.tipoSolicitacao.findMany({
+      where,
+      select: { id: true, codigo: true, nome: true, descricao: true, schemaJson: true },
+    })
+
+    let removed = 0
+    let markedAsLegacy = 0
+
+    for (const tipo of tipos) {
+      const [usageCount, approverCount] = await Promise.all([
+        prisma.solicitation.count({ where: { tipoId: tipo.id } }),
+        prisma.tipoSolicitacaoApprover.count({ where: { tipoId: tipo.id } }),
+      ])
+
+      if (usageCount === 0 && approverCount === 0) {
+        try {
+          await prisma.tipoSolicitacao.delete({ where: { id: tipo.id } })
+          removed += 1
+          continue
+        } catch (error) {
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2003') {
+            throw error
+          }
+
+          console.warn(
+            `⚠️ Tipo de solicitação ${tipo.codigo} (${tipo.id}) possui vínculo não mapeado pelo Prisma e será marcado como legado.`,
+          )
+        }
+      }
+
+      await prisma.tipoSolicitacao.update({
+        where: { id: tipo.id },
+        data: fallbackUpdate(tipo),
+      })
+      markedAsLegacy += 1
+    }
+
+    return { found: tipos.length, removed, markedAsLegacy }
+  }
+
 
   /* =========================
      DEPARTAMENTOS
@@ -1439,33 +1520,41 @@ async function main() {
   /* =========================
      TIPOS DE SOLICITAÇÃO BÁSICOS
      ========================= */
-  await prisma.tipoSolicitacao.deleteMany({
-    where: {
+  const valeTransporteCleanup = await safeDeleteTipoSolicitacao(
+    {
       OR: [
         { id: 'VALE_TRANSPORTE' },
         { nome: { contains: 'Vale-transporte' } },
       ],
     },
-  })
+    buildLegacyTipoSolicitacaoUpdate('substituído/removido do catálogo de solicitações'),
+  )
 
-  await prisma.tipoSolicitacao.deleteMany({
-    where: {
+  const legacyTiposCleanup = await safeDeleteTipoSolicitacao(
+    {
       OR: [
         { codigo: { startsWith: 'RQ.LEG.' } },
         { codigo: 'RQ.LEG.SOLICITACAO_EQUIPAMENTO' },
         { id: 'SOLICITACAO_EQUIPAMENTO' },
       ],
     },
-  })
+    buildLegacyTipoSolicitacaoUpdate('tipo legado substituído por catálogo atual'),
+  )
 
-  await prisma.tipoSolicitacao.deleteMany({
-    where: {
+  const duplicatedTiTiposCleanup = await safeDeleteTipoSolicitacao(
+    {
       codigo: {
         in: ['RQ.TI.001', 'RQ.TI.002', 'RQ.TI.003', 'RQ.TI.004', 'RQ.TI.005', 'RQ.TI.006', 'RQ.TI.007'],
       },
       id: { notIn: ['RQ_TI_001', 'RQ_TI_002', 'RQ_TI_003', 'RQ_TI_004', 'RQ_TI_005', 'RQ_TI_006', 'RQ_TI_007'] },
     },
-  })
+    buildLegacyTipoSolicitacaoUpdate('duplicado de TI substituído pelo tipo canônico RQ_TI_*'),
+  )
+
+  console.log('🧹 Limpeza segura de tipos de solicitação concluída.')
+  console.log(`   • Vale-transporte: ${valeTransporteCleanup.removed} removido(s), ${valeTransporteCleanup.markedAsLegacy} marcado(s) como legado(s).`)
+  console.log(`   • Tipos legados: ${legacyTiposCleanup.removed} removido(s), ${legacyTiposCleanup.markedAsLegacy} marcado(s) como legado(s).`)
+  console.log(`   • Duplicados TI: ${duplicatedTiTiposCleanup.removed} removido(s), ${duplicatedTiTiposCleanup.markedAsLegacy} marcado(s) como legado(s).`)
 
   const tiposTiCatalogo = [
     {
