@@ -26,6 +26,7 @@ import {
   Cpu,
   Package,
   ScanLine,
+  CalendarDays,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { handleFleetUnauthorized } from '@/lib/fleet-auth'
@@ -39,6 +40,7 @@ type Props = {
   showEquipments: boolean
   showMyDocuments: boolean
   showDocumentControl: boolean
+  showRoomScheduling: boolean
   canAccessDocumentApprovalTab2: boolean
   canAccessDocumentApprovalTab3: boolean
   isAdmin: boolean
@@ -77,6 +79,12 @@ type Props = {
     visualizar: boolean
     assinar: boolean
   }
+  meetingRoomFeatures: {
+    acessar: boolean
+    marcar: boolean
+    visualizar: boolean
+    cancelar: boolean
+  }
   equipmentFeatures: {
     atalho: boolean
     linhaTelefonica: boolean
@@ -99,6 +107,7 @@ export default function Sidebar({
   showEquipments,
   showMyDocuments,
   showDocumentControl,
+  showRoomScheduling,
   canAccessDocumentApprovalTab2,
   canAccessDocumentApprovalTab3,
   isAdmin,
@@ -111,6 +120,7 @@ export default function Sidebar({
   fleetFeatures,
   refusalFeatures,
   myDocumentsFeatures,
+  meetingRoomFeatures,
   equipmentFeatures,
   userMenu,
 }: Props) {
@@ -130,6 +140,7 @@ export default function Sidebar({
   const inEquipment = pathname.startsWith('/dashboard/controle-equipamentos-ti')
   const inMyDocuments = pathname.startsWith('/dashboard/meus-documentos')
   const inDocs = pathname.startsWith('/dashboard/controle-documentos')
+  const inRoomScheduling = pathname.startsWith('/dashboard/agendamento-salas')
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
@@ -914,6 +925,18 @@ export default function Sidebar({
                 </div>
               )}
             </div>
+          )}
+
+          {showRoomScheduling && (meetingRoomFeatures.acessar || meetingRoomFeatures.visualizar) && (
+            <Link
+              href="/dashboard/agendamento-salas"
+              className={`${baseSection} ${inRoomScheduling ? activeSection : inactiveSection}`}
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                <CalendarDays className="h-5 w-5 shrink-0" />
+              </span>
+              {!collapsed && <span className={labelBase}>Agendamento de Salas</span>}
+            </Link>
           )}
 
           {showConfig && (

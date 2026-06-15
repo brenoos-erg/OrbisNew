@@ -446,6 +446,7 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
   }
 
   function editAction(action: ActionItem) {
+    setActionError(null)
     setEditingActionId(action.id)
     setActionDraft({
       descricao: action.descricao || '',
@@ -555,7 +556,11 @@ export default function NaoConformidadeDetailClient({ id, initialSection }: { id
 
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      setActionError(data?.error || 'Erro ao salvar ação.')
+      if (process.env.NODE_ENV !== 'production' && data?.detail) {
+        console.error('Detalhe do erro ao salvar plano de ação:', data.detail)
+      }
+      const message = data?.error || 'Erro ao salvar ação.'
+      setActionError(process.env.NODE_ENV !== 'production' && data?.detail ? `${message} (${data.detail})` : message)
       setActionSaving(false)
       return
     }
