@@ -1481,3 +1481,40 @@ enum TiEquipmentStatus {
   MAINTENANCE
   RETIRED
 }
+
+model MeetingRoomBooking {
+  id             String                   @id @default(cuid())
+  room           MeetingRoomName
+  title          String
+  meetingType    String
+  description    String?                  @db.LongText
+  startsAt       DateTime
+  endsAt         DateTime
+  requesterId    String?
+  requesterName  String?
+  requesterEmail String?
+  createdById    String?
+  createdByName  String?
+  status         MeetingRoomBookingStatus @default(AGENDADA)
+  cancelReason   String?                  @db.LongText
+  canceledAt     DateTime?
+  canceledById   String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([room, startsAt, endsAt])
+  @@index([status, startsAt])
+  @@index([createdById])
+}
+
+enum MeetingRoomName {
+  OURO
+  SOLAR
+  DIAMANTE
+}
+
+enum MeetingRoomBookingStatus {
+  AGENDADA
+  CANCELADA
+  CONCLUIDA
+}

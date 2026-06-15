@@ -2992,6 +2992,7 @@ async function main() {
   const meusDocumentosModule = await ensureModule(MODULE_KEYS.MEUS_DOCUMENTOS, 'Meus documentos')
   const controleDocumentosModule = await ensureModule(MODULE_KEYS.CONTROLE_DOCUMENTOS, 'Controle de Documentos')
   const sstModule = await ensureModule(MODULE_KEYS.SST, 'SGI / Qualidade')
+  const meetingRoomsModule = await ensureModule(MODULE_KEYS.AGENDAMENTO_SALAS, 'Agendamento de Salas')
   const equipmentsModule = await ensureModule(
     MODULE_KEYS.EQUIPAMENTOS_TI,
     'Controle de Equipamentos TI',
@@ -3007,6 +3008,7 @@ async function main() {
     meusDocumentosModule,
     controleDocumentosModule,
     sstModule,
+    meetingRoomsModule,
   ]
 
 
@@ -3232,6 +3234,15 @@ async function main() {
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.IMPRESSORA, name: 'Impressoras' },
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.TPLINK, name: 'TP-Link' },
         { key: FEATURE_KEYS.EQUIPAMENTOS_TI.OUTROS, name: 'Outros equipamentos' },
+      ],
+    },
+    {
+      moduleId: meetingRoomsModule.id,
+      items: [
+        { key: FEATURE_KEYS.AGENDAMENTO_SALAS.ACESSAR, name: 'Acessar agendamento de salas' },
+        { key: FEATURE_KEYS.AGENDAMENTO_SALAS.MARCAR, name: 'Marcar reunião' },
+        { key: FEATURE_KEYS.AGENDAMENTO_SALAS.VISUALIZAR, name: 'Visualizar agenda de salas' },
+        { key: FEATURE_KEYS.AGENDAMENTO_SALAS.CANCELAR, name: 'Cancelar agendamento de salas' },
       ],
     },
     {

@@ -6,45 +6,108 @@ import { requireActiveUser } from '@/lib/auth'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature } from '@/lib/permissions'
-import { canManageAllNc } from '@/lib/sst/nonConformity'
+import { canFeature } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
-import { canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
+import { registerAppError } from '@/lib/errorRegistry'
 
-async function assertEditable(id: string, userId: string, level: ModuleLevel | undefined) {
+type ActionPlanContext = {
+  me: Awaited<ReturnType<typeof requireActiveUser>>
+  level: ModuleLevel | undefined
+  id: string
+}
+
+type InvalidDate = 'INVALID_DATE'
+
+async function authorizeActionPlanAccess(id: string): Promise<ActionPlanContext | NextResponse> {
+  const me = await requireActiveUser()
+  const { levels } = await getUserModuleContext(me.id)
+  const level = normalizeSstLevel(levels)
+  if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
+    return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
+  }
+
+  const canViewNonConformities = await canFeature(
+    me.id,
+    MODULE_KEYS.SST,
+    FEATURE_KEYS.SST.NAO_CONFORMIDADES,
+    Action.VIEW,
+  )
+  if (!canViewNonConformities) {
+    return NextResponse.json({ error: 'Sem acesso à tela de Não Conformidades.' }, { status: 403 })
+  }
+
+  return { me, level, id }
+}
+
+async function assertEditable(id: string) {
   const nc = await prisma.nonConformity.findUnique({
     where: { id },
     select: {
-      solicitanteId: true,
+      id: true,
+      status: true,
       aprovadoQualidadeStatus: true,
-      centroQueDetectouId: true,
-      centroQueOriginouId: true,
     },
-  })  
-   if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
-  if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !canManageAllNc(level)) {
-    return { error: 'Plano de ação só pode ser alterado após aprovação da qualidade.', status: 403 }
-  }
-  const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(userId)
-  const canTreat = canUserTreatNc({
-    userId,
-    level,
-    ncSolicitanteId: nc.solicitanteId,
-    centroQueDetectouId: nc.centroQueDetectouId,
-    centroQueOriginouId: nc.centroQueOriginouId,
-    userCostCenterIds,
   })
-  if (!canTreat) return { error: 'Sem permissão para esta NC.', status: 403 }
+  if (!nc) return { error: 'Não conformidade não encontrada.', status: 404 }
+  if (nc.status === 'CANCELADA' || nc.status === 'ENCERRADA') {
+    return { error: 'Plano de ação não pode ser alterado em RNC cancelada ou encerrada.', status: 409 }
+  }
 
   return null
 }
 
+function isNextResponse(value: ActionPlanContext | NextResponse): value is NextResponse {
+  return value instanceof NextResponse
+}
+
+async function registerActionPlanError(input: {
+  method: 'POST' | 'PATCH' | 'DELETE'
+  error: unknown
+  me?: Awaited<ReturnType<typeof requireActiveUser>> | null
+  nonConformityId?: string | null
+  actionItemId?: string | null
+}) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Erro ao salvar plano de ação', input.error)
+  }
+  await registerAppError({
+    area: 'sst',
+    route: '/api/sst/nao-conformidades/[id]/plano-de-acao',
+    method: input.method,
+    userId: input.me?.id,
+    userLogin: input.me?.login || input.me?.email,
+    message: 'Erro ao salvar plano de ação',
+    error: input.error,
+    statusCode: 500,
+    metadata: {
+      nonConformityId: input.nonConformityId,
+      actionItemId: input.actionItemId,
+    },
+  })
+}
+
+function toNullableDate(value: unknown): Date | null | InvalidDate {
+  if (value === undefined || value === null || value === '') return null
+  const parsed = new Date(String(value))
+  if (Number.isNaN(parsed.getTime())) return 'INVALID_DATE'
+  return parsed
+}
+
 function toDate(value: unknown) {
   if (value === undefined) return undefined
-  if (!value) return null
-  return new Date(String(value))
+  return toNullableDate(value)
+}
+
+function isInvalidDate(value: unknown): value is InvalidDate {
+  return value === 'INVALID_DATE'
+}
+
+function parseActionStatus(value: unknown, required = false) {
+  if (value === undefined || value === null || value === '') return required ? 'INVALID_STATUS' : undefined
+  if (!Object.values(NonConformityActionStatus).includes(value as NonConformityActionStatus)) return 'INVALID_STATUS'
+  return value as NonConformityActionStatus
 }
 
 function toOptionalString(value: unknown) {
@@ -70,17 +133,15 @@ function toOptionalDecimal(value: unknown) {
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let me: Awaited<ReturnType<typeof requireActiveUser>> | null = null
+  let id: string | null = null
   try {
-    const me = await requireActiveUser()
-    const { levels } = await getUserModuleContext(me.id)
-    const level = normalizeSstLevel(levels)
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
-      return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
-    }
-    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.CREATE)
+    id = (await params).id
+    const auth = await authorizeActionPlanAccess(id)
+    if (isNextResponse(auth)) return auth
+    me = auth.me
 
-    const id = (await params).id
-    const blocked = await assertEditable(id, me.id, level)
+    const blocked = await assertEditable(id)
     if (blocked) return NextResponse.json({ error: blocked.error }, { status: blocked.status })
 
       const body = await req.json().catch(() => ({} as any))
@@ -90,10 +151,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const row = await prisma.$transaction(async (tx) => {
       const dataInicioPrevista = toDate(body?.dataInicioPrevista)
       const dataFimPrevista = toDate(body?.dataFimPrevista)
-      const prazo = body?.prazo ? new Date(body.prazo) : null
+      const prazo = toNullableDate(body?.prazo)
       const dataConclusao = toDate(body?.dataConclusao)
+      if (
+        isInvalidDate(dataInicioPrevista) ||
+        isInvalidDate(dataFimPrevista) ||
+        isInvalidDate(prazo) ||
+        isInvalidDate(dataConclusao)
+      ) {
+        throw new Error('VALIDATION_INVALID_DATE')
+      }
+      const requestedStatus = parseActionStatus(body?.status)
+      if (requestedStatus === 'INVALID_STATUS') throw new Error('VALIDATION_INVALID_STATUS')
       const status = resolveAutomaticActionStatus({
-        requestedStatus: body?.status,
+        requestedStatus,
         prazo,
         dataInicioPrevista,
         dataConclusao,
@@ -101,9 +172,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const created = await tx.nonConformityActionItem.create({
         data: {
-          nonConformityId: id,
+          nonConformityId: id!,
           origemPlano: NonConformityActionPlanOrigin.NAO_CONFORMIDADE,
-          createdById: me.id,
+          createdById: me!.id,
           descricao,
           motivoBeneficio: toOptionalString(body?.motivoBeneficio),
           atividadeComo: toOptionalString(body?.atividadeComo),
@@ -129,15 +200,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       await appendNonConformityTimelineEvent(tx, {
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         tipo: 'PLANO_ACAO',
         message: `Ação ${created.id} criada no plano de ação (${created.status})${created.descricao ? ` - ${created.descricao}` : ''}`,
       })
       if (!created.responsavelId && created.responsavelNome) {
         await appendNonConformityTimelineEvent(tx, {
-          nonConformityId: id,
-          actorId: me.id,
+          nonConformityId: id!,
+          actorId: me!.id,
           tipo: 'ALERTA',
           message: `Ação ${created.id} criada com responsável em texto livre (${created.responsavelNome}); sem notificação automática por ausência de usuário vinculado`,
         })
@@ -146,14 +217,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     const createNotification = await notifyNonConformityStakeholders({
-      nonConformityId: id,
-      actorId: me.id,
+      nonConformityId: id!,
+      actorId: me!.id,
       event: 'ACTION_PLAN_CREATED',
       actionItemId: row.id,
     })
     if (!createNotification.sent) {
       console.warn('NC action plan creation notification not sent', {
-        nonConformityId: id,
+        nonConformityId: id!,
         actionItemId: row.id,
         reason: createNotification.reason,
       })
@@ -161,14 +232,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (row.responsavelId) {
       const assignedNotification = await notifyNonConformityStakeholders({
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         event: 'ACTION_ITEM_ASSIGNED',
         actionItemId: row.id,
       })
       if (!assignedNotification.sent) {
         console.warn('NC action assignment notification not sent', {
-          nonConformityId: id,
+          nonConformityId: id!,
           actionItemId: row.id,
           reason: assignedNotification.reason,
         })
@@ -177,30 +248,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     return NextResponse.json(row, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message === 'VALIDATION_INVALID_DATE') {
+      return NextResponse.json({ error: 'Data do prazo inválida.' }, { status: 400 })
+    }
+    if (error instanceof Error && error.message === 'VALIDATION_INVALID_STATUS') {
+      return NextResponse.json({ error: 'Status da ação inválido.' }, { status: 400 })
+    }
+    await registerActionPlanError({ method: 'POST', error, me, nonConformityId: id })
     return NextResponse.json({ error: 'Erro ao salvar plano de ação.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let me: Awaited<ReturnType<typeof requireActiveUser>> | null = null
+  let id: string | null = null
+  let actionId: string | null = null
   try {
-    const me = await requireActiveUser()
-    const { levels } = await getUserModuleContext(me.id)
-    const level = normalizeSstLevel(levels)
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
-      return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
-    }
-    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.UPDATE)
+    id = (await params).id
+    const auth = await authorizeActionPlanAccess(id)
+    if (isNextResponse(auth)) return auth
+    me = auth.me
 
-    const id = (await params).id
-    const blocked = await assertEditable(id, me.id, level)
+    const blocked = await assertEditable(id)
     if (blocked) return NextResponse.json({ error: blocked.error }, { status: blocked.status })
 
     const body = await req.json().catch(() => ({} as any))
-    const actionId = String(body?.id || '')
+    actionId = String(body?.id || '')
     if (!actionId) return NextResponse.json({ error: 'id da ação é obrigatório.' }, { status: 400 })
 
    const existing = await prisma.nonConformityActionItem.findUnique({
-      where: { id: actionId },
+      where: { id: actionId! },
       select: {
         id: true,
         nonConformityId: true,
@@ -216,14 +293,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
     }
 
-    const nextPrazo = body?.prazo !== undefined ? (body.prazo ? new Date(body.prazo) : null) : existing.prazo
+    const nextPrazo = body?.prazo !== undefined ? toNullableDate(body.prazo) : existing.prazo
+    const nextDataInicioPrevista = body?.dataInicioPrevista !== undefined ? toDate(body?.dataInicioPrevista) : existing.dataInicioPrevista
+    const nextDataConclusao = body?.dataConclusao !== undefined ? toDate(body?.dataConclusao) : existing.dataConclusao
+    const nextDataFimPrevista = body?.dataFimPrevista !== undefined ? toDate(body?.dataFimPrevista) : undefined
+    if (
+      isInvalidDate(nextPrazo) ||
+      isInvalidDate(nextDataInicioPrevista) ||
+      isInvalidDate(nextDataConclusao) ||
+      isInvalidDate(nextDataFimPrevista)
+    ) {
+      return NextResponse.json({ error: 'Data do prazo inválida.' }, { status: 400 })
+    }
+    const requestedStatus = parseActionStatus(body?.status)
+    if (requestedStatus === 'INVALID_STATUS') {
+      return NextResponse.json({ error: 'Status da ação inválido.' }, { status: 400 })
+    }
     const desiredStatus = resolveAutomaticActionStatus({
       currentStatus: existing.status,
-      requestedStatus: body?.status,
+      requestedStatus,
       prazo: nextPrazo,
-      dataInicioPrevista:
-        body?.dataInicioPrevista !== undefined ? toDate(body?.dataInicioPrevista) : existing.dataInicioPrevista,
-      dataConclusao: body?.dataConclusao !== undefined ? toDate(body?.dataConclusao) : existing.dataConclusao,
+      dataInicioPrevista: nextDataInicioPrevista,
+      dataConclusao: nextDataConclusao,
     })
     const observacao = String(body?.observacao || '').trim()
     const shouldSetConclusion = desiredStatus === NonConformityActionStatus.CONCLUIDA
@@ -231,19 +322,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const row = await prisma.$transaction(async (tx) => {
       const previous = await tx.nonConformityActionItem.findUnique({
-        where: { id: actionId },
+        where: { id: actionId! },
         select: { id: true, descricao: true, status: true, evidencias: true },
       })
       const baseEvidence = body?.evidencias !== undefined
         ? (body?.evidencias ? String(body.evidencias).trim() : null)
         : (previous?.evidencias || null)
       const evidenciasWithObs = observacao
-        ? `${baseEvidence ? `${baseEvidence}\n\n` : ''}[${new Date().toLocaleString('pt-BR')}] ${me.fullName || me.email}: ${observacao}`
+        ? `${baseEvidence ? `${baseEvidence}\n\n` : ''}[${new Date().toLocaleString('pt-BR')}] ${me!.fullName || me!.email}: ${observacao}`
         : baseEvidence
 
 
       const updated = await tx.nonConformityActionItem.update({
-       where: { id: actionId },
+       where: { id: actionId! },
         data: {
           descricao: body?.descricao !== undefined ? String(body.descricao).trim() : undefined,
           motivoBeneficio: toOptionalString(body?.motivoBeneficio),
@@ -252,7 +343,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
           centroResponsavelId: body?.centroResponsavelId !== undefined ? (body?.centroResponsavelId ? String(body.centroResponsavelId) : null) : undefined,
           dataInicioPrevista: toDate(body?.dataInicioPrevista),
-          dataFimPrevista: toDate(body?.dataFimPrevista),
+          dataFimPrevista: nextDataFimPrevista,
           custo: toOptionalDecimal(body?.custo),
           dataConclusao: shouldSetConclusion ? (toDate(body?.dataConclusao) ?? new Date()) : shouldClearConclusion ? null : toDate(body?.dataConclusao),
           tipo: Object.values(NonConformityActionType).includes(body?.tipo) ? body.tipo : undefined,
@@ -263,26 +354,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           beneficio: toOptionalIntBetween(body?.beneficio),
           responsavelId: body?.responsavelId !== undefined ? (body.responsavelId || null) : undefined,
           responsavelNome: body?.responsavelNome !== undefined ? (body.responsavelNome ? String(body.responsavelNome).trim() : null) : undefined,
-          prazo: body?.prazo !== undefined ? (body.prazo ? new Date(body.prazo) : null) : undefined,
+          prazo: body?.prazo !== undefined ? nextPrazo : undefined,
           status: desiredStatus,
           evidencias: observacao || body?.evidencias !== undefined ? evidenciasWithObs : undefined,
         },
       })
 
       await appendNonConformityTimelineEvent(tx, {
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         tipo: 'PLANO_ACAO',
         message: observacao
-          ? `Ação ${updated.id}: observação adicionada - ${observacao}`
+          ? `Ação ${updated.id} atualizada no plano de ação - observação adicionada`
           : previous?.status && previous.status !== updated.status
-            ? `Ação ${updated.id} alterada de ${previous.status} para ${updated.status}${updated.descricao ? ` - ${updated.descricao}` : ''}`
-            : `Ação ${updated.id} atualizada (${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`,
+            ? `Ação ${updated.id} atualizada no plano de ação (${previous.status} -> ${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`
+            : `Ação ${updated.id} atualizada no plano de ação (${updated.status})${updated.descricao ? ` - ${updated.descricao}` : ''}`,
       })
       if (!updated.responsavelId && updated.responsavelNome) {
         await appendNonConformityTimelineEvent(tx, {
-          nonConformityId: id,
-          actorId: me.id,
+          nonConformityId: id!,
+          actorId: me!.id,
           tipo: 'ALERTA',
           message: `Ação ${updated.id} permanece com responsável em texto livre (${updated.responsavelNome}); sem notificação automática por ausência de usuário vinculado`,
         })
@@ -293,14 +384,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const shouldNotifyAssigned = row.responsavelId && row.responsavelId !== existing.responsavelId
     if (shouldNotifyAssigned) {
       const assignedNotification = await notifyNonConformityStakeholders({
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         event: 'ACTION_ITEM_ASSIGNED',
         actionItemId: row.id,
       })
       if (!assignedNotification.sent) {
         console.warn('NC action assignment notification not sent', {
-          nonConformityId: id,
+          nonConformityId: id!,
           actionItemId: row.id,
           reason: assignedNotification.reason,
         })
@@ -309,14 +400,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     if (existing.status !== row.status && row.status === NonConformityActionStatus.CONCLUIDA) {
       const completedNotification = await notifyNonConformityStakeholders({
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         event: 'ACTION_ITEM_COMPLETED',
         actionItemId: row.id,
       })
       if (!completedNotification.sent) {
         console.warn('NC action completion notification not sent', {
-          nonConformityId: id,
+          nonConformityId: id!,
           actionItemId: row.id,
           reason: completedNotification.reason,
         })
@@ -325,44 +416,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(row)
   } catch (error) {
-    return NextResponse.json({ error: 'Erro ao atualizar ação.', detail: devErrorDetail(error) }, { status: 500 })
+    await registerActionPlanError({ method: 'PATCH', error, me, nonConformityId: id!, actionItemId: actionId })
+    return NextResponse.json({ error: 'Erro ao salvar plano de ação.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  let me: Awaited<ReturnType<typeof requireActiveUser>> | null = null
+  let id: string | null = null
+  let actionId: string | null = null
   try {
-    const me = await requireActiveUser()
-    const { levels } = await getUserModuleContext(me.id)
-    const level = normalizeSstLevel(levels)
-    if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
-      return NextResponse.json({ error: 'Nível SST inválido.' }, { status: 403 })
-    }
-    await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.PLANO_DE_ACAO, Action.DELETE)
+    id = (await params).id
+    const auth = await authorizeActionPlanAccess(id)
+    if (isNextResponse(auth)) return auth
+    me = auth.me
 
-    const id = (await params).id
-    const blocked = await assertEditable(id, me.id, level)
+    const blocked = await assertEditable(id)
     if (blocked) return NextResponse.json({ error: blocked.error }, { status: blocked.status })
 
     const body = await req.json().catch(() => ({} as any))
-    const actionId = String(body?.id || '')
+    actionId = String(body?.id || '')
     if (!actionId) return NextResponse.json({ error: 'id da ação é obrigatório.' }, { status: 400 })
 
-    const existing = await prisma.nonConformityActionItem.findUnique({ where: { id: actionId }, select: { id: true, nonConformityId: true } })
+    const existing = await prisma.nonConformityActionItem.findUnique({ where: { id: actionId! }, select: { id: true, nonConformityId: true } })
     if (!existing || existing.nonConformityId !== id) {
       return NextResponse.json({ error: 'Ação não encontrada para esta não conformidade.' }, { status: 404 })
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.nonConformityActionItem.delete({ where: { id: actionId } })
+      await tx.nonConformityActionItem.delete({ where: { id: actionId! } })
       await appendNonConformityTimelineEvent(tx, {
-        nonConformityId: id,
-        actorId: me.id,
+        nonConformityId: id!,
+        actorId: me!.id,
         tipo: 'PLANO_ACAO',
-        message: `Ação ${actionId} removida do plano de ação`,
+        message: `Ação ${actionId!} excluída do plano de ação`,
       })
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return NextResponse.json({ error: 'Erro ao excluir ação.', detail: devErrorDetail(error) }, { status: 500 })
+    await registerActionPlanError({ method: 'DELETE', error, me, nonConformityId: id!, actionItemId: actionId })
+    return NextResponse.json({ error: 'Erro ao salvar plano de ação.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

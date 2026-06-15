@@ -108,6 +108,7 @@ export default async function DashboardLayout({
   let canAccessRefusalPanel = false
   let showMyDocuments = false
   let showDocumentControl = false
+  let showRoomScheduling = false
   let canAccessDocumentApprovalTab2 = false
   let canAccessDocumentApprovalTab3 = false
   let canAccessExternalAdmissions = false
@@ -143,6 +144,12 @@ export default async function DashboardLayout({
     visualizar: false,
     assinar: false,
   }
+  let meetingRoomFeatures = {
+    acessar: false,
+    marcar: false,
+    visualizar: false,
+    cancelar: false,
+  }
   let equipmentFeatures = {
     atalho: false,
     linhaTelefonica: false,
@@ -174,6 +181,7 @@ export default async function DashboardLayout({
      const myDocumentsLevel = levels[MODULE_KEYS.MEUS_DOCUMENTOS]
       const sstLevel = levels[MODULE_KEYS.SST]
       const documentControlLevel = levels[MODULE_KEYS.CONTROLE_DOCUMENTOS]
+      const meetingRoomsLevel = levels[MODULE_KEYS.AGENDAMENTO_SALAS]
 
      const [
         canViewConfigPainel,
@@ -197,6 +205,10 @@ export default async function DashboardLayout({
         canViewMyDocumentsListar,
         canViewMyDocumentsVisualizar,
         canSignMyDocuments,
+        canAccessMeetingRooms,
+        canCreateMeetingRooms,
+        canViewMeetingRooms,
+        canCancelMeetingRooms,
         canViewEquipAtalho,
         canViewEquipLinhaTelefonica,
         canViewEquipSmartphone,
@@ -228,6 +240,10 @@ export default async function DashboardLayout({
         canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.LISTAR, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.VISUALIZAR, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.MEUS_DOCUMENTOS, FEATURE_KEYS.MEUS_DOCUMENTOS.ASSINAR, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.AGENDAMENTO_SALAS, FEATURE_KEYS.AGENDAMENTO_SALAS.ACESSAR, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.AGENDAMENTO_SALAS, FEATURE_KEYS.AGENDAMENTO_SALAS.MARCAR, Action.CREATE),
+        canFeature(appUser.id, MODULE_KEYS.AGENDAMENTO_SALAS, FEATURE_KEYS.AGENDAMENTO_SALAS.VISUALIZAR, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.AGENDAMENTO_SALAS, FEATURE_KEYS.AGENDAMENTO_SALAS.CANCELAR, Action.DELETE),
         canFeature(
           appUser.id,
           MODULE_KEYS.EQUIPAMENTOS_TI,
@@ -318,6 +334,12 @@ export default async function DashboardLayout({
         visualizar: canViewMyDocumentsVisualizar,
         assinar: canSignMyDocuments,
       }
+      meetingRoomFeatures = {
+        acessar: canAccessMeetingRooms,
+        marcar: canCreateMeetingRooms,
+        visualizar: canViewMeetingRooms,
+        cancelar: canCancelMeetingRooms,
+      }
       equipmentFeatures = {
         atalho: canViewEquipAtalho,
         linhaTelefonica: canViewEquipLinhaTelefonica,
@@ -348,6 +370,9 @@ export default async function DashboardLayout({
       showDocumentControl =
         hasMinLevel(documentControlLevel, ModuleLevel.NIVEL_1) &&
         hasStructure
+      showRoomScheduling =
+        hasMinLevel(meetingRoomsLevel, ModuleLevel.NIVEL_1) &&
+        (meetingRoomFeatures.acessar || meetingRoomFeatures.visualizar)
       ;[canAccessDocumentApprovalTab2, canAccessDocumentApprovalTab3] = await Promise.all([
         canAccessApprovalDocuments(appUser.id, appUser.role),
         canAccessQualityReviewDocuments(appUser.id, appUser.role),
@@ -391,6 +416,7 @@ export default async function DashboardLayout({
           showEquipments={showEquipments}
           showMyDocuments={showMyDocuments}
           showDocumentControl={showDocumentControl}
+          showRoomScheduling={showRoomScheduling}
           canAccessDocumentApprovalTab2={canAccessDocumentApprovalTab2}
           canAccessDocumentApprovalTab3={canAccessDocumentApprovalTab3}
           isAdmin={userIsAdmin}
@@ -404,6 +430,7 @@ export default async function DashboardLayout({
           refusalFeatures={refusalFeatures}
           equipmentFeatures={equipmentFeatures}
           myDocumentsFeatures={myDocumentsFeatures}
+          meetingRoomFeatures={meetingRoomFeatures}
           userMenu={<UserMenu collapsed={false} user={appUser} />}
         />
 

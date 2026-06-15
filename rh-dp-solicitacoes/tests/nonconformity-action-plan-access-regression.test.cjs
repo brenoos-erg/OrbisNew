@@ -1,0 +1,26 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
+
+const route = read('src/app/api/sst/nao-conformidades/[id]/plano-de-acao/route.ts')
+
+assert.doesNotMatch(route, /FEATURE_KEYS\.SST\.PLANO_DE_ACAO/, 'rota não deve exigir feature específica PLANO_DE_ACAO')
+assert.doesNotMatch(route, /assertCanFeature/, 'rota não deve usar assertCanFeature em plano de ação')
+assert.doesNotMatch(route, /canUserTreatNc|getUserCostCenterIds/, 'rota não deve bloquear por solicitante ou centro de custo')
+assert.match(route, /hasMinLevel\(level,\s*ModuleLevel\.NIVEL_1\)/, 'rota deve exigir nível mínimo 1 em SST')
+assert.match(route, /FEATURE_KEYS\.SST\.NAO_CONFORMIDADES[\s\S]*Action\.VIEW/, 'rota deve exigir visualização de Não Conformidades')
+assert.match(route, /nc\.status === 'CANCELADA' \|\| nc\.status === 'ENCERRADA'/, 'rota deve bloquear RNC cancelada ou encerrada')
+assert.match(route, /descricao[\s\S]*responsavelNome[\s\S]*prazo[\s\S]*status[\s\S]*evidencias/, 'criação deve aceitar campos básicos do formulário')
+assert.match(route, /Status da ação inválido\./, 'status inválido deve retornar mensagem 400')
+assert.match(route, /Data do prazo inválida\./, 'data inválida deve retornar mensagem 400')
+assert.match(route, /registerAppError\(/, 'erro interno deve ser registrado no error registry')
+assert.match(route, /area:\s*'sst'/, 'registro de erro deve informar área SST')
+assert.match(route, /actionItemId/, 'registro de erro deve incluir actionItemId quando houver')
+assert.match(route, /Ação \$\{created\.id\} criada no plano de ação/, 'criação deve registrar timeline')
+assert.match(route, /atualizada no plano de ação/, 'edição deve registrar timeline')
+assert.match(route, /excluída do plano de ação/, 'exclusão deve registrar timeline')
+
+console.log('nonconformity action plan access regression ok')
