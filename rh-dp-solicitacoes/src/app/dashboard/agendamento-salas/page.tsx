@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, XCircle } from 'lucide-react'
 
 type Room = 'OURO' | 'SOLAR' | 'DIAMANTE'
@@ -46,6 +46,7 @@ export default function MeetingRoomSchedulingPage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [scheduleForAnotherUser, setScheduleForAnotherUser] = useState(false)
+  const scheduleForAnotherUserRef = useRef(false)
   const [currentUser, setCurrentUser] = useState<UserOption | null>(null)
   const [users, setUsers] = useState<UserOption[]>([])
   const [selectedUserId, setSelectedUserId] = useState('')
@@ -73,7 +74,10 @@ export default function MeetingRoomSchedulingPage() {
       return
     }
     setCurrentUser(data.user)
-    setForm((current) => ({ ...current, requesterName: data.user.fullName ?? '', requesterEmail: data.user.email ?? '' }))
+    setForm((current) => {
+      if (scheduleForAnotherUserRef.current) return current
+      return { ...current, requesterName: data.user.fullName ?? '', requesterEmail: data.user.email ?? '' }
+    })
   }
 
   const loadUsers = async (search = userSearch) => {
@@ -136,6 +140,7 @@ export default function MeetingRoomSchedulingPage() {
   }, [conflictBookings, form.date, form.startTime, form.endTime])
 
   const handleScheduleForAnotherUserChange = (checked: boolean) => {
+    scheduleForAnotherUserRef.current = checked
     setScheduleForAnotherUser(checked)
     if (checked) {
       loadUsers(userSearch)
@@ -154,8 +159,18 @@ export default function MeetingRoomSchedulingPage() {
     setForm((current) => ({ ...current, requesterName: user.fullName, requesterEmail: user.email }))
   }
 
+  const submitDisabled =
+    loading ||
+    conflictLoading ||
+    !!scheduleConflict ||
+    (scheduleForAnotherUser && !selectedUserId)
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (scheduleForAnotherUser && !selectedUserId) {
+      setMessage('Selecione o usuário para quem a sala será agendada.')
+      return
+    }
     if (scheduleConflict) {
       setMessage('Sala já reservada nesse horário. Ajuste a sala ou o horário antes de agendar.')
       return
@@ -172,6 +187,7 @@ export default function MeetingRoomSchedulingPage() {
         description: form.description,
         requesterName: form.requesterName,
         requesterEmail: form.requesterEmail,
+        requesterUserId: scheduleForAnotherUser ? selectedUserId : currentUser?.id,
         startsAt: `${form.date}T${form.startTime}:00`,
         endsAt: `${form.date}T${form.endTime}:00`,
       }),
@@ -251,7 +267,7 @@ export default function MeetingRoomSchedulingPage() {
           <label className="space-y-1 text-sm font-medium">E-mail do solicitante<input className="app-input" type="email" readOnly value={form.requesterEmail} /></label>
           {scheduleConflict && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 md:col-span-2">Sala já reservada neste horário: {scheduleConflict.title} ({timeFmt.format(new Date(scheduleConflict.startsAt))} - {timeFmt.format(new Date(scheduleConflict.endsAt))}).</div>}
           <label className="space-y-1 text-sm font-medium md:col-span-2">Observações<textarea className="app-input min-h-24" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
-          <div className="md:col-span-2"><button disabled={loading || conflictLoading || !!scheduleConflict} className="app-button-primary" type="submit">{loading ? 'Agendando...' : 'Agendar reunião'}</button></div>
+          <div className="md:col-span-2"><button disabled={submitDisabled} className="app-button-primary" type="submit">{loading ? 'Agendando...' : 'Agendar reunião'}</button></div>
         </form>
       ) : (
         <div className="space-y-4">
