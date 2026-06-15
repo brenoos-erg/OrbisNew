@@ -14,7 +14,11 @@ type NotifyInput = {
   db?: DbClient
 }
 
+type RecipientReason = 'centro envolvido' | 'solicitante' | 'responsável da ação' | 'qualidade' | 'destinatário fixo'
+
 type RecipientUser = { id: string; fullName: string; email: string }
+
+type RecipientWithReasons = RecipientUser & { reasons: RecipientReason[] }
 
 type RecipientResolution = {
   nc: {
@@ -26,12 +30,12 @@ type RecipientResolution = {
     centroQueDetectouId: string
     centroQueOriginouId: string
   }
-  recipients: RecipientUser[]
+  recipients: RecipientWithReasons[]
   marker: string
   includeConfiguredRecipients?: boolean
 }
 
-const CONFIGURED_RECIPIENT_ALLOWED_EVENTS: NonConformityNotificationEvent[] = ['NC_CREATED', 'NC_UPDATED']
+const CONFIGURED_RECIPIENT_ALLOWED_EVENTS: NonConformityNotificationEvent[] = []
 
 const RETROACTIVE_ELIGIBLE_STATUSES: NonConformityStatus[] = [
   NonConformityStatus.ABERTA,
@@ -40,6 +44,29 @@ const RETROACTIVE_ELIGIBLE_STATUSES: NonConformityStatus[] = [
   NonConformityStatus.APROVADA_QUALIDADE,
 ]
 const QUALITY_MODULE_KEYS = ['SST', 'sgi-qualidade', 'sgi_qualidade'] as const
+
+
+function getDefaultSubjectTemplateForEvent(event: NonConformityNotificationEvent) {
+  switch (event) {
+    case 'NC_CREATED':
+      return 'NC {{numeroRnc}} registrada'
+    case 'ACTION_ITEM_ASSIGNED':
+      return 'NC {{numeroRnc}}: ação atribuída'
+    case 'ACTION_ITEM_COMPLETED':
+    case 'EFFECTIVENESS_REVIEW_REQUESTED':
+      return 'NC {{numeroRnc}}: verificação necessária'
+    default:
+      return 'NC {{numeroRnc}}: atualização registrada'
+  }
+}
+
+function resolveSubjectTemplate(event: NonConformityNotificationEvent, configuredTemplate: string) {
+  const trimmedTemplate = configuredTemplate.trim()
+  if (trimmedTemplate === 'NC {{numeroRnc}}: ação necessária' || trimmedTemplate === 'NC {{numeroRnc}}: atualização registrada') {
+    return getDefaultSubjectTemplateForEvent(event)
+  }
+  return configuredTemplate
+}
 
 async function findNc(nonConformityId: string, db: DbClient) {
   return db.nonConformity.findUnique({
@@ -160,77 +187,87 @@ export async function resolveNonConformityNotificationRecipientsByEvent(
   const involved = await resolveNonConformityInvolvedAreaRecipients(input.nonConformityId, db)
   const requester = await resolveNonConformityRequesterRecipients(input.nonConformityId, db)
 
-  const recipientsById = new Map<string, RecipientUser>()
-  const addRecipients = (list: RecipientUser[] = []) => list.forEach((user) => recipientsById.set(user.id, user))
+  const recipientsById = new Map<string, RecipientWithReasons>()
+  const addRecipients = (reason: RecipientReason, list: RecipientUser[] = []) => {
+    for (const user of list) {
+      const existing = recipientsById.get(user.id)
+      if (existing) {
+        if (!existing.reasons.includes(reason)) existing.reasons.push(reason)
+        continue
+      }
+      recipientsById.set(user.id, { ...user, reasons: [reason] })
+    }
+  }
 
   let marker = '[ALERTA_NC] Notificação processada'
   let includeConfiguredRecipients = false
 
   switch (input.event) {
     case 'NC_CREATED':
-      marker = '[ALERTA_NC_CREATED] Notificação de abertura enviada para Qualidade'
-      addRecipients(quality.recipients)
-      includeConfiguredRecipients = true
+      marker = '[ALERTA_NC_CREATED] Notificação de abertura enviada para solicitante e centros envolvidos'
+      addRecipients('centro envolvido', involved?.recipients)
+      addRecipients('solicitante', requester?.recipients)
       break
     case 'NC_APPROVED_BY_QUALITY':
       marker = '[ALERTA_NC_APPROVED_BY_QUALITY] Notificação pós-aprovação enviada para centros envolvidos'
-      addRecipients(involved?.recipients)
-      addRecipients(requester?.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
+      addRecipients('solicitante', requester?.recipients)
       break
     case 'NC_REJECTED_BY_QUALITY':
       marker = '[ALERTA_NC_REJECTED_BY_QUALITY] Notificação de reprovação enviada para solicitante e centros envolvidos'
-      addRecipients(requester?.recipients)
-      addRecipients(involved?.recipients)
+      addRecipients('solicitante', requester?.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
       break
     case 'NC_UPDATED':
-      marker = '[ALERTA_NC_UPDATED] Notificação de atualização enviada conforme regra do evento'
-      addRecipients(quality.recipients)
-      includeConfiguredRecipients = true
+      marker = '[ALERTA_NC_UPDATED] Notificação de atualização enviada para envolvidos'
+      addRecipients('solicitante', requester?.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
+      if (input.actionItemId) addRecipients('responsável da ação', await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
       break
     case 'NC_REOPENED':
       marker = '[ALERTA_NC_REOPENED] Notificação de reabertura enviada para Qualidade e envolvidos'
-      addRecipients(quality.recipients)
-      addRecipients(involved?.recipients)
+      addRecipients('qualidade', quality.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
       break
     case 'NC_CANCELLED':
     case 'NC_CLOSED':
       marker = `[ALERTA_${input.event}] Notificação de encerramento/cancelamento enviada para partes envolvidas`
-      addRecipients(quality.recipients)
-      addRecipients(involved?.recipients)
-      addRecipients(requester?.recipients)
+      addRecipients('qualidade', quality.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
+      addRecipients('solicitante', requester?.recipients)
       break
     case 'ACTION_PLAN_CREATED':
       marker = '[ALERTA_ACTION_PLAN_CREATED] Notificação de plano de ação enviada aos responsáveis'
-      if (input.actionItemId) addRecipients(await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
-      addRecipients(quality.recipients)
+      if (input.actionItemId) addRecipients('responsável da ação', await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
+      addRecipients('qualidade', quality.recipients)
       break
     case 'ACTION_ITEM_ASSIGNED':
       marker = '[ALERTA_ACTION_ITEM_ASSIGNED] Notificação de ação enviada ao responsável'
-      if (input.actionItemId) addRecipients(await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
+      if (input.actionItemId) addRecipients('responsável da ação', await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
       break
     case 'ACTION_ITEM_UPDATED':
       marker = '[ALERTA_ACTION_ITEM_UPDATED] Notificação de atualização de ação enviada conforme regra'
-      if (input.actionItemId) addRecipients(await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
+      if (input.actionItemId) addRecipients('responsável da ação', await resolveActionPlanResponsibleRecipients(input.actionItemId, db))
       break
     case 'ACTION_ITEM_COMPLETED':
       marker = '[ALERTA_ACTION_ITEM_COMPLETED] Notificação de verificação enviada para Qualidade'
-      addRecipients(quality.recipients)
+      addRecipients('qualidade', quality.recipients)
       break
     case 'ACTION_PLAN_COMPLETED':
       marker = '[ALERTA_ACTION_PLAN_COMPLETED] Notificação de plano concluído enviada para Qualidade, solicitante e área envolvida'
-      addRecipients(quality.recipients)
-      addRecipients(requester?.recipients)
-      addRecipients(involved?.recipients)
+      addRecipients('qualidade', quality.recipients)
+      addRecipients('solicitante', requester?.recipients)
+      addRecipients('centro envolvido', involved?.recipients)
       break
     case 'EFFECTIVENESS_REVIEW_REQUESTED':
     case 'EFFECTIVENESS_APPROVED':
     case 'EFFECTIVENESS_REJECTED':
       marker = `[ALERTA_${input.event}] Notificação de verificação de eficácia enviada para Qualidade e solicitante`
-      addRecipients(quality.recipients)
-      addRecipients(requester?.recipients)
+      addRecipients('qualidade', quality.recipients)
+      addRecipients('solicitante', requester?.recipients)
       break
     default:
-      addRecipients(quality.recipients)
+      addRecipients('qualidade', quality.recipients)
       break
   }
 
@@ -287,13 +324,19 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
               },
             ],
           },
-          select: { email: true },
+          select: { id: true, fullName: true, email: true },
         })
         for (const user of users) {
           const email = user.email?.trim()
           if (!email) continue
           recipients.add(email)
           configuredRecipientsAdded.push(email)
+          const existing = resolved.recipients.find((recipient) => recipient.id === user.id)
+          if (existing) {
+            if (!existing.reasons.includes('destinatário fixo')) existing.reasons.push('destinatário fixo')
+          } else {
+            resolved.recipients.push({ id: user.id, fullName: user.fullName, email, reasons: ['destinatário fixo'] })
+          }
         }
       }
     }
@@ -319,7 +362,8 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
     responsavel: resolved.recipients[0]?.fullName || '-',
     data: new Date().toLocaleString('pt-BR'),
   }
-  const subject = renderNcAlertTemplate(config.subjectTemplate, templateValues)
+  const subjectTemplate = resolveSubjectTemplate(input.event, config.subjectTemplate)
+  const subject = renderNcAlertTemplate(subjectTemplate, templateValues)
   const text = renderNcAlertTemplate(config.bodyTemplate, templateValues)
 
   const mailResult = await sendMail({ to, subject, text }, 'ALERTS')
@@ -332,12 +376,17 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
     })
   }
 
+  const recipientReasons = resolved.recipients
+    .filter((recipient) => to.includes(recipient.email))
+    .map((recipient) => `${recipient.email}: ${recipient.reasons.join(', ')}`)
+    .join('; ')
+
   await db.nonConformityTimeline.create({
     data: {
       nonConformityId: input.nonConformityId,
       actorId: input.actorId ?? null,
       tipo: 'ALERTA',
-      message: `${resolved.marker} (${to.length} destinatário(s); envio=${mailResult.sent ? 'ok' : 'falha'}${configuredRecipientsAdded.length ? `; fixos=${configuredRecipientsAdded.join(', ')}` : ''})`,
+      message: `${resolved.marker} (${to.length} destinatário(s); motivos=${recipientReasons || '-'}; envio=${mailResult.sent ? 'ok' : 'falha'}${configuredRecipientsAdded.length ? `; fixos=${configuredRecipientsAdded.join(', ')}` : ''})`,
     },
   })
 
