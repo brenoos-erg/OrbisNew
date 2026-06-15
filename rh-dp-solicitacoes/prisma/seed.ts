@@ -29,6 +29,10 @@ function hostOf(url?: string) {
 
 
 
+function truncateSeedText(value: string, max = 240) {
+  return value.length > max ? `${value.slice(0, max - 3)}...` : value
+}
+
 async function main() {
   console.log('🌱 Iniciando seed...')
   const enableLegacyCleanup = process.env.SEED_LEGACY_CLEANUP === 'true'
@@ -81,9 +85,11 @@ async function main() {
     return {
       codigo: `LEGACY.${tipo.id}`,
       nome: tipo.nome.startsWith('[Legado]') ? tipo.nome : `[Legado] ${tipo.nome} (${tipo.id})`,
-      descricao: tipo.descricao?.includes('Registro legado mantido por possuir vínculos históricos')
-        ? tipo.descricao
-        : `${tipo.descricao ?? 'Tipo de solicitação legado.'} Registro legado mantido por possuir vínculos históricos (${reason}); indisponível para novos cadastros.`,
+      descricao: truncateSeedText(
+        tipo.descricao?.includes('Registro legado mantido por possuir vínculos históricos')
+          ? tipo.descricao
+          : `${tipo.descricao ?? 'Tipo de solicitação legado.'} Registro legado mantido por possuir vínculos históricos.`,
+      ),
       schemaJson: {
         ...schemaJson,
         meta: {

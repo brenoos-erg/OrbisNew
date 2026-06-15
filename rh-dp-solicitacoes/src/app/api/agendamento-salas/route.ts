@@ -16,7 +16,7 @@ type MeetingRoomBookingStatus = (typeof STATUSES)[number]
 const MIN_DURATION_MS = 15 * 60 * 1000
 const MAX_DURATION_MS = 8 * 60 * 60 * 1000
 
-export function hasMeetingRoomConflict(existing: { startsAt: Date; endsAt: Date }, startsAt: Date, endsAt: Date) {
+function hasMeetingRoomConflict(existing: { startsAt: Date; endsAt: Date }, startsAt: Date, endsAt: Date) {
   return existing.startsAt < endsAt && existing.endsAt > startsAt
 }
 
