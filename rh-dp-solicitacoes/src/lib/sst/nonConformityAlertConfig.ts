@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { renderNcAlertTemplate } from '@/lib/sst/nonConformityAlertTemplate'
 
-const DEFAULT_SUBJECT = 'NC {{numeroRnc}}: ação necessária'
+const DEFAULT_SUBJECT = 'NC {{numeroRnc}}: atualização registrada'
 const DEFAULT_BODY = [
   'Foi registrada uma não conformidade no sistema.',
   '',

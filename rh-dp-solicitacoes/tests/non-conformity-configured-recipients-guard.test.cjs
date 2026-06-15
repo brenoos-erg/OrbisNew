@@ -5,7 +5,7 @@ const notificationSource = fs.readFileSync('src/lib/sst/nonConformityNotificatio
 const actionPlanSource = fs.readFileSync('src/app/api/sst/nao-conformidades/[id]/plano-de-acao/route.ts', 'utf8')
 
 assert.match(notificationSource, /CONFIGURED_RECIPIENT_ALLOWED_EVENTS/)
-assert.match(notificationSource, /'NC_CREATED', 'NC_UPDATED'/)
+assert.match(notificationSource, /CONFIGURED_RECIPIENT_ALLOWED_EVENTS: NonConformityNotificationEvent\[\] = \[\]/)
 assert.match(notificationSource, /Role\.ADMIN/)
 assert.match(actionPlanSource, /sem notificação automática por ausência de usuário vinculado/)
 
