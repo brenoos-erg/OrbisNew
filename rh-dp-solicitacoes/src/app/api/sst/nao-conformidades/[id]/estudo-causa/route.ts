@@ -1,14 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Action, ModuleLevel } from '@prisma/client'
+import { ModuleLevel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { devErrorDetail } from '@/lib/apiError'
 import { getUserModuleContext } from '@/lib/moduleAccess'
 import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
-import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
-import { assertCanFeature, getUserModuleLevel } from '@/lib/permissions'
+import { MODULE_KEYS } from '@/lib/featureKeys'
+import { getUserModuleLevel } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
 import { registerAppError } from '@/lib/errorRegistry'
+import { canUserAccessNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+
+type Change = {
+  fieldName: string
+  label: string
+  oldValue: string | null
+  newValue: string | null
+}
+
+function textValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  return text.length ? text : null
+}
+
+function pushChange(changes: Change[], fieldName: string, label: string, oldValue: unknown, newValue: unknown) {
+  const oldText = textValue(oldValue)
+  const newText = textValue(newValue)
+  if (oldText !== newText) changes.push({ fieldName, label, oldValue: oldText, newValue: newText })
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let id: string | undefined
@@ -22,15 +42,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { levels } = await getUserModuleContext(me.id)
     const level = normalizeSstLevel(levels)
     const sstLevel = await getUserModuleLevel(me.id, MODULE_KEYS.SST)
-    const hasSgiQualidadeLevel3 = hasMinLevel(sstLevel ?? level ?? undefined, ModuleLevel.NIVEL_3)
+    const effectiveLevel = sstLevel ?? level ?? undefined
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_1)) {
       return NextResponse.json({ error: 'Sem permissão no módulo SST.' }, { status: 403 })
-    }
-    try {
-      await assertCanFeature(me.id, MODULE_KEYS.SST, FEATURE_KEYS.SST.ESTUDO_DE_CAUSA, Action.UPDATE)
-    } catch {
-      return NextResponse.json({ error: 'Sem permissão para editar estudo de causa.' }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({} as any))
@@ -73,13 +88,47 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       console.info('[estudo-causa] payload normalizado', { nonConformityId, payload: normalized })
     }
 
-    const nc = await prisma.nonConformity.findUnique({ where: { id: nonConformityId }, select: { solicitanteId: true, aprovadoQualidadeStatus: true } })
+    const nc = await prisma.nonConformity.findUnique({
+      where: { id: nonConformityId },
+      select: {
+        solicitanteId: true,
+        centroQueDetectouId: true,
+        centroQueOriginouId: true,
+        aprovadoQualidadeStatus: true,
+        status: true,
+        causaRaiz: true,
+        estudoCausa: { orderBy: { ordem: 'asc' } },
+      },
+    })
     if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
-    if (nc.aprovadoQualidadeStatus !== 'APROVADO' && !hasSgiQualidadeLevel3) {
-      return NextResponse.json({ error: 'Estudo de causa só pode ser preenchido após aprovação da qualidade.' }, { status: 403 })
+    if (nc.status === 'CANCELADA' || nc.status === 'ENCERRADA') {
+      return NextResponse.json({ error: 'Não é possível editar estudo de causa em RNC cancelada ou encerrada.' }, { status: 409 })
     }
-    if (nc.solicitanteId !== me.id && !hasMinLevel(level, ModuleLevel.NIVEL_2)) {
+    const userCostCenterIds = hasMinLevel(effectiveLevel, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const canAccess = canUserAccessNc({
+      userId: me.id,
+      level: effectiveLevel,
+      ncSolicitanteId: nc.solicitanteId,
+      centroQueDetectouId: nc.centroQueDetectouId,
+      centroQueOriginouId: nc.centroQueOriginouId,
+      userCostCenterIds,
+    })
+    if (!canAccess) {
       return NextResponse.json({ error: 'Sem permissão para editar estudo de causa.' }, { status: 403 })
+    }
+
+    const changes: Change[] = []
+    const maxItems = Math.max(nc.estudoCausa.length, normalized.hasItems ? normalized.normalizedItems.length : 0)
+    if (normalized.hasItems) {
+      for (let idx = 0; idx < maxItems; idx += 1) {
+        const oldItem = nc.estudoCausa[idx]
+        const newItem = normalized.normalizedItems[idx]
+        pushChange(changes, `porque${idx + 1}.pergunta`, `Porquê ${idx + 1} - pergunta`, oldItem?.pergunta, newItem?.question ?? `Por quê ${idx + 1}?`)
+        pushChange(changes, `porque${idx + 1}.resposta`, `Porquê ${idx + 1} - resposta`, oldItem?.resposta, newItem?.answer)
+      }
+    }
+    if (normalized.rootCause !== undefined) {
+      pushChange(changes, 'causaRaiz', 'Causa raiz', nc.causaRaiz, normalized.rootCause)
     }
 
     const saved = await prisma.$transaction(async (tx) => {
@@ -111,11 +160,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           data: { causaRaiz: normalizedRootCause },
         })
       }
-       await appendNonConformityTimelineEvent(tx, {
+      if (changes.length > 0) {
+        await tx.nonConformityCauseStudyEditLog.create({
+          data: {
+            nonConformityId,
+            actorId: me.id,
+            actorName: me.fullName ?? null,
+            actorEmail: me.email ?? null,
+            actorLogin: me.login ?? null,
+            changes,
+          },
+        })
+      }
+      await appendNonConformityTimelineEvent(tx, {
         nonConformityId,
         actorId: me.id,
         tipo: 'ESTUDO_CAUSA',
-        message: 'Estudo de causa atualizado.',
+        message: `Estudo de causa editado por ${me.fullName ?? me.login ?? 'usuário'}. Campos alterados: ${changes.length}.`,
       })
       return { rows }
     })

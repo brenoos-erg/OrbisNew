@@ -74,6 +74,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           orderBy: { createdAt: 'asc' },
         },
         estudoCausa: { orderBy: { ordem: 'asc' } },
+        estudoCausaEditLogs: {
+          select: {
+            id: true,
+            editedAt: true,
+            actorName: true,
+            actorEmail: true,
+            actorLogin: true,
+            changes: true,
+          },
+          orderBy: { editedAt: 'desc' },
+        },
         anexos: { include: { createdBy: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'desc' } },
         comentarios: { include: { autor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },
         timeline: { include: { actor: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' } },
