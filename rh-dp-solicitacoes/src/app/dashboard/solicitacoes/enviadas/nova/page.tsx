@@ -21,6 +21,7 @@ import {
   isSolicitacaoEquipamento,
   isSolicitacaoInclusaoPlanoDependentes,
   isSolicitacaoIncentivoEducacao,
+  isSolicitacaoManutencaoTi,
 } from '@/lib/solicitationTypes';
 import {
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
@@ -214,11 +215,6 @@ const TI_STOCK_EQUIPMENT_OPTIONS = [
   'TP-Link',
   'Outros',
 ];
-
-const TI_MANUTENCAO_CODIGO = 'RQ.TI.003';
-
-const isTiMaintenanceRequest = (tipo: TipoSolicitacao | null) =>
-  !!tipo && tipo.codigo?.toUpperCase() === TI_MANUTENCAO_CODIGO;
 
 function formatBrazilPhone(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -552,7 +548,7 @@ export default function NovaSolicitacaoPage() {
   const isAbonoEducacional =
     selectedTipo?.nome === 'Solicitação de Abono Educacional';
   const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(selectedTipo);
-  const isTiMaintenance = isTiMaintenanceRequest(selectedTipo);
+  const isTiMaintenance = isSolicitacaoManutencaoTi(selectedTipo);
    const isAvaliacaoExperiencia = selectedTipo?.id === EXPERIENCE_EVALUATION_TIPO_ID;
 
   const isSolicitacaoEpi = isSolicitacaoEpiUniforme(selectedTipo);
