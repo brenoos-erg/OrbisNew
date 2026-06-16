@@ -46,6 +46,8 @@ export const AGENDAMENTO_FERIAS_TIPO_NOME = 'AGENDAMENTO DE FÉRIAS'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID = 'SOLICITACAO_EQUIPAMENTO'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_ID_ALT = 'RQ_089'
 export const SOLICITACAO_EQUIPAMENTO_TIPO_NOME = 'SOLICITAÇÃO DE EQUIPAMENTO'
+export const SOLICITACAO_MANUTENCAO_TI_TIPO_IDS = ['RQ_TI_MANUTENCAO', 'TI_MANUTENCAO'] as const
+export const SOLICITACAO_MANUTENCAO_TI_CODIGOS = ['RQ.TI.MANUTENCAO', 'RQ.TI.MAN'] as const
 export const TI_CATALOG_PREFIX = 'RQ.TI.'
 export const SOLICITACAO_EXAMES_SST_TIPO_ID = 'RQ_092'
 export const SOLICITACAO_EPI_UNIFORME_TIPO_ID = 'RQ_043'
@@ -369,6 +371,28 @@ export function isSolicitacaoEquipamento(tipo?: TipoSolicitacaoLike | null) {
   return (
     nome === normalizeSolicitacaoName(SOLICITACAO_EQUIPAMENTO_TIPO_NOME) ||
     nome.includes('EQUIPAMENTOS, TELEFONIA E RECURSOS DE TI')
+  )
+}
+
+export function isSolicitacaoManutencaoTi(tipo?: TipoSolicitacaoLike | null) {
+  if (!tipo) return false
+
+  const id = tipo.id?.trim().toUpperCase()
+  if (id && SOLICITACAO_MANUTENCAO_TI_TIPO_IDS.includes(id as (typeof SOLICITACAO_MANUTENCAO_TI_TIPO_IDS)[number])) {
+    return true
+  }
+
+  const codigo = tipo.codigo?.trim().toUpperCase()
+  if (codigo && SOLICITACAO_MANUTENCAO_TI_CODIGOS.includes(codigo as (typeof SOLICITACAO_MANUTENCAO_TI_CODIGOS)[number])) {
+    return true
+  }
+
+  const nome = normalizeSolicitacaoName(tipo.nome)
+  return (
+    nome === 'MANUTENCAO DE TI' ||
+    nome === 'MANUTENCAO - TI' ||
+    nome === 'TI - MANUTENCAO' ||
+    nome === 'MANUTENCAO DE EQUIPAMENTO OU SISTEMA DE TI'
   )
 }
 
