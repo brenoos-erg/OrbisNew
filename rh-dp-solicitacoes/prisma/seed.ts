@@ -3541,14 +3541,59 @@ async function main() {
       (await isoPrisma.approverGroup.create({ data: { name: 'APROVAÇÃO' } }))
 
     const allCatalogTypes = await isoPrisma.documentTypeCatalog.findMany()
+
     for (const type of allCatalogTypes) {
-      await isoPrisma.documentTypeApprovalFlow.deleteMany({ where: { documentTypeId: type.id } })
-      await isoPrisma.documentTypeApprovalFlow.createMany({
-        data: [
-          { documentTypeId: type.id, order: 1, stepType: 'REVIEW', approverGroupId: genericApproval.id, active: true },
-          { documentTypeId: type.id, order: 2, stepType: 'QUALITY', approverGroupId: qualityGroup.id, active: true },
-          { documentTypeId: type.id, order: 3, stepType: 'SIG', approverGroupId: sigGroup.id, active: true },
-        ],
+      const defaultFlowItems = [
+        {
+          order: 1,
+          stepType: 'REVIEW',
+          approverGroupId: genericApproval.id,
+        },
+        {
+          order: 2,
+          stepType: 'QUALITY',
+          approverGroupId: qualityGroup.id,
+        },
+        {
+          order: 3,
+          stepType: 'SIG',
+          approverGroupId: sigGroup.id,
+        },
+      ] as const
+
+      for (const item of defaultFlowItems) {
+        await isoPrisma.documentTypeApprovalFlow.upsert({
+          where: {
+            documentTypeId_order: {
+              documentTypeId: type.id,
+              order: item.order,
+            },
+          },
+          update: {
+            stepType: item.stepType,
+            approverGroupId: item.approverGroupId,
+            active: true,
+          },
+          create: {
+            documentTypeId: type.id,
+            order: item.order,
+            stepType: item.stepType,
+            approverGroupId: item.approverGroupId,
+            active: true,
+          },
+        })
+      }
+
+      await isoPrisma.documentTypeApprovalFlow.updateMany({
+        where: {
+          documentTypeId: type.id,
+          order: {
+            notIn: defaultFlowItems.map((item) => item.order),
+          },
+        },
+        data: {
+          active: false,
+        },
       })
     }
 
