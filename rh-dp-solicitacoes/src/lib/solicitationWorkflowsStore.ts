@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export type WorkflowStepKind = 'DEPARTAMENTO' | 'APROVACAO' | 'FIM'
@@ -23,6 +24,10 @@ function normalizeStep(step: WorkflowStepDraft): WorkflowStepDraft {
   return { ...step, notificationEmails: Array.from(new Set((step.notificationEmails ?? []).map((x) => x.trim()).filter(Boolean))), approverUserIds, notificationTemplate: normalizeTemplate(step.notificationTemplate), approvalTemplate: normalizeTemplate(step.approvalTemplate), notificationChannels: asChannels(step.notificationChannels, step.kind), notificationAdminEmails: Array.from(new Set((step.notificationAdminEmails ?? []).map((x) => x.trim()).filter(Boolean))), enabled: step.enabled ?? true, requiresApproval: step.requiresApproval ?? step.kind === 'APROVACAO', canAssume: step.canAssume ?? false, canFinalize: step.canFinalize ?? false }
 }
 
+function toPrismaJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return value == null ? Prisma.JsonNull : JSON.parse(JSON.stringify(value))
+}
+
 const includeWorkflow = { steps: { orderBy: { order: 'asc' as const } }, transitions: true }
 
 type DbWorkflow = Awaited<ReturnType<typeof prisma.solicitationWorkflow.findFirst<{ include: typeof includeWorkflow }>>>
@@ -40,7 +45,7 @@ export async function createWorkflowRow(input: WorkflowDraft, audit?: WorkflowAu
   const id = input.id ?? crypto.randomUUID(); const steps = [...input.steps].sort((a,b)=>a.order-b.order).map(normalizeStep)
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.solicitationWorkflow.create({ data: { id, name: input.name, tipoId: input.tipoId, departmentId: input.departmentId ?? null, active: input.active, createdById: audit?.actorId ?? null, updatedById: audit?.actorId ?? null, steps: { create: steps.map((s) => ({ order: s.order, stepKey: s.stepKey, label: s.label, kind: s.kind, defaultDepartmentId: s.defaultDepartmentId ?? null, approverGroupId: s.approverGroupId ?? null, requiresApproval: Boolean(s.requiresApproval), canAssume: Boolean(s.canAssume), canFinalize: Boolean(s.canFinalize), enabled: s.enabled ?? true, notificationEmailsJson: s.notificationEmails ?? [], notificationTemplateJson: s.notificationTemplate ?? DEFAULT_TEMPLATE, approvalTemplateJson: s.approvalTemplate ?? DEFAULT_TEMPLATE, notificationChannelsJson: s.notificationChannels ?? {}, notificationAdminEmailsJson: s.notificationAdminEmails ?? [], approverUserIdsJson: s.approverUserIds ?? [], posX: s.posX, posY: s.posY })) }, transitions: { create: input.transitions.map((t) => ({ fromStepKey: t.fromStepKey, toStepKey: t.toStepKey })) } }, include: includeWorkflow })
-    await tx.solicitationWorkflowAuditLog.create({ data: { workflowId: created.id, actorId: audit?.actorId ?? null, action: audit?.action ?? 'CREATE', beforeJson: null, afterJson: dbToDraft(created), ip: audit?.ip ?? null, userAgent: audit?.userAgent ?? null } })
+    await tx.solicitationWorkflowAuditLog.create({ data: { workflowId: created.id, actorId: audit?.actorId ?? null, action: audit?.action ?? 'CREATE', beforeJson: Prisma.JsonNull, afterJson: toPrismaJson(dbToDraft(created)), ip: audit?.ip ?? null, userAgent: audit?.userAgent ?? null } })
     return created
   })
   return dbToDraft(row)
@@ -53,7 +58,7 @@ export async function updateWorkflowRow(id: string, input: WorkflowDraft, audit?
   const row = await prisma.$transaction(async (tx) => {
     await tx.solicitationWorkflowStep.deleteMany({ where: { workflowId: id } }); await tx.solicitationWorkflowTransition.deleteMany({ where: { workflowId: id } })
     const updated = await tx.solicitationWorkflow.update({ where: { id }, data: { name: input.name, tipoId: input.tipoId, departmentId: input.departmentId ?? null, active: input.active, updatedById: audit?.actorId ?? null, steps: { create: steps.map((s) => ({ order: s.order, stepKey: s.stepKey, label: s.label, kind: s.kind, defaultDepartmentId: s.defaultDepartmentId ?? null, approverGroupId: s.approverGroupId ?? null, requiresApproval: Boolean(s.requiresApproval), canAssume: Boolean(s.canAssume), canFinalize: Boolean(s.canFinalize), enabled: s.enabled ?? true, notificationEmailsJson: s.notificationEmails ?? [], notificationTemplateJson: s.notificationTemplate ?? DEFAULT_TEMPLATE, approvalTemplateJson: s.approvalTemplate ?? DEFAULT_TEMPLATE, notificationChannelsJson: s.notificationChannels ?? {}, notificationAdminEmailsJson: s.notificationAdminEmails ?? [], approverUserIdsJson: s.approverUserIds ?? [], posX: s.posX, posY: s.posY })) }, transitions: { create: input.transitions.map((t) => ({ fromStepKey: t.fromStepKey, toStepKey: t.toStepKey })) } }, include: includeWorkflow })
-    await tx.solicitationWorkflowAuditLog.create({ data: { workflowId: id, actorId: audit?.actorId ?? null, action: audit?.action ?? 'UPDATE', beforeJson: dbToDraft(before), afterJson: dbToDraft(updated), ip: audit?.ip ?? null, userAgent: audit?.userAgent ?? null } })
+    await tx.solicitationWorkflowAuditLog.create({ data: { workflowId: id, actorId: audit?.actorId ?? null, action: audit?.action ?? 'UPDATE', beforeJson: toPrismaJson(dbToDraft(before)), afterJson: toPrismaJson(dbToDraft(updated)), ip: audit?.ip ?? null, userAgent: audit?.userAgent ?? null } })
     return updated
   })
   return dbToDraft(row)
