@@ -5,8 +5,27 @@ import { getUserModuleContext } from '@/lib/moduleAccess'
 import { ensureRequestContext, memoizeRequest } from '@/lib/request-metrics'
 import { getModuleKeyAliases, normalizeModuleKey } from '@/lib/moduleKey'
 
+export const CRITICAL_FEATURE_KEYS = new Set([ // normalized by normalizeFeatureKey()
+  'documents-publish',
+  'documents-approve',
+  'documents-delete',
+  'permissions-manage',
+  'users-delete',
+  'workflows-manage',
+  'solicitation-types-manage',
+  'non-conformity-close',
+  'non-conformity-effectiveness-approve',
+  'evidence-delete',
+  'solicitacoes.fluxos', // FEATURE_KEYS.SOLICITACOES.FLUXOS === 'SOLICITACOES.FLUXOS'
+  'configuracoes.permissoes',
+])
+
 function normalizeFeatureKey(featureKey: string) {
   return featureKey.trim().toLowerCase().replace(/_/g, '-')
+}
+
+export function isCriticalFeatureKey(featureKey: string) {
+  return CRITICAL_FEATURE_KEYS.has(normalizeFeatureKey(featureKey))
 }
 
 export function mapLevelToDefaultActions(level: ModuleLevel): Action[] {
@@ -105,6 +124,10 @@ export async function canFeature(
 
       if (grantActions) {
         return grantActions.includes(action)
+      }
+
+      if (isCriticalFeatureKey(featureKey)) {
+        return false
       }
 
       const fallbackActions = mapLevelToDefaultActions(level)

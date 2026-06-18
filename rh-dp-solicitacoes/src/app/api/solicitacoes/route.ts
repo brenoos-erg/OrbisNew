@@ -42,6 +42,8 @@ import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/soli
 import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
 import { isExternalAdmissionCandidateType, patchExternalAdmissionPayloadSeed } from '@/lib/externalAdmission'
 import { computeTiDueDate, isTiCatalogCode, resolveTiRequiresApprovalByPayload } from '@/lib/tiSolicitations'
+import { validateSolicitationPayload, SolicitationPayloadValidationError } from '@/lib/solicitationPayloadValidation'
+import { buildApprovalSnapshot, resolveSolicitationApprovers, resolveWorkflowForSolicitation } from '@/lib/solicitationApproverResolution'
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -574,6 +576,7 @@ export const POST = withModuleLevel(
 
         const tipo = await prisma.tipoSolicitacao.findUnique({
           where: { id: tipoId },
+          include: { approvers: { select: { userId: true } } },
         })
 
         if (!tipo) {
@@ -851,6 +854,24 @@ export const POST = withModuleLevel(
           }
         }
 
+        validateSolicitationPayload(tipo, payload)
+        const workflowForSnapshot = await resolveWorkflowForSolicitation(tipoId, resolvedDepartmentId, resolvedCostCenterId)
+        const approvalResolution = await resolveSolicitationApprovers({
+          tipo,
+          workflow: workflowForSnapshot,
+          solicitante: {
+            id: me.id,
+            departmentId: me.departmentId,
+            costCenterId: me.costCenterId,
+          },
+          payload,
+        })
+        const approvalSnapshots = buildApprovalSnapshot({
+          workflow: workflowForSnapshot,
+          approvers: approvalResolution,
+          notifications: { source: 'creation', typeId: tipoId },
+        })
+
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({
           data: {
@@ -866,6 +887,9 @@ export const POST = withModuleLevel(
             payload,
             idempotencyKey,
             nonConformityId: isGestaoMudancas ? nonConformityId : null,
+            workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson,
+            approvalSnapshotJson: approvalSnapshots.approvalSnapshotJson,
+            notificationSnapshotJson: approvalSnapshots.notificationSnapshotJson,
             requiresApproval: (() => {
               if (isAvaliacaoExperiencia) return false
               const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
@@ -1608,6 +1632,9 @@ export const POST = withModuleLevel(
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
          console.error('POST /api/solicitacoes error', { requestId, idempotencyKey, error: e })
+        if (e instanceof SolicitationPayloadValidationError) {
+          return NextResponse.json({ error: e.message }, { status: e.status })
+        }
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
           if (idempotencyKey) {
             const existingByIdempotency = await prisma.solicitation.findUnique({

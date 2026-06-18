@@ -213,6 +213,26 @@ function rowToApi(row: WorkflowDraft, departmentNameById: Map<string, string>) {
   }
 }
 
+async function enrichWorkflowRows(rows: WorkflowDraft[]) {
+  const tipoIds = [...new Set(rows.map((row) => row.tipoId).filter(Boolean))]
+  const departmentIds = [...new Set(rows.flatMap((row) => [row.departmentId, ...row.steps.map((step) => step.defaultDepartmentId)]).filter(Boolean) as string[])]
+  const [tipos, departments] = await Promise.all([
+    tipoIds.length
+      ? prisma.tipoSolicitacao.findMany({ where: { id: { in: tipoIds } }, select: { id: true, nome: true, codigo: true } })
+      : Promise.resolve([]),
+    departmentIds.length
+      ? prisma.department.findMany({ where: { id: { in: departmentIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+  ])
+  const tipoMap = new Map(tipos.map((tipo) => [tipo.id, tipo]))
+  const departmentMap = new Map(departments.map((department) => [department.id, department]))
+
+  return rows.map((row) => ({
+    ...row,
+    tipo: tipoMap.get(row.tipoId) ?? null,
+    department: row.departmentId ? departmentMap.get(row.departmentId) ?? null : null,
+  }))
+}
 
 async function getAccess(action: Action) {
   const appUser = await requireActiveUser()
@@ -233,13 +253,18 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url)
-  const typeId = searchParams.get('typeId')
-  if (!typeId) {
-    return NextResponse.json({ error: 'typeId obrigatório' }, { status: 400 })
-  }
+  const typeId = searchParams.get('typeId') ?? searchParams.get('tipoId')
+  const departmentId = searchParams.get('departmentId')
 
   const rows = await readWorkflowRows()
-  const existing = rows.find((row) => row.tipoId === typeId)
+  if (!typeId) {
+    const filtered = departmentId
+      ? rows.filter((row) => (row.departmentId ?? null) === departmentId)
+      : rows
+    return NextResponse.json(await enrichWorkflowRows(filtered))
+  }
+
+  const existing = rows.find((row) => row.tipoId === typeId && (!departmentId || (row.departmentId ?? null) === departmentId))
 
   if (existing) {
     const departmentIds = Array.from(new Set(existing.steps.map((step) => step.defaultDepartmentId).filter(Boolean))) as string[]
@@ -250,33 +275,45 @@ export async function GET(req: Request) {
     return NextResponse.json(rowToApi(existing, departmentNameById))
   }
 
+  return NextResponse.json({ workflowId: null, nodes: [], edges: [] })
+}
+
+export async function POST(req: Request) {
+  const appUser = await requireActiveUser()
+  if (!(await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.FLUXOS, 'CREATE'))) {
+    return NextResponse.json({ error: 'Sem permissão para criar workflow.' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const typeId = searchParams.get('typeId') ?? searchParams.get('tipoId')
+  const body = await req.json().catch(() => null)
+
+  if (body && typeof body === 'object' && 'name' in body && 'tipoId' in body && Array.isArray((body as WorkflowDraft).steps)) {
+    const draft = body as WorkflowDraft
+    const created = await createWorkflowRow(draft, {
+      actorId: appUser.id,
+      action: 'CREATE',
+      ip: req.headers.get('x-forwarded-for'),
+      userAgent: req.headers.get('user-agent'),
+    })
+    return NextResponse.json(created, { status: 201 })
+  }
+
+  if (!typeId) return NextResponse.json({ error: 'typeId obrigatório' }, { status: 400 })
+  const rows = await readWorkflowRows()
+  const existing = rows.find((row) => row.tipoId === typeId)
+  if (existing) return NextResponse.json({ error: 'Workflow já existe para este tipo.', workflowId: existing.id }, { status: 409 })
   const created = await createWorkflowRow({
-    name: 'Fluxo padrão',
-    tipoId: typeId,
-    active: true,
-    steps: defaultNodes.map((node, index) => ({
-      order: index + 1,
-      stepKey: node.id,
-      label: node.label,
-      kind: toStoreKind(node.kind),
-    })),
-    transitions: defaultEdges.map((edge) => ({
-      fromStepKey: edge.source,
-      toStepKey: edge.target,
-    })),
-  })
-
-  const createdDepartmentIds = Array.from(new Set(created.steps.map((step) => step.defaultDepartmentId).filter(Boolean))) as string[]
-  const createdDepartments = createdDepartmentIds.length
-    ? await prisma.department.findMany({ where: { id: { in: createdDepartmentIds } }, select: { id: true, name: true } })
-    : []
-  const createdDepartmentNameById = new Map(createdDepartments.map((department) => [department.id, department.name]))
-
-  return NextResponse.json(rowToApi(created, createdDepartmentNameById))
+    name: 'Fluxo padrão', tipoId: typeId, active: true,
+    steps: defaultNodes.map((node, index) => ({ order: index + 1, stepKey: node.id, label: node.label, kind: toStoreKind(node.kind) })),
+    transitions: defaultEdges.map((edge) => ({ fromStepKey: edge.source, toStepKey: edge.target })),
+  }, { actorId: appUser.id, action: 'CREATE_DEFAULT', ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent') })
+  return NextResponse.json(rowToApi(created, new Map()), { status: 201 })
 }
 
 export async function PUT(req: Request) {
-  if (!(await getAccess('UPDATE'))) {
+  const appUser = await requireActiveUser()
+  if (!(await canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.FLUXOS, 'UPDATE'))) {
     return NextResponse.json({ error: 'Sem permissão para editar o painel de e-mails.' }, { status: 403 })
   }
 
@@ -304,9 +341,9 @@ export async function PUT(req: Request) {
   }
 
   if (!existing) {
-    await createWorkflowRow(normalized)
+    await createWorkflowRow(normalized, { actorId: appUser.id, action: 'CREATE', ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent') })
   } else {
-    await updateWorkflowRow(existing.id!, normalized)
+    await updateWorkflowRow(existing.id!, normalized, { actorId: appUser.id, action: 'UPDATE', ip: req.headers.get('x-forwarded-for'), userAgent: req.headers.get('user-agent') })
   }
 
   return NextResponse.json({ ok: true })

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { sendMail } from '@/lib/mailer'
+import { sendSolicitationMailWithLog } from '@/lib/solicitationNotificationLog'
 import { resolveAppBaseUrl } from '@/lib/site-url'
 import { readWorkflowRows, type WorkflowStepDraft, type WorkflowStepKind } from '@/lib/solicitationWorkflowsStore'
 import { renderTemplate, resolveTemplate } from '@/lib/solicitationEmailTemplates'
@@ -149,7 +149,17 @@ export async function notifyWorkflowStepEntry(input: NotifyInput) {
   const text = renderTemplate(template.body, values)
 
   const startedAt = performance.now()
-  const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
+  const result = await sendSolicitationMailWithLog({
+    to: recipients,
+    subject,
+    text,
+    solicitationId: solicitation.id,
+    workflowId: workflow.id,
+    stepKey: targetStep.stepKey,
+    event,
+    recipientSource: targetStep.kind === 'APROVACAO' ? 'WORKFLOW_APPROVER' : 'WORKFLOW_STEP',
+    channel: 'NOTIFICATIONS',
+  })
   const elapsedMs = Math.round(performance.now() - startedAt)
 
   if (!result.sent) {

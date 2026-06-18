@@ -1,0 +1,50 @@
+const assert = require('node:assert')
+const fs = require('node:fs')
+
+const workflowRoute = fs.readFileSync('src/app/api/solicitacoes/workflows/route.ts', 'utf8')
+const getSegment = workflowRoute.slice(workflowRoute.indexOf('export async function GET'), workflowRoute.indexOf('export async function POST'))
+assert(!getSegment.includes('createWorkflowRow'), 'GET não deve criar workflow padrão automaticamente')
+assert(workflowRoute.includes('export async function POST'), 'Rota deve expor POST para criar workflow padrão')
+assert(!getSegment.includes("typeId obrigatório"), 'GET sem typeId não deve retornar erro typeId obrigatório')
+assert(getSegment.includes('return NextResponse.json(await enrichWorkflowRows(filtered))'), 'GET sem typeId deve retornar lista completa de workflows')
+assert(getSegment.includes('rowToApi(existing'), 'GET com typeId deve retornar estrutura gráfica compatível')
+
+const workflowByIdRoute = fs.readFileSync('src/app/api/solicitacoes/workflows/[id]/route.ts', 'utf8')
+assert(workflowByIdRoute.includes('requireActiveUser'), 'PUT /api/solicitacoes/workflows/[id] deve exigir usuário ativo')
+assert(workflowByIdRoute.includes('FEATURE_KEYS.SOLICITACOES.FLUXOS') && workflowByIdRoute.includes("'UPDATE'"), 'PUT /api/solicitacoes/workflows/[id] deve exigir UPDATE em FLUXOS')
+assert(workflowByIdRoute.includes('updateWorkflowRow(id, body'), 'PUT /api/solicitacoes/workflows/[id] deve chamar updateWorkflowRow(id, body, auditContext)')
+assert(workflowByIdRoute.includes("{ status: 404 }"), 'PUT /api/solicitacoes/workflows/[id] deve retornar 404 quando não encontrar')
+const legacyByIdRoute = fs.readFileSync('src/app/api/solicitation-workflows/[id]/route.ts', 'utf8')
+assert(legacyByIdRoute.includes("export { PUT } from '@/app/api/solicitacoes/workflows/[id]/route'"), 'Rota antiga [id] deve ser compatibilidade lógica da rota nova')
+
+const store = fs.readFileSync('src/lib/solicitationWorkflowsStore.ts', 'utf8')
+assert(!store.includes('fs.writeFile'), 'Workflow store não deve persistir em arquivo JSON')
+assert(store.includes('prisma.solicitationWorkflow'), 'Workflow store deve usar Prisma')
+assert(store.includes('solicitationWorkflowAuditLog.create'), 'Store deve gravar log de auditoria de workflow')
+
+const featureKeys = fs.readFileSync('src/lib/featureKeys.ts', 'utf8')
+assert(featureKeys.includes("FLUXOS: 'SOLICITACOES.FLUXOS'"), 'Valor real de FEATURE_KEYS.SOLICITACOES.FLUXOS deve ser SOLICITACOES.FLUXOS')
+const permissions = fs.readFileSync('src/lib/permissions.ts', 'utf8')
+assert(permissions.includes("'solicitacoes.fluxos'"), 'CRITICAL_FEATURE_KEYS deve usar valor normalizado correto de SOLICITACOES.FLUXOS')
+assert(permissions.includes('if (grantActions)') && permissions.includes('isCriticalFeatureKey(featureKey)'), 'Grant explícito deve ser avaliado antes de bloquear fallback crítico')
+
+const createRoute = fs.readFileSync('src/app/api/solicitacoes/route.ts', 'utf8')
+assert(createRoute.includes('validateSolicitationPayload(tipo, payload)'), 'Criação real deve validar payload no backend')
+assert(createRoute.includes('resolveSolicitationApprovers') && createRoute.includes('buildApprovalSnapshot'), 'Criação real deve resolver aprovadores e montar snapshot')
+assert(createRoute.includes('workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson'), 'Criação real deve salvar snapshot de workflow')
+
+const workflowNotifications = fs.readFileSync('src/lib/solicitationWorkflowNotifications.ts', 'utf8')
+const operationalNotifications = fs.readFileSync('src/lib/solicitationOperationalNotifications.ts', 'utf8')
+assert(workflowNotifications.includes('sendSolicitationMailWithLog'), 'E-mails de workflow devem gravar log persistente')
+assert(operationalNotifications.includes('sendSolicitationMailWithLog'), 'E-mails operacionais de solicitação devem gravar log persistente')
+
+const emailSender = fs.readFileSync('src/lib/emailSender.ts', 'utf8')
+assert(emailSender.includes('sendMail'), 'emailSender deve ser wrapper de sendMail')
+assert(!emailSender.includes('nodemailer'), 'emailSender não deve implementar transporte próprio')
+
+const validation = fs.readFileSync('src/lib/solicitationPayloadValidation.ts', 'utf8')
+assert(validation.includes('isSolicitacaoManutencaoTi'), 'Validação backend deve usar classificador central de manutenção TI')
+assert(validation.includes("'fields', 'campos', 'camposEspecificos'"), 'Validação deve ler fields, campos e camposEspecificos')
+assert(validation.includes('payload.campos') && validation.includes('return payload[fieldName]'), 'Validação deve ler payload.campos e payload direto')
+
+console.log('sgi-hardening-static ok')
