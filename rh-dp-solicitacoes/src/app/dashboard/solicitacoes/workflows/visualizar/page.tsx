@@ -43,7 +43,7 @@ export default function VisualizarWorkflowPage() {
     const load = async () => {
       setLoading(true)
       const [wfRes, tiposRes, depRes] = await Promise.all([
-        fetch('/api/solicitation-workflows', { cache: 'no-store' }),
+        fetch('/api/solicitacoes/workflows', { cache: 'no-store' }),
         fetch('/api/tipos-solicitacao', { cache: 'no-store' }),
         fetch('/api/departments', { cache: 'no-store' }),
       ])

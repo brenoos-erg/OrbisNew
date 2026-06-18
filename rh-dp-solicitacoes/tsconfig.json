@@ -22,12 +22,13 @@
         "name": "next"
       }
     ],
-    "baseUrl": ".", // ⬅️ adicione isto
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "next-env.d.ts",

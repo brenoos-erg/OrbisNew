@@ -184,7 +184,7 @@ export default function FluxosSolicitacoesPage() {
     const [tiposRes, depRes, wfRes] = await Promise.all([
       fetch('/api/tipos-solicitacao', { cache: 'no-store' }),
       fetch('/api/departments', { cache: 'no-store' }),
-      fetch('/api/solicitation-workflows', { cache: 'no-store' }),
+      fetch('/api/solicitacoes/workflows', { cache: 'no-store' }),
     ])
 
     setTipos(await tiposRes.json())
@@ -200,7 +200,7 @@ export default function FluxosSolicitacoesPage() {
 
   async function saveWorkflow(model = draft) {
     setSaving(true)
-    const url = model.id ? `/api/solicitation-workflows/${model.id}` : '/api/solicitation-workflows'
+    const url = model.id ? `/api/solicitacoes/workflows/${model.id}` : '/api/solicitacoes/workflows'
     const method = model.id ? 'PUT' : 'POST'
 
     await fetch(url, {

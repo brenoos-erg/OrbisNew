@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { nextSolicitationProtocolo } from '@/lib/protocolo'
+import { validateSolicitationPayload, SolicitationPayloadValidationError } from '@/lib/solicitationPayloadValidation'
+import { buildApprovalSnapshot, resolveSolicitationApprovers, resolveWorkflowForSolicitation } from '@/lib/solicitationApproverResolution'
 
 async function saveFile(file: File, folder: string) {
   const bytes = Buffer.from(await file.arrayBuffer())
@@ -55,6 +57,26 @@ export async function POST(req: NextRequest) {
     }
 
     const protocolo = await nextSolicitationProtocolo()
+    const payload = {
+      solicitarParaOutroColaborador: false,
+      solicitante: {
+        fullName: (campos.nome || 'Solicitante externo').trim(),
+        email: (campos.email || 'nao-informado@externo.local').trim(),
+        login: 'externo.portal',
+        phone: (campos.telefone || '').trim(),
+        positionName: 'Externo',
+        departmentName: 'Externo',
+        leaderName: '',
+        costCenterId: '',
+        costCenterText: '',
+      },
+      campos,
+      origemExterna: true,
+    }
+    validateSolicitationPayload(tipo, payload)
+    const workflowForSnapshot = await resolveWorkflowForSolicitation(tipo.id, departmentId, null)
+    const approvalResolution = await resolveSolicitationApprovers({ tipo, workflow: workflowForSnapshot, solicitante: { id: externalUser.id }, payload })
+    const approvalSnapshots = buildApprovalSnapshot({ workflow: workflowForSnapshot, approvers: approvalResolution, notifications: { source: 'external' } })
     const created = await prisma.solicitation.create({
       data: {
         protocolo,
@@ -63,22 +85,10 @@ export async function POST(req: NextRequest) {
         solicitanteId: externalUser.id,
         titulo: tipo.nome,
         descricao: 'Solicitação aberta por formulário externo.',
-        payload: {
-          solicitarParaOutroColaborador: false,
-          solicitante: {
-            fullName: (campos.nome || 'Solicitante externo').trim(),
-            email: (campos.email || 'nao-informado@externo.local').trim(),
-            login: 'externo.portal',
-            phone: (campos.telefone || '').trim(),
-            positionName: 'Externo',
-            departmentName: 'Externo',
-            leaderName: '',
-            costCenterId: '',
-            costCenterText: '',
-          },
-          campos,
-          origemExterna: true,
-        },
+        payload,
+        workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson,
+        approvalSnapshotJson: approvalSnapshots.approvalSnapshotJson,
+        notificationSnapshotJson: approvalSnapshots.notificationSnapshotJson,
       },
     })
 
@@ -116,6 +126,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id: created.id, protocolo: created.protocolo }, { status: 201 })
   } catch (error) {
+    if (error instanceof SolicitationPayloadValidationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error('Erro ao criar solicitação externa:', error)
     return NextResponse.json({ error: 'Erro interno ao criar solicitação externa.' }, { status: 500 })
   }

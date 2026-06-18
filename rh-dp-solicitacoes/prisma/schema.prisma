@@ -160,6 +160,8 @@ model TipoSolicitacao {
   updatedAt    DateTime                  @updatedAt
   solicitacoes Solicitation[]
   approvers    TipoSolicitacaoApprover[]
+  workflows    SolicitationWorkflow[]
+  auditLogs    TipoSolicitacaoAuditLog[]
 }
 
 model TipoSolicitacaoApprover {
@@ -186,6 +188,8 @@ model Department {
   modules         DepartmentModule[]
   positions       Position[]
   solicitations   Solicitation[]
+  workflows       SolicitationWorkflow[]
+  workflowSteps   SolicitationWorkflowStep[]
   users           User[]
   userDepartments UserDepartment[]
   isoDocuments    IsoDocument[]
@@ -229,6 +233,9 @@ model Solicitation {
   cancelamentoJustificativaAnalise String?                @db.Text
   cancelamentoOrigem               String?
   nonConformityId                  String?
+  workflowSnapshotJson             Json?
+  approvalSnapshotJson             Json?
+  notificationSnapshotJson         Json?
   anexos                           Attachment[]
   comentarios                      Comment[]
   eventos                          Event[]
@@ -241,6 +248,7 @@ model Solicitation {
   solicitante                      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
   tipo                             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
   timelines                        SolicitationTimeline[]
+  notificationLogs                 SolicitationNotificationLog[]
   solicitacaoSetores               SolicitacaoSetor[]
   documents                        Document[]
   nonConformity                    NonConformity?         @relation(fields: [nonConformityId], references: [id])
@@ -371,6 +379,12 @@ model User {
   isoAttachmentsUploaded                     DocumentAttachment[]           @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
+  auditLogs                                  AuditLog[]
+  permissionAuditLogsAsActor                 PermissionAuditLog[]             @relation("PermissionAuditActor")
+  permissionAuditLogsAsTarget                PermissionAuditLog[]             @relation("PermissionAuditTarget")
+  tipoSolicitacaoAuditLogs                   TipoSolicitacaoAuditLog[]
+  solicitationWorkflowAuditLogs              SolicitationWorkflowAuditLog[]
+  solicitationNotificationLogs               SolicitationNotificationLog[]
   isoTermAcceptances                         DocumentTermAcceptance[]
   isoTermActionAcceptances                   DocumentTermActionAcceptance[]
   isoDistributionsCreated                    Distribution[]                 @relation("IsoDistributionCreatedBy")
@@ -855,6 +869,155 @@ model UserCostCenter {
 
   @@unique([userId, costCenterId])
   @@map("UserCostCenter")
+}
+
+model SolicitationWorkflow {
+  id            String                          @id @default(uuid())
+  name          String
+  tipoId        String
+  departmentId  String?
+  active        Boolean                         @default(true)
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @default(now()) @updatedAt
+  createdById   String?
+  updatedById   String?
+  tipo          TipoSolicitacao                 @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  department    Department?                     @relation(fields: [departmentId], references: [id])
+  steps         SolicitationWorkflowStep[]
+  transitions   SolicitationWorkflowTransition[]
+  auditLogs     SolicitationWorkflowAuditLog[]
+  notifications SolicitationNotificationLog[]
+
+  @@index([tipoId, departmentId, active])
+}
+
+model SolicitationWorkflowStep {
+  id                          String               @id @default(uuid())
+  workflowId                  String
+  order                       Int
+  stepKey                     String
+  label                       String
+  kind                        String
+  defaultDepartmentId         String?
+  approverGroupId             String?
+  requiresApproval            Boolean              @default(false)
+  canAssume                   Boolean              @default(false)
+  canFinalize                 Boolean              @default(false)
+  enabled                     Boolean              @default(true)
+  notificationEmailsJson      Json?
+  notificationTemplateJson    Json?
+  approvalTemplateJson        Json?
+  notificationChannelsJson    Json?
+  notificationAdminEmailsJson Json?
+  approverUserIdsJson         Json?
+  posX                        Float?
+  posY                        Float?
+  workflow                    SolicitationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  defaultDepartment           Department?           @relation(fields: [defaultDepartmentId], references: [id])
+
+  @@unique([workflowId, stepKey])
+  @@index([workflowId, order])
+}
+
+model SolicitationWorkflowTransition {
+  id          String               @id @default(uuid())
+  workflowId  String
+  fromStepKey String
+  toStepKey   String
+  workflow    SolicitationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model SolicitationWorkflowAuditLog {
+  id         String               @id @default(uuid())
+  workflowId String
+  actorId    String?
+  action     String
+  beforeJson Json?
+  afterJson  Json?
+  createdAt  DateTime             @default(now())
+  ip         String?
+  userAgent  String?              @db.Text
+  workflow   SolicitationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  actor      User?                @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workflowId, createdAt])
+}
+
+model SolicitationNotificationLog {
+  id              String                @id @default(uuid())
+  solicitationId  String?
+  workflowId      String?
+  stepKey         String?
+  event           String
+  recipientEmail  String
+  recipientUserId String?
+  recipientSource String?
+  subject         String
+  bodyPreview     String?               @db.Text
+  status          String
+  provider        String?
+  error           String?               @db.Text
+  sentAt          DateTime?
+  createdAt       DateTime              @default(now())
+  solicitation    Solicitation?         @relation(fields: [solicitationId], references: [id], onDelete: SetNull)
+  workflow        SolicitationWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  recipientUser   User?                 @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([solicitationId, event])
+  @@index([workflowId, stepKey])
+  @@index([status, createdAt])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  entityType   String
+  entityId     String?
+  action       String
+  beforeJson   Json?
+  afterJson    Json?
+  metadataJson Json?
+  ip           String?
+  userAgent    String?  @db.Text
+  createdAt    DateTime @default(now())
+  actor        User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model PermissionAuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  action       String
+  beforeJson   Json?
+  afterJson    Json?
+  createdAt    DateTime @default(now())
+  ip           String?
+  userAgent    String?  @db.Text
+  actor        User?    @relation("PermissionAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetUser   User?    @relation("PermissionAuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetUserId, createdAt])
+}
+
+model TipoSolicitacaoAuditLog {
+  id         String          @id @default(uuid())
+  tipoId     String
+  actorId    String?
+  action     String
+  beforeJson Json?
+  afterJson  Json?
+  createdAt  DateTime        @default(now())
+  ip         String?
+  userAgent  String?         @db.Text
+  tipo       TipoSolicitacao @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  actor      User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tipoId, createdAt])
 }
 
 model SolicitationTimeline {

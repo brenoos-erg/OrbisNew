@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { sendMail } from '@/lib/mailer'
+import { sendSolicitationMailWithLog } from '@/lib/solicitationNotificationLog'
 import { resolveAppBaseUrl } from '@/lib/site-url'
 import { normalizeAndValidateEmails } from '@/lib/solicitationEmailTemplates'
 import { appendSolicitationEmailLog } from '@/lib/solicitationEmailLogStore'
@@ -171,7 +171,15 @@ export async function notifySolicitationEvent(input: NotifySolicitationEventInpu
     reason: input.reason,
   })
 
-  const result = await sendMail({ to: recipients, subject, text }, 'NOTIFICATIONS')
+  const result = await sendSolicitationMailWithLog({
+    to: recipients,
+    subject,
+    text,
+    solicitationId: solicitation.id,
+    event: input.event.toLowerCase(),
+    recipientSource: 'OPERATIONAL_POLICY',
+    channel: 'NOTIFICATIONS',
+  })
 
   await appendSolicitationEmailLog({
     solicitationId: solicitation.id,
