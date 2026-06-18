@@ -11,13 +11,67 @@ export async function resolveWorkflowForSolicitation(tipoId: string, departmentI
   return workflows.find((workflow) => (workflow.departmentId ?? null) === (departmentId ?? null)) ?? workflows.find((workflow) => !workflow.departmentId) ?? null
 }
 
-export async function resolveSolicitationApprovers({ tipo, workflow, solicitante }: { tipo: TipoLike; workflow?: WorkflowDraft | null; solicitante?: UserLike | null; payload?: unknown }) {
-  const workflowApprovers = workflow?.steps.flatMap((step) => step.requiresApproval || step.kind === 'APROVACAO' ? (step.approverUserIds ?? []) : []) ?? []
-  if (workflowApprovers.length) return { source: 'WORKFLOW', approverUserIds: Array.from(new Set(workflowApprovers)), required: true }
-  const tipoApprovers = tipo.approvers?.map((item) => item.userId).filter(Boolean) ?? await prisma.tipoSolicitacaoApprover.findMany({ where: { tipoId: tipo.id }, select: { userId: true } }).then((rows) => rows.map((row) => row.userId))
-  if (tipoApprovers.length) return { source: 'TIPO_SOLICITACAO', approverUserIds: Array.from(new Set(tipoApprovers)), required: true }
-  if (solicitante?.leaderId) return { source: 'GESTOR_SOLICITANTE', approverUserIds: [solicitante.leaderId], required: false }
-  return { source: 'NONE', approverUserIds: [], required: Boolean(workflow?.steps.some((step) => step.requiresApproval)) }
+export async function resolveSolicitationApprovers({
+  tipo,
+  workflow,
+  solicitante,
+}: {
+  tipo: TipoLike
+  workflow?: WorkflowDraft | null
+  solicitante?: UserLike | null
+  payload?: unknown
+}) {
+  const workflowApprovers =
+    workflow?.steps.flatMap((step) =>
+      step.requiresApproval || step.kind === 'APROVACAO'
+        ? (step.approverUserIds ?? [])
+        : [],
+    ) ?? []
+
+  if (workflowApprovers.length) {
+    return {
+      source: 'WORKFLOW',
+      approverUserIds: Array.from(new Set(workflowApprovers)),
+      required: true,
+    }
+  }
+
+  const tipoApproversFromInput =
+    tipo.approvers
+      ?.map((item) => item.userId)
+      .filter((userId): userId is string => Boolean(userId)) ?? []
+
+  const tipoApprovers =
+    tipoApproversFromInput.length > 0
+      ? tipoApproversFromInput
+      : await prisma.tipoSolicitacaoApprover
+          .findMany({
+            where: { tipoId: tipo.id },
+            select: { userId: true },
+          })
+          .then((rows) => rows.map((row) => row.userId).filter((userId): userId is string => Boolean(userId)))
+
+  if (tipoApprovers.length) {
+    return {
+      source: 'TIPO_SOLICITACAO',
+      approverUserIds: Array.from(new Set(tipoApprovers)),
+      required: true,
+    }
+  }
+
+  if (solicitante?.leaderId) {
+    return {
+      source: 'GESTOR_SOLICITANTE',
+      approverUserIds: [solicitante.leaderId],
+      required: false,
+    }
+  }
+
+  return {
+    source: 'NONE',
+    approverUserIds: [],
+    required: Boolean(workflow?.steps.some((step) => step.requiresApproval)),
+  }
 }
 
 function toPrismaJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
