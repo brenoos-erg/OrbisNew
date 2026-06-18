@@ -16,6 +16,14 @@ type NotifyInput = {
 
 type RecipientReason = 'centro envolvido' | 'solicitante' | 'responsável da ação' | 'qualidade' | 'destinatário fixo'
 
+const RECIPIENT_REASON_DESCRIPTIONS: Record<RecipientReason, string> = {
+  'centro envolvido': 'Você recebeu este alerta porque está vinculado ao centro de custo envolvido na NC.',
+  solicitante: 'Você recebeu este alerta porque é o solicitante da NC.',
+  'responsável da ação': 'Você recebeu este alerta porque é responsável por uma ação do plano.',
+  qualidade: 'Você recebeu este alerta porque possui perfil da Qualidade.',
+  'destinatário fixo': 'Você recebeu este alerta porque é um destinatário fixo configurado para este tipo de alerta.',
+}
+
 type RecipientUser = { id: string; fullName: string; email: string }
 
 type RecipientWithReasons = RecipientUser & { reasons: RecipientReason[] }
@@ -279,6 +287,30 @@ export async function resolveNonConformityNotificationRecipientsByEvent(
   }
 }
 
+
+async function resolveActionPlanResponsibleName(actionItemId: string | null | undefined, db: DbClient) {
+  if (!actionItemId) return null
+
+  const actionItem = await db.nonConformityActionItem.findUnique({
+    where: { id: actionItemId },
+    select: { responsavel: { select: { fullName: true } } },
+  })
+
+  return actionItem?.responsavel?.fullName?.trim() || null
+}
+
+function formatRecipientReasonAudit(recipients: RecipientWithReasons[]) {
+  return recipients
+    .map((recipient) => `${recipient.email}: ${recipient.reasons.join(', ')}`)
+    .join('; ')
+}
+
+function formatRecipientReasonExplanation(recipient: RecipientWithReasons) {
+  return recipient.reasons
+    .map((reason) => RECIPIENT_REASON_DESCRIPTIONS[reason])
+    .join('\n') || '-'
+}
+
 export async function notifyNonConformityStakeholders(input: NotifyInput) {
   const db = input.db ?? prisma
   const resolved = await resolveNonConformityNotificationRecipientsByEvent(input, db)
@@ -355,45 +387,64 @@ export async function notifyNonConformityStakeholders(input: NotifyInput) {
     return { sent: false, reason: 'no-recipients' as const }
   }
 
-  const templateValues = {
-    numeroRnc: resolved.nc.numeroRnc,
-    descricao: resolved.nc.descricao.slice(0, 1000),
-    status: resolved.nc.status,
-    responsavel: resolved.recipients[0]?.fullName || '-',
-    data: new Date().toLocaleString('pt-BR'),
-  }
+  const responsibleName = await resolveActionPlanResponsibleName(input.actionItemId, db) ?? '-'
   const subjectTemplate = resolveSubjectTemplate(input.event, config.subjectTemplate)
-  const subject = renderNcAlertTemplate(subjectTemplate, templateValues)
-  const text = renderNcAlertTemplate(config.bodyTemplate, templateValues)
+  const deliveryResults: Array<{ recipient: RecipientWithReasons; sent: boolean; error?: unknown }> = []
 
-  const mailResult = await sendMail({ to, subject, text }, 'ALERTS')
-  if (!mailResult.sent) {
-    console.error('Falha no envio de alerta de NC', {
-      nonConformityId: input.nonConformityId,
-      event: input.event,
-      recipients: to.length,
-      error: mailResult.error,
-    })
+  for (const recipient of resolved.recipients.filter((item) => to.includes(item.email))) {
+    const templateValues = {
+      numeroRnc: resolved.nc.numeroRnc,
+      descricao: resolved.nc.descricao.slice(0, 1000),
+      status: resolved.nc.status,
+      responsavel: responsibleName,
+      motivoEnvio: formatRecipientReasonExplanation(recipient),
+      motivosEnvio: formatRecipientReasonExplanation(recipient),
+      data: new Date().toLocaleString('pt-BR'),
+    }
+    const subject = renderNcAlertTemplate(subjectTemplate, templateValues)
+    const text = renderNcAlertTemplate(config.bodyTemplate, templateValues)
+    const mailResult = await sendMail({ to: [recipient.email], subject, text }, 'ALERTS')
+
+    deliveryResults.push({ recipient, sent: mailResult.sent, error: mailResult.error })
+    if (!mailResult.sent) {
+      console.error('Falha no envio de alerta de NC', {
+        nonConformityId: input.nonConformityId,
+        event: input.event,
+        recipient: recipient.email,
+        error: mailResult.error,
+      })
+    }
   }
 
-  const recipientReasons = resolved.recipients
-    .filter((recipient) => to.includes(recipient.email))
-    .map((recipient) => `${recipient.email}: ${recipient.reasons.join(', ')}`)
+  const recipientReasons = formatRecipientReasonAudit(deliveryResults.map((result) => result.recipient))
+  const deliveryAudit = deliveryResults
+    .map((result) => `${result.recipient.email}: ${result.sent ? 'ok' : 'falha'}`)
     .join('; ')
+  const sentCount = deliveryResults.filter((result) => result.sent).length
+  const failedCount = deliveryResults.length - sentCount
 
   await db.nonConformityTimeline.create({
     data: {
       nonConformityId: input.nonConformityId,
       actorId: input.actorId ?? null,
       tipo: 'ALERTA',
-      message: `${resolved.marker} (${to.length} destinatário(s); motivos=${recipientReasons || '-'}; envio=${mailResult.sent ? 'ok' : 'falha'}${configuredRecipientsAdded.length ? `; fixos=${configuredRecipientsAdded.join(', ')}` : ''})`,
+      message: `${resolved.marker} (evento=${input.event}; ${to.length} destinatário(s); motivos=${recipientReasons || '-'}; envio=${deliveryAudit || '-'}; ok=${sentCount}; falha=${failedCount}${configuredRecipientsAdded.length ? `; fixos=${configuredRecipientsAdded.join(', ')}` : ''})`,
     },
   })
 
-  return { sent: mailResult.sent, reason: mailResult.sent ? 'ok' as const : 'mail-failed' as const }
+  return { sent: sentCount > 0, reason: failedCount === 0 ? 'ok' as const : 'mail-failed' as const }
 }
 
-export async function notifyRetroactiveOpenNonConformities(limit = 500) {
+type RetroactiveNotifyOptions = {
+  limit?: number
+  confirm?: boolean
+}
+
+export async function notifyRetroactiveOpenNonConformities(options: RetroactiveNotifyOptions = {}) {
+  const limit = options.limit ?? 500
+  if (!options.confirm) {
+    return { total: 0, notified: 0, skipped: 0, reason: 'confirmation-required' as const }
+  }
   const items = await prisma.nonConformity.findMany({
     where: { status: { in: RETROACTIVE_ELIGIBLE_STATUSES } },
     select: { id: true },

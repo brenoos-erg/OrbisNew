@@ -1,7 +1,8 @@
 import { notifyRetroactiveOpenNonConformities } from '@/lib/sst/nonConformityNotifications'
 
 async function main() {
-  const summary = await notifyRetroactiveOpenNonConformities()
+  const confirm = process.argv.includes('--confirm') || process.env.NC_RETROACTIVE_ALERTS_CONFIRM === 'true'
+  const summary = await notifyRetroactiveOpenNonConformities({ confirm })
   console.info('[retroactive-nc-alerts] concluído', summary)
 }
 
