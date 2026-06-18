@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import type { WorkflowDraft } from '@/lib/solicitationWorkflowsStore'
 import { readWorkflowRows } from '@/lib/solicitationWorkflowsStore'
@@ -19,7 +20,11 @@ export async function resolveSolicitationApprovers({ tipo, workflow, solicitante
   return { source: 'NONE', approverUserIds: [], required: Boolean(workflow?.steps.some((step) => step.requiresApproval)) }
 }
 
+function toPrismaJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return value == null ? Prisma.JsonNull : JSON.parse(JSON.stringify(value))
+}
+
 export function buildApprovalSnapshot(args: { workflow?: WorkflowDraft | null; approvers: { source: string; approverUserIds: string[]; required: boolean }; notifications?: unknown }) {
   if (args.approvers.required && args.approvers.approverUserIds.length === 0) throw new Error('Aprovação obrigatória sem aprovador configurado.')
-  return { workflowSnapshotJson: args.workflow ?? null, approvalSnapshotJson: args.approvers, notificationSnapshotJson: args.notifications ?? null }
+  return { workflowSnapshotJson: toPrismaJson(args.workflow), approvalSnapshotJson: toPrismaJson(args.approvers), notificationSnapshotJson: toPrismaJson(args.notifications) }
 }
