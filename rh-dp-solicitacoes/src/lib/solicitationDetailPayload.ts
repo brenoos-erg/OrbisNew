@@ -9,6 +9,9 @@ export type DetailPermissionFlags = {
   canComment: boolean
   canPrintExperienceEvaluationPdf?: boolean
   canRequesterEditRq092?: boolean
+  canFinalizeNadaConstaGlobal?: boolean
+  nadaConstaAllSectorsCompleted?: boolean
+  nadaConstaPendingSectors?: string[]
 }
 
 type AnyRecord = Record<string, any>

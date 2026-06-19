@@ -13,6 +13,8 @@ import {
 import {
    isSolicitacaoDesligamento,
   isSolicitacaoNadaConsta,
+  isNadaConstaAllSectorsCompleted,
+  getNadaConstaPendingSectors,
   isSolicitacaoEquipamento,
   isSolicitacaoEpiUniforme,
   isSolicitacaoExamesSst,
@@ -126,7 +128,7 @@ type SchemaJson = {
   camposEspecificos?: CampoEspecifico[]
 }
 
-type ConstaFlag = 'CONSTA' | 'NADA_CONSTA'
+type ConstaFlag = 'CONSTA' | 'NADA_CONSTA' | boolean
 
 type PayloadSolicitante = {
   fullName?: string
@@ -216,7 +218,7 @@ type SolicitacaoSetor = {
   id: string
   setor: string
   status: string
-  constaFlag?: string | null
+  constaFlag?: string | boolean | null
   campos?: Record<string, any> | null
   finalizadoEm?: string | null
   finalizadoPor?: string | null
@@ -296,6 +298,9 @@ export type SolicitationDetail = {
   canComment?: boolean
   canPrintExperienceEvaluationPdf?: boolean
   canRequesterEditRq092?: boolean
+  canFinalizeNadaConstaGlobal?: boolean
+  nadaConstaAllSectorsCompleted?: boolean
+  nadaConstaPendingSectors?: string[]
   rq092Corrections?: Array<{
     id?: string
     createdAt?: string | null
@@ -995,6 +1000,7 @@ export function SolicitationDetailModal({
   const apiCanAssume = detail?.canAssume !== false
   const apiCanApprove = detail?.canApprove !== false
   const apiCanFinalize = detail?.canFinalize !== false
+  const apiCanFinalizeNadaConstaGlobal = detail?.canFinalizeNadaConstaGlobal === true
   const apiCanCancel = detail?.canCancel !== false
   const apiCanManageCancellationRequest = detail?.canManageCancellationRequest === true
   const apiCanComment = detail?.canComment !== false
@@ -1043,6 +1049,16 @@ export function SolicitationDetailModal({
     !followsRhFinalizationFlow &&
     !isNadaConsta &&
     !isSolicitacaoExames &&
+    !isFinalizadaOuCancelada
+
+  const nadaConstaAllSectorsCompleted = detail?.nadaConstaAllSectorsCompleted ?? isNadaConstaAllSectorsCompleted(detail?.solicitacaoSetores)
+  const nadaConstaPendingSectors = detail?.nadaConstaPendingSectors ?? getNadaConstaPendingSectors(detail?.solicitacaoSetores)
+  const usuarioPodeFinalizarNadaConstaGlobal = userIsAdmin || userSectorKeys.has('DP') || currentUser?.role === 'DP' || apiCanFinalizeNadaConstaGlobal
+  const canFinalizarNadaConstaGlobal =
+    isNadaConsta &&
+    apiCanFinalize &&
+    nadaConstaAllSectorsCompleted &&
+    usuarioPodeFinalizarNadaConstaGlobal &&
     !isFinalizadaOuCancelada
     
   const setoresNadaConsta = (() => {
@@ -3741,6 +3757,28 @@ async function handleEncaminharAprovacaoComAnexo() {
 
                       {nadaConstaError && (
                         <p className="mb-2 text-xs text-red-600">{nadaConstaError}</p>
+                      )}
+
+                      {nadaConstaPendingSectors.length > 0 && !nadaConstaAllSectorsCompleted && (
+                        <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs font-medium text-amber-800">
+                          Aguardando finalização dos setores: {nadaConstaPendingSectors.join(', ')}.
+                        </p>
+                      )}
+
+                      {nadaConstaAllSectorsCompleted && canFinalizarNadaConstaGlobal && (
+                        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                          <p className="mb-2 text-xs font-semibold text-emerald-800">
+                            Todos os setores obrigatórios finalizaram o Nada Consta.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleFinalizarUltimaEtapa}
+                            disabled={closing || isFinalizadaOuCancelada}
+                            className="app-button-primary w-full px-4 py-3 text-base lg:w-auto lg:text-sm"
+                          >
+                            {closing ? 'Finalizando...' : 'Finalizar chamado'}
+                          </button>
+                        </div>
                       )}
 
                       {camposNadaConstaSetor.length > 0 ? (

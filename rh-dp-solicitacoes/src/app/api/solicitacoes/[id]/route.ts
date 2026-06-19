@@ -20,6 +20,7 @@ import {
   canCommentSolicitation,
   canEditSolicitation,
   canFinalizeSolicitation,
+  canFinalizeNadaConstaGlobal,
   canRequesterEditRq092AfterSubmit,
   canViewSolicitation,
   isViewerOnlyByPolicy,
@@ -28,6 +29,7 @@ import {
 import { listExperienceEvaluators } from '@/lib/experienceEvaluation'
 import { buildSolicitationDetailPayload } from '@/lib/solicitationDetailPayload'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { getNadaConstaPendingSectors, isNadaConstaAllSectorsCompleted } from '@/lib/solicitationTypes'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -331,6 +333,9 @@ export async function GET(
       canComment: canCommentSolicitation(userAccess, solicitationForActions),
     }
     const canRequesterEditRq092 = canRequesterEditRq092AfterSubmit(me.id, solicitationForActions)
+    const nadaConstaAllSectorsCompleted = isNadaConstaAllSectorsCompleted(solicitacaoSetores)
+    const nadaConstaPendingSectors = getNadaConstaPendingSectors(solicitacaoSetores)
+    const canFinalizeNadaConsta = canFinalizeNadaConstaGlobal(userAccess, solicitationForActions)
     const hasOperationalPermission = Object.values(basePermissions).some(Boolean)
     const viewerOnlyByLinkedRhDp = canViewByLinkedRhDp && !hasOperationalPermission
     const viewerOnly = viewerOnlyByLinkedRhDp || isViewerOnlyByPolicy(userAccess, solicitationForActions)
@@ -340,6 +345,9 @@ export async function GET(
       canEdit: viewerOnlyByLinkedRhDp ? false : basePermissions.canEdit,
       canApprove: viewerOnlyByLinkedRhDp ? false : basePermissions.canApprove,
       canFinalize: viewerOnlyByLinkedRhDp ? false : basePermissions.canFinalize,
+      canFinalizeNadaConstaGlobal: viewerOnlyByLinkedRhDp ? false : canFinalizeNadaConsta,
+      nadaConstaAllSectorsCompleted,
+      nadaConstaPendingSectors,
       canCancel: viewerOnlyByLinkedRhDp ? false : canCancelSolicitation(userAccess, solicitationForActions),
       canManageCancellationRequest: viewerOnlyByLinkedRhDp ? false : basePermissions.canManageCancellationRequest,
       canComment: viewerOnlyByLinkedRhDp ? false : basePermissions.canComment,
