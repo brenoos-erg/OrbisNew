@@ -128,7 +128,7 @@ type SchemaJson = {
   camposEspecificos?: CampoEspecifico[]
 }
 
-type ConstaFlag = 'CONSTA' | 'NADA_CONSTA' | boolean
+type ConstaFlag = 'CONSTA' | 'NADA_CONSTA'
 
 type PayloadSolicitante = {
   fullName?: string
@@ -1563,11 +1563,11 @@ export function SolicitationDetailModal({
           </div>
         )
       }
-      const normalizedValue = normalizeConstaValue(value) as ConstaFlag | ''
-      const options = [
-        { value: 'CONSTA' as ConstaFlag, label: 'Consta' },
-        { value: 'NADA_CONSTA' as ConstaFlag, label: 'Nada Consta' },
-      ] as const
+      const normalizedValue = normalizeConstaValue(value)
+      const options: { value: ConstaFlag; label: string }[] = [
+        { value: 'CONSTA', label: 'Consta' },
+        { value: 'NADA_CONSTA', label: 'Nada Consta' },
+      ]
       return (
         <div key={campo.name} className="space-y-2 text-xs text-[var(--foreground)]">
           <span className="font-semibold">{campo.label}</span>
