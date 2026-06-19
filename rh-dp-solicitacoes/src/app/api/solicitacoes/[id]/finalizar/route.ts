@@ -82,7 +82,8 @@ export async function PATCH(
       (departamentoFinal !== null && solicitation.departmentId === departamentoFinal)
 
    const isNadaConsta = isSolicitacaoNadaConsta({ id: solicitation.tipo?.id, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome })
-    if (isNadaConsta && !observacao) {
+    const hasComentarioExistente = solicitation.comentarios.length > 0
+    if (isNadaConsta && !observacao && !hasComentarioExistente) {
       return NextResponse.json(
         { error: 'Para finalizar Nada Consta, a observação é obrigatória.' },
         { status: 400 },
