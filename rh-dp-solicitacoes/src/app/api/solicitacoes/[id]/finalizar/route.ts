@@ -7,12 +7,12 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
-import { canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canFinalizeNadaConstaGlobal, canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
-import { isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
+import { getNadaConstaPendingSectors, isNadaConstaAllSectorsCompleted, isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
 export async function PATCH(
   req: Request,
@@ -42,6 +42,7 @@ export async function PATCH(
           select: {
             id: true,
             nome: true,
+            codigo: true,
             schemaJson: true,
           },
         },
@@ -80,7 +81,7 @@ export async function PATCH(
       departamentos.length <= 1 ||
       (departamentoFinal !== null && solicitation.departmentId === departamentoFinal)
 
-   const isNadaConsta = isSolicitacaoNadaConsta({ id: solicitation.tipo?.id, nome: solicitation.tipo?.nome })
+   const isNadaConsta = isSolicitacaoNadaConsta({ id: solicitation.tipo?.id, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome })
     if (isNadaConsta && !observacao) {
       return NextResponse.json(
         { error: 'Para finalizar Nada Consta, a observação é obrigatória.' },
@@ -104,15 +105,20 @@ export async function PATCH(
         { status: 400 },
       )
     }
-    const todosSetoresVerdes =
-      solicitation.solicitacaoSetores.length > 0 &&
-      solicitation.solicitacaoSetores.every((setor) => setor.status === 'CONCLUIDO' && Boolean(setor.constaFlag))
+    const todosSetoresVerdes = isNadaConstaAllSectorsCompleted(solicitation.solicitacaoSetores)
+    const setoresPendentesNadaConsta = getNadaConstaPendingSectors(solicitation.solicitacaoSetores)
 
-    const dpPodeFinalizarExcecao =
-      me.role === 'DP' &&
-      (solicitation.department?.code === '08' || solicitation.assumidaPorId === me.id)
+    if (isNadaConsta && !todosSetoresVerdes) {
+      return NextResponse.json(
+        {
+          error: `Aguardando finalização dos setores: ${setoresPendentesNadaConsta.join(', ')}.`,
+          pendingSectors: setoresPendentesNadaConsta,
+        },
+        { status: 400 },
+      )
+    }
 
-    if (!isUltimaEtapa && !(isNadaConsta && todosSetoresVerdes) && !dpPodeFinalizarExcecao) {
+    if (!isUltimaEtapa && !(isNadaConsta && todosSetoresVerdes)) {
       return NextResponse.json(
         { error: 'Só é possível finalizar chamados na última etapa do fluxo.' },
         { status: 400 },
@@ -140,7 +146,19 @@ export async function PATCH(
       payload: solicitation.payload,
     })
 
-    if (!canFinalize && !dpPodeFinalizarExcecao) {
+    const canFinalizeNadaConsta = canFinalizeNadaConstaGlobal(userAccess, {
+      tipoId: solicitation.tipoId,
+      tipo: solicitation.tipo,
+      status: solicitation.status,
+      solicitanteId: solicitation.solicitanteId,
+      approverId: solicitation.approverId,
+      assumidaPorId: solicitation.assumidaPorId,
+      departmentId: solicitation.departmentId,
+      solicitacaoSetores: solicitation.solicitacaoSetores,
+      payload: solicitation.payload,
+    })
+
+    if (!canFinalize && !(isNadaConsta && canFinalizeNadaConsta)) {
       return NextResponse.json(
         { error: 'Você não pode finalizar solicitações desta etapa/departamento.' },
         { status: 403 },
@@ -160,7 +178,9 @@ export async function PATCH(
       data: {
         solicitationId: id,
         status: 'CONCLUIDA',
-        message: 'Solicitação finalizada na última etapa do fluxo.',
+        message: isNadaConsta
+          ? 'Nada Consta finalizado pelo DP após conclusão dos setores.'
+          : 'Solicitação finalizada na última etapa do fluxo.',
       },
     })
     if (observacao) {

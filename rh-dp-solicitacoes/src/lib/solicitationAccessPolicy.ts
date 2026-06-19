@@ -15,7 +15,7 @@ import {
 } from '@/lib/experienceEvaluation'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { isRhDepartment } from '@/lib/rhAccess'
-import { isSolicitacaoExamesSst } from '@/lib/solicitationTypes'
+import { isNadaConstaAllSectorsCompleted, isSolicitacaoExamesSst, isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
 export type UserAccessContext = {
   userId: string
@@ -40,7 +40,7 @@ export type UserAccessContext = {
 
 type DepartmentLike = { id?: string | null; code?: string | null; sigla?: string | null; name?: string | null }
 
-type SolicitationLike = {
+export type SolicitationAccessLike = {
   tipoId?: string | null
   tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null
   status?: string | null
@@ -48,7 +48,7 @@ type SolicitationLike = {
   approverId?: string | null
   assumidaPorId?: string | null
   departmentId?: string | null
-  solicitacaoSetores?: { setor?: string | null }[]
+  solicitacaoSetores?: { setor?: string | null; status?: string | null; constaFlag?: unknown }[]
   payload?: unknown
 }
 
@@ -176,11 +176,11 @@ export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.Solic
   })
 }
 
-function hasTipoAccess(tipoIds: string[], solicitation: SolicitationLike) {
+function hasTipoAccess(tipoIds: string[], solicitation: SolicitationAccessLike) {
   return Boolean(solicitation.tipoId && tipoIds.includes(solicitation.tipoId))
 }
 
-export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (ctx.role === 'ADMIN') return true
   if (
     hasTipoAccess(ctx.allowedTipoIds, solicitation) ||
@@ -198,7 +198,7 @@ export function canViewSolicitation(ctx: UserAccessContext, solicitation: Solici
   )
 }
 
-function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationLike) {
+function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (ctx.role === 'ADMIN') return true
   if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (!EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as any)) return false
@@ -215,7 +215,7 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
   )
 }
 
-function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
+function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (ctx.role === 'ADMIN') return true
   if (!solicitation.tipoId || !solicitation.status) return false
 
@@ -229,7 +229,7 @@ function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitati
 }
 
 
-export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (
     solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
@@ -265,11 +265,11 @@ export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicita
   return canViewSolicitation(ctx, solicitation)
 }
 
-export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   return canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation)
 }
 
-function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationLike) {
+function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (ctx.role === 'ADMIN') return true
   if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) return false
   if (solicitation.departmentId && ctx.userDepartmentIds.includes(solicitation.departmentId)) {
@@ -295,7 +295,7 @@ function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: Solicita
   return false
 }
 
-export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (ctx.role === 'ADMIN') return false
   return Boolean(
     solicitation.tipoId &&
@@ -308,15 +308,15 @@ export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: Solic
   )
 }
 
-export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   return (
     !isViewerOnlyByPolicy(ctx, solicitation) &&
     canViewSolicitation(ctx, solicitation) &&
-    (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
+(canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
   )
 }
 
-export function canApproveSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canApproveSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isViewerOnlyByPolicy(ctx, solicitation)) return false
   if (ctx.role === 'ADMIN') return true
   return Boolean(
@@ -353,7 +353,7 @@ export function isRequesterEditableStatus(status?: string | null) {
 
 export function canRequesterEditRq092AfterSubmit(
   userId: string | null | undefined,
-  solicitation: Pick<SolicitationLike, 'tipoId' | 'tipo' | 'solicitanteId' | 'status'>,
+  solicitation: Pick<SolicitationAccessLike, 'tipoId' | 'tipo' | 'solicitanteId' | 'status'>,
 ) {
   if (!userId) return false
   if (!solicitation?.solicitanteId || solicitation.solicitanteId !== userId) return false
@@ -365,20 +365,20 @@ export function canRequesterEditRq092AfterSubmit(
   return isRequesterEditableStatus(solicitation.status)
 }
 
-export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   return !isViewerOnlyByPolicy(ctx, solicitation) && canActOnSolicitation(ctx, solicitation)
 }
 
-export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   return canEditSolicitation(ctx, solicitation)
 }
 
-export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isViewerOnlyByPolicy(ctx, solicitation)) return false
   return ctx.hasSolicitationsModuleAccess && canViewSolicitation(ctx, solicitation)
 }
 
-export function canManageCancellationRequest(ctx: UserAccessContext, solicitation: SolicitationLike) {
+export function canManageCancellationRequest(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isViewerOnlyByPolicy(ctx, solicitation)) return false
   if (ctx.role === 'ADMIN') return canViewSolicitation(ctx, solicitation)
   return (
@@ -391,7 +391,22 @@ export function canManageCancellationRequest(ctx: UserAccessContext, solicitatio
   )
 }
 
-export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationLike) {
+
+export function canFinalizeNadaConstaGlobal(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
+  if (!isSolicitacaoNadaConsta({
+    id: solicitation.tipo?.id ?? solicitation.tipoId ?? null,
+    codigo: solicitation.tipo?.codigo ?? null,
+    nome: solicitation.tipo?.nome ?? null,
+  })) return false
+
+  if (!isNadaConstaAllSectorsCompleted(solicitation.solicitacaoSetores)) return false
+  if (ctx.role === 'ADMIN' || ctx.role === 'DP') return true
+  if (solicitation.tipoId && ctx.finalizerTipoIds.includes(solicitation.tipoId)) return true
+  if (ctx.userSetorKeys.includes('DP')) return true
+  return ctx.userDepartmentNamesNormalized.some((name) => name.includes('departamento pessoal') || name.includes('pessoal'))
+}
+
+export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   const isExperienceFinalizationStage =
     solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
     solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
@@ -408,6 +423,10 @@ export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: So
   return (
     !isViewerOnlyByPolicy(ctx, solicitation) &&
     canViewSolicitation(ctx, solicitation) &&
-    (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
+    (
+      canUserActOnCurrentStage(ctx, solicitation) ||
+      canUserActAsFinalizerForCurrentStage(ctx, solicitation) ||
+      canFinalizeNadaConstaGlobal(ctx, solicitation)
+    )
   )
 }

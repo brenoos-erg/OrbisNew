@@ -272,6 +272,51 @@ export const NADA_CONSTA_SETORES_KEYS = NADA_CONSTA_SETORES.map(
   (setor) => setor.key,
 )
 
+
+export type NadaConstaSetorCompletionLike = {
+  setor?: string | null
+  status?: string | null
+  constaFlag?: unknown
+}
+
+export function isNadaConstaConstaFlagFilled(value: unknown) {
+  if (value === true) return true
+  if (typeof value !== 'string') return false
+  const normalized = normalizeText(value)
+  return ['TRUE', 'CONSTA', 'NADA_CONSTA', 'NADA CONSTA', 'CIENTE'].includes(normalized)
+}
+
+export function getNadaConstaPendingSectors(
+  solicitacaoSetores?: NadaConstaSetorCompletionLike[] | null,
+) {
+  if (!solicitacaoSetores || solicitacaoSetores.length === 0) return []
+
+  return solicitacaoSetores
+    .filter(
+      (setor) =>
+        setor.status !== 'CONCLUIDO' ||
+        !isNadaConstaConstaFlagFilled(setor.constaFlag),
+    )
+    .map((setor) => {
+      const key = String(setor.setor ?? '').trim().toUpperCase()
+      return NADA_CONSTA_SETORES.find((meta) => meta.key === key)?.label ?? key
+    })
+    .filter(Boolean)
+}
+
+export function isNadaConstaAllSectorsCompleted(
+  solicitacaoSetores?: NadaConstaSetorCompletionLike[] | null,
+) {
+  return Boolean(solicitacaoSetores?.length) && getNadaConstaPendingSectors(solicitacaoSetores).length === 0
+}
+
+export function isDpDepartmentLike(dept?: { code?: string | null; name?: string | null } | null) {
+  if (!dept) return false
+  if (dept.code?.trim() === '08') return true
+  const normalizedName = normalizeText(dept.name ?? '')
+  return normalizedName.includes('DEPARTAMENTO PESSOAL') || normalizedName.includes('PESSOAL')
+}
+
 export function resolveNadaConstaSetoresByDepartment(
   dept?: {
     code?: string | null
@@ -346,7 +391,9 @@ export function isSolicitacaoDesligamento(tipo?: TipoSolicitacaoLike | null) {
 export function isSolicitacaoNadaConsta(tipo?: TipoSolicitacaoLike | null) {
   if (!tipo) return false
   const id = tipo.id?.trim().toUpperCase()
-  if (id === 'RQ_300') return true
+  const codigo = tipo.codigo?.trim().toUpperCase()
+  if (id === 'RQ_300' || id === 'RQ_016' || id === 'RQ.016') return true
+  if (codigo === 'RQ.016' || codigo === 'RQ.DP.016') return true
   const nome = tipo.nome?.trim().toUpperCase() ?? ''
   return nome.includes('NADA CONSTA')
 }

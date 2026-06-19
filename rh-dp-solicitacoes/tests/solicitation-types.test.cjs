@@ -1,5 +1,11 @@
 const assert = require('node:assert/strict')
-const { isSolicitacaoEquipamento, isSolicitacaoManutencaoTi } = require('../src/lib/solicitationTypes.ts')
+const {
+  getNadaConstaPendingSectors,
+  isNadaConstaAllSectorsCompleted,
+  isSolicitacaoEquipamento,
+  isSolicitacaoManutencaoTi,
+  isSolicitacaoNadaConsta,
+} = require('../src/lib/solicitationTypes.ts')
 
 assert.equal(
   isSolicitacaoEquipamento({ id: 'RQ_089', nome: 'Qualquer nome' }),
@@ -47,6 +53,37 @@ assert.equal(
   isSolicitacaoManutencaoTi({ nome: 'Manutenção de equipamento ou sistema de TI' }),
   true,
   'Nome específico de manutenção de TI deve retornar true',
+)
+
+assert.equal(
+  isSolicitacaoNadaConsta({ codigo: 'RQ.016', nome: 'Nada Consta' }),
+  true,
+  'RQ.016 deve ser tratado como Nada Consta',
+)
+
+const setoresNadaConstaConcluidos = [
+  { setor: 'DP', status: 'CONCLUIDO', constaFlag: true },
+  { setor: 'TI', status: 'CONCLUIDO', constaFlag: 'NADA_CONSTA' },
+  { setor: 'ALMOX', status: 'CONCLUIDO', constaFlag: 'CONSTA' },
+  { setor: 'LOGISTICA', status: 'CONCLUIDO', constaFlag: 'CIENTE' },
+  { setor: 'SST', status: 'CONCLUIDO', constaFlag: 'true' },
+  { setor: 'SAUDE', status: 'CONCLUIDO', constaFlag: 'CIENTE' },
+  { setor: 'FINANCEIRO', status: 'CONCLUIDO', constaFlag: 'CONSTA' },
+  { setor: 'FISCAL', status: 'CONCLUIDO', constaFlag: 'NADA CONSTA' },
+]
+assert.equal(
+  isNadaConstaAllSectorsCompleted(setoresNadaConstaConcluidos),
+  true,
+  'Todos os setores concluídos e com constaFlag válido devem liberar finalização global',
+)
+
+assert.deepEqual(
+  getNadaConstaPendingSectors([
+    ...setoresNadaConstaConcluidos.filter((setor) => setor.setor !== 'TI'),
+    { setor: 'TI', status: 'PENDENTE', constaFlag: 'NADA_CONSTA' },
+  ]),
+  ['Tecnologia da Informação'],
+  'Setor sem status CONCLUIDO deve aparecer como pendente',
 )
 
 console.info('solicitation-types.test.cjs: ok')
