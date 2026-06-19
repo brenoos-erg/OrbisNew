@@ -1908,7 +1908,8 @@ async function handleEncaminharAprovacaoComAnexo() {
     setCloseSuccess(null)
 
     try {
-      if (isNadaConsta && !novoComentario.trim()) {
+      const hasExistingComment = (detail?.comentarios?.length ?? 0) > 0
+      if (isNadaConsta && !novoComentario.trim() && !hasExistingComment) {
         throw new Error('Para finalizar Nada Consta, registre uma observação.')
       }
       if (isSolicitacaoEquipamentoTi && existeTermoParaAnexar === 'SIM') {
