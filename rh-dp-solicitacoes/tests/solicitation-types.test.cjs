@@ -77,6 +77,44 @@ assert.equal(
   'Todos os setores concluídos e com constaFlag válido devem liberar finalização global',
 )
 
+
+const setoresNadaConstaComTiAusente = setoresNadaConstaConcluidos.filter(
+  (setor) => setor.setor !== 'TI',
+)
+
+assert.equal(
+  isNadaConstaAllSectorsCompleted(setoresNadaConstaComTiAusente),
+  false,
+  'Setor oficial ausente deve impedir finalização global',
+)
+
+assert.deepEqual(
+  getNadaConstaPendingSectors(setoresNadaConstaComTiAusente),
+  ['Tecnologia da Informação'],
+  'Setor oficial ausente deve aparecer como pendente',
+)
+
+assert.equal(
+  isNadaConstaAllSectorsCompleted([]),
+  false,
+  'Lista vazia de setores deve impedir finalização global',
+)
+
+assert.deepEqual(
+  getNadaConstaPendingSectors([]),
+  [
+    'Departamento Pessoal',
+    'Tecnologia da Informação',
+    'Almoxarifado',
+    'Logística',
+    'SST',
+    'Saúde',
+    'Financeiro',
+    'Fiscal',
+  ],
+  'Lista vazia deve marcar todos os setores oficiais como pendentes',
+)
+
 assert.deepEqual(
   getNadaConstaPendingSectors([
     ...setoresNadaConstaConcluidos.filter((setor) => setor.setor !== 'TI'),

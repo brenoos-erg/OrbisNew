@@ -289,25 +289,29 @@ export function isNadaConstaConstaFlagFilled(value: unknown) {
 export function getNadaConstaPendingSectors(
   solicitacaoSetores?: NadaConstaSetorCompletionLike[] | null,
 ) {
-  if (!solicitacaoSetores || solicitacaoSetores.length === 0) return []
+  const registrosPorSetor = new Map(
+    (solicitacaoSetores ?? []).map((setor) => [
+      String(setor.setor ?? '').trim().toUpperCase(),
+      setor,
+    ]),
+  )
 
-  return solicitacaoSetores
-    .filter(
-      (setor) =>
-        setor.status !== 'CONCLUIDO' ||
-        !isNadaConstaConstaFlagFilled(setor.constaFlag),
-    )
-    .map((setor) => {
-      const key = String(setor.setor ?? '').trim().toUpperCase()
-      return NADA_CONSTA_SETORES.find((meta) => meta.key === key)?.label ?? key
+  return NADA_CONSTA_SETORES
+    .filter((meta) => {
+      const registro = registrosPorSetor.get(meta.key)
+      if (!registro) return true
+      return (
+        registro.status !== 'CONCLUIDO' ||
+        !isNadaConstaConstaFlagFilled(registro.constaFlag)
+      )
     })
-    .filter(Boolean)
+    .map((meta) => meta.label)
 }
 
 export function isNadaConstaAllSectorsCompleted(
   solicitacaoSetores?: NadaConstaSetorCompletionLike[] | null,
 ) {
-  return Boolean(solicitacaoSetores?.length) && getNadaConstaPendingSectors(solicitacaoSetores).length === 0
+  return getNadaConstaPendingSectors(solicitacaoSetores).length === 0
 }
 
 export function isDpDepartmentLike(dept?: { code?: string | null; name?: string | null } | null) {
