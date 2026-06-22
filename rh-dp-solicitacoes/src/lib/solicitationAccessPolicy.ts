@@ -1,432 +1,293 @@
-import { ModuleLevel, Prisma, Role } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
-import {
-  buildReceivedSolicitationVisibilityWhere,
-  canUserViewSolicitationByDepartment,
-  resolveUserSetorKeysFromDepartments,
-} from '@/lib/solicitationVisibility'
-import {
-  EXPERIENCE_EVALUATOR_GROUP_NAME,
-  isExperienceEvaluationEvaluator,
-  EXPERIENCE_EVALUATION_STATUS,
-  EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
-  EXPERIENCE_EVALUATION_VISIBLE_STATUSES,
-} from '@/lib/experienceEvaluation'
-import { MODULE_KEYS } from '@/lib/featureKeys'
-import { isRhDepartment } from '@/lib/rhAccess'
-import { isNadaConstaAllSectorsCompleted, isSolicitacaoExamesSst, isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
+import { ModuleLevel, Prisma } from '@prisma/client'
+import { prisma } from './prisma'
+import { resolveNadaConstaSetoresByDepartment } from './solicitationTypes'
+import type { SolicitationVisibilityUserContext } from './solicitationVisibility'
 
-export type UserAccessContext = {
-  userId: string
-  userLogin?: string | null
-  userEmail?: string | null
-  userFullName?: string | null
-  role: Role
-  userDepartmentIds: string[]
-  userCostCenterIds: string[]
-  userDepartmentNamesNormalized: string[]
-  userSectorNamesNormalized: string[]
-  userSetorKeys: string[]
-  finalizerTipoIds: string[]
-  allowedTipoIds: string[]
-  viewerTipoIds: string[]
-  actionableTipoIds: string[]
-  isExperienceEvaluationCoordinator: boolean
-  isRhAuthorizedForExperienceEvaluation: boolean
-  isRhAuthorizedForSharedHiringFlow: boolean
-  hasSolicitationsModuleAccess: boolean
+type VisibilityUser = {
+  id: string
+  role?: string | null
 }
 
-type DepartmentLike = { id?: string | null; code?: string | null; sigla?: string | null; name?: string | null }
-
-export type SolicitationAccessLike = {
-  tipoId?: string | null
-  tipo?: { id?: string | null; codigo?: string | null; nome?: string | null } | null
-  status?: string | null
-  solicitanteId: string
-  approverId?: string | null
-  assumidaPorId?: string | null
-  departmentId?: string | null
-  solicitacaoSetores?: { setor?: string | null; status?: string | null; constaFlag?: unknown }[]
-  payload?: unknown
+type DepartmentLike = {
+  id?: string | null
+  code?: string | null
+  name?: string | null
 }
 
-export async function resolveUserAccessContext(input: {
-  userId: string
-  userLogin?: string | null
-  userEmail?: string | null
-  userFullName?: string | null
-  role: Role
-  primaryDepartmentId?: string | null
-  primaryDepartment?: DepartmentLike | null
-}): Promise<UserAccessContext> {
-  const departmentLinks = await prisma.userDepartment.findMany({
-    where: { userId: input.userId },
+type CostCenterLike = {
+  id?: string | null
+  code?: string | null
+  externalCode?: string | null
+  abbreviation?: string | null
+  description?: string | null
+  department?: DepartmentLike | null
+}
+
+const LEVEL_ORDER: ModuleLevel[] = [
+  ModuleLevel.NIVEL_1,
+  ModuleLevel.NIVEL_2,
+  ModuleLevel.NIVEL_3,
+]
+
+function hasMinLevel(
+  level: ModuleLevel | string | null | undefined,
+  minLevel: ModuleLevel,
+) {
+  if (!level) return false
+  return LEVEL_ORDER.indexOf(level as ModuleLevel) >= LEVEL_ORDER.indexOf(minLevel)
+}
+
+function normalize(value?: string | null) {
+  return (
+    value
+      ?.toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase() ?? ''
+  )
+}
+
+function isRhDpDepartment(department?: DepartmentLike | null) {
+  const code = department?.code?.trim()
+  const name = normalize(department?.name)
+  return (
+    code === '08' ||
+    code === '17' ||
+    name.includes('DEPARTAMENTO PESSOAL') ||
+    name.includes('RECURSOS HUMANOS') ||
+    name === 'RH' ||
+    name === 'DP'
+  )
+}
+
+function isRhDpCostCenter(costCenter?: CostCenterLike | null) {
+  if (!costCenter) return false
+  const text = normalize(
+    [
+      costCenter.code,
+      costCenter.externalCode,
+      costCenter.abbreviation,
+      costCenter.description,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
+  return (
+    isRhDpDepartment(costCenter.department) ||
+    text.includes('RECURSOS HUMANOS') ||
+    text.includes('DEPARTAMENTO PESSOAL') ||
+    /\bRH\b/.test(text) ||
+    /\bDP\b/.test(text)
+  )
+}
+
+function addValue(target: Set<string>, value?: string | null) {
+  if (value) target.add(value)
+}
+
+function mergeAnd(
+  baseWhere: Prisma.SolicitationWhereInput,
+  clause: Prisma.SolicitationWhereInput,
+): Prisma.SolicitationWhereInput {
+  const { AND, ...rest } = baseWhere
+  const clauses = Array.isArray(AND) ? AND : AND ? [AND] : []
+  return {
+    ...rest,
+    AND: [...clauses, clause],
+  }
+}
+
+function notPendingRq063Where(): Prisma.SolicitationWhereInput {
+  return {
+    NOT: {
+      AND: [
+        { requiresApproval: true },
+        { approvalStatus: 'PENDENTE' },
+        { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+      ],
+    },
+  }
+}
+
+export async function buildSolicitationVisibilityContext(
+  user: VisibilityUser,
+): Promise<SolicitationVisibilityUserContext> {
+  const record = await prisma.user.findUnique({
+    where: { id: user.id },
     select: {
+      id: true,
+      role: true,
+      costCenterId: true,
       departmentId: true,
-      department: { select: { id: true, code: true, sigla: true, name: true } },
+      costCenter: {
+        select: {
+          id: true,
+          code: true,
+          externalCode: true,
+          abbreviation: true,
+          description: true,
+          department: { select: { id: true, code: true, name: true } },
+        },
+      },
+      department: { select: { id: true, code: true, name: true } },
+      costCenters: {
+        select: {
+          costCenterId: true,
+          costCenter: {
+            select: {
+              id: true,
+              code: true,
+              externalCode: true,
+              abbreviation: true,
+              description: true,
+              department: { select: { id: true, code: true, name: true } },
+            },
+          },
+        },
+      },
+      userDepartments: {
+        select: {
+          departmentId: true,
+          department: { select: { id: true, code: true, name: true } },
+        },
+      },
+      moduleAccesses: {
+        select: {
+          level: true,
+          module: { select: { key: true } },
+        },
+      },
     },
   })
 
-  const userDepartmentIds = new Set<string>()
-  if (input.primaryDepartmentId) userDepartmentIds.add(input.primaryDepartmentId)
-  for (const link of departmentLinks) userDepartmentIds.add(link.departmentId)
+  const departmentIds = new Set<string>()
+  const costCenterIds = new Set<string>()
+  const sharedRhDpDepartmentIds = new Set<string>()
+  const sharedRhDpCostCenterIds = new Set<string>()
+  const nadaConstaSetores = new Set<string>()
 
-  const departmentRecords = new Map<string, DepartmentLike>()
-  if (input.primaryDepartment?.id) {
-    departmentRecords.set(input.primaryDepartment.id, input.primaryDepartment)
+  const departments: DepartmentLike[] = []
+  if (record?.department) departments.push(record.department)
+  for (const link of record?.userDepartments ?? []) {
+    departments.push(link.department)
   }
-  for (const link of departmentLinks) {
-    if (link.department?.id) {
-      departmentRecords.set(link.department.id, link.department)
+
+  for (const department of departments) {
+    addValue(departmentIds, department.id)
+    for (const setor of resolveNadaConstaSetoresByDepartment(department)) {
+      nadaConstaSetores.add(setor)
+    }
+    if (isRhDpDepartment(department)) {
+      addValue(sharedRhDpDepartmentIds, department.id)
     }
   }
 
-  const userDepartments = Array.from(departmentRecords.values())
-  const userSetorKeys = resolveUserSetorKeysFromDepartments(userDepartments)
-  const [finalizerRows, viewerTipoRows, approverTipoRows, evaluatorGroupMember, solicitationModuleAccess] = await Promise.all([
-    prisma.tipoSolicitacaoApprover.findMany({
-      where: { userId: input.userId, role: 'FINALIZER' },
-      select: { tipoId: true },
-    }),
-    prisma.tipoSolicitacaoApprover.findMany({
-      where: { userId: input.userId, role: 'VIEWER' },
-      select: { tipoId: true },
-    }),
-    prisma.tipoSolicitacaoApprover.findMany({
-      where: { userId: input.userId, role: 'APPROVER' },
-      select: { tipoId: true },
-    }),
-    prisma.approverGroupMember.findFirst({
-      where: {
-        userId: input.userId,
-        group: { name: EXPERIENCE_EVALUATOR_GROUP_NAME },
-      },
-      select: { userId: true },
-    }),
-    prisma.userModuleAccess.findFirst({
-      where: {
-        userId: input.userId,
-        level: { in: [ModuleLevel.NIVEL_1, ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
-        module: { key: MODULE_KEYS.SOLICITACOES },
-      },
-      select: { id: true },
-    }),
-  ])
-
-  const hasSolicitationsModuleAccess = input.role === 'ADMIN' || Boolean(solicitationModuleAccess)
-  const userCostCenterIds = new Set<string>()
-  const userCostCenterLinks = await prisma.userCostCenter.findMany({ where: { userId: input.userId }, select: { costCenterId: true } })
-  if (input.primaryDepartmentId) {
-    const primaryUser = await prisma.user.findUnique({ where: { id: input.userId }, select: { costCenterId: true } })
-    if (primaryUser?.costCenterId) userCostCenterIds.add(primaryUser.costCenterId)
+  const costCenters: CostCenterLike[] = []
+  if (record?.costCenter) costCenters.push(record.costCenter)
+  for (const link of record?.costCenters ?? []) {
+    if (link.costCenter) costCenters.push(link.costCenter)
   }
-  for (const link of userCostCenterLinks) userCostCenterIds.add(link.costCenterId)
-  const normalizeName = (value: unknown) => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
-  const userDepartmentNamesNormalized = userDepartments.map((department) => normalizeName(department.name)).filter(Boolean)
-  const userSectorNamesNormalized = Array.from(new Set([...userSetorKeys.map((key) => normalizeName(key)), ...userDepartmentNamesNormalized]))
-  const isRhAuthorizedForSharedHiringFlow =
-    hasSolicitationsModuleAccess &&
-    (input.role === 'RH' || userDepartments.some((department) => isRhDepartment(department)))
-  const isRhAuthorizedForExperienceEvaluation = isRhAuthorizedForSharedHiringFlow
+
+  for (const costCenter of costCenters) {
+    addValue(costCenterIds, costCenter.id)
+    if (isRhDpCostCenter(costCenter)) {
+      addValue(sharedRhDpCostCenterIds, costCenter.id)
+      addValue(sharedRhDpDepartmentIds, costCenter.department?.id)
+    }
+  }
+
+  let solicitationModuleLevel: ModuleLevel | null = null
+  let configuracoesModuleLevel: ModuleLevel | null = null
+
+  for (const access of record?.moduleAccesses ?? []) {
+    const key = access.module.key
+    if (key === 'solicitacoes') {
+      solicitationModuleLevel = access.level
+    }
+    if (key === 'configuracoes') {
+      configuracoesModuleLevel = access.level
+    }
+  }
+
+  const isAdminTechnical =
+    record?.role === 'ADMIN' ||
+    user.role === 'ADMIN' ||
+    hasMinLevel(solicitationModuleLevel, ModuleLevel.NIVEL_3) ||
+    hasMinLevel(configuracoesModuleLevel, ModuleLevel.NIVEL_3)
 
   return {
-    userId: input.userId,
-    userLogin: input.userLogin,
-    userEmail: input.userEmail,
-    userFullName: input.userFullName,
-    role: input.role,
-    userDepartmentIds: [...userDepartmentIds],
-    userCostCenterIds: [...userCostCenterIds],
-    userDepartmentNamesNormalized,
-    userSectorNamesNormalized,
-    userSetorKeys,
-    finalizerTipoIds: finalizerRows.map((row) => row.tipoId),
-    allowedTipoIds: Array.from(
-      new Set([...finalizerRows, ...viewerTipoRows, ...approverTipoRows].map((row) => row.tipoId)),
-    ),
-    viewerTipoIds: Array.from(new Set(viewerTipoRows.map((row) => row.tipoId))),
-    actionableTipoIds: Array.from(new Set(approverTipoRows.map((row) => row.tipoId))),
-    isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
-    isRhAuthorizedForExperienceEvaluation,
-    isRhAuthorizedForSharedHiringFlow,
-    hasSolicitationsModuleAccess,
+    userId: user.id,
+    role: record?.role ?? user.role ?? null,
+    departmentIds: [...departmentIds],
+    costCenterIds: [...costCenterIds],
+    nadaConstaSetores: [...nadaConstaSetores],
+    sharedRhDpDepartmentIds: [...sharedRhDpDepartmentIds],
+    sharedRhDpCostCenterIds: [...sharedRhDpCostCenterIds],
+    solicitationModuleLevel,
+    configuracoesModuleLevel,
+    isAdminTechnical,
   }
 }
 
-export function buildReceivedWhereByPolicy(ctx: UserAccessContext): Prisma.SolicitationWhereInput {
-  return buildReceivedSolicitationVisibilityWhere({
-    userId: ctx.userId,
-    userLogin: ctx.userLogin,
-    userEmail: ctx.userEmail,
-    userFullName: ctx.userFullName,
-    role: ctx.role,
-    userDepartmentIds: ctx.userDepartmentIds,
-    userCostCenterIds: ctx.userCostCenterIds,
-    userDepartmentNamesNormalized: ctx.userDepartmentNamesNormalized,
-    userSectorNamesNormalized: ctx.userSectorNamesNormalized,
-    userSetorKeys: ctx.userSetorKeys,
-    finalizerTipoIds: ctx.finalizerTipoIds,
-    allowedTipoIds: ctx.allowedTipoIds,
-    viewerTipoIds: ctx.viewerTipoIds,
-    isExperienceEvaluationCoordinator: ctx.isExperienceEvaluationCoordinator,
-    isRhAuthorizedForExperienceEvaluation: ctx.isRhAuthorizedForExperienceEvaluation,
-    isRhAuthorizedForSharedHiringFlow: ctx.isRhAuthorizedForSharedHiringFlow,
-  })
-}
+export function buildReceivedWhereByPolicy(
+  ctx: SolicitationVisibilityUserContext,
+  baseWhere: Prisma.SolicitationWhereInput = {},
+  options: { excludePendingRq063?: boolean } = {},
+): Prisma.SolicitationWhereInput {
+  const receivedFilters: Prisma.SolicitationWhereInput[] = []
 
-function hasTipoAccess(tipoIds: string[], solicitation: SolicitationAccessLike) {
-  return Boolean(solicitation.tipoId && tipoIds.includes(solicitation.tipoId))
-}
+  receivedFilters.push({ assumidaPorId: ctx.userId })
+  receivedFilters.push({ approverId: ctx.userId })
 
-export function canViewSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (ctx.role === 'ADMIN') return true
-  if (
-    hasTipoAccess(ctx.allowedTipoIds, solicitation) ||
-    hasTipoAccess(ctx.actionableTipoIds, solicitation) ||
-    hasTipoAccess(ctx.viewerTipoIds, solicitation) ||
-    hasTipoAccess(ctx.finalizerTipoIds, solicitation)
-  ) {
-    return true
+  if (ctx.departmentIds?.length) {
+    receivedFilters.push({ departmentId: { in: ctx.departmentIds as string[] } })
   }
 
-  return (
-    canUserViewSolicitationByDepartment(ctx, solicitation) ||
-    canUserActAsExperienceEvaluator(ctx, solicitation) ||
-    canUserActAsFinalizerForCurrentStage(ctx, solicitation)
-  )
-}
-
-function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (ctx.role === 'ADMIN') return true
-  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
-  if (!EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as any)) return false
-  if (ctx.isExperienceEvaluationCoordinator) return true
-
-  return isExperienceEvaluationEvaluator(
-    { payload: solicitation.payload, approverId: solicitation.approverId },
-    {
-      id: ctx.userId,
-      login: ctx.userLogin,
-      email: ctx.userEmail,
-      fullName: ctx.userFullName,
-    },
-  )
-}
-
-function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (ctx.role === 'ADMIN') return true
-  if (!solicitation.tipoId || !solicitation.status) return false
-
-  return (
-    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
-    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    (ctx.finalizerTipoIds.includes(solicitation.tipoId) ||
-      ctx.isExperienceEvaluationCoordinator ||
-      ctx.isRhAuthorizedForExperienceEvaluation)
-  )
-}
-
-
-export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
-  if (
-    solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-    solicitation.status !== 'CONCLUIDA' &&
-    solicitation.status !== 'FINALIZADA'
-  ) {
-    return false
+  if (ctx.costCenterIds?.length) {
+    receivedFilters.push({ costCenterId: { in: ctx.costCenterIds as string[] } })
   }
 
-  if (ctx.role === 'ADMIN') return true
-  if (
-    ctx.finalizerTipoIds.includes(EXPERIENCE_EVALUATION_TIPO_ID) ||
-    ctx.isExperienceEvaluationCoordinator ||
-    ctx.isRhAuthorizedForExperienceEvaluation
-  ) {
-    return true
-  }
-
-  if (
-    isExperienceEvaluationEvaluator(
-      { payload: solicitation.payload, approverId: solicitation.approverId },
-      {
-        id: ctx.userId,
-        login: ctx.userLogin,
-        email: ctx.userEmail,
-        fullName: ctx.userFullName,
+  if (ctx.nadaConstaSetores?.length) {
+    receivedFilters.push({
+      solicitacaoSetores: {
+        some: { setor: { in: ctx.nadaConstaSetores as string[] } },
       },
-    )
-  ) {
-    return true
+    })
   }
 
-  return canViewSolicitation(ctx, solicitation)
-}
-
-export function canActOnSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  return canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation)
-}
-
-function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (ctx.role === 'ADMIN') return true
-  if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) return false
-  if (solicitation.departmentId && ctx.userDepartmentIds.includes(solicitation.departmentId)) {
-    return true
+  if (ctx.tipoApproverTipoIds?.length) {
+    receivedFilters.push({ tipoId: { in: ctx.tipoApproverTipoIds as string[] } })
   }
 
-  const solicitationSetores = new Set(
-    (solicitation.solicitacaoSetores ?? [])
-      .map((setor) => setor.setor)
-      .filter((setor): setor is string => Boolean(setor)),
-  )
-
-  if (solicitationSetores.size > 0) {
-    for (const userSetor of ctx.userSetorKeys) {
-      if (solicitationSetores.has(userSetor)) return true
-    }
+  if (ctx.tipoViewerTipoIds?.length) {
+    receivedFilters.push({ tipoId: { in: ctx.tipoViewerTipoIds as string[] } })
   }
 
-  if (solicitation.tipoId && ctx.actionableTipoIds.includes(solicitation.tipoId)) {
-    return true
+  if (ctx.tipoFinalizerTipoIds?.length) {
+    receivedFilters.push({ tipoId: { in: ctx.tipoFinalizerTipoIds as string[] } })
   }
 
-  return false
-}
-
-export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (ctx.role === 'ADMIN') return false
-  return Boolean(
-    solicitation.tipoId &&
-      ctx.viewerTipoIds.includes(solicitation.tipoId) &&
-      !ctx.actionableTipoIds.includes(solicitation.tipoId) &&
-      !ctx.finalizerTipoIds.includes(solicitation.tipoId) &&
-      !canUserActAsExperienceEvaluator(ctx, solicitation) &&
-      !canUserActAsFinalizerForCurrentStage(ctx, solicitation) &&
-      !canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null }),
-  )
-}
-
-export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  return (
-    !isViewerOnlyByPolicy(ctx, solicitation) &&
-    canViewSolicitation(ctx, solicitation) &&
-(canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation))
-  )
-}
-
-export function canApproveSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
-  if (ctx.role === 'ADMIN') return true
-  return Boolean(
-    canViewSolicitation(ctx, solicitation) &&
-      solicitation.tipoId &&
-      (ctx.actionableTipoIds.includes(solicitation.tipoId) || solicitation.approverId === ctx.userId),
-  )
-}
-
-
-const REQUESTER_EDIT_BLOCKED_STATUSES = new Set([
-  'CONCLUIDA',
-  'CONCLUÍDA',
-  'FINALIZADA',
-  'FINALIZADO',
-  'CANCELADA',
-  'CANCELADO',
-  'ENCERRADA',
-  'ENCERRADO',
-])
-
-function normalizeStatusForRequesterEdit(status?: string | null) {
-  return (status ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toUpperCase()
-}
-
-export function isRequesterEditableStatus(status?: string | null) {
-  const normalized = normalizeStatusForRequesterEdit(status)
-  return Boolean(normalized) && !REQUESTER_EDIT_BLOCKED_STATUSES.has(normalized)
-}
-
-export function canRequesterEditRq092AfterSubmit(
-  userId: string | null | undefined,
-  solicitation: Pick<SolicitationAccessLike, 'tipoId' | 'tipo' | 'solicitanteId' | 'status'>,
-) {
-  if (!userId) return false
-  if (!solicitation?.solicitanteId || solicitation.solicitanteId !== userId) return false
-  if (!isSolicitacaoExamesSst({
-    id: solicitation.tipo?.id ?? solicitation.tipoId ?? null,
-    codigo: solicitation.tipo?.codigo ?? null,
-    nome: solicitation.tipo?.nome ?? null,
-  })) return false
-  return isRequesterEditableStatus(solicitation.status)
-}
-
-export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  return !isViewerOnlyByPolicy(ctx, solicitation) && canActOnSolicitation(ctx, solicitation)
-}
-
-export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  return canEditSolicitation(ctx, solicitation)
-}
-
-export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
-  return ctx.hasSolicitationsModuleAccess && canViewSolicitation(ctx, solicitation)
-}
-
-export function canManageCancellationRequest(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
-  if (ctx.role === 'ADMIN') return canViewSolicitation(ctx, solicitation)
-  return (
-    canViewSolicitation(ctx, solicitation) &&
-    (
-      solicitation.assumidaPorId === ctx.userId ||
-      canUserActOnCurrentStage(ctx, solicitation) ||
-      canUserActAsFinalizerForCurrentStage(ctx, solicitation)
-    )
-  )
-}
-
-
-export function canFinalizeNadaConstaGlobal(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (!isSolicitacaoNadaConsta({
-    id: solicitation.tipo?.id ?? solicitation.tipoId ?? null,
-    codigo: solicitation.tipo?.codigo ?? null,
-    nome: solicitation.tipo?.nome ?? null,
-  })) return false
-
-  if (!isNadaConstaAllSectorsCompleted(solicitation.solicitacaoSetores)) return false
-  if (ctx.role === 'ADMIN' || ctx.role === 'DP') return true
-  if (solicitation.tipoId && ctx.finalizerTipoIds.includes(solicitation.tipoId)) return true
-  if (ctx.userSetorKeys.includes('DP')) return true
-  return ctx.userDepartmentNamesNormalized.some((name) => name.includes('departamento pessoal') || name.includes('pessoal'))
-}
-
-export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  const isExperienceFinalizationStage =
-    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
-    solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
-
-  if (isExperienceFinalizationStage && ctx.role !== 'ADMIN') {
-    return (
-      !isViewerOnlyByPolicy(ctx, solicitation) &&
-      canViewSolicitation(ctx, solicitation) &&
-      canUserActAsFinalizerForCurrentStage(ctx, solicitation) &&
-      solicitation.approverId !== ctx.userId
-    )
+  if (ctx.sharedRhDpDepartmentIds?.length) {
+    receivedFilters.push({
+      departmentId: { in: ctx.sharedRhDpDepartmentIds as string[] },
+    })
   }
 
-  return (
-    !isViewerOnlyByPolicy(ctx, solicitation) &&
-    canViewSolicitation(ctx, solicitation) &&
-    (
-      canUserActOnCurrentStage(ctx, solicitation) ||
-      canUserActAsFinalizerForCurrentStage(ctx, solicitation) ||
-      canFinalizeNadaConstaGlobal(ctx, solicitation)
-    )
-  )
+  if (ctx.sharedRhDpCostCenterIds?.length) {
+    receivedFilters.push({
+      costCenterId: { in: ctx.sharedRhDpCostCenterIds as string[] },
+    })
+  }
+
+  let where =
+    receivedFilters.length > 0
+      ? mergeAnd(baseWhere, { OR: receivedFilters })
+      : mergeAnd(baseWhere, { id: '__never__' })
+
+  if (options.excludePendingRq063) {
+    where = mergeAnd(where, notPendingRq063Where())
+  }
+
+  return where
 }
