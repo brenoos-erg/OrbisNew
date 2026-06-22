@@ -1,0 +1,464 @@
+ORIENTACAO_OFICIAL_FLUXOS_SGI_ORBIS
+Sistema: Orbis / rh-dp-solicitacoes
+Objetivo: manter os fluxos, visibilidade, e-mails e responsabilidades sempre previsiveis para vistoria/auditoria.
+
+Data de referencia: 2026-06-22
+
+================================================================================
+1. REGRA PRINCIPAL DO SISTEMA
+================================================================================
+
+Nenhum chamado pode ficar invisivel para o usuario, setor, aprovador, finalizador ou centro de custo responsavel.
+
+Regra obrigatoria:
+- Se o usuario abriu o chamado, ele deve ver em "Solicitacoes Enviadas".
+- Se o usuario e responsavel atual, assumiu o chamado, e aprovador, e finalizador do tipo, pertence ao departamento atual, pertence ao centro de custo do chamado, ou pertence ao setor vinculado ao chamado, ele deve ver em "Solicitacoes Recebidas" ou na tela correspondente.
+- Chamados antigos tambem devem aparecer. Quando nao houver workflowSnapshotJson, approvalSnapshotJson ou notificationSnapshotJson, o sistema deve usar fallback por:
+  1. tipo da solicitacao;
+  2. departamento atual;
+  3. centro de custo;
+  4. solicitante;
+  5. approverId;
+  6. assumidaPorId;
+  7. TipoSolicitacaoApprover;
+  8. UserDepartment;
+  9. UserCostCenter.
+
+Proibido:
+- Esconder chamado antigo porque foi criado antes de workflow novo.
+- Depender apenas de snapshot novo para visibilidade.
+- Depender apenas de e-mail para o usuario descobrir demanda.
+- Enviar chamado para setor sem que ele apareca em tela.
+
+Obrigatorio:
+- Toda mudanca de etapa deve atualizar status/departamento/responsavel e gerar timeline.
+- Toda notificacao deve ter destinatario auditavel e motivo.
+- Todo fluxo especial deve ter teste de regressao.
+
+================================================================================
+2. REGRA DE E-MAIL E NOTIFICACAO
+================================================================================
+
+O sistema deve enviar e-mail para quem tem papel real no chamado.
+
+Destinatarios operacionais permitidos:
+- Solicitante.
+- Responsavel atual / usuario que assumiu.
+- Departamento atual.
+- Centro de custo atual.
+- Aprovador da etapa.
+- Finalizador configurado do tipo.
+- Setor especifico do fluxo, quando houver.
+
+Destinatarios tecnicos/admin:
+- Admin ou e-mail tecnico so recebe alerta de falha, configuracao incompleta, etapa sem responsavel ou etapa sem destinatario.
+- Admin nao deve receber todo chamado operacional por padrao.
+
+Regra obrigatoria de entrega:
+Usuario abre chamado -> sistema identifica responsavel/setor -> chamado aparece em tela -> e-mail e enviado -> timeline registra.
+
+Se o e-mail falhar, a demanda ainda deve aparecer na tela do responsavel.
+
+================================================================================
+3. FLUXO GERAL DE SOLICITACOES
+================================================================================
+
+Fluxo generico:
+Usuario abre chamado
+-> Sistema grava protocolo, tipo, solicitante, departamento inicial e centro de custo
+-> Sistema resolve workflow/tipo/aprovadores/departamento
+-> Chamado aparece para o setor responsavel
+-> Setor assume ou trata
+-> Se houver aprovacao, vai para aprovador
+-> Aprovador aprova/reprova
+-> Setor destino trata
+-> Finalizador encerra
+-> Status vira CONCLUIDA
+-> Timeline registra tudo
+
+Estados esperados:
+- ABERTA: chamado criado e aguardando inicio/tratativa.
+- EM_ATENDIMENTO: chamado assumido/tratado.
+- AGUARDANDO_APROVACAO: chamado aguardando aprovador.
+- AGUARDANDO_TERMO: chamado aguardando documento/assinatura.
+- AGUARDANDO_AVALIACAO_GESTOR: usado em avaliacao de experiencia.
+- AGUARDANDO_FINALIZACAO_AVALIACAO: usado para retorno ao RH/DP.
+- CONCLUIDA: chamado encerrado.
+- CANCELADA: chamado cancelado.
+
+================================================================================
+4. FLUXO RQ_063 - SOLICITACAO DE PESSOAL
+================================================================================
+
+Fluxo oficial:
+Usuario/Setor abre chamado
+-> Setor origem registra necessidade
+-> Chamado vai para aprovadores
+-> Aprovador aprova
+-> Chamado vai para RH
+-> RH atualiza dados do contratado: nome, CPF/documento, cargo, salario, data prevista, beneficios e demais campos
+-> RH encaminha para DP
+-> DP valida dados admissionais/documentais
+-> DP finaliza chamado
+-> Status vira CONCLUIDA
+
+Regra:
+- RH e DP precisam enxergar o mesmo fluxo quando forem responsaveis por etapa.
+- Chamados antigos de pessoal devem aparecer para RH/DP se o departamento atual ou fluxo compartilhado indicar responsabilidade.
+
+================================================================================
+5. FLUXO RQ_247 - DESLIGAMENTO DE PESSOAL
+================================================================================
+
+Fluxo oficial:
+Usuario abre chamado
+-> Vai para aprovacao obrigatoria
+-> Aprovador aprova/reprova
+-> Se aprovado, vai para Departamento Pessoal
+-> DP preenche/trata dados do desligamento
+-> DP finaliza chamado
+-> Status vira CONCLUIDA
+
+Regra:
+- O DP deve conseguir concluir o chamado quando ele chegar na etapa DP.
+- O solicitante acompanha pela tela de enviados.
+- Setores envolvidos so atuam quando o fluxo exigir.
+
+================================================================================
+6. FLUXO RQ_088 - SOLICITACAO DE VEICULOS
+================================================================================
+
+Fluxo oficial:
+Usuario abre chamado
+-> Sistema verifica aprovador configurado para o tipo
+-> Chamado fica AGUARDANDO_APROVACAO
+-> Gestor/aprovador aprova
+-> Chamado vai para Logistica
+-> Logistica trata solicitacao
+-> Logistica finaliza
+-> Status vira CONCLUIDA
+
+Regra:
+- Aprovador deve estar configurado em Configuracoes -> Aprovadores.
+- Logistica deve receber e visualizar quando a etapa for Logistica.
+- Nao usar e-mail fixo como solucao principal; usar departamento/etapa/aprovador.
+
+================================================================================
+7. FLUXO AGENDAMENTO DE FERIAS
+================================================================================
+
+Fluxo oficial recomendado:
+Usuario abre solicitacao de ferias
+-> Sistema valida inicio do gozo e quantidade de dias
+-> Sistema calcula fim do gozo
+-> Sistema busca gestor imediato do colaborador
+-> Se gestor valido existir, envia para gestor
+-> Se nao existir, usa aprovador fallback configurado por tipo
+-> Gestor/aprovador aprova
+-> Chamado vai para DP
+-> DP valida informacoes
+-> DP aprova/finaliza
+-> Status vira CONCLUIDA ou ABERTA/liberada conforme regra operacional
+
+Regra:
+- Ferias deve priorizar hierarquia do colaborador.
+- Se nao houver gestor nem fallback, erro deve ser claro:
+  "Colaborador sem gestor imediato cadastrado e sem aprovador fallback configurado para Agendamento de Ferias."
+
+================================================================================
+8. FLUXO RQ.016 - NADA CONSTA
+================================================================================
+
+Fluxo oficial:
+DP abre Nada Consta
+-> Sistema cria setores obrigatorios:
+   Departamento Pessoal
+   Tecnologia da Informacao
+   Almoxarifado
+   Logistica
+   SST
+   Saude
+   Financeiro
+   Fiscal
+-> Cada setor visualiza sua propria secao
+-> Cada setor preenche campos e seleciona Consta/Nada Consta/Ciente
+-> Cada setor clica em Finalizar setor
+-> Quando todos os setores estiverem CONCLUIDO e com constaFlag preenchido, DP ve "Finalizar chamado"
+-> DP registra observacao ou usa observacao ja salva
+-> DP clica em Finalizar chamado
+-> Status vira CONCLUIDA
+
+Regra:
+- Setor finaliza apenas a propria parte.
+- DP finaliza o chamado geral.
+- O botao "Finalizar chamado" so aparece quando todos os setores obrigatorios terminaram.
+- Se houver comentario/observacao ja salvo, DP pode finalizar sem digitar nova observacao.
+- Se nao houver observacao nenhuma, deve bloquear e pedir observacao.
+- Chamado nao pode ficar "Em atendimento" quando todos os setores finalizaram e DP concluiu.
+
+================================================================================
+9. FLUXO RQ_092 - SOLICITACAO DE EXAMES
+================================================================================
+
+Fluxo oficial:
+Usuario abre solicitacao de exame
+-> Chamado vai para SST/Saude
+-> SST/Saude preenche resposta/solucao
+-> SST/Saude pode salvar parcial
+-> SST/Saude finaliza quando concluido
+-> Status vira CONCLUIDA
+
+Regra:
+- Solicitante pode acompanhar.
+- SST/Saude devem enxergar quando forem setor responsavel.
+- Se houver correcao permitida ao solicitante, deve ser rastreada em timeline.
+
+================================================================================
+10. FLUXO RQ_089 / SOLICITACAO DE EQUIPAMENTOS TI
+================================================================================
+
+Fluxo oficial:
+Usuario abre solicitacao
+-> Chamado vai para TI
+-> TI analisa estoque
+-> Se houver equipamento, TI aloca item
+-> Sistema gera termo quando necessario
+-> Usuario/termo segue assinatura se aplicavel
+-> TI anexa/gera termo quando obrigatorio
+-> TI finaliza chamado
+-> Status vira CONCLUIDA
+
+Regra:
+- Se "Existe termo para anexar = SIM", nao pode finalizar sem termo anexo/gerado.
+- TI deve receber e visualizar demandas de TI.
+- Se sem estoque, seguir regra de aprovacao/filas definida no sistema.
+
+================================================================================
+11. SGI / QUALIDADE - NAO CONFORMIDADES / RNC
+================================================================================
+
+Fluxo oficial:
+Usuario abre ou registra RNC
+-> RNC fica vinculada a centro que detectou e centro que originou
+-> Qualidade/SST valida/aprova quando aplicavel
+-> Plano de acao e criado
+-> Cada acao deve ter responsavelId quando houver usuario responsavel
+-> Responsavel trata sua acao
+-> Qualidade/SST verifica conclusao/eficacia
+-> RNC e encerrada
+
+Regra de acesso:
+- Nivel 2 ou Nivel 3 no modulo SGI/Qualidade/SST pode ter acesso amplo conforme politica.
+- Nivel 1 deve visualizar RNCs do proprio centro de custo, ou onde for solicitante, ou onde tiver acao sob responsabilidade.
+- Usuario vinculado ao centro de custo so deve ver RNCs relacionadas ao centro que detectou/originou.
+- Para tratar, o usuario deve estar como responsavel da acao no plano de acao.
+
+Regra para apoio em contratos:
+- Vincular usuario aos centros de custo dos contratos.
+- Garantir acesso ao modulo SGI/Qualidade.
+- Garantir permissao em Nao Conformidades/Plano de Acao.
+- Vincular usuario como responsavel nas acoes especificas.
+
+================================================================================
+12. DIREITO DE RECUSA
+================================================================================
+
+Fluxo oficial:
+Usuario registra direito de recusa
+-> Sistema registra dados do contrato, empregado, risco e local/equipamento
+-> Responsavel analisa
+-> Parecer e registrado
+-> Status muda conforme procedencia
+-> Historico fica registrado
+
+Regra:
+- Solicitante visualiza o que abriu.
+- Responsavel/analista visualiza o que deve analisar.
+- Historico deve ser mantido para auditoria.
+
+================================================================================
+13. CONTROLE DE DOCUMENTOS
+================================================================================
+
+Fluxo oficial:
+Usuario acessa documentos
+-> Sistema exibe documentos conforme permissao
+-> Documento pode ser visualizado/assinado quando aplicavel
+-> Status/historico devem ser preservados
+
+Regra:
+- Usuario nao deve ver documentos fora do seu escopo.
+- Documento obrigatorio deve aparecer para quem precisa assinar ou visualizar.
+
+================================================================================
+14. GESTAO DE FROTAS
+================================================================================
+
+Fluxo oficial:
+Usuario/area solicita ou registra demanda de frota
+-> Logistica/Frotas recebe
+-> Responsavel trata veiculo/motorista/check-in/deslocamento
+-> Finaliza quando atendimento concluido
+
+Regra:
+- Demandas de veiculo devem aparecer para Logistica/Frotas.
+- Aprovacao de veiculo deve seguir aprovador configurado.
+- Motorista/veiculo/check-in devem ficar rastreaveis.
+
+================================================================================
+15. CONTROLE DE EQUIPAMENTOS TI
+================================================================================
+
+Fluxo oficial:
+Usuario solicita equipamento/recurso
+-> TI recebe
+-> TI verifica estoque, inventario e necessidade de termo
+-> TI aloca ou registra indisponibilidade
+-> Se exigir termo, termo deve ser anexado/gerado
+-> TI finaliza
+
+Regra:
+- TI deve enxergar todas as demandas do departamento/centro de custo de TI.
+- Nao finalizar com pendencia de termo obrigatorio.
+
+================================================================================
+16. AGENDAMENTO DE SALAS
+================================================================================
+
+Fluxo oficial:
+Usuario solicita agendamento
+-> Sistema valida sala, data e horario
+-> Reserva e criada
+-> Usuario pode acompanhar/cancelar conforme permissao
+
+Regra:
+- Conflito de horario deve bloquear.
+- Responsavel da sala deve visualizar quando aplicavel.
+
+================================================================================
+17. MEUS DOCUMENTOS
+================================================================================
+
+Fluxo oficial:
+Usuario acessa documentos pessoais
+-> Visualiza documentos liberados para ele
+-> Assina quando houver tarefa de assinatura
+-> Historico deve ficar rastreado
+
+Regra:
+- Nao expor documento de outro usuario.
+- Tarefa de assinatura deve aparecer para o usuario responsavel.
+
+================================================================================
+18. CONFIGURACOES
+================================================================================
+
+Paginas principais:
+- Painel
+- Usuarios
+- Permissoes
+- Aprovadores
+- Coordenadores de Avaliacao
+- Poderes de Acesso
+- Centros de Custo
+- Cargos
+- Fluxo de Solicitacao
+
+Regras:
+Usuarios:
+- Manter status ATIVO/INATIVO correto.
+- Vincular departamentos oficiais.
+- Vincular centros de custo quando o usuario precisa ver demandas daquele centro.
+- Configurar modulos por nivel.
+
+Permissoes / Poderes de Acesso:
+- Definir nivel por modulo.
+- Definir permissoes por feature quando aplicavel.
+- Evitar dar Nivel 2/3 amplo se o usuario so precisa de centro especifico.
+
+Aprovadores:
+- Configurar aprovador por tipo quando fluxo exigir.
+- Papeis: APPROVER, VIEWER, FINALIZER.
+- Para finalizacao especial, usar FINALIZER quando necessario.
+
+Fluxo de Solicitacao:
+- Nao alterar fluxo sem atualizar este documento.
+- Toda alteracao de etapa deve gerar teste de regressao.
+
+Centros de Custo:
+- Manter centro ativo/inativo correto.
+- Vincular usuarios aos centros que eles realmente atendem.
+
+================================================================================
+19. REGRA PARA PROTOCOLOS ANTIGOS
+================================================================================
+
+Problema observado:
+Coordenador nao consegue visualizar protocolos antigos.
+
+Regra definitiva:
+Todo protocolo antigo deve aparecer quando o usuario/setor for responsavel pelo chamado mesmo que:
+- nao tenha snapshot de workflow;
+- tenha sido criado antes de fluxo novo;
+- tenha departamento antigo;
+- tenha centro de custo antigo;
+- tenha campos legados.
+
+Fallback obrigatorio para visibilidade:
+1. Se usuario e solicitante, mostrar.
+2. Se usuario e assumidaPorId, mostrar.
+3. Se usuario e approverId, mostrar.
+4. Se usuario tem departamento atual do chamado, mostrar.
+5. Se usuario tem centro de custo do chamado, mostrar.
+6. Se usuario tem setor vinculado do Nada Consta, mostrar.
+7. Se usuario e finalizer do tipo, mostrar.
+8. Se usuario tem TipoSolicitacaoApprover do tipo, mostrar.
+9. Se usuario tem acesso por fluxo compartilhado RH/DP, mostrar.
+10. Se protocolo estiver em etapa sem responsavel, mostrar para admin tecnico e registrar alerta.
+
+================================================================================
+20. CHECKLIST PARA CODEX ANTES DE ALTERAR QUALQUER FLUXO
+================================================================================
+
+Antes de alterar:
+- Identificar tipo de solicitacao.
+- Identificar departamento inicial, destino, aprovador e finalizador.
+- Identificar quem deve ver na tela.
+- Identificar quem deve receber e-mail.
+- Identificar status esperado em cada etapa.
+- Identificar regra para protocolos antigos.
+
+Durante alteracao:
+- Nao quebrar visibilidade.
+- Nao esconder chamado antigo.
+- Nao remover timeline.
+- Nao substituir regra por e-mail fixo.
+- Nao misturar admin tecnico com destinatario operacional.
+- Criar teste de regressao.
+
+Depois da alteracao:
+- npx prisma generate --schema ./prisma/schema.prisma
+- npx next build --webpack
+- Testar protocolo novo.
+- Testar protocolo antigo.
+- Testar usuario responsavel.
+- Testar usuario sem permissao.
+- Testar e-mail quando aplicavel.
+
+================================================================================
+21. RESUMO EXECUTIVO PARA VISTORIA
+================================================================================
+
+O SGI deve garantir rastreabilidade completa:
+- Quem abriu.
+- Quando abriu.
+- Para quem foi.
+- Quem aprovou.
+- Quem tratou.
+- Quem finalizou.
+- Qual setor/centro de custo era responsavel.
+- Quais notificacoes foram enviadas.
+- Qual historico foi registrado.
+
+Nenhuma demanda deve depender somente de e-mail.
+A tela do usuario/setor responsavel e a fonte principal de verdade.

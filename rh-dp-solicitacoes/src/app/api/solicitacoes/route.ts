@@ -2,7 +2,7 @@ export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, Prisma, SolicitationPriority } from '@prisma/client'
+import { ModuleLevel, SolicitationPriority } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -10,40 +10,32 @@ import { performance } from 'node:perf_hooks'
 import { logTiming, withRequestMetrics } from '@/lib/request-metrics'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
-   isSolicitacaoAgendamentoFerias,
+  isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
-  isSolicitacaoEquipamento,
-  isSolicitacaoEpiUniforme,
-  isSolicitacaoExamesSst,
-  isSolicitacaoInclusaoPlanoDependentes,
-  isSolicitacaoIncentivoEducacao,
   isSolicitacaoNadaConsta,
-  isSolicitacaoPessoal,
-  isSolicitacaoVeiculos,
   NADA_CONSTA_SETORES,
-  normalizeSolicitacaoPessoalMotivoVaga,
 } from '@/lib/solicitationTypes'
-import { resolveResponsibleDepartmentsByTipo } from '@/lib/solicitationRouting'
-import { buildSensitiveHiringVisibilityWhere, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
-import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
-import { notifyWorkflowStepEntry } from '@/lib/solicitationWorkflowNotifications'
-import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
-import { nextSolicitationProtocolo } from '@/lib/protocolo'
-import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import {
-  EXPERIENCE_EVALUATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
-  listExperienceEvaluators,
-  patchExperienceEvaluationEvaluatorPayload,
-  patchExperienceEvaluationEvaluatorFields,
-  resolveRhDepartmentForExperienceEvaluation,
-} from '@/lib/experienceEvaluation'
-import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
-import { buildUtcDateRangeFilter, normalizeFilterText } from '@/lib/solicitationFilters'
-import { isExternalAdmissionCandidateType, patchExternalAdmissionPayloadSeed } from '@/lib/externalAdmission'
-import { computeTiDueDate, isTiCatalogCode, resolveTiRequiresApprovalByPayload } from '@/lib/tiSolicitations'
-import { validateSolicitationPayload, SolicitationPayloadValidationError } from '@/lib/solicitationPayloadValidation'
-import { buildApprovalSnapshot, resolveSolicitationApprovers, resolveWorkflowForSolicitation } from '@/lib/solicitationApproverResolution'
+  buildReceivedWhereByPolicy,
+  buildSolicitationVisibilityContext,
+} from '@/lib/solicitationAccessPolicy'
+
+
+
+/**
+ * Gera um código de protocolo simples, ex: RQ2502-0001
+ */
+function generateProtocolo() {
+  const now = new Date()
+  const yy = now.getFullYear().toString().slice(-2)
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).toString().padStart(2, '0')
+  const rand = Math.floor(Math.random() * 9999)
+    .toString()
+    .padStart(4, '0')
+  return `RQ${yy}${mm}${dd}-${rand}`
+}
+
 /**
  * Monta o objeto `where` para o Prisma a partir dos filtros da query string
  */
@@ -56,165 +48,63 @@ function buildWhereFromSearchParams(searchParams: URLSearchParams) {
   const costCenterId = searchParams.get('costCenterId') ?? centerId
   const departmentId = searchParams.get('departmentId')
   const tipoId = searchParams.get('tipoId')
-  const protocolo = normalizeFilterText(searchParams.get('protocolo'))
-  const solicitante = normalizeFilterText(searchParams.get('solicitante'))
-  const solicitanteLogin = normalizeFilterText(searchParams.get('solicitanteLogin'))
-  const status = normalizeFilterText(searchParams.get('status'))
-  const text = normalizeFilterText(searchParams.get('text'))
-  const openedRange = buildUtcDateRangeFilter({ start: dateStart, end: dateEnd })
-  if (openedRange) where.dataAbertura = openedRange
+  const protocolo = searchParams.get('protocolo')
+  const solicitante = searchParams.get('solicitante')
+  const status = searchParams.get('status')
+  const text = searchParams.get('text')
+  if (dateStart || dateEnd) {
+    where.dataAbertura = {}
+    if (dateStart) {
+      where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
+    }
+    if (dateEnd) {
+      const end = new Date(dateEnd + 'T23:59:59')
+      where.dataAbertura.lte = end
+    }
+  }
 
   if (departmentId) where.departmentId = departmentId
   if (costCenterId) where.costCenterId = costCenterId
   if (tipoId) where.tipoId = tipoId
-  const hasProtocoloFilter = protocolo.length > 0
-
   if (status) where.status = status
 
-  if (hasProtocoloFilter) {
+  if (protocolo) {
     where.protocolo = {
       contains: protocolo,
+      mode: 'insensitive',
     }
   }
 
-  const solicitanteFilters: Record<string, unknown> = {}
   if (solicitante) {
-    solicitanteFilters.OR = [
-      { fullName: { contains: solicitante } },
-      { email: { contains: solicitante } },
-    ]
-  }
-  if (solicitanteLogin) {
-    solicitanteFilters.login = { contains: solicitanteLogin }
-  }
-  if (Object.keys(solicitanteFilters).length > 0) {
-    where.solicitante = solicitanteFilters
+    where.solicitante = {
+      OR: [
+        {
+          fullName: { contains: solicitante, mode: 'insensitive' },
+        },
+        {
+          email: { contains: solicitante, mode: 'insensitive' },
+        },
+      ],
+    }
   }
 
   if (text) {
-    const textValue = text
-    where.AND = [
-      ...(where.AND ?? []),
+    const or: any[] = [
       {
-         OR: [
-          { titulo: { contains: textValue } },
-          { descricao: { contains: textValue } },
-          { payload: { path: '$.campos', string_contains: textValue } },
-          { payload: { path: '$.formulario', string_contains: textValue } },
-          { payload: { path: '$.form', string_contains: textValue } },
-          { payload: { path: '$.metadata', string_contains: textValue } },
-          { payload: { path: '$.requestData', string_contains: textValue } },
-          { payload: { path: '$.dynamicForm', string_contains: textValue } },
-          { payload: { path: '$.answers', string_contains: textValue } },
-          { payload: { path: '$.fields', string_contains: textValue } },
-          { payload: { path: '$.avaliacaoGestor', string_contains: textValue } },
-        ],
+        titulo: { contains: text, mode: 'insensitive' },
+      },
+      {
+        descricao: { contains: text, mode: 'insensitive' },
       },
     ]
+    if (where.OR) {
+      where.OR = [...where.OR, ...or]
+    } else {
+      where.OR = or
+    }
   }
 
   return where
-}
-function normalizeSimpleText(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toUpperCase()
-}
-
-function normalizeSimNao(value: unknown): 'Sim' | 'Não' | null {
-  if (typeof value === 'boolean') return value ? 'Sim' : 'Não'
-  if (typeof value === 'number') {
-    if (value === 1) return 'Sim'
-    if (value === 0) return 'Não'
-  }
-  if (typeof value !== 'string') return null
-
-  const normalized = value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase()
-
-  if (!normalized) return null
-  if (['sim', 's', 'true', '1'].includes(normalized)) return 'Sim'
-  if (['nao', 'n', 'false', '0'].includes(normalized)) return 'Não'
-  return null
-}
-
-function parseDateOnly(value: unknown) {
-  if (typeof value !== 'string' || !value.trim()) return null
-  const date = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(date.getTime())) return null
-  return date
-}
-
-function formatDateOnly(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function computeFimGozoInclusive(inicioGozo: unknown, qtdDiasCorridos: unknown) {
-  const startDate = parseDateOnly(inicioGozo)
-  const days = Number.parseInt(String(qtdDiasCorridos ?? ''), 10)
-  if (!startDate || !Number.isFinite(days) || days < 1) return null
-
-  const endDate = new Date(startDate)
-  endDate.setDate(endDate.getDate() + (days - 1))
-  return formatDateOnly(endDate)
-}
-
-async function resolveRhRoutingTarget() {
-  const rhDepartment = await prisma.department.findFirst({
-    where: {
-      OR: [{ code: '17' }, { sigla: { contains: 'RH' } }, { name: { contains: 'Recursos Humanos' } }],
-    },
-    select: { id: true },
-  })
-
-  if (!rhDepartment) return null
-
-  const rhCostCenter = await prisma.costCenter.findFirst({
-    where: {
-      OR: [
-        { departmentId: rhDepartment.id },
-        { externalCode: '490' },
-        { description: { contains: 'Recursos Humanos' } },
-        { abbreviation: { contains: 'RH' } },
-        { code: { contains: 'RH' } },
-      ],
-    },
-    orderBy: [{ departmentId: 'desc' }, { description: 'asc' }],
-    select: { id: true, departmentId: true },
-  })
-
-  return { rhDepartmentId: rhDepartment.id, rhCostCenter }
-}
-
-async function resolveTiRoutingTarget() {
-  const tiDepartment = await prisma.department.findFirst({
-    where: {
-      OR: [{ code: '20' }, { sigla: { contains: 'TI' } }, { name: { contains: 'Tecnologia da Informação' } }],
-    },
-    select: { id: true },
-  })
-
-  if (!tiDepartment) return null
-
-  const tiCostCenter = await prisma.costCenter.findFirst({
-    where: {
-      OR: [
-        { departmentId: tiDepartment.id },
-        { description: { contains: 'Tecnologia da Informação' } },
-        { abbreviation: { contains: 'TI' } },
-        { code: { contains: 'TI' } },
-      ],
-    },
-    orderBy: [{ departmentId: 'desc' }, { description: 'asc' }],
-    select: { id: true, departmentId: true },
-  })
-
-  return { tiDepartmentId: tiDepartment.id, tiCostCenter }
 }
 
 /**
@@ -240,155 +130,65 @@ export const GET = withModuleLevel(
         const where = buildWhereFromSearchParams(searchParams)
 
         const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
-        const userAccess = await resolveUserAccessContext({
-          userId: me.id,
-          userLogin: me.login,
-          userEmail: me.email,
-          userFullName: me.fullName,
-          role: me.role,
-          primaryDepartmentId: me.departmentId,
-          primaryDepartment: me.department,
-        })
 
         if (scope === 'sent') {
           where.solicitanteId = me.id
         } else if (scope === 'received') {
-          where.AND = [
-            ...(where.AND ?? []),
-            buildReceivedWhereByPolicy(userAccess),
-          ]
-
-          // RQ_063 só deve chegar na fila após aprovação (nível 3)
-          where.AND = [
-            ...(where.AND ?? []),
-            {
-              NOT: {
-                AND: [
-                  { requiresApproval: true },
-                  { approvalStatus: 'PENDENTE' },
-                   {
-                    OR: [{ tipo: { id: 'RQ_063' } }, { tipo: { codigo: { in: ['RQ.RH.063', 'RQ.063', 'RQ.RH.001'] } } }],
-                  },
-                ],
-              },
-            },
-          ]
+          const visibilityContext = await buildSolicitationVisibilityContext(me)
+          Object.assign(
+            where,
+            buildReceivedWhereByPolicy(visibilityContext, where, {
+              excludePendingRq063: true,
+            }),
+          )
         } else if (scope === 'to-approve') {
           where.requiresApproval = true
           where.approvalStatus = 'PENDENTE'
-          where.OR = [
-            { approverId: me.id },
-            { tipo: { approvers: { some: { userId: me.id, role: 'APPROVER' } } } },
-          ]
+          // se quiser filtrar por aprovador:
+          // where.approverId = me.id
         }
 
-        const userDepartmentIdsForSensitive = await getUserDepartmentIds(me.id, me.departmentId)
-
-        where.AND = [
-          ...(where.AND ?? []),
-          buildSensitiveHiringVisibilityWhere({
-            userId: me.id,
-            userLogin: me.login,
-            userEmail: me.email,
-            userFullName: me.fullName,
-            role: me.role,
-            departmentIds: userDepartmentIdsForSensitive,
-            allowedTipoIds: userAccess.allowedTipoIds,
-            finalizerTipoIds: userAccess.finalizerTipoIds,
-            isExperienceEvaluationCoordinator: userAccess.isExperienceEvaluationCoordinator,
-            isRhAuthorizedForExperienceEvaluation:
-              userAccess.isRhAuthorizedForExperienceEvaluation,
-            isRhAuthorizedForSharedHiringFlow:
-              userAccess.isRhAuthorizedForSharedHiringFlow,
-          }),
-        ]
-
-    const listStartedAt = performance.now()
+        const listStartedAt = performance.now()
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
             skip,
             take: pageSize,
-            orderBy: [{ updatedAt: 'desc' }, { dataAbertura: 'desc' }],
+            orderBy: { dataAbertura: 'desc' },
             include: {
-             tipo: { select: { codigo: true, nome: true } },
+              tipo: { select: { nome: true } },
               department: { select: { name: true } },
               costCenter: { select: { description: true, externalCode: true, code: true } },
               approver: { select: { id: true, fullName: true } },
               assumidaPor: { select: { id: true, fullName: true } },
               solicitante: { select: { id: true, fullName: true } },
-              solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
-              eventos: {
-                where: {
-                  tipo: {
-                    in: ['FINALIZADA', 'FINALIZADA_RH', 'FINALIZADA_DP', 'FINALIZADA_TI'],
-                  },
-                },
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-                include: { actor: { select: { id: true, fullName: true } } },
-              },
-           },
+            },
           }),
           prisma.solicitation.count({ where }),
         ])
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
-   const rows = solicitations.map((s) => {
-  const finalizadorEvent = s.eventos?.[0] ?? null
-  const responsible = resolvePrimaryResponsibleForList({
-    tipo: s.tipo,
-    assumidaPor: s.assumidaPor,
-    assumidaPorId: s.assumidaPorId,
-    approver: s.approver,
-    approverId: s.approverId,
-    status: s.status,
-  })
 
-  return {
+        const rows = solicitations.map((s) => ({
   id: s.id,
   titulo: s.titulo,
   status: s.status,
   protocolo: s.protocolo,
   createdAt: s.dataAbertura.toISOString(),
-  updatedAt: s.updatedAt.toISOString(),
-  tipo: s.tipo ? { id: s.tipoId, codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
+  tipo: s.tipo ? { nome: s.tipo.nome } : null,
 
-  solicitanteId: s.solicitanteId,
-  assumidaPorId: s.assumidaPorId,
-  cancelamentoStatus: s.cancelamentoStatus,
-  cancelamentoSolicitadoEm: s.cancelamentoSolicitadoEm?.toISOString() ?? null,
-  cancelamentoMotivo: s.cancelamentoMotivo,
-
-  responsavelId: responsible.responsavelId,
-  responsavel: responsible.responsavel,
-  finalizadorId: finalizadorEvent?.actor?.id ?? null,
-  finalizador: finalizadorEvent?.actor
-    ? { fullName: finalizadorEvent.actor.fullName }
-    : null,
+  responsavelId: s.assumidaPor?.id ?? null,
+  responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
 
   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
+
   sla: null,
 
-  setorDestino: s.department?.name ?? formatCostCenterLabel(s.costCenter, ''),
-  departamentoResponsavel: s.department?.name ?? null,
-  departmentId: s.departmentId,
-  approverId: s.approver?.id ?? s.approverId ?? null,
-  viewerOnly:
-    me.role === 'RH' &&
-    s.departmentId !== me.departmentId &&
-    (Boolean(s.parentId) ||
-      Boolean((s.payload as Record<string, any> | null)?.origem?.rhSolicitationId) ||
-      Boolean((s.payload as Record<string, any> | null)?.origem?.rhProtocolo)),
-  acompanhamentoLabel:
-    me.role === 'RH' &&
-    s.department?.name?.toUpperCase().includes('PESSOAL')
-      ? 'Em atendimento no DP'
-      : null,
+  setorDestino:
+    formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,
-}
-})
+}))
         return NextResponse.json({ rows, total })
       } catch (e) {
         console.error('GET /api/solicitacoes error', e)
@@ -405,6 +205,22 @@ export const GET = withModuleLevel(
  * Acha um "aprovador nível 3" vinculado ao centro de custo,
  * ou qualquer usuário como fallback.
  */
+async function findLevel3ApproverForCostCenter(costCenterId?: string | null) {
+  if (costCenterId) {
+    const link = await prisma.userCostCenter.findFirst({
+      where: { costCenterId },
+      include: { user: true },
+    })
+
+    if (link?.user) {
+      return link.user
+    }
+  }
+
+  // fallback: qualquer usuário
+  const fallback = await prisma.user.findFirst()
+  return fallback
+}
 
 /**
  * Monta o payload padrão com dados do solicitante + campos do formulário
@@ -412,75 +228,22 @@ export const GET = withModuleLevel(
 async function buildPayload(
   solicitanteId: string,
   campos: Record<string, any>,
-  options?: {
-    solicitarParaOutroColaborador?: boolean
-    solicitanteManual?: {
-      fullName?: string
-      email?: string
-      login?: string
-      phone?: string
-      positionName?: string
-      departmentName?: string
-      leaderName?: string
-      costCenterId?: string
-      costCenterText?: string
-    } | null
-  },
 ) {
-  const solicitarParaOutroColaborador = options?.solicitarParaOutroColaborador === true
-  const solicitanteManual = options?.solicitanteManual ?? null
-
   const user = await prisma.user.findUnique({
     where: { id: solicitanteId },
-    include: {
-      costCenter: true,
-      position: true,
-      department: true,
-      leader: true,
-    },
+    include: { costCenter: true },
   })
-  let manualCostCenterText = ''
-  if (solicitanteManual?.costCenterId) {
-    const manualCostCenter = await prisma.costCenter.findUnique({
-      where: { id: solicitanteManual.costCenterId },
-    })
-
-    if (manualCostCenter) {
-      manualCostCenterText = formatCostCenterLabel(manualCostCenter, '')
-    }
-  }
-
-  const payloadSolicitante = solicitarParaOutroColaborador
-    ? {
-        fullName: solicitanteManual?.fullName ?? '',
-        email: solicitanteManual?.email ?? '',
-        login: solicitanteManual?.login ?? '',
-        phone: solicitanteManual?.phone ?? '',
-        positionName: solicitanteManual?.positionName ?? '',
-        departmentName: solicitanteManual?.departmentName ?? '',
-        leaderName: solicitanteManual?.leaderName ?? '',
-        costCenterId: solicitanteManual?.costCenterId ?? '',
-        costCenterText:
-          manualCostCenterText || solicitanteManual?.costCenterText || '',
-      }
-    : {
-        fullName: user?.fullName ?? '',
-        email: user?.email ?? '',
-        login: user?.login ?? '',
-        phone: user?.phone ?? '',
-        positionName: user?.position?.name ?? '',
-        departmentName: user?.department?.name ?? '',
-        leaderName: user?.leader?.fullName ?? '',
-        costCenterId: user?.costCenterId ?? '',
-        costCenterText: user?.costCenter
-          ? formatCostCenterLabel(user.costCenter, '')
-          : '',
-      }
 
   return {
-    solicitarParaOutroColaborador,
-    solicitanteManual: solicitarParaOutroColaborador ? payloadSolicitante : null,
-    solicitante: payloadSolicitante,
+    solicitante: {
+      fullName: user?.fullName ?? '',
+      email: user?.email ?? '',
+      login: user?.login ?? '',
+      phone: user?.phone ?? '',
+      costCenterText: user?.costCenter
+        ? formatCostCenterLabel(user.costCenter, '')
+        : '',
+    },
     campos,
   }
 }
@@ -493,8 +256,6 @@ export const POST = withModuleLevel(
   ModuleLevel.NIVEL_1,
   async (req: NextRequest, ctx) => {
     return withRequestMetrics('POST /api/solicitacoes', async () => {
-      let idempotencyKey: string | null = null
-      let requestId: string | null = null
       try {
         const { me } = ctx
         const body = await req.json().catch(() => null)
@@ -506,77 +267,23 @@ export const POST = withModuleLevel(
           )
         }
 
-         const tipoId = body.tipoId as string | undefined
+        const tipoId = body.tipoId as string | undefined
         const costCenterId = body.costCenterId as string | null | undefined
         const departmentId = body.departmentId as string | undefined
-        const idempotencyKeyRaw = body.idempotencyKey
-        idempotencyKey =
-          typeof idempotencyKeyRaw === 'string' && idempotencyKeyRaw.trim().length > 0
-            ? idempotencyKeyRaw.trim()
-            : null
-        requestId = req.headers.get('x-request-id') ?? crypto.randomUUID()
-         const solicitanteId = me.id
+        const solicitanteId = me.id
         const campos = (body.campos ?? {}) as Record<string, any>
-        const origemMudancaRaw = typeof body.origem === 'string' ? body.origem.toUpperCase() : undefined
-        const origemMudanca = origemMudancaRaw === 'NAO_CONFORMIDADE' ? 'NAO_CONFORMIDADE' : 'MANUAL'
-        const nonConformityId = typeof body.nonConformityId === 'string' && body.nonConformityId.trim() ? body.nonConformityId.trim() : null
-        const nonConformityNumero = typeof body.nonConformityNumero === 'string' && body.nonConformityNumero.trim() ? body.nonConformityNumero.trim() : null
-        const solicitarParaOutroColaborador = body.solicitarParaOutroColaborador === true
-        const solicitanteManual =
-          body.solicitanteManual && typeof body.solicitanteManual === 'object'
-            ? (body.solicitanteManual as Record<string, unknown>)
-            : null
 
-        console.info('POST /api/solicitacoes request', {
-          requestId,
-          idempotencyKey,
-          solicitanteId,
-          tipoId,
-        })
-
-        if (idempotencyKey) {
-          const existingByIdempotency = await prisma.solicitation.findUnique({
-            where: { idempotencyKey },
-          })
-
-          if (existingByIdempotency) {
-            console.info('POST /api/solicitacoes duplicate prevented (pre-check)', {
-              requestId,
-              idempotencyKey,
-              solicitationId: existingByIdempotency.id,
-            })
-            return NextResponse.json(existingByIdempotency, { status: 200 })
-          }
-        }
-
-        if (!tipoId) {
+        if (!tipoId || !departmentId) {
           return NextResponse.json(
             {
-              error: 'Tipo é obrigatório.',
+              error: 'Tipo e departamento são obrigatórios.',
             },
             { status: 400 },
           )
         }
-         if (solicitarParaOutroColaborador) {
-          const fullName = String(solicitanteManual?.fullName ?? '').trim()
-          const email = String(solicitanteManual?.email ?? '').trim()
-          const login = String(solicitanteManual?.login ?? '').trim()
-          const costCenterIdManual = String(solicitanteManual?.costCenterId ?? '').trim()
-
-           if (!fullName || !email || !costCenterIdManual) {
-            return NextResponse.json(
-              {
-                error:
-                  'Ao solicitar para outro colaborador, informe nome, e-mail e centro de custo.',
-              },
-              { status: 400 },
-            )
-          }
-        }
 
         const tipo = await prisma.tipoSolicitacao.findUnique({
           where: { id: tipoId },
-          include: { approvers: { select: { userId: true } } },
         })
 
         if (!tipo) {
@@ -585,330 +292,45 @@ export const POST = withModuleLevel(
             { status: 400 },
           )
         }
-        const isSolicitacaoPessoalTipo = isSolicitacaoPessoal(tipo)
-        const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
 
-        if (isAgendamentoFerias) {
-          const fimGozoCalculado = computeFimGozoInclusive(campos.inicioGozo, campos.qtdDiasCorridos)
-          if (!fimGozoCalculado) {
-            return NextResponse.json(
-              {
-                error:
-                  'Informe Início do gozo e quantidade de dias corridos válidos para calcular o Fim do gozo.',
-              },
-              { status: 400 },
-            )
-          }
-
-          campos.fimGozo = fimGozoCalculado
-          delete campos.anexosSolicitacao
-          delete campos.anexosSolicitante
-        }
-
-          
-          const protocolo = await nextSolicitationProtocolo()
+         const protocolo = generateProtocolo()
         const titulo = tipo.nome
+        const descricao = null
         const tipoMeta = (tipo.schemaJson as {
-          meta?: {
-            defaultPrioridade?: SolicitationPriority
-            defaultSlaHours?: number
-            defaultDescricaoSolicitacao?: string
-            prazoPadraoDias?: number
-            departamentos?: string[]
-            requiresApproval?: boolean
-          }
+          meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number }
         } | null)?.meta
-        const descricao = tipoMeta?.defaultDescricaoSolicitacao ?? null
-        let prioridade = tipoMeta?.defaultPrioridade
-        const prioridadeSolicitadaRaw = String(campos.prioridadeSolicitada ?? '').trim().toUpperCase()
-        const prioridadeByForm: Record<string, SolicitationPriority> = {
-          BAIXA: 'BAIXA',
-          MEDIA: 'MEDIA',
-          'MÉDIA': 'MEDIA',
-          ALTA: 'ALTA',
-          CRITICA: 'URGENTE',
-          'CRÍTICA': 'URGENTE',
-          URGENTE: 'URGENTE',
-        }
-        if (prioridadeSolicitadaRaw && prioridadeByForm[prioridadeSolicitadaRaw]) {
-          prioridade = prioridadeByForm[prioridadeSolicitadaRaw]
-        }
-        let dataPrevista =
-          typeof tipoMeta?.prazoPadraoDias === 'number' &&
-          Number.isFinite(tipoMeta.prazoPadraoDias)
-            ? new Date(Date.now() + tipoMeta.prazoPadraoDias * 24 * 60 * 60 * 1000)
-            : typeof tipoMeta?.defaultSlaHours === 'number' &&
-                Number.isFinite(tipoMeta.defaultSlaHours)
-              ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
-              : undefined
-        if (isTiCatalogCode(tipo.codigo)) {
-          const tiDueDate = computeTiDueDate(prioridade ?? null, new Date())
-          if (tiDueDate) dataPrevista = tiDueDate
-        }
-        const routing = await resolveResponsibleDepartmentsByTipo(tipoId)
-        const metaDepartmentId = Array.isArray(tipoMeta?.departamentos)
-          ? tipoMeta.departamentos[0]
-          : null
-        const resolvedDepartmentId =
-          metaDepartmentId ?? routing.mainDepartmentId ?? departmentId ?? me.departmentId ?? null
-        if (!resolvedDepartmentId) {
+        const prioridade = tipoMeta?.defaultPrioridade
+        const dataPrevista =
+          typeof tipoMeta?.defaultSlaHours === 'number' &&
+          Number.isFinite(tipoMeta.defaultSlaHours)
+            ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
+            : undefined
+        const resolvedCostCenterId = costCenterId ?? me.costCenterId ?? null
+
+        if (!resolvedCostCenterId) {
           return NextResponse.json(
-            {
-              error:
-                'Não foi possível identificar o departamento responsável. Configure meta.departamentos no tipo de solicitação.',
-            },
+            { error: 'Centro de custo é obrigatório.' },
             { status: 400 },
           )
         }
-        const resolvedCostCenterId = costCenterId || me.costCenterId || null
-
 
 
         // monta o payload com dados do solicitante + campos do formulário
-         if (isSolicitacaoDesligamento(tipo)) {
-          campos.gestorSolicitanteInfo = `${me.fullName ?? me.login} / Cargo: gestor solicitante / Data: ${new Date().toISOString().slice(0, 10)}`
-        }
-        const payload: any = await buildPayload(solicitanteId, campos, {
-          solicitarParaOutroColaborador,
-          solicitanteManual: solicitanteManual
-            ? {
-                fullName: String(solicitanteManual.fullName ?? ''),
-                email: String(solicitanteManual.email ?? ''),
-                login: String(solicitanteManual.login ?? ''),
-                phone: String(solicitanteManual.phone ?? ''),
-                positionName: String(solicitanteManual.positionName ?? ''),
-                departmentName: String(solicitanteManual.departmentName ?? ''),
-                leaderName: String(solicitanteManual.leaderName ?? ''),
-                costCenterId: String(solicitanteManual.costCenterId ?? ''),
-                costCenterText: String(solicitanteManual.costCenterText ?? ''),
-              }
-            : null,
-        })
-        const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
-        if (isExternalAdmissionCandidateType(tipo)) {
-          Object.assign(payload, patchExternalAdmissionPayloadSeed(payload))
-        }
-
-        if (isAvaliacaoExperiencia) {
-          const gestorImediatoAvaliadorId =
-            typeof campos.gestorImediatoAvaliadorId === 'string'
-              ? campos.gestorImediatoAvaliadorId.trim()
-              : ''
-
-          if (!gestorImediatoAvaliadorId) {
-            return NextResponse.json(
-              { error: 'Selecione o gestor imediato avaliador.' },
-              { status: 400 },
-            )
-          }
-
-          const coordenadores = await listExperienceEvaluators()
-          const gestorSelecionado = coordenadores.find(
-            (coordenador) => coordenador.id === gestorImediatoAvaliadorId,
-          )
-
-          if (!gestorSelecionado) {
-            return NextResponse.json(
-              {
-                error:
-                  'Gestor imediato avaliador inválido. Verifique o grupo COORDENADORES_AVALIACAO_EXPERIENCIA.',
-              },
-              { status: 400 },
-            )
-          }
-          const normalizedPayload = patchExperienceEvaluationEvaluatorPayload(payload, gestorSelecionado)
-          payload.campos = normalizedPayload.campos ?? patchExperienceEvaluationEvaluatorFields(payload.campos ?? {}, gestorSelecionado)
-          payload.metadata = normalizedPayload.metadata ?? payload.metadata
-          payload.requestData = normalizedPayload.requestData ?? payload.requestData
-          payload.dynamicForm = normalizedPayload.dynamicForm ?? payload.dynamicForm
-        }
-
-        if (isSolicitacaoInclusaoPlanoDependentes(tipo)) {
-          const hasPlanoSaude = String(campos.planoSaude ?? '').toLowerCase() === 'true'
-          const hasPlanoOdontologico =
-            String(campos.planoOdontologico ?? '').toLowerCase() === 'true'
-
-          if (!hasPlanoSaude && !hasPlanoOdontologico) {
-            return NextResponse.json(
-              {
-                  error:
-                  'Marque ao menos uma opção de benefício: Plano de Saúde ou Plano Odontológico.',
-              },
-              { status: 400 },
-            )
-          }
-        }
-
-
-        const isGestaoMudancas = tipo.codigo?.toUpperCase() === 'RQ.QUA.148'
-        if (isGestaoMudancas) {
-          payload.campos = {
-            ...(payload.campos ?? {}),
-            origem: origemMudanca,
-            nonConformityId,
-            nonConformityNumero,
-          }
-        }
-
-        if (isSolicitacaoIncentivoEducacao(tipo)) {
-          const hasTipoFormacao = [
-            'educacaoBasica',
-            'cursoTecnico',
-            'graduacao',
-            'posGraduacao',
-          ].some((field) => String(campos[field] ?? '').toLowerCase() === 'true')
-
-          if (!hasTipoFormacao) {
-            return NextResponse.json(
-              {
-                error:
-                  'Marque ao menos um tipo de formação: Educação Básica, Curso Técnico, Graduação ou Pós-Graduação.',
-              },
-              { status: 400 },
-            )
-          }
-
-          if (String(campos.anexosObrigatoriosConferidos ?? '').toLowerCase() !== 'true') {
-            return NextResponse.json(
-              {
-                error:
-                  'Confirme os anexos obrigatórios marcando o checkbox de conferência antes de enviar.',
-              },
-              { status: 400 },
-            )
-          }
-
-          const deferido = String(campos.deferido ?? '').toLowerCase() === 'true'
-          const indeferido = String(campos.indeferido ?? '').toLowerCase() === 'true'
-          if (deferido && indeferido) {
-            return NextResponse.json(
-              {
-                error:
-                  'Não é permitido marcar Deferido e Indeferido ao mesmo tempo.',
-              },
-              { status: 400 },
-            )
-          }
-        }
-
-        if (isSolicitacaoPessoalTipo) {
-          const previstoContrato = String(campos.previstoContrato ?? '').trim()
-          if (!previstoContrato) {
-            return NextResponse.json(
-              {
-                error:
-                  'Preencha o campo obrigatório "Previsto em contrato (Salários, Benefícios, Carga Horária e outros)".',
-              },
-              { status: 400 },
-            )
-          }
-
-          const motivoNormalizado =
-            normalizeSolicitacaoPessoalMotivoVaga(campos.motivoVaga) ??
-            normalizeSolicitacaoPessoalMotivoVaga(campos.motivoDaVaga) ??
-            (String(campos.motivoSubstituicao ?? '').toLowerCase() === 'true'
-              ? 'Substituição'
-              : null) ??
-            (String(campos.motivoAumentoQuadro ?? '').toLowerCase() === 'true'
-              ? 'Aumento'
-              : null)
-
-          if (!motivoNormalizado) {
-            return NextResponse.json(
-              {
-                error:
-                  'Motivo da vaga é obrigatório para Solicitação de Pessoal. Valores aceitos: Aumento ou Substituição.',
-              },
-              { status: 400 },
-            )
-          }
-
-          const vagaSigilosa = normalizeSimNao(campos.vagaSigilosa)
-          if (!vagaSigilosa) {
-            return NextResponse.json(
-              {
-                error: 'Informe se a vaga é sigilosa.',
-              },
-              { status: 400 },
-            )
-          }
-
-          const podeDivulgarVaga = normalizeSimNao(campos.podeDivulgarVaga)
-          if (!podeDivulgarVaga) {
-            return NextResponse.json(
-              {
-                error: 'Informe se a vaga pode ser divulgada.',
-              },
-              { status: 400 },
-            )
-          }
-
-          payload.campos = {
-            ...(payload.campos ?? {}),
-            previstoContrato,
-            motivoVaga: motivoNormalizado,
-            motivoDaVaga: motivoNormalizado,
-            vagaSigilosa,
-            podeDivulgarVaga,
-            observacaoSigiloDivulgacao: String(campos.observacaoSigiloDivulgacao ?? '').trim(),
-          }
-        }
-
-        validateSolicitationPayload(tipo, payload)
-        const workflowForSnapshot = await resolveWorkflowForSolicitation(tipoId, resolvedDepartmentId, resolvedCostCenterId)
-        const approvalResolution = await resolveSolicitationApprovers({
-          tipo,
-          workflow: workflowForSnapshot,
-          solicitante: {
-            id: me.id,
-            departmentId: me.departmentId,
-            costCenterId: me.costCenterId,
-          },
-          payload,
-        })
-        const approvalSnapshots = buildApprovalSnapshot({
-          workflow: workflowForSnapshot,
-          approvers: approvalResolution,
-          notifications: { source: 'creation', typeId: tipoId },
-        })
+        const payload: any = await buildPayload(solicitanteId, campos)
 
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({
           data: {
             protocolo,
             tipoId,
-             costCenterId: resolvedCostCenterId,
-            departmentId: resolvedDepartmentId,
+            costCenterId: resolvedCostCenterId,
+            departmentId,
             solicitanteId,
             titulo,
             descricao,
             prioridade,
             dataPrevista,
             payload,
-            idempotencyKey,
-            nonConformityId: isGestaoMudancas ? nonConformityId : null,
-            workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson,
-            approvalSnapshotJson: approvalSnapshots.approvalSnapshotJson,
-            notificationSnapshotJson: approvalSnapshots.notificationSnapshotJson,
-            requiresApproval: (() => {
-              if (isAvaliacaoExperiencia) return false
-              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
-              if (tiDecision !== null) return tiDecision
-              return Boolean(tipoMeta?.requiresApproval)
-            })(),
-            approvalStatus: (() => {
-              if (isAvaliacaoExperiencia) return 'NAO_PRECISA'
-              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
-              if (tiDecision === true) return 'PENDENTE'
-              return 'NAO_PRECISA'
-            })(),
-            status: (() => {
-              if (isAvaliacaoExperiencia) return EXPERIENCE_EVALUATION_STATUS as any
-              const tiDecision = resolveTiRequiresApprovalByPayload(tipo.codigo, payload)
-              if (tiDecision === true) return 'AGUARDANDO_APROVACAO'
-              return 'ABERTA'
-            })(),
-            approverId: isAvaliacaoExperiencia ? String(payload?.campos?.gestorImediatoAvaliadorId ?? '') : undefined,
           },
         })
 
@@ -921,74 +343,57 @@ export const POST = withModuleLevel(
             tipo: 'CRIACAO',
           },
         })
-        await prisma.solicitationTimeline.create({
-          data: {
-            solicitationId: created.id,
-            status: created.status === 'AGUARDANDO_APROVACAO' ? 'AGUARDANDO_APROVACAO' : 'ABERTA',
-            message: created.status === 'AGUARDANDO_APROVACAO' ? 'Solicitação criada e enviada para aprovação.' : 'Solicitação criada pelo solicitante.',
+
+        const isSolicitacaoPessoal =
+          tipo.nome === 'RQ_063 - Solicitação de Pessoal'
+        const isSolicitacaoIncentivo =
+          tipo.nome === 'RQ_091 - Solicitação de Incentivo à Educação'
+        const isDesligamento = isSolicitacaoDesligamento(tipo)
+        const isNadaConsta = isSolicitacaoNadaConsta(tipo)
+        const isAbonoEducacional =
+          tipo.nome === 'Solicitação de Abono Educacional'
+        const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
+
+        const rhCostCenter = await prisma.costCenter.findFirst({
+          where: {
+            OR: [
+              {
+                description: {
+                  contains: 'Recursos Humanos',
+                  mode: 'insensitive',
+                },
+              },
+              {
+                abbreviation: {
+                  contains: 'RH',
+                  mode: 'insensitive',
+                },
+              },
+              {
+                code: { contains: 'RH', mode: 'insensitive' },
+              },
+            ],
           },
         })
-
-        await notifySolicitationEvent({
-          solicitationId: created.id,
-          event: 'OPENED',
-          actorName: me.fullName ?? me.id,
-          dedupeKey: `OPENED:${created.id}`,
-        })
-
-        if (isGestaoMudancas && nonConformityId) {
-          const nc = await prisma.nonConformity.findUnique({
-            where: { id: nonConformityId },
-            select: { id: true, numeroRnc: true },
+        /* =====================================================================
+           2.5) Agendamento de Férias (auto aprovado e encaminhado ao DP)
+           ===================================================================== */
+        if (isAgendamentoFerias) {
+          const dpDepartment = await prisma.department.findUnique({
+            where: { code: '08' },
+            select: { id: true },
           })
-
-
-          if (nc) {
-            await prisma.solicitationTimeline.create({
-              data: {
-                solicitationId: created.id,
-                status: 'ABERTA',
-                message: `Originada da não conformidade ${nc.numeroRnc}.`,
-              },
-            })
-
-            await prisma.nonConformityTimeline.create({
-              data: {
-                nonConformityId: nc.id,
-                actorId: solicitanteId,
-                tipo: 'GESTAO_MUDANCAS_VINCULADA',
-                message: `Gestão de Mudanças vinculada: ${created.protocolo}.`,
-              },
-            })
-          }
-        }
-        if (isAvaliacaoExperiencia) {
-          const gestorImediatoAvaliadorId = String(
-            payload?.campos?.gestorImediatoAvaliadorId ?? '',
-          )
-          const rhRouting = await resolveRhDepartmentForExperienceEvaluation()
-          if (!rhRouting?.departmentId) {
-            return NextResponse.json(
-              { error: 'Não foi possível identificar o departamento do RH para este fluxo.' },
-              { status: 400 },
-            )
-          }
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
-              approverId: gestorImediatoAvaliadorId,
-              status: EXPERIENCE_EVALUATION_STATUS as any,
-              departmentId: rhRouting.departmentId,
-              ...(rhRouting.costCenterId ? { costCenterId: rhRouting.costCenterId } : {}),
-            },
-          })
-
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: EXPERIENCE_EVALUATION_STATUS as any,
-              message: 'Encaminhada para gestor imediato avaliador.',
+              requiresApproval: false,
+              approvalStatus: 'APROVADO',
+              approvalAt: new Date(),
+              approverId: null,
+              status: 'ABERTA',
+              costCenterId: created.costCenterId,
+              departmentId: dpDepartment?.id ?? departmentId,
             },
           })
 
@@ -998,68 +403,7 @@ export const POST = withModuleLevel(
               id: crypto.randomUUID(),
               solicitationId: created.id,
               actorId: solicitanteId,
-              tipo: 'ENCAMINHADA_GESTOR_AVALIADOR',
-            },
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
-
-          const isSolicitacaoIncentivo = isSolicitacaoIncentivoEducacao(tipo)
-        const isDesligamento = isSolicitacaoDesligamento(tipo)
-        const isNadaConsta = isSolicitacaoNadaConsta(tipo)
-        const isAbonoEducacional =
-          tipo.nome === 'Solicitação de Abono Educacional'
-        const isSolicitacaoVeiculosTipo = isSolicitacaoVeiculos(tipo)
-        const isSolicitacaoExames = isSolicitacaoExamesSst(tipo)
-        const isSolicitacaoEquipamentoTi = isSolicitacaoEquipamento(tipo)
-        const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
-
-        const rhTarget = await resolveRhRoutingTarget()
-        const rhCostCenter = rhTarget?.rhCostCenter ?? null
-
-        const sstDepartment = await prisma.department.findUnique({
-          where: { code: '19' },
-          select: { id: true, name: true },
-        })
-        const logisticaDepartment = await prisma.department.findUnique({
-          where: { code: '11' },
-          select: { id: true, name: true },
-        })
-
-        if (isSolicitacaoExames) {
-
-          if (!sstDepartment) {
-            return NextResponse.json(
-              { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado.' },
-              { status: 400 },
-            )
-          }
-
-          const payloadAtualizado = {
-            ...(payload as Record<string, any>),
-            sst: {
-              categoria: 'SERVIÇOS DE SST',
-              solicitacaoCodigo: 'RQ.SST.092',
-              solicitacaoNome: 'SOLICITAÇÃO DE EXAMES',
-              prazoLabel: '1 - DIA(S)',
-              prazoDias: 1,
-              empresa: 'ERG ENGENHARIA',
-              dataAbertura: created.dataAbertura?.toISOString() ?? new Date().toISOString(),
-              prazoSolucao:
-                dataPrevista?.toISOString() ??
-                new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            },
-          }
-
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              departmentId: sstDepartment.id,
-              status: 'ABERTA',
-              requiresApproval: false,
-              approvalStatus: 'NAO_PRECISA',
-              payload: payloadAtualizado,
+              tipo: 'APROVACAO_AUTOMATICA',
             },
           })
 
@@ -1068,132 +412,32 @@ export const POST = withModuleLevel(
               solicitationId: created.id,
               status: 'AGUARDANDO_ATENDIMENTO',
               message:
-                'Solicitação RQ.SST.092 criada e encaminhada automaticamente para SEGURANÇA DO TRABALHO.',
+                'Solicitação aprovada automaticamente e encaminhada para a fila do Departamento Pessoal.',
             },
-          })
-
-          await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
-            },
-          })
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
           })
 
           return NextResponse.json(updated, { status: 201 })
         }
-        /* =====================================================================
-            2.5) Agendamento de Férias (aguarda aprovação do gestor e segue para DP)
-           ===================================================================== */
-        if (isAgendamentoFerias) {
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
 
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              requiresApproval: true,
-              approvalStatus: 'PENDENTE',
-              approverId,
-              status: 'AGUARDANDO_APROVACAO',
-            },
-          })
-
-
-          await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: approverId ?? solicitanteId,
-              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-            },
-          })
-
-           await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO',
-              message: 'Solicitação de férias aguardando aprovação do gestor.',
-            },
-          })
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
-        /* =====================================================================
-           2.6) Solicitação de Equipamento (encaminha obrigatoriamente para TI)
-           ===================================================================== */
-        if (isSolicitacaoEquipamentoTi) {
-          const tiRouting = await resolveTiRoutingTarget()
-          const equipmentDepartmentId = tiRouting?.tiDepartmentId ?? resolvedDepartmentId
-          const equipmentCostCenterId =
-            tiRouting?.tiCostCenter?.id ?? resolvedCostCenterId
-
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              departmentId: equipmentDepartmentId,
-              costCenterId: equipmentCostCenterId,
-              requiresApproval: false,
-              approvalStatus: 'NAO_PRECISA',
-              approverId: null,
-              status: 'ABERTA',
-            },
-          })
-
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
-              message: 'Solicitação de equipamento encaminhada automaticamente para TI.',
-            },
-          })
-
-           await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'ENCAMINHADA_TI',
-            },
-          })
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
          /* =====================================================================
-          3) RQ_063 - Solicitação de Pessoal
+           3) RQ_063 - Solicitação de Pessoal
            ===================================================================== */
-        if (isSolicitacaoPessoalTipo) {
+        if (isSolicitacaoPessoal) {
           const rawCampo =
             (payload?.campos?.vagaPrevistaContrato as string | undefined) ??
             (payload?.campos?.vagaPrevista as string | undefined) ??
             ''
 
-          const normalized = rawCampo ? normalizeSimpleText(rawCampo.toString()) : ''
-
+          const normalized = rawCampo
+            ? rawCampo
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim()
+                .toUpperCase()
+            : ''
 
           const isSim = normalized === 'SIM' || normalized === 'S'
-
 
           if (isSim) {
             if (!rhCostCenter) {
@@ -1216,8 +460,7 @@ export const POST = withModuleLevel(
                 approverId: null,
                 status: 'ABERTA',
                 costCenterId: rhCostCenter.id,
-                 departmentId:
-                  rhCostCenter.departmentId ?? rhTarget?.rhDepartmentId ?? resolvedDepartmentId,
+                departmentId: rhCostCenter.departmentId ?? departmentId,
               },
             })
 
@@ -1233,159 +476,20 @@ export const POST = withModuleLevel(
             await prisma.solicitationTimeline.create({
               data: {
                 solicitationId: created.id,
-                 status: 'ENCAMINHADA_RH',
+                status: 'AGUARDANDO_ATENDIMENTO',
                 message:
-                  'Solicitação de pessoal com vaga prevista em contrato encaminhada diretamente para o RH.',
+                  'Solicitação aprovada automaticamente e encaminhada para o RH preencher os dados do candidato.',
               },
             })
 
-           await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
+            return NextResponse.json(updated, { status: 201 })
           }
 
-           // qualquer coisa diferente de SIM exige aprovação
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
-
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              requiresApproval: true,
-              approvalStatus: 'PENDENTE',
-              approverId,
-              status: 'AGUARDANDO_APROVACAO',
-            },
-          })
-
-           await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: approverId ?? solicitanteId,
-              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-            },
-          })
-
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO_SETOR',
-              message:
-                'Solicitação de pessoal aguardando aprovação do aprovador do setor para encaminhamento ao RH.',
-            },
-          })
-
-     await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
-        if (isSolicitacaoEpi) {
-          if (!sstDepartment) {
-            return NextResponse.json(
-              { error: 'Departamento SEGURANÇA DO TRABALHO não encontrado.' },
-              { status: 400 },
-            )
-          }
-           const funcionarioStatusRaw = (payload as Record<string, any>)?.campos
-            ?.funcionarioStatus
-          const funcionarioStatus = funcionarioStatusRaw
-            ? String(funcionarioStatusRaw).trim().toUpperCase()
-            : ''
-          const isFuncionarioAntigo = funcionarioStatus === 'ANTIGO'
-
-
-           const payloadAtualizado = {
-            ...(payload as Record<string, any>),
-            epiUniforme: {
-              categoria: 'SERVIÇOS DE LOGÍSTICA',
-              solicitacaoCodigo: 'RQ.SST.043',
-              solicitacaoNome: 'REQUISIÇÃO DE EPI S/UNIFORMES',
-              centroResponsavelLabel: sstDepartment.name,
-              logisticaDepartmentId: logisticaDepartment?.id ?? null,
-            },
-          }
-
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
-
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              departmentId: sstDepartment.id,
-              payload: payloadAtualizado,
-               requiresApproval: isFuncionarioAntigo,
-              approvalStatus: isFuncionarioAntigo ? 'PENDENTE' : 'NAO_PRECISA',
-              approverId,
-              status: isFuncionarioAntigo ? 'AGUARDANDO_APROVACAO' : 'ABERTA',
-            },
-          })
-
-          if (isFuncionarioAntigo) {
-            await prisma.event.create({
-              data: {
-                id: crypto.randomUUID(),
-                solicitationId: created.id,
-                actorId: approverId,
-                tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-              },
-            })
-
-            await prisma.solicitationTimeline.create({
-              data: {
-                solicitationId: created.id,
-                status: 'AGUARDANDO_APROVACAO_SETOR',
-                message:
-                  'Solicitação de EPI/Uniformes para funcionário antigo encaminhada diretamente para aprovação do aprovador do setor.',
-              },
-            })
-          } else {
-            await prisma.event.create({
-              data: {
-                id: crypto.randomUUID(),
-                solicitationId: created.id,
-                actorId: solicitanteId,
-                tipo: 'ENCAMINHAMENTO_AUTOMATICO_SST',
-              },
-            })
-
-            await prisma.solicitationTimeline.create({
-              data: {
-                solicitationId: created.id,
-                status: 'ENCAMINHADA_SST',
-                message:
-                  'Solicitação de EPI/Uniformes para funcionário novo criada e encaminhada à fila de atendimento do SST.',
-              },
-            })
-          }
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
-
-
-          if (isSolicitacaoVeiculosTipo) {
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
+          // qualquer coisa diferente de SIM exige aprovação
+          const approver = await findLevel3ApproverForCostCenter(
+            resolvedCostCenterId,
+          )
+          const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -1406,23 +510,8 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO',
-               message: 'Solicitação de veículos aguardando aprovação do gestor.',
-            },
-          })
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
+    return NextResponse.json(updated, { status: 201 })
         }
-
 
       /* =====================================================================
            4) RQ_091 - Solicitação de Incentivo à Educação
@@ -1433,30 +522,23 @@ export const POST = withModuleLevel(
               {
                 error:
                   'Centro de custo de Recursos Humanos não encontrado para receber a solicitação.',
-             
               },
               { status: 400 },
             )
           }
 
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
-
-         
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
             data: {
               requiresApproval: true,
               approvalStatus: 'PENDENTE',
-              approverId,
+              approverId: null, // RH vai tratar
               status: 'AGUARDANDO_APROVACAO',
               costCenterId: rhCostCenter.id,
-              departmentId:
-                rhCostCenter.departmentId ?? rhTarget?.rhDepartmentId ?? resolvedDepartmentId,
+              departmentId: rhCostCenter.departmentId ?? departmentId,
             },
           })
+
           await prisma.event.create({
             data: {
               id: crypto.randomUUID(),
@@ -1475,22 +557,76 @@ export const POST = withModuleLevel(
             },
           })
 
-        await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
+       return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
            ===================================================================== */
         if (isDesligamento) {
-          const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: false,
+              approvalStatus: 'APROVADO',
+              approvalAt: new Date(),
+              approverId: null,
+              status: 'ABERTA',
+            },
+          })
+
+          await prisma.event.create({
+            data: {
+              id: crypto.randomUUID(),
+              solicitationId: created.id,
+              actorId: solicitanteId,
+              tipo: 'APROVACAO_AUTOMATICA',
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message:
+                'Solicitação aprovada automaticamente e enviada ao centro de custo responsável.',
+            },
+          })
+          return NextResponse.json(updated, { status: 201 })
+        }
+        /* =====================================================================
+           4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
+           ===================================================================== */
+        if (isNadaConsta) {
+          await prisma.solicitacaoSetor.createMany({
+            data: NADA_CONSTA_SETORES.map((setor) => ({
+              solicitacaoId: created.id,
+              setor: setor.key,
+              status: 'PENDENTE',
+            })),
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: 'AGUARDANDO_ATENDIMENTO',
+              message:
+                'Solicitação criada e encaminhada automaticamente para os setores responsáveis.',
+            },
+          })
+
+          return NextResponse.json(created, { status: 201 })
+        }
+
+
+
+         /* =====================================================================
+           5) Solicitação de Abono Educacional
+           ===================================================================== */
+        if (isAbonoEducacional) {
+          const approver = await findLevel3ApproverForCostCenter(
+            resolvedCostCenterId,
+          )
+          const approverId = approver?.id ?? null
 
           const updated = await prisma.solicitation.update({
             where: { id: created.id },
@@ -1511,146 +647,15 @@ export const POST = withModuleLevel(
             },
           })
 
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_APROVACAO',
-              message: 'Solicitação de desligamento aguardando aprovação do gestor.',
-            },
-          })
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
-          return NextResponse.json(updated, { status: 201 })
-        }
-        /* =====================================================================
-           4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
-           ===================================================================== */
-        if (isNadaConsta || routing.multiSetor) {
-          const setoresDestino = Array.from(
-            new Set([
-              ...NADA_CONSTA_SETORES.map((setor) => setor.key),
-              ...routing.targetSetorKeys,
-            ]),
-          )
-
-          await prisma.solicitacaoSetor.createMany({
-            data: setoresDestino.map((setor) => ({
-              solicitacaoId: created.id,
-              setor,
-              status: 'PENDENTE',
-            })),
-            skipDuplicates: true,
-          })
-
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
-              message:
-                'Solicitação criada e encaminhada automaticamente para os setores responsáveis.',
-            },
-          })
-
-         await notifyWorkflowStepEntry({
-            solicitationId: created.id,
-            preferredDepartmentId: created.departmentId,
-          })
-
-
-        return NextResponse.json(created, { status: 201 })
-        }
-
-
-
-        
-         /* =====================================================================
-           5) Solicitação de Abono Educacional
-           ===================================================================== */
-        if (isAbonoEducacional) {
-           const approverId = await resolveTipoApproverId(tipoId)
-          if (!approverId) {
-            return NextResponse.json({ error: 'Não existe aprovador configurado para este tipo de solicitação.' }, { status: 400 })
-          }
-
-          const updated = await prisma.solicitation.update({
-            where: { id: created.id },
-            data: {
-              requiresApproval: true,
-              approvalStatus: 'PENDENTE',
-              approverId,
-              status: 'AGUARDANDO_APROVACAO',
-            },
-          })
-          await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-             actorId: approverId ?? solicitanteId,
-              tipo: 'AGUARDANDO_APROVACAO_GESTOR',
-            },
-          })
-
-          await notifyWorkflowStepEntry({
-            solicitationId: updated.id,
-            preferredKind: updated.status === 'AGUARDANDO_APROVACAO' ? 'APROVACAO' : undefined,
-            preferredDepartmentId: updated.departmentId,
-          })
-
           return NextResponse.json(updated, { status: 201 })
         }
 
         // ======================================================================
         // 6) Demais tipos: segue fluxo simples, sem aprovação especial
         // ======================================================================
-         if (tipo.id === 'RQ_DP_049') {
-          await prisma.solicitationTimeline.create({
-            data: {
-              solicitationId: created.id,
-              status: 'AGUARDANDO_ATENDIMENTO',
-              message: 'Solicitação encaminhada para LOGÍSTICA.',
-            },
-          })
-
-            await prisma.event.create({
-            data: {
-              id: crypto.randomUUID(),
-              solicitationId: created.id,
-              actorId: solicitanteId,
-              tipo: 'ENCAMINHADA_LOGISTICA',
-            },
-          })
-        }
-        await notifyWorkflowStepEntry({
-          solicitationId: created.id,
-          preferredDepartmentId: created.departmentId,
-        })
-
         return NextResponse.json(created, { status: 201 })
       } catch (e) {
-         console.error('POST /api/solicitacoes error', { requestId, idempotencyKey, error: e })
-        if (e instanceof SolicitationPayloadValidationError) {
-          return NextResponse.json({ error: e.message }, { status: e.status })
-        }
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          if (idempotencyKey) {
-            const existingByIdempotency = await prisma.solicitation.findUnique({
-              where: { idempotencyKey },
-            })
-
-            if (existingByIdempotency) {
-              console.info('POST /api/solicitacoes duplicate prevented (race)', {
-                idempotencyKey,
-                solicitationId: existingByIdempotency.id,
-              })
-              return NextResponse.json(existingByIdempotency, { status: 200 })
-            }
-          }
-          return NextResponse.json({ error: 'Conflito de dados únicos ao criar solicitação.' }, { status: 409 })
-        }
+        console.error('POST /api/solicitacoes error', e)
         return NextResponse.json(
           { error: 'Erro ao criar solicitação.' },
           { status: 500 },

@@ -1,15 +1,12 @@
 // src/app/dashboard/solicitacoes/aprovacao/page.tsx
 'use client'
 
-import { formatDateDDMMYYYY } from '@/lib/date'
-import React, { useEffect, useMemo, useState } from 'react'
-import { Printer } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import {
   SolicitationDetailModal,
   type Row,
   type SolicitationDetail,
 } from '@/components/solicitacoes/SolicitationDetailModal'
-import { useSearchParams } from 'next/navigation'
 
 type ApiResponse = {
   rows: Row[]
@@ -21,17 +18,12 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const searchParams = useSearchParams()
-  const deepLinkId = useMemo(() => searchParams.get('open')?.trim() || '', [searchParams])
-
   // estado do modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedRow, setSelectedRow] = useState<Row | null>(null)
   const [detail, setDetail] = useState<SolicitationDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
-  const [deepLinkHandledId, setDeepLinkHandledId] = useState('')
-  const [deepLinkMessage, setDeepLinkMessage] = useState<string | null>(null)
 
   // ===== CARREGAR LISTA DE APROVAÇÕES =====
   async function loadApprovals() {
@@ -61,31 +53,13 @@ export default function ApprovalsPage() {
     loadApprovals()
   }, [])
 
-
-  useEffect(() => {
-    if (!deepLinkId || loading || deepLinkHandledId === deepLinkId) return
-
-    const targetRow = rows.find((row) => row.id === deepLinkId)
-    if (!targetRow) {
-      setDeepLinkMessage('A solicitação do link não está pendente para sua aprovação ou não foi encontrada.')
-      setDeepLinkHandledId(deepLinkId)
-      return
-    }
-
-    setDeepLinkMessage(null)
-    setDeepLinkHandledId(deepLinkId)
-    void handleOpenPreview(targetRow)
-  }, [deepLinkId, deepLinkHandledId, loading, rows])
-
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
   async function handleOpenPreview(row: Row) {
     setSelectedRow(row)
     setIsModalOpen(true)
     setDetail(null)
     setDetailError(null)
-    setDeepLinkMessage(null)
     setDetailLoading(true)
-
 
     try {
       const res = await fetch(`/api/solicitacoes/${row.id}`)
@@ -104,12 +78,11 @@ export default function ApprovalsPage() {
     }
   }
 
- function handleCloseModal() {
+  function handleCloseModal() {
     setIsModalOpen(false)
     setSelectedRow(null)
     setDetail(null)
     setDetailError(null)
-    setDeepLinkMessage(null)
   }
 
   // ===== AÇÕES DE APROVAR / REPROVAR (botões da lista) =====
@@ -177,10 +150,10 @@ export default function ApprovalsPage() {
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-[var(--foreground)]">
+          <h1 className="text-lg font-semibold text-slate-800">
             Painel de Aprovação
           </h1>
-          <p className="text-xs text-[var(--muted-foreground)]">
+          <p className="text-xs text-slate-500">
             Solicitações pendentes de aprovação para você.
           </p>
         </div>
@@ -193,18 +166,14 @@ export default function ApprovalsPage() {
         </button>
       </div>
 
-       {error && (
+      {error && (
         <p className="mb-2 text-xs text-red-600">{error}</p>
       )}
 
-      {deepLinkMessage && (
-        <p className="mb-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{deepLinkMessage}</p>
-      )}
-
-      <div className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] text-sm">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
         <table className="min-w-full border-collapse">
           <thead>
-            <tr className="bg-[var(--card-muted)] text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
+            <tr className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <th className="px-3 py-2 text-left">Protocolo</th>
               <th className="px-3 py-2 text-left">Data</th>
               <th className="px-3 py-2 text-left">Tipo</th>
@@ -219,7 +188,7 @@ export default function ApprovalsPage() {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-3 py-4 text-center text-xs text-[var(--muted-foreground)]"
+                  className="px-3 py-4 text-center text-xs text-slate-500"
                 >
                   Carregando...
                 </td>
@@ -228,28 +197,28 @@ export default function ApprovalsPage() {
               <tr>
                 <td
                   colSpan={7}
-                  className="px-3 py-4 text-center text-xs text-[var(--muted-foreground)]"
+                  className="px-3 py-4 text-center text-xs text-slate-500"
                 >
                   Nenhuma solicitação pendente de aprovação.
                 </td>
               </tr>
             ) : (
-                rows.map((row) => {
-                  const canApproveRow = true
-                  return (
+              rows.map((row) => (
                 <tr
-                   key={row.id}
+                  key={row.id}
                   onClick={() => handleOpenPreview(row)}
-                  className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--card-muted)]"
+                  className="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
                 >
                   <td className="px-3 py-2 text-xs">
                     {row.protocolo ?? '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                     {row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '—'}
+                    {row.createdAt
+                      ? new Date(row.createdAt).toLocaleString('pt-BR')
+                      : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : '—'}
+                    {row.tipo?.nome ?? '—'}
                   </td>
                   <td className="px-3 py-2 text-xs">{row.titulo}</td>
                   <td className="px-3 py-2 text-xs">
@@ -257,34 +226,23 @@ export default function ApprovalsPage() {
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {row.setorDestino ?? '—'}
-                 </td>
+                  </td>
                   <td className="px-3 py-2 text-right text-xs">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(`/solicitacoes/impressao/${row.id}`, '_blank', 'noopener,noreferrer')
-                      }}
-                      className="mr-2 rounded border border-[var(--input-border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--card-muted)]"
-                    >
-                      <span className="inline-flex items-center gap-1"><Printer size={12} />Imprimir</span>
-                    </button>
-                    <button
                       onClick={(e) => handleApprove(e, row)}
-                       disabled={!canApproveRow}
-                      className="mr-2 rounded bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mr-2 rounded bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-500"
                     >
                       Aprovar
                     </button>
                     <button
                       onClick={(e) => handleReject(e, row)}
-                      disabled={!canApproveRow}
-                      className="rounded bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded bg-red-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-red-500"
                     >
                       Reprovar
                     </button>
                   </td>
                 </tr>
-              )})
+              ))
             )}
           </tbody>
         </table>
