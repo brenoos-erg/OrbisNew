@@ -19,6 +19,9 @@ export type SolicitationVisibilityResult = {
 
 export type SolicitationVisibilityUserContext = {
   userId: string
+  login?: string | null
+  email?: string | null
+  fullName?: string | null
   role?: string | null
   departmentIds?: Array<string | null | undefined>
   costCenterIds?: Array<string | null | undefined>

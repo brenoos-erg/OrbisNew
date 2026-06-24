@@ -32,7 +32,7 @@ export async function listExperienceEvaluators() {
     },
   })
 
-  if (!group) return [] as Array<{ id: string; fullName: string }>
+  if (!group) return [] as Array<{ id: string; fullName: string; login?: string | null; email?: string | null }>
 
   return group.members
     .map((member) => member.user)
