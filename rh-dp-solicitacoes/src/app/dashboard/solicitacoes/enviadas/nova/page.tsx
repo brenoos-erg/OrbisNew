@@ -146,6 +146,8 @@ type Extras = Record<string, string>;
 type CoordinatorOption = {
   id: string;
   fullName: string;
+  login?: string | null;
+  email?: string | null;
 };
 
 type InputChange = ChangeEvent<HTMLInputElement>;
@@ -1259,8 +1261,22 @@ export default function NovaSolicitacaoPage() {
         }
 
         if (isAvaliacaoExperiencia) {
+          const selectedCoordinator = coordinators.find(
+            (coordinator) => coordinator.id === extras.gestorImediatoAvaliadorId,
+          );
           campos.gestorImediatoAvaliadorId = extras.gestorImediatoAvaliadorId ?? '';
-          campos.gestorImediatoAvaliador = extras.gestorImediatoAvaliador ?? '';
+          campos.gestorImediatoAvaliador =
+            selectedCoordinator?.fullName ?? extras.gestorImediatoAvaliador ?? '';
+          campos.gestorImediatoAvaliadorLogin = selectedCoordinator?.login ?? '';
+          campos.gestorImediatoAvaliadorEmail = selectedCoordinator?.email ?? '';
+          campos.avaliadorId = campos.gestorImediatoAvaliadorId;
+          campos.avaliador = campos.gestorImediatoAvaliador;
+          campos.avaliadorLogin = campos.gestorImediatoAvaliadorLogin;
+          campos.avaliadorEmail = campos.gestorImediatoAvaliadorEmail;
+          campos.gestorId = campos.gestorImediatoAvaliadorId;
+          campos.gestor = campos.gestorImediatoAvaliador;
+          campos.gestorLogin = campos.gestorImediatoAvaliadorLogin;
+          campos.gestorEmail = campos.gestorImediatoAvaliadorEmail;
         }
         if (selectedTipo?.id === 'RQ_043') {
           const centroDestinoId =
@@ -2898,6 +2914,14 @@ useEffect(() => {
                                 handleExtraChange(
                                   'gestorImediatoAvaliador',
                                   selectedCoordinator?.fullName ?? '',
+                                );
+                                handleExtraChange(
+                                  'gestorImediatoAvaliadorLogin',
+                                  selectedCoordinator?.login ?? '',
+                                );
+                                handleExtraChange(
+                                  'gestorImediatoAvaliadorEmail',
+                                  selectedCoordinator?.email ?? '',
                                 );
                               }}
                               required

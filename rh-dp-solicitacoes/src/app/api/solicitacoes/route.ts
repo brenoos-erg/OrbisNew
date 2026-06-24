@@ -19,6 +19,12 @@ import {
   buildReceivedWhereByPolicy,
   buildSolicitationVisibilityContext,
 } from '@/lib/solicitationAccessPolicy'
+import {
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+  patchExperienceEvaluationEvaluatorPayload,
+  resolveExperienceEvaluationEvaluatorFromDirectory,
+} from '@/lib/experienceEvaluation'
 
 
 
@@ -353,6 +359,7 @@ export const POST = withModuleLevel(
         const isAbonoEducacional =
           tipo.nome === 'Solicitação de Abono Educacional'
         const isAgendamentoFerias = isSolicitacaoAgendamentoFerias(tipo)
+        const isAvaliacaoExperiencia = tipoId === EXPERIENCE_EVALUATION_TIPO_ID
 
         const rhCostCenter = await prisma.costCenter.findFirst({
           where: {
@@ -413,6 +420,52 @@ export const POST = withModuleLevel(
               status: 'AGUARDANDO_ATENDIMENTO',
               message:
                 'Solicitação aprovada automaticamente e encaminhada para a fila do Departamento Pessoal.',
+            },
+          })
+
+          return NextResponse.json(updated, { status: 201 })
+        }
+
+        if (isAvaliacaoExperiencia) {
+          const evaluators = await prisma.approverGroup.findFirst({
+            where: { name: 'COORDENADORES_AVALIACAO_EXPERIENCIA' },
+            select: {
+              members: {
+                select: {
+                  user: { select: { id: true, fullName: true, login: true, email: true } },
+                },
+              },
+            },
+          })
+          const evaluator = resolveExperienceEvaluationEvaluatorFromDirectory(
+            payload,
+            evaluators?.members.map((member) => member.user) ?? [],
+          )
+
+          if (!evaluator) {
+            return NextResponse.json(
+              { error: 'Gestor imediato avaliador não encontrado.' },
+              { status: 400 },
+            )
+          }
+
+          const patchedPayload = patchExperienceEvaluationEvaluatorPayload(payload, evaluator)
+          const updated = await prisma.solicitation.update({
+            where: { id: created.id },
+            data: {
+              requiresApproval: true,
+              approvalStatus: 'PENDENTE',
+              approverId: evaluator.id,
+              status: EXPERIENCE_EVALUATION_STATUS,
+              payload: patchedPayload,
+            },
+          })
+
+          await prisma.solicitationTimeline.create({
+            data: {
+              solicitationId: created.id,
+              status: EXPERIENCE_EVALUATION_STATUS,
+              message: 'Avaliação encaminhada para resposta do gestor imediato avaliador.',
             },
           })
 

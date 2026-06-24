@@ -1,5 +1,9 @@
 import { ModuleLevel, Prisma } from '@prisma/client'
 import { prisma } from './prisma'
+import {
+  EXPERIENCE_EVALUATION_STATUS,
+  EXPERIENCE_EVALUATION_TIPO_ID,
+} from './experienceEvaluation.constants'
 import { resolveNadaConstaSetoresByDepartment } from './solicitationTypes'
 import type { SolicitationVisibilityUserContext } from './solicitationVisibility'
 
@@ -117,6 +121,9 @@ export async function buildSolicitationVisibilityContext(
     where: { id: user.id },
     select: {
       id: true,
+      login: true,
+      email: true,
+      fullName: true,
       role: true,
       costCenterId: true,
       departmentId: true,
@@ -218,6 +225,9 @@ export async function buildSolicitationVisibilityContext(
 
   return {
     userId: user.id,
+    login: record?.login ?? null,
+    email: record?.email ?? null,
+    fullName: record?.fullName ?? null,
     role: record?.role ?? user.role ?? null,
     departmentIds: [...departmentIds],
     costCenterIds: [...costCenterIds],
@@ -230,6 +240,53 @@ export async function buildSolicitationVisibilityContext(
   }
 }
 
+function addExperienceEvaluationEvaluatorJsonFilters(
+  target: Prisma.SolicitationWhereInput[],
+  ctx: SolicitationVisibilityUserContext,
+) {
+  const identities = [
+    {
+      value: ctx.userId,
+      fields: ['gestorImediatoAvaliadorId', 'avaliadorId', 'gestorId'],
+    },
+    {
+      value: ctx.login,
+      fields: ['gestorImediatoAvaliadorLogin', 'avaliadorLogin', 'gestorLogin'],
+    },
+    {
+      value: ctx.email,
+      fields: ['gestorImediatoAvaliadorEmail', 'avaliadorEmail', 'gestorEmail'],
+    },
+    {
+      value: ctx.fullName,
+      fields: ['gestorImediatoAvaliador', 'avaliador', 'gestor'],
+    },
+  ]
+
+  const payloadSections = ['campos', 'metadata', 'requestData', 'dynamicForm']
+  const identityFilters = identities.flatMap(({ value, fields }) => {
+    const normalizedValue = String(value ?? '').trim()
+    if (!normalizedValue) return []
+
+    return fields.flatMap((field) =>
+      payloadSections.map((section) => ({
+        payload: {
+          path: [section, field],
+          equals: normalizedValue,
+        },
+      })),
+    )
+  })
+
+  if (!identityFilters.length) return
+
+  target.push({
+    tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+    status: EXPERIENCE_EVALUATION_STATUS,
+    OR: identityFilters,
+  })
+}
+
 export function buildReceivedWhereByPolicy(
   ctx: SolicitationVisibilityUserContext,
   baseWhere: Prisma.SolicitationWhereInput = {},
@@ -239,6 +296,7 @@ export function buildReceivedWhereByPolicy(
 
   receivedFilters.push({ assumidaPorId: ctx.userId })
   receivedFilters.push({ approverId: ctx.userId })
+  addExperienceEvaluationEvaluatorJsonFilters(receivedFilters, ctx)
 
   if (ctx.departmentIds?.length) {
     receivedFilters.push({ departmentId: { in: ctx.departmentIds as string[] } })
