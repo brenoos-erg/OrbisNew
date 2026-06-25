@@ -6,6 +6,31 @@ type PersonRef = {
   fullName?: string | null
 }
 
+function readPayloadCampos(payload: unknown): Record<string, unknown> {
+  if (!payload || typeof payload !== 'object') return {}
+  const root = payload as Record<string, unknown>
+  const campos = root.campos
+  return campos && typeof campos === 'object' ? (campos as Record<string, unknown>) : root
+}
+
+function readFirstText(payload: unknown, keys: string[]) {
+  const campos = readPayloadCampos(payload)
+  for (const key of keys) {
+    const value = campos[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return null
+}
+
+function readFirstId(payload: unknown, keys: string[]) {
+  const campos = readPayloadCampos(payload)
+  for (const key of keys) {
+    const value = campos[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return null
+}
+
 type SolicitationTypeRef = {
   id?: string | null
   codigo?: string | null
@@ -23,6 +48,7 @@ export function resolvePrimaryResponsibleForList(input: {
   approver?: PersonRef | null
   approverId?: string | null
   status?: string | null
+  payload?: unknown
 }) {
   const preferApprover = shouldUseApproverAsPrimaryResponsible(input.tipo)
 
@@ -37,12 +63,25 @@ export function resolvePrimaryResponsibleForList(input: {
   }
 
   if (preferApprover) {
+    const fallbackName = readFirstText(input.payload, [
+      'gestorImediatoAvaliador',
+      'avaliador',
+      'gestor',
+    ])
+    const fallbackId = readFirstId(input.payload, [
+      'gestorImediatoAvaliadorId',
+      'avaliadorId',
+      'gestorId',
+    ])
+
     return {
-      responsavelId: input.approver?.id ?? input.approverId ?? null,
+      responsavelId: input.approver?.id ?? input.approverId ?? fallbackId,
       responsavel:
         input.approver?.fullName && input.approver.fullName.trim().length > 0
           ? { fullName: input.approver.fullName }
-          : null,
+          : fallbackName
+            ? { fullName: fallbackName }
+            : null,
     }
   }
 
