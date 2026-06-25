@@ -17,12 +17,12 @@ import { canUserViewSolicitationByFallback } from '@/lib/solicitationVisibility'
  */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser()
     const item = await prisma.solicitation.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
       include: {
         tipo: true,
         costCenter: true,
@@ -203,11 +203,11 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const me = await requireActiveUser() // usuário logado
-    const solicitationId = params.id
+    const { id: solicitationId } = await params
 
     const body = await req.json().catch(() => ({}))
     const comment: string | undefined = body.comment

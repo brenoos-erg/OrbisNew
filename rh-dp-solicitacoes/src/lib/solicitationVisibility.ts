@@ -1,3 +1,7 @@
+import { Prisma } from '@prisma/client'
+import { resolveNadaConstaSetoresByDepartment } from './solicitationTypes'
+import { EXPERIENCE_EVALUATION_FINALIZATION_STATUS, EXPERIENCE_EVALUATION_TIPO_ID, EXPERIENCE_EVALUATION_VISIBLE_STATUSES } from './experienceEvaluation.constants'
+
 export type SolicitationVisibilityReason =
   | 'REQUESTER'
   | 'ASSIGNED_USER'
@@ -34,6 +38,10 @@ export type SolicitationVisibilityUserContext = {
   solicitationModuleLevel?: string | null
   configuracoesModuleLevel?: string | null
   isAdminTechnical?: boolean
+  isExperienceEvaluationCoordinator?: boolean
+  isRhAuthorizedForExperienceEvaluation?: boolean
+  isRhAuthorizedForSharedHiringFlow?: boolean
+  hasSolicitationsModuleAccess?: boolean
 }
 
 export type SolicitationVisibilitySolicitation = {
@@ -197,4 +205,182 @@ export function canUserViewSolicitationByFallback(
     canView: reasons.length > 0,
     reasons,
   }
+}
+
+export function resolveUserSetorKeysFromDepartments(
+  departments: Array<{ id?: string | null; code?: string | null; sigla?: string | null; name?: string | null }>,
+) {
+  const setorKeys = new Set<string>()
+  for (const department of departments) {
+    for (const setor of resolveNadaConstaSetoresByDepartment(department)) {
+      setorKeys.add(setor)
+    }
+  }
+  return [...setorKeys]
+}
+
+export function buildRhSharedHiringFlowVisibilityWhere(): Prisma.SolicitationWhereInput {
+  return {
+    OR: [
+      {
+        OR: [
+          { tipoId: 'RQ_063' },
+          { tipo: { codigo: { in: ['RQ.RH.063', 'RQ.063', 'RQ.RH.001'] } } },
+          { tipo: { nome: { contains: 'Solicitação de Pessoal' } } },
+          { tipo: { nome: { contains: 'Solicitação de pessoal' } } },
+        ],
+      },
+      {
+        AND: [
+          {
+            OR: [
+              { tipoId: 'SOLICITACAO_ADMISSAO' },
+              { tipo: { codigo: { in: ['RQ.DP.001'] } } },
+              { tipo: { nome: { contains: 'Solicitação de Admissão' } } },
+              { tipo: { nome: { contains: 'Solicitação de admissão' } } },
+            ],
+          },
+          {
+            OR: [
+              { parent: { tipoId: 'RQ_063' } },
+              { parent: { tipo: { codigo: { in: ['RQ.RH.063', 'RQ.063', 'RQ.RH.001'] } } } },
+              { payload: { path: '$.origem.rhSolicitationId', not: Prisma.JsonNull } },
+              { payload: { path: '$.origem.rhProtocolo', not: Prisma.JsonNull } },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+}
+
+type LegacyReceivedInput = {
+  userId: string
+  userLogin?: string | null
+  userEmail?: string | null
+  userFullName?: string | null
+  role?: string | null
+  userDepartmentIds?: string[]
+  userCostCenterIds?: string[]
+  userSetorKeys?: string[]
+  userDepartmentNamesNormalized?: string[]
+  userSectorNamesNormalized?: string[]
+  finalizerTipoIds?: string[]
+  allowedTipoIds?: string[]
+  viewerTipoIds?: string[]
+  isExperienceEvaluationCoordinator?: boolean
+  isRhAuthorizedForExperienceEvaluation?: boolean
+  isRhAuthorizedForSharedHiringFlow?: boolean
+}
+
+function buildExperienceEvaluatorPayloadFilters(input: LegacyReceivedInput) {
+  const sections = ['campos', 'metadata', 'requestData', 'dynamicForm']
+  const identities = [
+    { value: input.userId, fields: ['gestorImediatoAvaliadorId', 'avaliadorId', 'gestorId'] },
+    { value: input.userLogin, fields: ['gestorImediatoAvaliadorLogin', 'avaliadorLogin', 'gestorLogin'] },
+    { value: input.userEmail, fields: ['gestorImediatoAvaliadorEmail', 'avaliadorEmail', 'gestorEmail'] },
+    { value: input.userFullName, fields: ['gestorImediatoAvaliador', 'avaliador', 'gestor'] },
+  ]
+  return identities.flatMap(({ value, fields }) => {
+    const normalizedValue = String(value ?? '').trim()
+    if (!normalizedValue) return []
+    return fields.flatMap((field) => sections.map((section) => ({ payload: { path: `$.${section}.${field}`, equals: normalizedValue } })))
+  })
+}
+
+export function buildReceivedSolicitationVisibilityWhere(input: LegacyReceivedInput): Prisma.SolicitationWhereInput {
+  if (input.role === 'ADMIN') return {}
+  const regular: Prisma.SolicitationWhereInput[] = [{ assumidaPorId: input.userId }]
+  if (input.userDepartmentIds?.length) regular.push({ departmentId: { in: input.userDepartmentIds } })
+  if (input.userCostCenterIds?.length) regular.push({ costCenterId: { in: input.userCostCenterIds } })
+  if (input.userSetorKeys?.length) regular.push({ solicitacaoSetores: { some: { setor: { in: input.userSetorKeys } } } })
+  if (input.viewerTipoIds?.length) regular.push({ tipoId: { in: input.viewerTipoIds } })
+  if (input.isRhAuthorizedForSharedHiringFlow) regular.push(buildRhSharedHiringFlowVisibilityWhere())
+
+  const evaluatorPayloadFilters = buildExperienceEvaluatorPayloadFilters(input)
+  const orFilters: Prisma.SolicitationWhereInput[] = [
+    { tipoId: { not: EXPERIENCE_EVALUATION_TIPO_ID }, OR: regular },
+    {
+      tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
+      status: { in: EXPERIENCE_EVALUATION_VISIBLE_STATUSES },
+      OR: [
+        { solicitanteId: input.userId },
+        { approverId: input.userId },
+        ...(input.isExperienceEvaluationCoordinator || input.isRhAuthorizedForExperienceEvaluation ? [{ id: { not: '' } }] : []),
+        ...(input.viewerTipoIds?.includes(EXPERIENCE_EVALUATION_TIPO_ID) ? [{ id: { not: '' } }] : []),
+        ...(evaluatorPayloadFilters.length ? evaluatorPayloadFilters : []),
+      ],
+    },
+  ]
+  if (input.finalizerTipoIds?.includes(EXPERIENCE_EVALUATION_TIPO_ID) || input.viewerTipoIds?.includes(EXPERIENCE_EVALUATION_TIPO_ID) || input.isExperienceEvaluationCoordinator || input.isRhAuthorizedForExperienceEvaluation) {
+    orFilters.push({ tipoId: EXPERIENCE_EVALUATION_TIPO_ID, status: { in: [EXPERIENCE_EVALUATION_FINALIZATION_STATUS, 'CONCLUIDA'] } })
+  }
+  return { OR: orFilters }
+}
+
+function normalizeSharedFlowText(value: unknown) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
+}
+
+export function isSolicitacaoPessoalSharedFlowRecord(solicitation: {
+  tipoId?: string | null
+  tipo?: { codigo?: string | null; nome?: string | null } | null
+}) {
+  const tipoId = normalizeSharedFlowText(solicitation.tipoId)
+  const codigo = normalizeSharedFlowText(solicitation.tipo?.codigo)
+  const nome = normalizeSharedFlowText(solicitation.tipo?.nome)
+  return tipoId === 'RQ_063' || ['RQ.RH.063', 'RQ.063', 'RQ.RH.001'].includes(codigo) || nome.includes('SOLICITACAO DE PESSOAL')
+}
+
+export function isLinkedAdmissionFromSharedHiringFlow(solicitation: {
+  tipoId?: string | null
+  parentId?: string | null
+  payload?: unknown
+  tipo?: { codigo?: string | null; nome?: string | null } | null
+  parent?: { tipoId?: string | null; tipo?: { codigo?: string | null; nome?: string | null } | null } | null
+}) {
+  const tipoId = normalizeSharedFlowText(solicitation.tipoId)
+  const codigo = normalizeSharedFlowText(solicitation.tipo?.codigo)
+  const nome = normalizeSharedFlowText(solicitation.tipo?.nome)
+  const isAdmission = tipoId === 'SOLICITACAO_ADMISSAO' || codigo === 'RQ.DP.001' || nome.includes('SOLICITACAO DE ADMISSAO')
+  if (!isAdmission) return false
+  const origem = solicitation.payload && typeof solicitation.payload === 'object' ? (solicitation.payload as { origem?: Record<string, unknown> }).origem : null
+  if (origem?.rhSolicitationId || origem?.rhProtocolo) return true
+  return Boolean(solicitation.parentId && solicitation.parent && isSolicitacaoPessoalSharedFlowRecord(solicitation.parent))
+}
+
+export function canUserViewSolicitationByDepartment(
+  input: LegacyReceivedInput,
+  solicitation: {
+    tipoId?: string | null
+    status?: string | null
+    solicitanteId?: string | null
+    approverId?: string | null
+    assumidaPorId?: string | null
+    departmentId?: string | null
+    costCenterId?: string | null
+    parentId?: string | null
+    payload?: unknown
+    parent?: { tipoId?: string | null; tipo?: { codigo?: string | null; nome?: string | null } | null } | null
+    tipo?: { codigo?: string | null; nome?: string | null } | null
+    solicitacaoSetores?: { setor?: string | null }[]
+  },
+) {
+  if (input.role === 'ADMIN') return true
+  if (solicitation.solicitanteId === input.userId) return true
+  if (solicitation.assumidaPorId === input.userId) return true
+  if (solicitation.approverId === input.userId) return true
+  if (input.isRhAuthorizedForSharedHiringFlow && (isSolicitacaoPessoalSharedFlowRecord(solicitation) || isLinkedAdmissionFromSharedHiringFlow(solicitation))) return true
+  if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) {
+    if (
+      EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as never) &&
+      (input.isRhAuthorizedForExperienceEvaluation || input.isExperienceEvaluationCoordinator || input.viewerTipoIds?.includes(EXPERIENCE_EVALUATION_TIPO_ID))
+    ) return true
+    return buildExperienceEvaluatorPayloadFilters(input).some((filter) => JSON.stringify(filter).includes(String(input.userId)))
+  }
+  if (solicitation.departmentId && input.userDepartmentIds?.includes(solicitation.departmentId)) return true
+  if (solicitation.costCenterId && input.userCostCenterIds?.includes(solicitation.costCenterId)) return true
+  const setores = new Set((solicitation.solicitacaoSetores ?? []).map((setor) => setor.setor).filter((setor): setor is string => Boolean(setor)))
+  if (input.userSetorKeys?.some((setor) => setores.has(setor))) return true
+  return Boolean(solicitation.tipoId && input.viewerTipoIds?.includes(solicitation.tipoId))
 }

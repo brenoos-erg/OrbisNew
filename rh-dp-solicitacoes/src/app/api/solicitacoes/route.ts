@@ -25,6 +25,7 @@ import {
   patchExperienceEvaluationEvaluatorPayload,
   resolveExperienceEvaluationEvaluatorFromDirectory,
 } from '@/lib/experienceEvaluation'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 
 
 
@@ -162,7 +163,7 @@ export const GET = withModuleLevel(
             take: pageSize,
             orderBy: { dataAbertura: 'desc' },
             include: {
-              tipo: { select: { nome: true } },
+              tipo: { select: { id: true, codigo: true, nome: true } },
               department: { select: { name: true } },
               costCenter: { select: { description: true, externalCode: true, code: true } },
               approver: { select: { id: true, fullName: true } },
@@ -174,7 +175,17 @@ export const GET = withModuleLevel(
         ])
         logTiming('prisma.solicitation.list (/api/solicitacoes)', listStartedAt)
 
-        const rows = solicitations.map((s) => ({
+        const rows = solicitations.map((s) => {
+          const responsible = resolvePrimaryResponsibleForList({
+            tipo: s.tipo,
+            assumidaPor: s.assumidaPor,
+            assumidaPorId: s.assumidaPorId,
+            approver: s.approver,
+            approverId: s.approverId,
+            status: s.status,
+            payload: s.payload,
+          })
+          return ({
   id: s.id,
   titulo: s.titulo,
   status: s.status,
@@ -182,8 +193,8 @@ export const GET = withModuleLevel(
   createdAt: s.dataAbertura.toISOString(),
   tipo: s.tipo ? { nome: s.tipo.nome } : null,
 
-  responsavelId: s.assumidaPor?.id ?? null,
-  responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+  responsavelId: responsible.responsavelId,
+  responsavel: responsible.responsavel,
 
   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
@@ -194,7 +205,8 @@ export const GET = withModuleLevel(
 
   requiresApproval: s.requiresApproval,
   approvalStatus: s.approvalStatus,
-}))
+})
+        })
         return NextResponse.json({ rows, total })
       } catch (e) {
         console.error('GET /api/solicitacoes error', e)

@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
+import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import {
   buildReceivedWhereByPolicy,
   buildSolicitationVisibilityContext,
@@ -100,7 +101,7 @@ export async function GET(req: NextRequest) {
         take: pageSize,
         orderBy: { dataAbertura: 'desc' },
         include: {
-          tipo: { select: { nome: true } },
+          tipo: { select: { id: true, codigo: true, nome: true } },
           department: { select: { name: true } },
           costCenter: { select: { description: true, externalCode: true, code: true } },
           approver: { select: { id: true, fullName: true } },
@@ -111,15 +112,25 @@ export async function GET(req: NextRequest) {
       prisma.solicitation.count({ where }),
     ])
 
-    const rows = solicitations.map((s) => ({
+    const rows = solicitations.map((s) => {
+      const responsible = resolvePrimaryResponsibleForList({
+        tipo: s.tipo,
+        assumidaPor: s.assumidaPor,
+        assumidaPorId: s.assumidaPorId,
+        approver: s.approver,
+        approverId: s.approverId,
+        status: s.status,
+        payload: s.payload,
+      })
+      return ({
       id: s.id,
       titulo: s.titulo,
       status: s.status,
       protocolo: s.protocolo,
       createdAt: s.dataAbertura ? s.dataAbertura.toISOString() : null,
       tipo: s.tipo ? { nome: s.tipo.nome } : null,
-      responsavelId: s.assumidaPor?.id ?? null,
-      responsavel: s.assumidaPor ? { fullName: s.assumidaPor.fullName } : null,
+      responsavelId: responsible.responsavelId,
+      responsavel: responsible.responsavel,
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
       sla: null,
       setorDestino:
@@ -127,7 +138,8 @@ export async function GET(req: NextRequest) {
       requiresApproval: s.requiresApproval,
       approvalStatus: s.approvalStatus,
       costCenterId: s.costCenterId ?? null,
-    }))
+    })
+    })
 
     return NextResponse.json({ rows, total })
   } catch (err) {

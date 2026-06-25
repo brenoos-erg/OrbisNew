@@ -156,6 +156,7 @@ export function buildReceivedResponsibleFilterText(
     >[0]["approver"],
     approverId: solicitation.approverId as string | null | undefined,
     status: solicitation.status as string | null | undefined,
+    payload: solicitation.payload,
   });
 
   const fallbackExperienceFinalization =
