@@ -125,7 +125,7 @@ async function main() {
           OR: [
             { email: args.user },
             { login: args.user },
-            { fullName: { contains: args.user, mode: 'insensitive' } },
+            { fullName: { contains: args.user } },
           ],
         }
 
