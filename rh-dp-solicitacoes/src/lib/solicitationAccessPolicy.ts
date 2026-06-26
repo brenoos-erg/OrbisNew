@@ -297,13 +297,13 @@ function addExperienceEvaluationEvaluatorJsonFilters(
     if (!normalizedValue) return []
 
     return fields.flatMap((field) =>
-      payloadSections.map((section) => ({
-        payload: {
-          path: [section, field],
-          equals: normalizedValue,
-        },
-      })),
-    )
+  payloadSections.map((section) => ({
+    payload: {
+      path: `$.${section}.${field}`,
+      equals: normalizedValue,
+    },
+  })),
+)
   })
 
   if (!identityFilters.length) return
