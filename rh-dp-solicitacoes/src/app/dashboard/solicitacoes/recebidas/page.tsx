@@ -151,6 +151,40 @@ function formatTipoLabel(tipo?: TipoOption | null) {
   return tipo.codigo ? `${tipo.codigo} - ${tipo.nome}` : tipo.nome
 }
 
+function safeText(value: unknown) {
+  if (value === null || value === undefined) return ''
+  const text = String(value).trim()
+  if (!text || ['undefined', 'null', 'NaN'].includes(text)) return ''
+  return text
+}
+
+function formatSolicitationType(row: Pick<Row, 'tipo' | 'titulo'>) {
+  const codigo = safeText(row.tipo?.codigo)
+  const nome = safeText(row.tipo?.nome)
+  const titulo = safeText(row.titulo)
+  if (codigo && nome) return `${codigo} - ${nome}`
+  if (nome) return nome
+  if (titulo) return titulo
+  return 'Tipo não identificado'
+}
+
+function formatAssignee(row: Row) {
+  const responsibleName = safeText(row.responsavel?.fullName)
+  const finalizerName = safeText(row.finalizador?.fullName)
+  if (row.status === 'CONCLUIDA') return finalizerName || responsibleName || '-'
+  if (responsibleName) return responsibleName
+  if (row.requiresApproval && row.approvalStatus === 'PENDENTE') {
+    return row.approverId ? 'Aguardando aprovação' : 'Aguardando aprovação de responsável'
+  }
+  if (row.status === 'ABERTA') {
+    if (safeText(row.setorDestino) || safeText(row.departmentId) || safeText(row.costCenterId)) {
+      return 'Aguardando setor assumir'
+    }
+    return 'Aguardando responsável'
+  }
+  return '-'
+}
+
 function formatCostCenterOptionLabel(center?: CostCenterOption | null) {
   if (!center) return 'Centro de custo não identificado'
   return `${center.externalCode ?? center.code ?? '-'} - ${center.description}`
@@ -539,9 +573,9 @@ export default function ReceivedRequestsPage() {
       row.protocolo ?? '',
       row.solicitanteNome ?? row.autor?.fullName ?? '',
       row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '',
-      row.tipo ? `${row.tipo.codigo ?? ''} - ${row.tipo.nome}` : row.titulo,
+      formatSolicitationType(row),
       row.setorDestino ?? '',
-      row.status === 'ABERTA' ? '-' : row.status === 'CONCLUIDA' ? (row.finalizador?.fullName ?? row.responsavel?.fullName ?? '-') : (row.responsavel?.fullName ?? '-'),
+      formatAssignee(row),
       row.nadaConstaStatus === 'PREENCHIDO' ? 'Preenchido' : row.nadaConstaStatus === 'PENDENTE' ? 'Pendente' : '',
     ])
     const csv = [header, ...lines].map((line) => line.map((col) => `"${String(col).replaceAll('"', '""')}"`).join(';')).join('\n')
@@ -995,7 +1029,7 @@ export default function ReceivedRequestsPage() {
                     <td className="px-4 py-2 text-xs">{row.solicitanteNome ?? row.autor?.fullName ?? '-'}</td>
                     <td className="px-4 py-2 text-xs">{row.createdAt ? formatDateDDMMYYYY(row.createdAt) : '-'}</td>
                     <td className="px-4 py-2 text-xs">
-                      <div>{row.tipo ? `${row.tipo.codigo} - ${row.tipo.nome}` : row.titulo}</div>
+                      <div>{formatSolicitationType(row)}</div>
                       {row.sharedHiringFlowLabel && (
                         <span className="mt-1 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                           {row.sharedHiringFlowLabel}
@@ -1004,11 +1038,7 @@ export default function ReceivedRequestsPage() {
                     </td>
                     <td className="px-4 py-2 text-xs">{row.setorDestino ?? '-'}</td>
                     <td className="px-4 py-2 text-xs">
-                      {row.status === 'ABERTA'
-                        ? '-'
-                        : row.status === 'CONCLUIDA'
-                          ? (row.finalizador?.fullName ?? row.responsavel?.fullName ?? '-')
-                          : (row.responsavel?.fullName ?? '-')}
+                      {formatAssignee(row)}
                     </td>
                     <td className="px-4 py-2 text-xs font-semibold">
                       {row.nadaConstaStatus === 'PREENCHIDO' ? (

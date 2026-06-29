@@ -1,13 +1,10 @@
 import { ModuleLevel, Prisma, Role } from '@prisma/client'
 import { prisma } from './prisma'
-import {
-  EXPERIENCE_EVALUATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
-} from './experienceEvaluation.constants'
 import { isNadaConstaAllSectorsCompleted, isSolicitacaoExamesSst, isSolicitacaoNadaConsta, resolveNadaConstaSetoresByDepartment } from './solicitationTypes'
 import { canUserViewSolicitationByFallback, type SolicitationVisibilityUserContext } from './solicitationVisibility'
 import { isExperienceEvaluationEvaluator } from './experienceEvaluation.shared'
-import { EXPERIENCE_EVALUATION_FINALIZATION_STATUS, EXPERIENCE_EVALUATION_VISIBLE_STATUSES, EXPERIENCE_EVALUATOR_GROUP_NAME } from './experienceEvaluation.constants'
+import { EXPERIENCE_EVALUATION_FINALIZATION_STATUS, EXPERIENCE_EVALUATION_TIPO_ID, EXPERIENCE_EVALUATION_VISIBLE_STATUSES, EXPERIENCE_EVALUATOR_GROUP_NAME } from './experienceEvaluation.constants'
+import { isExperienceEvaluationTipo } from './experienceEvaluationForm'
 
 type VisibilityUser = {
   id: string
@@ -104,13 +101,23 @@ function mergeAnd(
   }
 }
 
+function rq063TipoWhere(): Prisma.SolicitationWhereInput {
+  return {
+    OR: [
+      { tipoId: 'RQ_063' },
+      { tipo: { codigo: { in: ['RQ.RH.063', 'RQ.063'] } } },
+      { tipo: { nome: { contains: 'Solicitação de Pessoal' } } },
+    ],
+  }
+}
+
 function notPendingRq063Where(): Prisma.SolicitationWhereInput {
   return {
     NOT: {
       AND: [
         { requiresApproval: true },
         { approvalStatus: 'PENDENTE' },
-        { tipo: { nome: 'RQ_063 - Solicitação de Pessoal' } },
+        rq063TipoWhere(),
       ],
     },
   }
@@ -297,21 +304,29 @@ function addExperienceEvaluationEvaluatorJsonFilters(
     if (!normalizedValue) return []
 
     return fields.flatMap((field) =>
-  payloadSections.map((section) => ({
-    payload: {
-      path: `$.${section}.${field}`,
-      equals: normalizedValue,
-    },
-  })),
-)
+      payloadSections.map((section) => ({
+        payload: {
+          path: `$.${section}.${field}`,
+          equals: normalizedValue,
+        },
+      })),
+    )
   })
 
   if (!identityFilters.length) return
 
   target.push({
-    tipoId: EXPERIENCE_EVALUATION_TIPO_ID,
-    status: EXPERIENCE_EVALUATION_STATUS,
-    OR: identityFilters,
+    AND: [
+      {
+        OR: [
+          { tipoId: EXPERIENCE_EVALUATION_TIPO_ID },
+          { tipo: { codigo: 'RQ.RH.103' } },
+          { tipo: { nome: { contains: 'Avaliação do Período de Experiência' } } },
+        ],
+      },
+      { status: { in: [...EXPERIENCE_EVALUATION_VISIBLE_STATUSES] } },
+      { OR: identityFilters },
+    ],
   })
 }
 
@@ -325,6 +340,21 @@ export function buildReceivedWhereByPolicy(
   receivedFilters.push({ assumidaPorId: ctx.userId })
   receivedFilters.push({ approverId: ctx.userId })
   addExperienceEvaluationEvaluatorJsonFilters(receivedFilters, ctx)
+
+  if (ctx.isRhAuthorizedForExperienceEvaluation) {
+    receivedFilters.push({
+      AND: [
+        {
+          OR: [
+            { tipoId: EXPERIENCE_EVALUATION_TIPO_ID },
+            { tipo: { codigo: 'RQ.RH.103' } },
+            { tipo: { nome: { contains: 'Avaliação do Período de Experiência' } } },
+          ],
+        },
+        { status: { in: [...EXPERIENCE_EVALUATION_VISIBLE_STATUSES] } },
+      ],
+    })
+  }
 
   if (ctx.departmentIds?.length) {
     receivedFilters.push({ departmentId: { in: ctx.departmentIds as string[] } })
@@ -466,7 +496,7 @@ function isAdmin(ctx: UserAccessContext) { return ctx.role === 'ADMIN' || ctx.is
 
 function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return true
-  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
+  if (!isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null })) return false
   if (!EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as never)) return false
   if (ctx.isExperienceEvaluationCoordinator) return true
   return isExperienceEvaluationEvaluator(
@@ -477,7 +507,7 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
 
 function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return true
-  if (solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID) return false
+  if (isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null })) return false
   if (solicitation.departmentId && contextDepartmentIds(ctx).includes(solicitation.departmentId)) return true
   const setores = new Set((solicitation.solicitacaoSetores ?? []).map((s) => s.setor).filter((s): s is string => Boolean(s)))
   if (setores.size > 0 && contextSetorKeys(ctx).some((setor) => setores.has(setor))) return true
@@ -487,9 +517,9 @@ function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: Solicita
 function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return true
   return Boolean(
-    solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
+    isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null }) &&
       solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS &&
-      (contextFinalizerTipoIds(ctx).includes(solicitation.tipoId) ||
+      (Boolean(solicitation.tipoId && contextFinalizerTipoIds(ctx).includes(solicitation.tipoId)) ||
         ctx.isExperienceEvaluationCoordinator ||
         ctx.isRhAuthorizedForExperienceEvaluation),
   )
@@ -505,7 +535,7 @@ export function canViewSolicitation(ctx: UserAccessContext, solicitation: Solici
 
 export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return false
-  return Boolean(solicitation.tipoId && contextViewerTipoIds(ctx).includes(solicitation.tipoId) && !contextActionableTipoIds(ctx).includes(solicitation.tipoId) && !contextFinalizerTipoIds(ctx).includes(solicitation.tipoId) && !canUserActAsExperienceEvaluator(ctx, solicitation) && !canUserActAsFinalizerForCurrentStage(ctx, solicitation) && !canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null }))
+  return Boolean(solicitation.tipoId && contextViewerTipoIds(ctx).includes(solicitation.tipoId) && !contextActionableTipoIds(ctx).includes(solicitation.tipoId) && !Boolean(solicitation.tipoId && contextFinalizerTipoIds(ctx).includes(solicitation.tipoId)) && !canUserActAsExperienceEvaluator(ctx, solicitation) && !canUserActAsFinalizerForCurrentStage(ctx, solicitation) && !canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null }))
 }
 
 export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
@@ -536,12 +566,12 @@ export function canFinalizeNadaConstaGlobal(ctx: UserAccessContext, solicitation
   return isAdmin(ctx) || ctx.role === 'DP' || hasTipoAccess(contextFinalizerTipoIds(ctx), solicitation) || contextSetorKeys(ctx).includes('DP') || (ctx.userDepartmentNamesNormalized ?? []).some((name) => name.includes('departamento pessoal') || name.includes('pessoal'))
 }
 export function canFinalizeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  const isExperienceFinalizationStage = solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID && solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
+  const isExperienceFinalizationStage = isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null }) && solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
   if (isExperienceFinalizationStage && !isAdmin(ctx)) return !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation) && canUserActAsFinalizerForCurrentStage(ctx, solicitation) && solicitation.approverId !== ctx.userId
   return !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation) && (canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation) || canFinalizeNadaConstaGlobal(ctx, solicitation))
 }
 export function canPrintExperienceEvaluationPdf(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
-  if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) return false
+  if (!isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null })) return false
   if (solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS && solicitation.status !== 'CONCLUIDA' && solicitation.status !== 'FINALIZADA') return false
   if (isAdmin(ctx) || contextFinalizerTipoIds(ctx).includes(EXPERIENCE_EVALUATION_TIPO_ID) || ctx.isExperienceEvaluationCoordinator || ctx.isRhAuthorizedForExperienceEvaluation) return true
   if (canUserActAsExperienceEvaluator(ctx, solicitation)) return true
