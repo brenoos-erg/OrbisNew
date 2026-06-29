@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
       status: s.status,
       protocolo: s.protocolo,
       createdAt: s.dataAbertura ? s.dataAbertura.toISOString() : null,
-      tipo: s.tipo ? { nome: s.tipo.nome } : null,
+      tipo: s.tipo ? { id: s.tipo.id, codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
       responsavelId: responsible.responsavelId,
       responsavel: responsible.responsavel,
       autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
@@ -136,6 +136,8 @@ export async function GET(req: NextRequest) {
         formatCostCenterLabel(s.costCenter, '') || (s.department?.name ?? null),
       requiresApproval: s.requiresApproval,
       approvalStatus: s.approvalStatus,
+      approverId: s.approverId ?? null,
+      departmentId: s.departmentId ?? null,
       costCenterId: s.costCenterId ?? null,
     })
     })
