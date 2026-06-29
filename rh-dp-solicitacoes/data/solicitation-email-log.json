@@ -1,5 +1,587 @@
 [
   {
+    "id": "3b4d0d60-fb03-4230-a947-06776d96940d",
+    "createdAt": "2026-06-27T13:26:19.037Z",
+    "solicitationId": "cdc508a3-efbb-42ba-bc9d-8e2b6877b4e1",
+    "typeId": "RQ_088",
+    "event": "finalized",
+    "recipients": [
+      "marllonrs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.088] Solicitação concluída · RQ2026-02469",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "FINALIZED:cdc508a3-efbb-42ba-bc9d-8e2b6877b4e1"
+    }
+  },
+  {
+    "id": "6c20a5f8-7236-4884-9957-d46204b9c0d3",
+    "createdAt": "2026-06-27T13:20:31.929Z",
+    "solicitationId": "37d04e9d-7cc7-4a9f-8f22-c6fbcc4deda6",
+    "typeId": "RQ_088",
+    "event": "finalized",
+    "recipients": [
+      "franciscolc@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.088] Solicitação concluída · RQ2026-01155",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "FINALIZED:37d04e9d-7cc7-4a9f-8f22-c6fbcc4deda6"
+    }
+  },
+  {
+    "id": "88bd81f8-df1c-4266-9515-a0a64551fca3",
+    "createdAt": "2026-06-26T21:18:33.270Z",
+    "solicitationId": "dd5722a5-898b-4e29-bc2f-19c32a2087bc",
+    "typeId": "RQ_088",
+    "event": "finalized",
+    "recipients": [
+      "pauloac@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.088] Solicitação concluída · RQ2026-02314",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "FINALIZED:dd5722a5-898b-4e29-bc2f-19c32a2087bc"
+    }
+  },
+  {
+    "id": "eab8d664-ebca-478b-b5e6-40e738bc1e48",
+    "createdAt": "2026-06-26T18:38:59.435Z",
+    "solicitationId": "2c6260dd-09a5-4d63-8bf9-f4e73a029ecf",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "emanuelysp@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "gabrielacs@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ260626-8600",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:2c6260dd-09a5-4d63-8bf9-f4e73a029ecf:99090391-78a7-4505-b236-624aff7b34c9"
+    }
+  },
+  {
+    "id": "1a6d78e2-f3bf-4cfc-b75c-c95810ece5e6",
+    "createdAt": "2026-06-26T18:27:35.894Z",
+    "solicitationId": "6c0871a9-0697-449d-ad9b-1b27b8b52dc5",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "emanuelysp@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "gabrielacs@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ260626-8709",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:6c0871a9-0697-449d-ad9b-1b27b8b52dc5:99090391-78a7-4505-b236-624aff7b34c9"
+    }
+  },
+  {
+    "id": "306c5aec-844a-472a-9410-af54774981d0",
+    "createdAt": "2026-06-26T18:22:21.728Z",
+    "solicitationId": "efd5d48c-1f97-4923-b78a-6ce8e8106972",
+    "typeId": "RQ_300",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.016] Atualização relevante na solicitação · RQ260626-4262",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:efd5d48c-1f97-4923-b78a-6ce8e8106972:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
+    "id": "48a78473-9572-4131-9de0-a86d03c0c8ad",
+    "createdAt": "2026-06-26T18:05:51.470Z",
+    "solicitationId": "122e826b-82f2-49ec-9ebb-2033ae385909",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "emanuelysp@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "gabrielacs@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ260626-5591",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:122e826b-82f2-49ec-9ebb-2033ae385909:99090391-78a7-4505-b236-624aff7b34c9"
+    }
+  },
+  {
+    "id": "4b5f289c-38ea-4ac2-918f-fff63e8bc1b4",
+    "createdAt": "2026-06-26T17:47:46.610Z",
+    "solicitationId": "bbea6fc1-1029-4d40-a47d-f961d866455a",
+    "typeId": "RQ_043",
+    "event": "finalized",
+    "recipients": [
+      "duanest@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.043] Solicitação concluída · RQ260626-7210",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "FINALIZED:bbea6fc1-1029-4d40-a47d-f961d866455a"
+    }
+  },
+  {
+    "id": "db3fd7d0-36e0-45e4-99a7-56d63ef86344",
+    "createdAt": "2026-06-26T15:29:22.634Z",
+    "solicitationId": "ba02b686-0511-437b-b1cb-2934311cd41b",
+    "typeId": "RQ_TI_001",
+    "event": "updated",
+    "recipients": [
+      "rafaelah@ergengenharia.com.br",
+      "cauamm@ergengenharia.com.br",
+      "brenoos@ergengenharia.com.br",
+      "alanof@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "renatafm@ergengenharia.com.br",
+      "externo.solicitacoes@ergengenharia.com.br",
+      "gabrielas@ergengenharia.com.br",
+      "marciofm@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.001] Atualização relevante na solicitação · RQ260626-5512",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:ba02b686-0511-437b-b1cb-2934311cd41b:8afb5912-ffcd-4b52-a9dd-877f417a188f"
+    }
+  },
+  {
+    "id": "ab197644-f800-4ca5-bbee-956c4148439c",
+    "createdAt": "2026-06-26T15:22:42.851Z",
+    "solicitationId": "68786911-ad46-4fca-a0fb-afc4f66291a9",
+    "typeId": "RQ_TI_002",
+    "event": "finalized",
+    "recipients": [
+      "joandrasc@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.002] Solicitação concluída · RQ260626-7984",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "FINALIZED:68786911-ad46-4fca-a0fb-afc4f66291a9"
+    }
+  },
+  {
+    "id": "ff20528b-cb7b-4b2d-b02a-2f0fc2181977",
+    "createdAt": "2026-06-26T15:22:39.472Z",
+    "solicitationId": "68786911-ad46-4fca-a0fb-afc4f66291a9",
+    "typeId": "RQ_TI_002",
+    "event": "updated",
+    "recipients": [
+      "rafaelah@ergengenharia.com.br",
+      "cauamm@ergengenharia.com.br",
+      "brenoos@ergengenharia.com.br",
+      "alanof@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "renatafm@ergengenharia.com.br",
+      "externo.solicitacoes@ergengenharia.com.br",
+      "gabrielas@ergengenharia.com.br",
+      "marciofm@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.002] Atualização relevante na solicitação · RQ260626-7984",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "COMMENT:68786911-ad46-4fca-a0fb-afc4f66291a9:Intervenção já realizadas."
+    }
+  },
+  {
+    "id": "07bc0f3f-8533-427a-af26-bdcb0a0f7a1e",
+    "createdAt": "2026-06-26T15:22:26.853Z",
+    "solicitationId": "68786911-ad46-4fca-a0fb-afc4f66291a9",
+    "typeId": "RQ_TI_002",
+    "event": "updated",
+    "recipients": [
+      "rafaelah@ergengenharia.com.br",
+      "cauamm@ergengenharia.com.br",
+      "brenoos@ergengenharia.com.br",
+      "alanof@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "renatafm@ergengenharia.com.br",
+      "externo.solicitacoes@ergengenharia.com.br",
+      "gabrielas@ergengenharia.com.br",
+      "marciofm@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.002] Atualização relevante na solicitação · RQ260626-7984",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:68786911-ad46-4fca-a0fb-afc4f66291a9:8afb5912-ffcd-4b52-a9dd-877f417a188f"
+    }
+  },
+  {
+    "id": "7fda37d9-ee8a-4420-9792-b5c1a69f1150",
+    "createdAt": "2026-06-26T14:57:13.447Z",
+    "solicitationId": "40f009c8-4b32-4653-9556-e80b95102b5b",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "gabrielacs@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "emanuelysp@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ260626-6537",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:40f009c8-4b32-4653-9556-e80b95102b5b:7e36354a-897b-4667-89ec-b22f704c1b23"
+    }
+  },
+  {
+    "id": "9fb3e53c-49e6-4733-baaf-8af12d49ada1",
+    "createdAt": "2026-06-26T14:26:14.021Z",
+    "solicitationId": "4669597b-2c9a-4e08-8436-82a3bb5e0f48",
+    "typeId": "RQ_043",
+    "event": "canceled",
+    "recipients": [
+      "franciscapd@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.043] Solicitação cancelada · RQ260626-6096",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "CANCELED:4669597b-2c9a-4e08-8436-82a3bb5e0f48:1782483972561"
+    }
+  },
+  {
+    "id": "7957c055-ca95-4006-b1f7-a43b2ce982e0",
+    "createdAt": "2026-06-26T13:23:17.318Z",
+    "solicitationId": "b38aa5fc-ba0c-4a84-b733-faacd29dbedd",
+    "typeId": "RQ_300",
+    "event": "canceled",
+    "recipients": [
+      "pedroph@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.016] Solicitação cancelada · RQ2026-02529",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "CANCELED:b38aa5fc-ba0c-4a84-b733-faacd29dbedd:1782480195876"
+    }
+  },
+  {
+    "id": "8f16641b-0545-4898-bd7c-856ae2460436",
+    "createdAt": "2026-06-26T13:19:27.170Z",
+    "solicitationId": "197a40fb-d2b0-45b4-b9e6-dbf63d926b9d",
+    "typeId": "RQ_247",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "eduardo@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.247] Atualização relevante na solicitação · RQ2026-02463",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:197a40fb-d2b0-45b4-b9e6-dbf63d926b9d:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
+    "id": "a11c87fc-0788-4726-8cc3-e53132f68895",
+    "createdAt": "2026-06-26T13:18:06.489Z",
+    "solicitationId": "829a5d7d-d831-4a8a-961f-0b0208b2a062",
+    "typeId": "RQ_247",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.247] Atualização relevante na solicitação · RQ260626-1129",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:829a5d7d-d831-4a8a-961f-0b0208b2a062:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
+    "id": "1591b246-108b-4705-aff6-4b0f02beed16",
+    "createdAt": "2026-06-26T12:41:49.773Z",
+    "solicitationId": "44ceaea1-ee2b-4674-a3b2-ab7d7dfa1015",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "gabrielacs@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "emanuelysp@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ260626-0425",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:44ceaea1-ee2b-4674-a3b2-ab7d7dfa1015:7e36354a-897b-4667-89ec-b22f704c1b23"
+    }
+  },
+  {
+    "id": "6c1bf837-4aa5-4587-ac5b-77fce8dd7441",
+    "createdAt": "2026-06-26T12:41:27.465Z",
+    "solicitationId": "8faecc33-16ca-4bd8-80e5-01abeb4db176",
+    "typeId": "RQ_092",
+    "event": "updated",
+    "recipients": [
+      "gabrielacs@ergengenharia.com.br",
+      "sst@ergengenharia.com.br",
+      "camilabf@ergengenharia.com.br",
+      "rangelfn@ergengenharia.com.br",
+      "jacquelinegr@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "joseas@ergengenharia.com.br",
+      "emanuelysp@ergengenharia.com.br",
+      "milenarn@ergengenharia.com.br",
+      "saude@ergengenharia.com.br",
+      "testes@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.SST.092] Atualização relevante na solicitação · RQ2026-02538",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:8faecc33-16ca-4bd8-80e5-01abeb4db176:7e36354a-897b-4667-89ec-b22f704c1b23"
+    }
+  },
+  {
+    "id": "2e8a7340-d954-4e19-b10a-9dca2bbe86e4",
+    "createdAt": "2026-06-26T12:38:33.200Z",
+    "solicitationId": "11bd513d-76ac-4df2-9eb1-57d3f2b22567",
+    "typeId": "RQ_TI_003",
+    "event": "updated",
+    "recipients": [
+      "gabrielas@ergengenharia.com.br",
+      "cauamm@ergengenharia.com.br",
+      "brenoos@ergengenharia.com.br",
+      "alanof@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "rafaelah@ergengenharia.com.br",
+      "renatafm@ergengenharia.com.br",
+      "externo.solicitacoes@ergengenharia.com.br",
+      "marciofm@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.003] Atualização relevante na solicitação · RQ2026-02334",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "COMMENT:11bd513d-76ac-4df2-9eb1-57d3f2b22567:helenocs@ergengenharia.com.br \nerg@2026\n(31) 9 9946-9874\nGalaxy A03 \nPat: 8589"
+    }
+  },
+  {
+    "id": "bb7d6403-15bb-4368-8f77-0973c30870c3",
+    "createdAt": "2026-06-26T12:33:39.199Z",
+    "solicitationId": "61b09368-86ae-46a7-a828-83e209b1547c",
+    "typeId": "RQ_247",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "eduardo@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.247] Atualização relevante na solicitação · RQ2026-02541",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:61b09368-86ae-46a7-a828-83e209b1547c:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
+    "id": "33392732-0f4f-47bb-88e9-31495e000951",
+    "createdAt": "2026-06-26T12:30:50.803Z",
+    "solicitationId": "11bd513d-76ac-4df2-9eb1-57d3f2b22567",
+    "typeId": "RQ_TI_003",
+    "event": "updated",
+    "recipients": [
+      "gabrielas@ergengenharia.com.br",
+      "cauamm@ergengenharia.com.br",
+      "brenoos@ergengenharia.com.br",
+      "alanof@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "rafaelah@ergengenharia.com.br",
+      "renatafm@ergengenharia.com.br",
+      "externo.solicitacoes@ergengenharia.com.br",
+      "marciofm@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.TI.003] Atualização relevante na solicitação · RQ2026-02334",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:11bd513d-76ac-4df2-9eb1-57d3f2b22567:d702657f-0462-4803-8b75-9159d8583114"
+    }
+  },
+  {
+    "id": "160166ca-8351-48dd-88a7-e8d404c2a8b2",
+    "createdAt": "2026-06-26T12:29:03.275Z",
+    "solicitationId": "993848d9-e1cb-45f8-996c-34e2e3a3a96b",
+    "typeId": "RQ_300",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.016] Atualização relevante na solicitação · RQ260626-4675",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:993848d9-e1cb-45f8-996c-34e2e3a3a96b:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
+    "id": "af35023b-a3cf-44a0-a4d1-fa7d1e2aea80",
+    "createdAt": "2026-06-26T12:28:29.700Z",
+    "solicitationId": "6a3ff27d-e777-4b1c-a0db-5c8b4f6e4830",
+    "typeId": "RQ_300",
+    "event": "updated",
+    "recipients": [
+      "normalc@ergengenharia.com.br",
+      "juliagn@ergengenharia.com.br",
+      "regianep@ergengenharia.com.br",
+      "wagnercf@ergengenharia.com.br",
+      "dp@ergengenharia.com.br",
+      "keniass@ergengenharia.com.br",
+      "tested@ergengenharia.com.br",
+      "superadmin@ergengenharia.com.br",
+      "anamp@ergengenharia.com.br",
+      "thaynas@ergengenharia.com.br",
+      "livials@ergengenharia.com.br",
+      "stephanieag@ergengenharia.com.br",
+      "gislainebs@ergengenharia.com.br"
+    ],
+    "status": "SUCCESS",
+    "templateKey": "operational-default",
+    "subject": "[RQ.016] Atualização relevante na solicitação · RQ260626-1264",
+    "error": null,
+    "metadata": {
+      "dedupeKey": "ASSUMIR:6a3ff27d-e777-4b1c-a0db-5c8b4f6e4830:d25d0926-bae4-498f-83ec-a2ce25521006"
+    }
+  },
+  {
     "id": "d544ea77-291a-4de1-96a5-ea1777df8ea7",
     "createdAt": "2026-06-26T11:18:22.011Z",
     "solicitationId": "d9abd9d7-398a-46fd-8746-bc7a8cfeb5d4",

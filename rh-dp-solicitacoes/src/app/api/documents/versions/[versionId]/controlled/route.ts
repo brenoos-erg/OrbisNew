@@ -44,6 +44,8 @@ async function registerActionLogs(params: {
         versionId: params.versionId,
         type: PrintCopyType.UNCONTROLLED,
         issuedById: params.userId,
+	copyNumber: `CP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+	watermark: 'CÓPIA NÃO CONTROLADA',
       },
     })
   }
