@@ -1,0 +1,47 @@
+const fs = require('fs')
+const assert = require('assert')
+
+const gestorRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/avaliacao-gestor/route.ts', 'utf8')
+const pdfRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/avaliacao-pdf/route.ts', 'utf8')
+const modal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
+const finalizar = fs.readFileSync('src/app/api/solicitacoes/[id]/finalizar/route.ts', 'utf8')
+const diagnose = fs.readFileSync('scripts/diagnose-experience-evaluation-protocols.ts', 'utf8')
+const fix = fs.readFileSync('scripts/fix-stuck-experience-evaluations.ts', 'utf8')
+
+assert.match(gestorRoute, /include:\s*\{\s*tipo:\s*\{\s*select:\s*\{\s*id:\s*true,\s*codigo:\s*true,\s*nome:\s*true/s, 'POST avaliação gestor deve carregar tipo id/código/nome')
+assert.match(gestorRoute, /isExperienceEvaluationTipo\(\{\s*id:\s*solicitation\.tipo\?\.id \?\? solicitation\.tipoId,\s*codigo:\s*solicitation\.tipo\?\.codigo,\s*nome:\s*solicitation\.tipo\?\.nome/s, 'POST avaliação gestor deve validar tipo pelo helper')
+assert.match(gestorRoute, /respondidoPorId:\s*me\.id[\s\S]*respondidoPorNome:[\s\S]*respondidoPorLogin:[\s\S]*respondidoPorEmail:[\s\S]*respondidoEm/s, 'conclusão deve persistir respondidoPor e respondidoEm')
+assert.match(gestorRoute, /status:\s*EXPERIENCE_EVALUATION_FINALIZATION_STATUS/s, 'conclusão deve devolver para AGUARDANDO_FINALIZACAO_AVALIACAO')
+assert.match(gestorRoute, /departmentId:\s*rhRouting\.departmentId/s, 'conclusão deve devolver para RH/DP')
+assert.match(gestorRoute, /AVALIACAO_GESTOR_CONCLUIDA/, 'conclusão deve registrar evento AVALIACAO_GESTOR_CONCLUIDA')
+assert.match(gestorRoute, /Avaliação concluída por \$\{me\.fullName/s, 'timeline deve registrar avaliador e retorno ao RH')
+
+assert.match(pdfRoute, /isExperienceEvaluationTipo/, 'PDF deve validar tipo pelo helper')
+assert.match(pdfRoute, /CANCELADA[\s\S]*avaliação cancelada não pode ser impressa/i, 'PDF deve bloquear canceladas com erro claro')
+assert.match(pdfRoute, /EXPERIENCE_EVALUATION_FINALIZATION_STATUS[\s\S]*CONCLUIDA[\s\S]*FINALIZADA/s, 'PDF deve permitir status finais')
+assert.match(pdfRoute, /hasExperienceEvaluationPrintableData/, 'PDF só deve bloquear quando não houver avaliação preenchida')
+assert.match(pdfRoute, /Não foi possível gerar PDF porque o Chromium do Playwright não está disponível nesta instância/, 'PDF deve retornar erro amigável de Chromium')
+assert.match(pdfRoute, /console\.log\('Gerando PDF de avaliação de experiência'/, 'PDF deve registrar protocolo/status/usuário em log')
+
+assert.match(modal, /Concluir avaliação e devolver ao RH/, 'modal deve mostrar botão claro de conclusão do avaliador')
+assert.match(modal, /isExperienceEvaluationEvaluator[\s\S]*userIsAdmin[\s\S]*isExperienceEvaluationCoordinator[\s\S]*AGUARDANDO_AVALIACAO_GESTOR/s, 'botão do avaliador deve aceitar aliases, admin/coordenador autorizado')
+assert.doesNotMatch(modal, /canEditAvaliacaoGestor[\s\S]{0,500}detail\?\.canFinalize/s, 'botão do avaliador não deve depender de finalizador RH')
+assert.match(modal, /content-type[\s\S]*application\/pdf[\s\S]*Não foi possível baixar o PDF/s, 'download do PDF deve validar content-type e exibir erro da API')
+assert.match(modal, /Você pode visualizar este chamado, mas não possui permissão para imprimir a avaliação/, 'modal deve explicar falta de permissão para imprimir')
+assert.match(modal, /Finalizar avaliação \(RH\)/, 'modal deve manter ação de finalização RH')
+
+assert.match(finalizar, /isExperienceEvaluationTipo/, 'finalização RH deve validar RQ_RH_103 por id/código/nome')
+assert.doesNotMatch(finalizar, /avaliacao-pdf/, 'Opção A: finalizar RH não deve depender de download prévio do PDF')
+
+assert.match(diagnose, /--protocols/, 'diagnóstico deve aceitar múltiplos protocolos')
+assert.match(diagnose, /payload\.avaliacaoGestor/, 'diagnóstico deve imprimir payload.avaliacaoGestor')
+assert.match(diagnose, /RH\/DP consegue imprimir PDF/, 'diagnóstico deve indicar capacidade de PDF')
+assert.match(fix, /--apply/, 'correção deve exigir --apply para gravar')
+assert.doesNotMatch(fix, /prisma\.event\.create/, 'correção não deve criar Event sem actorId obrigatório')
+assert.match(fix, /dry-run/, 'correção deve simular sem --apply')
+assert.match(fix, /hasExperienceEvaluationPrintableData/, 'correção deve detectar avaliação já preenchida')
+
+const tsconfig = JSON.parse(fs.readFileSync('tsconfig.json', 'utf8'))
+assert.notEqual(tsconfig.compilerOptions?.ignoreDeprecations, '6.0', 'tsconfig não pode usar ignoreDeprecations 6.0')
+
+console.log('experience-evaluation-stuck-protocols-regression OK')

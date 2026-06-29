@@ -7,10 +7,10 @@ import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
   hasExperienceEvaluationPrintableData,
   normalizeExperienceEvaluationPayload,
 } from '@/lib/experienceEvaluation'
+import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import {
   EXPERIENCE_EVALUATION_COMMENT_QUESTION,
   EXPERIENCE_EVALUATION_INTRO_TEXT,
@@ -49,7 +49,7 @@ export async function GET(
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
       include: {
-        tipo: { select: { nome: true } },
+        tipo: { select: { id: true, codigo: true, nome: true } },
         solicitante: { select: { fullName: true } },
         solicitacaoSetores: { select: { setor: true } },
         timelines: { select: { status: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
@@ -60,7 +60,7 @@ export async function GET(
       return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     }
 
-    if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) {
+    if (!isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome })) {
       return NextResponse.json(
         { error: 'PDF disponível somente para Avaliação do Período de Experiência.' },
         { status: 400 },
@@ -110,6 +110,8 @@ export async function GET(
         { status: 400 },
       )
     }
+
+    console.log('Gerando PDF de avaliação de experiência', { protocolo: solicitation.protocolo, status: solicitation.status, userId: me.id })
 
     const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload, solicitation)
 
@@ -193,7 +195,7 @@ export async function GET(
     if (details.toLowerCase().includes('executable')) {
       return NextResponse.json(
         {
-          error: 'Chromium do Playwright não está disponível para gerar o PDF nesta instância.',
+          error: 'Não foi possível gerar PDF porque o Chromium do Playwright não está disponível nesta instância.',
         },
         { status: 409 },
       )

@@ -10,8 +10,8 @@ import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/sol
 import { canFinalizeNadaConstaGlobal, canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
 } from '@/lib/experienceEvaluation'
+import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import { getNadaConstaPendingSectors, isNadaConstaAllSectorsCompleted, isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
 export async function PATCH(
@@ -63,7 +63,7 @@ export async function PATCH(
     }
 
     if (
-      solicitation.tipoId === EXPERIENCE_EVALUATION_TIPO_ID &&
+      isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome }) &&
       solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS
     ) {
       return NextResponse.json(
@@ -145,6 +145,7 @@ export async function PATCH(
       departmentId: solicitation.departmentId,
       solicitacaoSetores: solicitation.solicitacaoSetores,
       payload: solicitation.payload,
+      tipo: solicitation.tipo,
     })
 
     const canFinalizeNadaConsta = canFinalizeNadaConstaGlobal(userAccess, {

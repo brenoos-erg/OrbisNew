@@ -228,6 +228,10 @@ type ExperienceEvaluationReadModel = ReturnType<typeof extractExperienceEvaluati
 
 type CurrentUser = {
   id: string
+  login?: string | null
+  email?: string | null
+  fullName?: string | null
+  isExperienceEvaluationCoordinator?: boolean
   role?: string | null
   departmentCode?: string | null
   departmentName?: string | null
@@ -880,10 +884,15 @@ export function SolicitationDetailModal({
   const isAvaliacaoExperiencia = isExperienceEvaluationTipo(detail?.tipo)
   const canEditAvaliacaoGestor =
     Boolean(currentUser?.id) &&
-    isExperienceEvaluationEvaluator(
-      { payload: detail?.payload, approverId: detail?.approverId },
-      currentUser ?? {},
+    (
+      isExperienceEvaluationEvaluator(
+        { payload: detail?.payload, approverId: detail?.approverId },
+        currentUser ?? {},
+      ) ||
+      userIsAdmin ||
+      currentUser?.isExperienceEvaluationCoordinator === true
     ) &&
+    isAvaliacaoExperiencia &&
     effectiveStatus === 'AGUARDANDO_AVALIACAO_GESTOR'
 
   const missingGestorAvaliacaoFields = useMemo(() => {
@@ -1194,12 +1203,11 @@ export function SolicitationDetailModal({
   const userIsCurrentDepartmentResponsible =
     !!detail?.department?.id && currentUserDepartmentIds.has(detail.department.id)
   const isExperienceEvaluationPdfAvailableStatus =
-    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' || effectiveStatus === 'CONCLUIDA'
+    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' || effectiveStatus === 'CONCLUIDA' || effectiveStatus === 'FINALIZADA'
   const canFinalizeExperienceByRh =
     apiCanFinalize &&
     isAvaliacaoExperiencia &&
-    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO' &&
-    (userIsAdmin || userIsCurrentDepartmentResponsible)
+    effectiveStatus === 'AGUARDANDO_FINALIZACAO_AVALIACAO'
   const canDownloadExperiencePdf =
     isAvaliacaoExperiencia &&
     isExperienceEvaluationPdfAvailableStatus &&
@@ -1956,9 +1964,12 @@ async function handleEncaminharAprovacaoComAnexo() {
     setCloseSuccess(null)
     try {
       const res = await fetch(`/api/solicitacoes/${solicitationId}/avaliacao-pdf`)
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        throw new Error(json?.error ?? 'Falha ao gerar PDF da avaliação.')
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!res.ok || !contentType.toLowerCase().includes('application/pdf')) {
+        const json = contentType.toLowerCase().includes('application/json')
+          ? await res.json().catch(() => ({}))
+          : {}
+        throw new Error(`Não foi possível baixar o PDF: ${json?.error ?? 'resposta inválida da API.'}`)
       }
 
       const blob = await res.blob()
@@ -3074,7 +3085,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                         disabled={!canSubmitGestorAvaliacao}
                         className="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                       >
-                        {savingGestorAvaliacao ? 'Salvando...' : 'Salvar avaliação e concluir'}
+                        {savingGestorAvaliacao ? 'Salvando...' : 'Concluir avaliação e devolver ao RH'}
                       </button>
                     </div>
                   )}
