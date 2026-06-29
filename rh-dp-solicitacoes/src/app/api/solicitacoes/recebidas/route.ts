@@ -7,72 +7,18 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
+import {
+  applyReceivedInMemoryFilters,
+  buildListAndCountArgs,
+  buildWhereFromSearchParams,
+  getAdvancedTextFilters,
+  hasReceivedInMemoryFilters,
+} from '@/lib/receivedSolicitationsQuery'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import {
   buildReceivedWhereByPolicy,
-  buildSolicitationVisibilityContext,
+  resolveUserAccessContext,
 } from '@/lib/solicitationAccessPolicy'
-
-function buildWhereFromSearchParams(searchParams: URLSearchParams) {
-  const where: any = {}
-
-  const dateStart = searchParams.get('dateStart')
-  const dateEnd = searchParams.get('dateEnd')
-  const centerId = searchParams.get('centerId')
-  const costCenterId = searchParams.get('costCenterId') ?? centerId
-  const departmentId = searchParams.get('departmentId')
-  const tipoId = searchParams.get('tipoId')
-  const protocolo = searchParams.get('protocolo')
-  const solicitante = searchParams.get('solicitante')
-  const status = searchParams.get('status')
-  const text = searchParams.get('text')
-
-  if (dateStart || dateEnd) {
-    where.dataAbertura = {}
-    if (dateStart) {
-      where.dataAbertura.gte = new Date(dateStart + 'T00:00:00')
-    }
-    if (dateEnd) {
-      const end = new Date(dateEnd + 'T23:59:59')
-      where.dataAbertura.lte = end
-    }
-  }
-
-  if (departmentId) where.departmentId = departmentId
-  if (costCenterId) where.costCenterId = costCenterId
-  if (tipoId) where.tipoId = tipoId
-  if (status) where.status = status
-
-  if (protocolo) {
-    where.protocolo = {
-      contains: protocolo,
-    }
-  }
-
-  if (solicitante) {
-    where.solicitante = {
-      OR: [
-        { fullName: { contains: solicitante } },
-        { email: { contains: solicitante } },
-      ],
-    }
-  }
-
-  if (text) {
-    const or: any[] = [
-      { titulo: { contains: text } },
-      { descricao: { contains: text } },
-    ]
-    if (where.OR) {
-      where.OR = [...where.OR, ...or]
-    } else {
-      where.OR = or
-    }
-  }
-
-  return where
-}
-
 
 export async function GET(req: NextRequest) {
   try {
@@ -86,32 +32,44 @@ export async function GET(req: NextRequest) {
       Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
 
     const skip = (page - 1) * pageSize
-    const visibilityContext = await buildSolicitationVisibilityContext(me)
-    const where = buildReceivedWhereByPolicy(
-      visibilityContext,
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    })
+    const dbWhere = buildReceivedWhereByPolicy(
+      userAccess,
       buildWhereFromSearchParams(searchParams),
       { excludePendingRq063: true },
     )
 
-    const [solicitations, total] = await Promise.all([
-      prisma.solicitation.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: { dataAbertura: 'desc' },
-        include: {
-          tipo: { select: { id: true, codigo: true, nome: true } },
-          department: { select: { name: true } },
-          costCenter: { select: { description: true, externalCode: true, code: true } },
-          approver: { select: { id: true, fullName: true } },
-          assumidaPor: { select: { id: true, fullName: true } },
-          solicitante: { select: { id: true, fullName: true } },
-        },
-      }),
-      prisma.solicitation.count({ where }),
+    const advancedTextFilters = getAdvancedTextFilters(searchParams)
+    const hasInMemoryFilters = hasReceivedInMemoryFilters(advancedTextFilters)
+    const { findManyArgs, countArgs } = buildListAndCountArgs(dbWhere, {
+      skip,
+      pageSize,
+      orderBy: [{ dataAbertura: 'desc' }],
+      includeGlobalSearchData: hasInMemoryFilters,
+    })
+
+    const [allSolicitations, dbTotal] = await Promise.all([
+      prisma.solicitation.findMany(findManyArgs),
+      hasInMemoryFilters ? Promise.resolve(0) : prisma.solicitation.count(countArgs),
     ])
 
-    const rows = solicitations.map((s) => {
+    const filteredSolicitations = hasInMemoryFilters
+      ? applyReceivedInMemoryFilters(allSolicitations, advancedTextFilters)
+      : allSolicitations
+    const total = hasInMemoryFilters ? filteredSolicitations.length : dbTotal
+    const paginatedSolicitations = hasInMemoryFilters
+      ? filteredSolicitations.slice(skip, skip + pageSize)
+      : filteredSolicitations
+
+    const rows = paginatedSolicitations.map((s) => {
       const responsible = resolvePrimaryResponsibleForList({
         tipo: s.tipo,
         assumidaPor: s.assumidaPor,
@@ -145,6 +103,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ rows, total })
   } catch (err) {
     console.error('GET /api/solicitacoes/recebidas error', err)
+    if (err instanceof Error && err.message === 'Usuário não autenticado') {
+      return NextResponse.json({ error: err.message }, { status: 401 })
+    }
+    if (err instanceof Error && err.message === 'Usuário inativo') {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === 'P2021' &&
