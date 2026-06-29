@@ -19,6 +19,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
       status: true,
       fileUrl: true,
       revisionNumber: true,
+      documentId: true,
       document: { select: { code: true } },
     },
   })
@@ -94,7 +95,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
   }
 
 
+  const publicationObsoleteUpdate = nextStatus === DocumentVersionStatus.PUBLICADO
+    ? prisma.documentVersion.updateMany({
+      where: { documentId: version.documentId, isCurrentPublished: true, id: { not: versionId } },
+      data: { isCurrentPublished: false, obsoleteAt: new Date(), obsoleteReason: 'Substituído por nova revisão publicada.', obsoletedById: me.id, operationalUseBlocked: true },
+    })
+    : null
+
   await prisma.$transaction([
+    ...(publicationObsoleteUpdate ? [publicationObsoleteUpdate] : []),
     prisma.documentApproval.update({
       where: { id: approval.id },
       data: { status: DocumentApprovalStatus.APPROVED, decidedById: me.id, decidedAt: new Date() },
@@ -110,9 +119,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
     }),
   ])
 
-  const documentId = (
-    await prisma.documentVersion.findUnique({ where: { id: versionId }, select: { documentId: true } })
-  )?.documentId
+  const documentId = version.documentId
 
   if (documentId) {
     void sendDocumentNotification('DOCUMENT_APPROVED', {

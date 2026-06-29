@@ -3,6 +3,8 @@ import path from 'node:path'
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentApprovalStatus, DocumentVersionStatus, Prisma } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
+import { getUserModuleLevel } from '@/lib/access'
+import { MODULE_KEYS } from '@/lib/featureKeys'
 import {
   createSuccessMessageByStatus,
   resolveInitialVersionStatus,
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest)   {
     failureStage = 'validation:document-type'
     const documentType = await prisma.documentTypeCatalog.findUnique({
       where: { id: String(payload.documentTypeId) },
-      select: { id: true, code: true },
+      select: { id: true, code: true, controlledCopy: true },
     })
 
     if (!documentType) {
@@ -178,7 +180,23 @@ export async function POST(req: NextRequest)   {
       select: { id: true, stepType: true },
     })
 
-    const initialStatus = resolveInitialVersionStatus(flow)
+    const directPublicationJustification = String(payload.directPublicationJustification ?? '').trim()
+    const userModuleLevel = await getUserModuleLevel(me.id, MODULE_KEYS.CONTROLE_DOCUMENTOS)
+    let initialStatus: DocumentVersionStatus
+    try {
+      initialStatus = resolveInitialVersionStatus(flow, {
+        documentTypeControlledCopy: documentType.controlledCopy,
+        documentTypeCode: documentType.code,
+        documentCode: payload.code,
+        userModuleLevel,
+        directPublicationJustification,
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        return NextResponse.json({ error: error.message }, { status: 422 })
+      }
+      throw error
+    }
     const requestedInitialRevisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
 
     failureStage = 'documents:check-existing-code'
@@ -234,6 +252,13 @@ export async function POST(req: NextRequest)   {
           },
         })
 
+        if (initialStatus === DocumentVersionStatus.PUBLICADO) {
+          await tx.documentVersion.updateMany({
+            where: { documentId: existing.id, isCurrentPublished: true },
+            data: { isCurrentPublished: false, obsoleteAt: new Date(), obsoletedById: me.id, obsoleteReason: payload.revisionReason || 'Substituído por nova revisão publicada.' },
+          })
+        }
+
         const version = await tx.documentVersion.create({
           data: {
             documentId: existing.id,
@@ -247,6 +272,12 @@ export async function POST(req: NextRequest)   {
             isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
           },
         })
+        if (initialStatus === DocumentVersionStatus.PUBLICADO && directPublicationJustification) {
+          await tx.documentAuditLog.create({
+            data: { documentId: existing.id, versionId: version.id, userId: me.id, action: 'DIRECT_PUBLICATION', reason: directPublicationJustification },
+          })
+        }
+
         if (flow.length > 0) {
           await tx.documentApproval.createMany({
             data: flow.map((item) => ({
@@ -327,6 +358,12 @@ export async function POST(req: NextRequest)   {
       },
       include: { versions: true },
     })
+
+    if (initialStatus === DocumentVersionStatus.PUBLICADO && directPublicationJustification && created.versions[0]) {
+      await prisma.documentAuditLog.create({
+        data: { documentId: created.id, versionId: created.versions[0].id, userId: me.id, action: 'DIRECT_PUBLICATION', reason: directPublicationJustification },
+      })
+    }
 
     failureStage = 'documents:create-approvals'
     if (flow.length > 0 && created.versions[0]) {

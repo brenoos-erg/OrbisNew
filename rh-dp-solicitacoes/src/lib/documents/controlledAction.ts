@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { PrintCopyType } from '@prisma/client'
+import { ModuleLevel, PrintCopyType } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
@@ -39,6 +39,8 @@ type ControlledActionDeps = {
     documentId: string
     versionId: string
     userId: string
+    type: PrintCopyType
+    validUntil?: Date | null
   }) => Promise<unknown>
   registerAuditLog: typeof registerDocumentAuditLog
 }
@@ -60,8 +62,11 @@ const defaultDeps: ControlledActionDeps = {
       data: {
         documentId: data.documentId,
         versionId: data.versionId,
-        type: PrintCopyType.UNCONTROLLED,
+        type: data.type,
         issuedById: data.userId,
+        copyNumber: `CP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+        validUntil: data.validUntil ?? null,
+        watermark: data.type === PrintCopyType.CONTROLLED ? 'CÓPIA CONTROLADA' : 'CÓPIA NÃO CONTROLADA',
       },
     }),
   registerAuditLog: registerDocumentAuditLog,
@@ -83,6 +88,9 @@ async function executeControlledDocumentActionWithDeps(
   const ip = input.req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
   const userAgent = input.req.headers.get('user-agent')
   const intentUpper = input.intent.toUpperCase() as 'VIEW' | 'DOWNLOAD' | 'PRINT'
+  const requestedCopyType = input.req.nextUrl.searchParams.get('copyType') === 'CONTROLLED'
+    ? PrintCopyType.CONTROLLED
+    : PrintCopyType.UNCONTROLLED
 
   if (input.intent === 'download') {
     await deps.createDownloadLog({
@@ -95,10 +103,15 @@ async function executeControlledDocumentActionWithDeps(
   }
 
   if (input.intent === 'print') {
+    if (requestedCopyType === PrintCopyType.CONTROLLED && resolved.access.moduleLevel !== ModuleLevel.NIVEL_3) {
+      return { error: 'Somente usuários NIVEL_3 podem emitir cópia controlada.', status: 403 }
+    }
     await deps.createPrintCopy({
       documentId: resolved.access.documentId,
       versionId: resolved.access.versionId,
       userId: input.userId,
+      type: requestedCopyType,
+      validUntil: resolved.access.expiresAt ?? null,
     })
   }
 

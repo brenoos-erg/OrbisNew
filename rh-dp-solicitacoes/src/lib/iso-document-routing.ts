@@ -1,4 +1,4 @@
-import { DocumentFlowStepType, DocumentVersionStatus } from '@prisma/client'
+import { DocumentFlowStepType, DocumentVersionStatus, ModuleLevel } from '@prisma/client'
 
 export type DocumentRouting = {
   status: DocumentVersionStatus
@@ -14,8 +14,37 @@ export type CodeAvailabilityFeedback = {
   currentRevisionNumber?: number | null
   routing?: Omit<DocumentRouting, 'message'>
 }
-export function resolveInitialVersionStatus(flow: Array<{ stepType: DocumentFlowStepType }>) {
+export const MISSING_APPROVAL_FLOW_ERROR = 'Tipo documental sem fluxo de aprovação configurado.'
+
+export type InitialVersionStatusContext = {
+  documentTypeControlledCopy?: boolean
+  documentTypeCode?: string | null
+  documentCode?: string | null
+  userModuleLevel?: ModuleLevel | null
+  directPublicationJustification?: string | null
+}
+
+export function isQualityManagementDocument(context: InitialVersionStatusContext) {
+  const markers = [context.documentTypeCode, context.documentCode]
+    .filter(Boolean)
+    .map((value) => String(value).toUpperCase())
+
+  return markers.some((value) => /(^|[-_\s])(SGQ|SGI|ISO|QUAL|PQ|IT|POP|MQ)([-_\s]|$)/.test(value))
+}
+
+export function resolveInitialVersionStatus(
+  flow: Array<{ stepType: DocumentFlowStepType }>,
+  context: InitialVersionStatusContext = {},
+) {
   if (flow.length === 0) {
+    const requiresFlow = Boolean(context.documentTypeControlledCopy) || isQualityManagementDocument(context)
+    const hasDirectPublicationOverride =
+      context.userModuleLevel === ModuleLevel.NIVEL_3 && Boolean(context.directPublicationJustification?.trim())
+
+    if (requiresFlow && !hasDirectPublicationOverride) {
+      throw new Error(MISSING_APPROVAL_FLOW_ERROR)
+    }
+
     return DocumentVersionStatus.PUBLICADO
   }
 
