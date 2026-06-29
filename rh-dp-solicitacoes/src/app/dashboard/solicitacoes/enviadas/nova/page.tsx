@@ -682,6 +682,14 @@ export default function NovaSolicitacaoPage() {
       : '';
   };
 
+  const resolveRequestCostCenterId = (camposValues: Record<string, string>) =>
+    camposValues.centroCustoId ||
+    camposValues.centroCustoDestinoId ||
+    extras.centroCustoForm ||
+    solicitanteManual.costCenterId ||
+    me?.costCenterId ||
+    null;
+
 
 
 
@@ -1317,11 +1325,28 @@ export default function NovaSolicitacaoPage() {
         }
       }
 
+      const resolvedRequestCostCenterId = resolveRequestCostCenterId(campos);
+
+      if (selectedTipo?.id === 'RQ_063' && !resolvedRequestCostCenterId) {
+        setSubmitError('Selecione o Centro de Custo da solicitação.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (resolvedRequestCostCenterId) {
+        const resolvedCostCenterLabel = buildCostCenterLabel(resolvedRequestCostCenterId);
+        campos.centroCustoId = campos.centroCustoId || resolvedRequestCostCenterId;
+        if (resolvedCostCenterLabel) {
+          campos.centroCustoIdLabel = campos.centroCustoIdLabel || resolvedCostCenterLabel;
+          campos.centroCustoFormLabel = campos.centroCustoFormLabel || resolvedCostCenterLabel;
+        }
+      }
 
       const body = {
         solicitanteId: me?.id ?? null,
         departmentId: departamentoId,
         tipoId,
+        costCenterId: resolvedRequestCostCenterId,
         campos,
         solicitarParaOutroColaborador,
         solicitanteManual: solicitarParaOutroColaborador
