@@ -6,10 +6,11 @@ import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   EXPERIENCE_EVALUATION_REQUIRED_FIELDS,
   EXPERIENCE_EVALUATION_STATUS,
-  EXPERIENCE_EVALUATION_TIPO_ID,
+  EXPERIENCE_EVALUATOR_GROUP_NAME,
   isExperienceEvaluationEvaluator,
   resolveRhDepartmentForExperienceEvaluation,
 } from '@/lib/experienceEvaluation'
+import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import { EXPERIENCE_EVALUATION_SCORE_OPTIONS } from '@/lib/experienceEvaluationQuestions'
 
 export async function POST(
@@ -78,7 +79,10 @@ export async function POST(
       )
     }
 
-    const solicitation = await prisma.solicitation.findUnique({ where: { id } })
+    const solicitation = await prisma.solicitation.findUnique({
+      where: { id },
+      include: { tipo: { select: { id: true, codigo: true, nome: true } } },
+    })
 
     if (!solicitation) {
       return NextResponse.json(
@@ -87,21 +91,28 @@ export async function POST(
       )
     }
 
-    if (solicitation.tipoId !== EXPERIENCE_EVALUATION_TIPO_ID) {
+    if (!isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome })) {
       return NextResponse.json(
         { error: 'Tipo de solicitação não suportado para avaliação do gestor.' },
         { status: 400 },
       )
     }
 
-     if (
-      !isExperienceEvaluationEvaluator(
-        { payload: solicitation.payload, approverId: solicitation.approverId },
-        me,
-      )
-    ) {
+    const isAssignedEvaluator = isExperienceEvaluationEvaluator(
+      { payload: solicitation.payload, approverId: solicitation.approverId },
+      me,
+    )
+    const isCoordinator = Boolean(
+      await prisma.approverGroupMember.findFirst({
+        where: { userId: me.id, group: { name: EXPERIENCE_EVALUATOR_GROUP_NAME } },
+        select: { id: true },
+      }),
+    )
+    const canSubmitAsEvaluator = isAssignedEvaluator || isCoordinator || me.role === 'ADMIN'
+
+    if (!canSubmitAsEvaluator) {
       return NextResponse.json(
-        { error: 'Somente o gestor imediato avaliador pode preencher esta etapa.' },
+        { error: 'Somente o gestor imediato avaliador, coordenador autorizado ou administrador pode preencher esta etapa.' },
         { status: 403 },
       )
     }
@@ -128,11 +139,19 @@ export async function POST(
       ...payload,
       avaliadoEm: typeof payload.avaliadoEm === 'string' && payload.avaliadoEm.trim() ? payload.avaliadoEm : nowIso,
       respondidoEm: typeof payload.respondidoEm === 'string' && payload.respondidoEm.trim() ? payload.respondidoEm : nowIso,
+      respondidoPorId: me.id,
+      respondidoPorNome: me.fullName ?? me.login ?? me.email ?? me.id,
+      respondidoPorLogin: me.login ?? '',
+      respondidoPorEmail: me.email ?? '',
       avaliacaoGestor: {
         ...avaliacao,
         avaliadoEm: nowIso,
         respondidoEm: nowIso,
         avaliadorId: me.id,
+        respondidoPorId: me.id,
+        respondidoPorNome: me.fullName ?? me.login ?? me.email ?? me.id,
+        respondidoPorLogin: me.login ?? '',
+        respondidoPorEmail: me.email ?? '',
       },
     }
 
@@ -154,7 +173,7 @@ export async function POST(
       data: {
         solicitationId: id,
         status: EXPERIENCE_EVALUATION_FINALIZATION_STATUS as any,
-        message: 'Avaliação do gestor concluída. Solicitação devolvida ao RH para emissão de PDF e finalização.',
+        message: `Avaliação concluída por ${me.fullName ?? me.login ?? me.email ?? me.id}. Solicitação devolvida ao RH para finalização.`,
       },
     })
 

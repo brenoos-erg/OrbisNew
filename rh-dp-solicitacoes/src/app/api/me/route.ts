@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureUserDepartmentLink } from '@/lib/userDepartments'
 import { getUserModuleLevels } from '@/lib/moduleAccess'
 import { requireActiveUser } from '@/lib/auth'
+import { EXPERIENCE_EVALUATOR_GROUP_NAME } from '@/lib/experienceEvaluation.constants'
 
 export async function GET() {
   const me = await requireActiveUser()
@@ -21,6 +22,10 @@ export async function GET() {
   })
   if (!dbUser) return NextResponse.json({ error: 'Usuário não encontrado.' }, { status: 404 })
   const moduleLevels = await getUserModuleLevels(dbUser.id)
+  const evaluatorGroupMember = await prisma.approverGroupMember.findFirst({
+    where: { userId: dbUser.id, group: { name: EXPERIENCE_EVALUATOR_GROUP_NAME } },
+    select: { id: true },
+  })
   const departmentsLinks = await prisma.userDepartment.findMany({ where: { userId: dbUser.id }, select: { department: { select: { id: true, name: true, code: true } } } })
   return NextResponse.json({
     id: dbUser.id, email: dbUser.email, fullName: dbUser.fullName, login: dbUser.login, phone: dbUser.phone, role: dbUser.role,
@@ -29,6 +34,7 @@ export async function GET() {
     departments: departmentsLinks.map((link) => ({ id: link.department.id, name: link.department.name, code: link.department.code })),
     costCenterId: dbUser.costCenterId, costCenterName: dbUser.costCenter ? `${dbUser.costCenter.code ? dbUser.costCenter.code + ' - ' : ''}${dbUser.costCenter.description}` : null,
     leaderId: dbUser.leaderId, leaderName: dbUser.leader?.fullName ?? null, moduleLevels,
+    isExperienceEvaluationCoordinator: Boolean(evaluatorGroupMember),
   })
 }
 
