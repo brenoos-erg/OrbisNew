@@ -325,11 +325,23 @@ export const POST = withModuleLevel(
           Number.isFinite(tipoMeta.defaultSlaHours)
             ? new Date(Date.now() + tipoMeta.defaultSlaHours * 60 * 60 * 1000)
             : undefined
-        const resolvedCostCenterId = costCenterId ?? me.costCenterId ?? null
+        const costCenterIdFromCampos =
+          campos.centroCustoId ||
+          campos.centroCustoDestinoId ||
+          campos.centroCustoForm ||
+          campos.costCenterId ||
+          campos.contratoDestinoId ||
+          null
+
+        const resolvedCostCenterId =
+          costCenterId ??
+          costCenterIdFromCampos ??
+          me.costCenterId ??
+          null
 
         if (!resolvedCostCenterId) {
           return NextResponse.json(
-            { error: 'Centro de custo é obrigatório.' },
+            { error: 'Centro de custo é obrigatório. Selecione o campo Centro de Custo da solicitação antes de enviar.' },
             { status: 400 },
           )
         }
