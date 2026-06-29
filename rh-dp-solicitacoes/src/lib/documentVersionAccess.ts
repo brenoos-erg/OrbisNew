@@ -59,7 +59,7 @@ export async function resolveDocumentVersionAccess(
         level: { in: [ModuleLevel.NIVEL_1, ModuleLevel.NIVEL_2, ModuleLevel.NIVEL_3] },
         module: { key: { in: ['controle-documentos', 'meus-documentos'] } },
       },
-      select: { id: true },
+      select: { id: true, level: true },
     }),
     ownerDepartmentId
       ? prisma.userDepartment.findFirst({
@@ -113,6 +113,13 @@ export async function resolveDocumentVersionAccess(
       }
     }
   }
+  if ((version.operationalUseBlocked || !version.isCurrentPublished) && intent) {
+    const canHistorical = me.role === 'ADMIN' || moduleAccess?.level === ModuleLevel.NIVEL_3
+    if (!canHistorical) {
+      return { error: 'Versões obsoletas são apenas para consulta histórica autorizada.', status: 403 as const }
+    }
+  }
+
   const versionCandidates = [version.fileUrl]
 
   const publishedCandidates = await prisma.documentVersion.findMany({
@@ -161,5 +168,8 @@ export async function resolveDocumentVersionAccess(
     publicationDate: version.publishedAt ?? null,
     elaboratorName: version.document.author.fullName,
     approverName: version.approvals[0]?.decidedBy?.fullName ?? '-',
+    moduleLevel: moduleAccess?.level ?? null,
+    expiresAt: version.expiresAt ?? null,
+    isCurrentPublished: version.isCurrentPublished,
   }
 }

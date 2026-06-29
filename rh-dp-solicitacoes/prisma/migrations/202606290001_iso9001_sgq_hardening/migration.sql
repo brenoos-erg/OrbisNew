@@ -1,0 +1,37 @@
+-- Minimal SGQ hardening for controlled documents. MySQL 8 safe: no UUID defaults on existing rows.
+ALTER TABLE `IsoDocument`
+  ADD COLUMN `inactiveAt` DATETIME(3) NULL,
+  ADD COLUMN `inactiveById` VARCHAR(191) NULL,
+  ADD COLUMN `inactiveReason` LONGTEXT NULL,
+  ADD COLUMN `isActive` BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE `DocumentVersion`
+  ADD COLUMN `obsoleteAt` DATETIME(3) NULL,
+  ADD COLUMN `obsoleteReason` LONGTEXT NULL,
+  ADD COLUMN `obsoletedById` VARCHAR(191) NULL,
+  ADD COLUMN `operationalUseBlocked` BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE `DocumentVersion`
+  MODIFY `status` ENUM('EM_ELABORACAO','EM_REVISAO','EM_ANALISE_QUALIDADE','AG_APROVACAO','PUBLICADO','CANCELADO','OBSOLETO','VENCIDO') NOT NULL;
+
+ALTER TABLE `DocumentAuditLog`
+  MODIFY `action` ENUM('VIEW','DOWNLOAD','PRINT','CANCEL','DIRECT_PUBLICATION','OBSOLETE','CONTROLLED_COPY_ISSUED','CONTROLLED_COPY_CANCELED') NOT NULL,
+  ADD COLUMN `reason` LONGTEXT NULL;
+
+ALTER TABLE `PrintCopy`
+  ADD COLUMN `copyNumber` VARCHAR(191) NULL,
+  ADD COLUMN `validUntil` DATETIME(3) NULL,
+  ADD COLUMN `watermark` VARCHAR(191) NOT NULL DEFAULT 'CÓPIA NÃO CONTROLADA',
+  ADD COLUMN `status` ENUM('ACTIVE','CANCELED','RECALLED','EXPIRED') NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN `canceledAt` DATETIME(3) NULL,
+  ADD COLUMN `canceledById` VARCHAR(191) NULL,
+  ADD COLUMN `cancelReason` LONGTEXT NULL;
+
+UPDATE `PrintCopy`
+SET `copyNumber` = CONCAT('CP-', DATE_FORMAT(`issuedAt`, '%Y%m%d%H%i%s'), '-', `id`)
+WHERE `copyNumber` IS NULL;
+
+ALTER TABLE `PrintCopy`
+  MODIFY `copyNumber` VARCHAR(191) NOT NULL;
+
+CREATE UNIQUE INDEX `PrintCopy_copyNumber_key` ON `PrintCopy`(`copyNumber`);

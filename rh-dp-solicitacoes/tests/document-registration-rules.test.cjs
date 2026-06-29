@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict')
-const { DocumentFlowStepType, DocumentVersionStatus } = require('@prisma/client')
+const { DocumentFlowStepType, DocumentVersionStatus, ModuleLevel } = require('@prisma/client')
 const {
   resolveInitialVersionStatus,
   routingForStatus,
@@ -17,8 +17,19 @@ function test(name, fn) {
   }
 }
 
-test('novo documento sem fluxo inicia como PUBLICADO', () => {
-  const status = resolveInitialVersionStatus([])
+test('documento controlado sem fluxo bloqueia publicação direta', () => {
+  assert.throws(
+    () => resolveInitialVersionStatus([], { documentTypeControlledCopy: true }),
+    /Tipo documental sem fluxo de aprovação configurado/,
+  )
+})
+
+test('publicação direta sem fluxo exige NIVEL_3 e justificativa', () => {
+  const status = resolveInitialVersionStatus([], {
+    documentTypeControlledCopy: true,
+    userModuleLevel: ModuleLevel.NIVEL_3,
+    directPublicationJustification: 'Migração controlada autorizada.',
+  })
   assert.equal(status, DocumentVersionStatus.PUBLICADO)
 })
 

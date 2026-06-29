@@ -26,6 +26,9 @@ type DocumentAccessResolved = {
   publicationDate?: Date | null
   elaboratorName?: string | null
   approverName?: string | null
+  moduleLevel?: import('@prisma/client').ModuleLevel | null
+  expiresAt?: Date | null
+  isCurrentPublished?: boolean
 }
 
 

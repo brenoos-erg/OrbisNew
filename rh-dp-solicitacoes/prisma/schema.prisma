@@ -473,6 +473,10 @@ model IsoDocument {
   distributions      Distribution[]
   printCopies        PrintCopy[]
   notificationLogs   DocumentNotificationLog[]
+  inactiveAt         DateTime?
+  inactiveById       String?
+  inactiveReason     String?                   @db.LongText
+  isActive           Boolean                   @default(true)
 
   @@index([ownerDepartmentId])
   @@index([ownerCostCenterId])
@@ -491,6 +495,10 @@ model DocumentVersion {
   expiresAt             DateTime?
   nextReviewAt          DateTime?
   isCurrentPublished    Boolean                        @default(false)
+  obsoleteAt            DateTime?
+  obsoleteReason        String?                         @db.LongText
+  obsoletedById         String?
+  operationalUseBlocked Boolean                         @default(false)
   document              IsoDocument                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
   approvals             DocumentApproval[]
   attachments           DocumentAttachment[]
@@ -557,6 +565,7 @@ model DocumentAuditLog {
   createdAt  DateTime            @default(now())
   ip         String?
   userAgent  String?
+  reason     String?             @db.LongText
   document   IsoDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
   version    DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
   user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -711,7 +720,14 @@ model PrintCopy {
   versionId  String
   type       PrintCopyType
   issuedById String
-  issuedAt   DateTime        @default(now())
+  issuedAt     DateTime        @default(now())
+  copyNumber   String          @unique
+  validUntil   DateTime?
+  watermark    String          @default("CÓPIA NÃO CONTROLADA")
+  status       PrintCopyStatus @default(ACTIVE)
+  canceledAt   DateTime?
+  canceledById String?
+  cancelReason String?         @db.LongText
   document   IsoDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
   version    DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   issuedBy   User            @relation("IsoPrintCopyIssuedBy", fields: [issuedById], references: [id])
@@ -1573,6 +1589,7 @@ enum DocumentVersionStatus {
   AG_APROVACAO
   PUBLICADO
   CANCELADO
+  OBSOLETO
   VENCIDO
 }
 
@@ -1615,6 +1632,11 @@ enum DocumentAuditAction {
   VIEW
   DOWNLOAD
   PRINT
+  CANCEL
+  DIRECT_PUBLICATION
+  OBSOLETE
+  CONTROLLED_COPY_ISSUED
+  CONTROLLED_COPY_CANCELED
 }
 
 enum ReadReceiptStatus {
@@ -1625,6 +1647,13 @@ enum ReadReceiptStatus {
 enum PrintCopyType {
   CONTROLLED
   UNCONTROLLED
+}
+
+enum PrintCopyStatus {
+  ACTIVE
+  CANCELED
+  RECALLED
+  EXPIRED
 }
 
 enum TiEquipmentCategory {
