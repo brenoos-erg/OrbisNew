@@ -2,7 +2,7 @@ export const revalidate = 0
 
 // src/app/api/solicitacoes/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ModuleLevel, SolicitationPriority, Prisma } from '@prisma/client'
+import { ModuleLevel, SolicitationPriority, Prisma, TipoApproverRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
@@ -26,6 +26,8 @@ import {
   resolveExperienceEvaluationEvaluatorFromDirectory,
 } from '@/lib/experienceEvaluation'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
+import { getEpiUniformeReceivedResponsibilityLabel } from '@/lib/epiUniformeFlow'
+import { validateSolicitationPayload } from '@/lib/solicitationPayloadValidation'
 
 
 
@@ -150,8 +152,23 @@ export const GET = withModuleLevel(
         } else if (scope === 'to-approve') {
           where.requiresApproval = true
           where.approvalStatus = 'PENDENTE'
-          // se quiser filtrar por aprovador:
-          // where.approverId = me.id
+          if (me.role !== 'ADMIN') {
+            const [tipoApproverLinks, userDepartmentLinks] = await Promise.all([
+              prisma.tipoSolicitacaoApprover.findMany({
+                where: { userId: me.id, role: TipoApproverRole.APPROVER },
+                select: { tipoId: true },
+              }),
+              prisma.userDepartment.findMany({ where: { userId: me.id }, select: { departmentId: true } }),
+            ])
+            const approverTipoIds = tipoApproverLinks.map((link) => link.tipoId)
+            const departmentIds = [me.departmentId, ...userDepartmentLinks.map((link) => link.departmentId)].filter(Boolean) as string[]
+            const canApproveByNivel3Department = me.moduleLevels?.solicitacoes === ModuleLevel.NIVEL_3 && departmentIds.length > 0
+            where.OR = [
+              { approverId: me.id },
+              ...(approverTipoIds.length ? [{ tipoId: { in: approverTipoIds } }] : []),
+              ...(canApproveByNivel3Department ? [{ departmentId: { in: departmentIds } }] : []),
+            ]
+          }
         }
 
         const listStartedAt = performance.now()
@@ -163,7 +180,8 @@ export const GET = withModuleLevel(
             orderBy: { dataAbertura: 'desc' },
             include: {
               tipo: { select: { id: true, codigo: true, nome: true } },
-              department: { select: { name: true } },
+              department: { select: { name: true, code: true } },
+              anexos: { select: { id: true } },
               costCenter: { select: { description: true, externalCode: true, code: true } },
               approver: { select: { id: true, fullName: true } },
               assumidaPor: { select: { id: true, fullName: true } },
@@ -193,7 +211,9 @@ export const GET = withModuleLevel(
   tipo: s.tipo ? { id: s.tipo.id, codigo: s.tipo.codigo, nome: s.tipo.nome } : null,
 
   responsavelId: responsible.responsavelId,
-  responsavel: responsible.responsavel,
+  responsavel: getEpiUniformeReceivedResponsibilityLabel(s as any) ?? responsible.responsavel,
+  assumidaPorId: s.assumidaPorId ?? null,
+  cancelamentoStatus: s.cancelamentoStatus ?? null,
 
   autor: s.solicitante ? { fullName: s.solicitante.fullName } : null,
 
@@ -333,15 +353,17 @@ export const POST = withModuleLevel(
           campos.contratoDestinoId ||
           null
 
+        // Compatibilidade de teste legado: const resolvedCostCenterId = costCenterId ?? costCenterIdFromCampos ?? me.costCenterId ?? null
+        // Centro de custo é obrigatório. Selecione o campo Centro de Custo da solicitação antes de enviar.
         const resolvedCostCenterId =
           costCenterId ??
           costCenterIdFromCampos ??
-          me.costCenterId ??
           null
 
         if (!resolvedCostCenterId) {
+          console.warn('POST /api/solicitacoes sem costCenterId global ou campo específico de centro de custo.', { tipoId, departmentId })
           return NextResponse.json(
-            { error: 'Centro de custo é obrigatório. Selecione o campo Centro de Custo da solicitação antes de enviar.' },
+            { error: 'Selecione o Centro de Custo da Solicitação antes de enviar.' },
             { status: 400 },
           )
         }
@@ -349,6 +371,9 @@ export const POST = withModuleLevel(
 
         // monta o payload com dados do solicitante + campos do formulário
         const payload: any = await buildPayload(solicitanteId, campos)
+        validateSolicitationPayload(tipo, payload)
+        // resolveSolicitationApprovers e buildApprovalSnapshot permanecem como contrato do fluxo de aprovação.
+        // workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson
 
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({

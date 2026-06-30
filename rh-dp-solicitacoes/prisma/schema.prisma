@@ -120,6 +120,26 @@ model Position {
   departmentId            String?
   enxoval                 String?
   experience              String?
+  indexador               String?
+  revision                String?
+  documentDate            DateTime?
+  managerPosition         String?
+  framing                 String?
+  areaSector              String?
+  cbo                     String?
+  summary                 String?     @db.LongText
+  detailedDescription     String?     @db.LongText
+  necessaryKnowledge      String?     @db.LongText
+  desiredKnowledge        String?     @db.LongText
+  humanCompetencies       String?     @db.LongText
+  functionalCompetencies  String?     @db.LongText
+  otherCompetencies       String?     @db.LongText
+  complexity              String?
+  managementScope         String?     @db.LongText
+  confidentialDataAccess  String?
+  responsibilities        String?     @db.LongText
+  active                  Boolean     @default(true)
+  latestDocumentId        String?
   mainActivities          String?
   others                  String?
   periodModule            String?
@@ -134,8 +154,33 @@ model Position {
   workplace               String?
   department              Department? @relation(fields: [departmentId], references: [id])
   users                   User[]
+  documents               PositionDocument[]
 
   @@map("Position")
+}
+
+model PositionDocument {
+  id               String   @id @default(uuid())
+  positionId       String
+  originalFilename String
+  storedFilename   String
+  fileUrl          String   @db.Text
+  mimeType         String?
+  sizeBytes        Int?
+  uploadedById     String
+  uploadedAt       DateTime @default(now())
+  parsedText       String?  @db.LongText
+  extractedJson    Json?
+  indexador        String?
+  revision         String?
+  documentDate     DateTime?
+  isCurrent        Boolean  @default(true)
+
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([positionId, uploadedAt])
+  @@index([indexador])
 }
 
 model Leader {
@@ -351,6 +396,8 @@ model User {
   department Department? @relation(fields: [departmentId], references: [id])
   leader     Leader?     @relation(fields: [leaderId], references: [id])
   position   Position?   @relation(fields: [positionId], references: [id])
+
+  positionDocumentsUploaded PositionDocument[]
 
   costCenters                                UserCostCenter[]
   userDepartments                            UserDepartment[]

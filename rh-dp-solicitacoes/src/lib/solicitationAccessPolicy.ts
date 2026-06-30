@@ -530,6 +530,9 @@ export function canViewSolicitation(ctx: UserAccessContext, solicitation: Solici
   if (hasTipoAccess(contextAllowedTipoIds(ctx), solicitation) || hasTipoAccess(contextViewerTipoIds(ctx), solicitation) || hasTipoAccess(contextFinalizerTipoIds(ctx), solicitation)) return true
   if (solicitation.solicitanteId === ctx.userId || solicitation.assumidaPorId === ctx.userId || solicitation.approverId === ctx.userId) return true
   if (canUserActAsExperienceEvaluator(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation)) return true
+  if (ctx.isRhAuthorizedForExperienceEvaluation &&
+    isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null }) &&
+    EXPERIENCE_EVALUATION_VISIBLE_STATUSES.includes(solicitation.status as never)) return true
   return canUserViewSolicitationByFallback({ ...ctx, departmentIds: contextDepartmentIds(ctx), costCenterIds: contextCostCenterIds(ctx), nadaConstaSetores: contextSetorKeys(ctx), tipoApproverTipoIds: contextActionableTipoIds(ctx), tipoViewerTipoIds: contextViewerTipoIds(ctx), tipoFinalizerTipoIds: contextFinalizerTipoIds(ctx) }, solicitation).canView
 }
 

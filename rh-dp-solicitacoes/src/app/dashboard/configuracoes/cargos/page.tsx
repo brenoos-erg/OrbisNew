@@ -3,11 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-type Cargo = {
-  id: string;
-  name: string;
-  sectorProject: string | null;
-};
+type Cargo = { id: string; name: string; sectorProject: string | null; indexador?: string | null; revision?: string | null; areaSector?: string | null; cbo?: string | null; active?: boolean; latestDocument?: { id: string } | null };
 
 export default function CargosPage() {
   const [cargos, setCargos] = useState<Cargo[]>([]);
@@ -18,9 +14,7 @@ export default function CargosPage() {
     async function load() {
       setLoading(true);
 
-      const url = search
-        ? `/api/configuracoes/cargos?q=${encodeURIComponent(search)}`
-        : `/api/configuracoes/cargos`;
+      const url = search ? `/api/positions?q=${encodeURIComponent(search)}&includeInactive=true` : `/api/positions?includeInactive=true`;
 
       const res = await fetch(url);
 
@@ -32,7 +26,7 @@ export default function CargosPage() {
       }
 
       const json = await res.json();
-      setCargos(Array.isArray(json) ? json : []);
+      setCargos(Array.isArray(json) ? json : json.items ?? []);
       setLoading(false);
     }
 
@@ -66,7 +60,12 @@ export default function CargosPage() {
           <thead className="bg-gray-100 border-b">
             <tr>
               <th className="px-3 py-2 text-left">Nome</th>
-              <th className="px-3 py-2 text-left">Setor/Projeto</th>
+              <th className="px-3 py-2 text-left">Indexador</th>
+              <th className="px-3 py-2 text-left">Revisão</th>
+              <th className="px-3 py-2 text-left">Área/Setor</th>
+              <th className="px-3 py-2 text-left">CBO</th>
+              <th className="px-3 py-2 text-left">Documento</th>
+              <th className="px-3 py-2 text-left">Status</th>
               <th className="px-3 py-2 text-right">Ações</th>
             </tr>
           </thead>
@@ -74,13 +73,13 @@ export default function CargosPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
                   Carregando...
                 </td>
               </tr>
             ) : cargos.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
                   Nenhum cargo encontrado
                 </td>
               </tr>
@@ -91,9 +90,12 @@ export default function CargosPage() {
                   className="border-t hover:bg-gray-50 cursor-pointer"
                 >
                   <td className="px-3 py-2">{cargo.name}</td>
-                  <td className="px-3 py-2">
-                    {cargo.sectorProject ?? '—'}
-                  </td>
+                  <td className="px-3 py-2">{cargo.indexador ?? '—'}</td>
+                  <td className="px-3 py-2">{cargo.revision ?? '—'}</td>
+                  <td className="px-3 py-2">{cargo.areaSector ?? cargo.sectorProject ?? '—'}</td>
+                  <td className="px-3 py-2">{cargo.cbo ?? '—'}</td>
+                  <td className="px-3 py-2">{cargo.latestDocument ? 'Anexado' : 'Não'}</td>
+                  <td className="px-3 py-2">{cargo.active === false ? 'Inativo' : 'Ativo'}</td>
                   <td className="px-3 py-2 text-right">
                     <Link
                       href={`/dashboard/configuracoes/cargos/${cargo.id}`}

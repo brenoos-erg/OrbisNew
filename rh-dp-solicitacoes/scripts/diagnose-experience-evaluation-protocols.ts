@@ -133,7 +133,7 @@ async function main() {
     print('RH/DP consegue imprimir PDF', pdfAllowedByStatus && hasExperienceEvaluationPrintableData(solicitation.payload) ? 'sim' : 'não')
     print('RH/DP consegue finalizar', String(solicitation.status) === EXPERIENCE_EVALUATION_FINALIZATION_STATUS ? 'sim' : 'não')
     print('avaliadoEm normalizado', normalized.avaliadoEm)
-    print('motivo objetivo do bloqueio', probableMissingReason(solicitation))
+    print('motivo provável de não aparecer', probableMissingReason(solicitation))
     print('sugestão de correção', hasExperienceEvaluationPrintableData(solicitation.payload) ? 'Rodar avaliacoes:fix-stuck -- --protocol '+protocolo+' --apply para devolver ao RH/DP se necessário.' : 'Garantir approverId/aliases do avaliador e reenviar para avaliação do gestor.')
   }
 }

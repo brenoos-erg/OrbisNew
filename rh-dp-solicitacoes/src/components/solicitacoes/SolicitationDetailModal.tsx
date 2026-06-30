@@ -179,6 +179,8 @@ type Attachment = {
   id: string
   filename: string
   url: string
+  originalUrl?: string | null
+  downloadUrl?: string | null
   mimeType: string
   sizeBytes: number
   createdAt: string
@@ -882,6 +884,10 @@ export function SolicitationDetailModal({
       }
     : payloadCampos
   const isAvaliacaoExperiencia = isExperienceEvaluationTipo(detail?.tipo)
+  const userIsAdmin = useMemo(
+    () => getUserIsAdmin(currentUser),
+    [currentUser],
+  )
   const canEditAvaliacaoGestor =
     Boolean(currentUser?.id) &&
     (
@@ -994,10 +1000,6 @@ export function SolicitationDetailModal({
     () => new Set(userSectors),
     [userSectors],
   )
-  const userIsAdmin = useMemo(
-    () => getUserIsAdmin(currentUser),
-    [currentUser],
-  )
 
   const userCanEditSetor =
     Boolean(activeSector) &&
@@ -1007,7 +1009,7 @@ export function SolicitationDetailModal({
 
   const apiCanEdit = detail?.canEdit !== false
   const apiCanAssume = detail?.canAssume !== false
-  const apiCanApprove = detail?.canApprove !== false
+  const apiCanApprove = detail?.canApprove === true
   const apiCanFinalize = detail?.canFinalize !== false
   const apiCanFinalizeNadaConstaGlobal = detail?.canFinalizeNadaConstaGlobal === true
   const apiCanCancel = detail?.canCancel !== false
@@ -1184,9 +1186,6 @@ export function SolicitationDetailModal({
    currentUser?.departmentCode === '19' ||
     (currentUser?.departments ?? []).some((dept) => dept.code === '19')
   const canEditSstResposta = apiCanEdit && showManagementActions && userIsSstOrAdmin && !isFinalizadaOuCancelada
-  const canApproveEpiUniforme =
-    currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' && userIsSstOrAdmin
-
   const currentUserDepartmentIds = useMemo(() => {
     const ids = new Set<string>()
     if (currentUser?.departmentId) ids.add(currentUser.departmentId)
@@ -1200,6 +1199,11 @@ export function SolicitationDetailModal({
     currentUser?.moduleLevels?.solicitacoes === 'NIVEL_3' &&
     !!detail?.department?.id &&
     currentUserDepartmentIds.has(detail.department.id)
+  const canApproveByCompatibleRule =
+    userIsAdmin ||
+    apiCanApprove ||
+    Boolean(currentUserId && (detail?.approverId ?? row?.approverId ?? null) === currentUserId) ||
+    canApproveByDepartment
   const userIsCurrentDepartmentResponsible =
     !!detail?.department?.id && currentUserDepartmentIds.has(detail.department.id)
   const isExperienceEvaluationPdfAvailableStatus =
@@ -1222,9 +1226,7 @@ export function SolicitationDetailModal({
     isApprovalMode &&
     approvalStatus === 'PENDENTE' &&
     !isViewerOnly &&
-    apiCanApprove &&
-    canApproveByDepartment &&
-    (!isSolicitacaoEpiUniformeTipo || canApproveEpiUniforme)
+    canApproveByCompatibleRule
   const camposFormSolicitante = (
     isSolicitacaoEpiUniformeTipo
       ? camposSchema.filter((campo) => !campo.stage || campo.stage === 'solicitante')
@@ -2623,7 +2625,7 @@ async function handleEncaminharAprovacaoComAnexo() {
                       >
                         <span>{a.filename}</span>
                         <a
-                          href={a.url}
+                          href={a.downloadUrl ?? a.url?.replace('/upload/documents/', '/uploads/documents/')}
                           target="_blank"
                           rel="noreferrer"
                           className="text-[11px] font-medium text-blue-600 hover:underline"

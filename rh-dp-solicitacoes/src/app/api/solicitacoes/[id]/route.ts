@@ -10,6 +10,7 @@ import { getUserModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
 import { buildSolicitationVisibilityContext } from '@/lib/solicitationAccessPolicy'
 import { canUserViewSolicitationByFallback } from '@/lib/solicitationVisibility'
+import { normalizeStoredAttachmentUrl } from '@/lib/files/attachmentStorage'
 
 /**
  * GET /api/solicitacoes/[id]
@@ -93,6 +94,14 @@ export async function GET(
       return !already
     })
 
+    const canApproveByRule = item.requiresApproval === true && item.approvalStatus === 'PENDENTE' && (
+      me.role === 'ADMIN' ||
+      item.approverId === me.id ||
+      Boolean(item.tipoId && visibilityContext.tipoApproverTipoIds?.includes(item.tipoId)) ||
+      (visibilityContext.solicitationModuleLevel === ModuleLevel.NIVEL_3 &&
+        Boolean(item.departmentId && visibilityContext.departmentIds?.includes(item.departmentId)))
+    )
+
     // Mapeia para o formato que o front espera
     const result = {
    id: item.id,
@@ -101,7 +110,13 @@ export async function GET(
       descricao: item.descricao,
 
       status: item.status,
+      requiresApproval: item.requiresApproval,
       approvalStatus: item.approvalStatus, // 👈 ADICIONAR ISSO
+      approverId: item.approverId,
+      solicitanteId: item.solicitanteId,
+      departmentId: item.departmentId,
+      costCenterId: item.costCenterId,
+      canApprove: canApproveByRule,
 
       dataAbertura: item.dataAbertura?.toISOString(),
       dataPrevista: item.dataPrevista?.toISOString() ?? null,
@@ -133,7 +148,9 @@ export async function GET(
       anexos: dedupedAttachments.map((a) => ({
         id: a.id,
         filename: a.filename,
-        url: a.url,
+        url: normalizeStoredAttachmentUrl(a.url) ?? a.url,
+        originalUrl: a.url,
+        downloadUrl: `/api/solicitacoes/${item.id}/anexos/${a.id}/download`,
         mimeType: a.mimeType,
         sizeBytes: a.sizeBytes,
         createdAt: a.createdAt.toISOString(),
