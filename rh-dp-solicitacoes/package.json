@@ -9,7 +9,7 @@
     "build:turbo": "next build",
     "start": "prisma migrate deploy --schema ./prisma/schema.prisma && next start",
     "lint": "tsc --noEmit",
-    "test": "npm run test:workflow-notifications && node tests/rq063-cost-center-submission.test.cjs",
+    "test": "npm run test:workflow-notifications && node tests/rq063-cost-center-submission.test.cjs && npm run test:regression",
     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
     "seed": "prisma db push --schema ./prisma/schema.prisma && ts-node -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts",
@@ -27,7 +27,10 @@
     "avaliacoes:reassign": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" node -r ts-node/register -r tsconfig-paths/register scripts/reassign-experience-evaluation-coordinator.ts",
     "test:enter-as-tab": "node -r ts-node/register -r tsconfig-paths/register tests/enter-as-tab.test.cjs",
     "debug:received": "ts-node -r tsconfig-paths/register scripts/debug-received-visibility.ts",
-    "avaliacoes:fix-stuck": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" node -r ts-node/register -r tsconfig-paths/register scripts/fix-stuck-experience-evaluations.ts"
+    "avaliacoes:fix-stuck": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" node -r ts-node/register -r tsconfig-paths/register scripts/fix-stuck-experience-evaluations.ts",
+    "epi:diagnose": "ts-node -r tsconfig-paths/register scripts/diagnose-epi-approval-flow.ts",
+    "epi:fix": "ts-node -r tsconfig-paths/register scripts/fix-epi-attachments-and-approval.ts",
+    "test:regression": "node tests/epi-admin-scripts-static.test.cjs && node tests/epi-approval-flow-static.test.cjs && node tests/epi-attachment-download-static.test.cjs && node tests/experience-evaluation-finalization-rh.test.cjs && node tests/position-document-parser.test.cjs && node tests/position-document-snapshot.test.cjs && node tests/position-document-upload-static.test.cjs && node tests/position-rq063-prefill.test.cjs && node tests/request-cost-center-global.test.cjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

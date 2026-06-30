@@ -21,6 +21,11 @@ assert.equal(canUserViewSolicitationByDepartment(base, {
   tipoId: 'TIPO_X', solicitanteId: 'other', departmentId: 'dep-sst', solicitacaoSetores: [{ setor: 'SST' }],
 }), false, 'APPROVER/allowed tipo não libera recebidas fora do setor')
 
+
+assert.equal(canUserViewSolicitationByDepartment(base, {
+  tipoId: 'TIPO_OUTRO', solicitanteId: 'other', departmentId: 'dep-sst', costCenterId: 'cc-1', solicitacaoSetores: [{ setor: 'SST' }],
+}), true, 'fallback por centro de custo vinculado continua liberando visibilidade')
+
 assert.equal(canUserViewSolicitationByDepartment({ ...base, viewerTipoIds: ['TIPO_VIEW'] }, {
   tipoId: 'TIPO_VIEW', solicitanteId: 'other', departmentId: 'dep-sst', solicitacaoSetores: [{ setor: 'SST' }],
 }), true, 'VIEWER libera exceção individual fora do setor')

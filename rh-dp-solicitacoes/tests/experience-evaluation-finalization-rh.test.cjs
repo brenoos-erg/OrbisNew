@@ -1,0 +1,15 @@
+const assert = require('assert'); const fs = require('fs');
+const route = fs.readFileSync('src/app/api/solicitacoes/[id]/finalizar/route.ts','utf8');
+const modal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx','utf8');
+assert(route.includes('isExperienceEvaluationReadyForRh'));
+assert(route.includes('!isExperienceEvaluationReadyForRh && !isUltimaEtapa'));
+assert(route.includes("'Avaliação de experiência finalizada pelo RH.'"));
+assert(route.includes('isRhDpOfCurrentDepartment'));
+assert(route.includes('finalizerTipoIds?.includes'));
+assert(route.includes('isExperienceEvaluationCoordinator'));
+assert(route.includes('isRhAuthorizedForExperienceEvaluation'));
+assert(!route.includes("isExperienceEvaluationReadyForRh && ['ADMIN', 'RH', 'DP'].includes"));
+assert(route.includes('A avaliação de experiência só pode ser finalizada após conclusão do gestor'));
+assert(modal.includes('Finalizar avaliação (RH)'));
+assert(modal.includes('AGUARDANDO_FINALIZACAO_AVALIACAO'));
+console.log('experience-evaluation-finalization-rh ok');

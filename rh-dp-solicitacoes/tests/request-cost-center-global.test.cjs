@@ -1,0 +1,12 @@
+const assert = require('assert'); const fs = require('fs');
+const page = fs.readFileSync('src/app/dashboard/solicitacoes/enviadas/nova/page.tsx','utf8');
+const api = fs.readFileSync('src/app/api/solicitacoes/route.ts','utf8');
+assert(page.includes('selectedRequestCostCenterId'));
+assert(page.includes('Centro de Custo da Solicitação'));
+assert(page.includes('costCenterId: resolvedRequestCostCenterId'));
+assert(page.includes('Selecione o Centro de Custo da Solicitação antes de enviar.'));
+assert(!/extras\.localidade[^\n]+costCenterId/.test(page), 'Localidade não deve ser tratada como centro de custo');
+assert(api.includes('const costCenterId = body.costCenterId'));
+assert(api.includes('Selecione o Centro de Custo da Solicitação antes de enviar.'));
+assert(!api.includes('costCenterIdFromCampos ??\n          me.costCenterId'), 'backend não deve depender de me.costCenterId quando o body não envia centro');
+console.log('request-cost-center-global ok');

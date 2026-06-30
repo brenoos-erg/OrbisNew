@@ -22,9 +22,10 @@ export function normalizeStoredAttachmentUrl(rawUrl: string | null | undefined) 
   const withoutHash = raw.split('#')[0]?.split('?')[0] || ''
   const withoutLeading = withoutHash.replace(/^\/+/, '')
   const withoutPublicPrefix = withoutLeading.replace(/^public\//i, '')
+  const normalizedLegacyUpload = withoutPublicPrefix.replace(/^upload\/documents\//i, 'uploads/documents/')
 
-  if (!withoutPublicPrefix) return null
-  return `/${withoutPublicPrefix}`
+  if (!normalizedLegacyUpload) return null
+  return `/${normalizedLegacyUpload}`
 }
 
 export function toPublicAbsolutePath(urlPath: string) {

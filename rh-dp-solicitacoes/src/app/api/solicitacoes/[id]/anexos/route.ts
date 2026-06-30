@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
+import { isEpiUniformeReadyToForwardApproval } from '@/lib/epiUniformeFlow'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildDocumentUploadPaths, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
@@ -49,12 +50,7 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
     },
   })
 
-  const isSstEpiFlow =
-    Boolean(solicitation) &&
-    isSolicitacaoEpiUniforme(solicitation?.tipo) &&
-    solicitation?.department?.code === '19' &&
-    solicitation.approvalStatus === 'NAO_PRECISA' &&
-    solicitation.requiresApproval === false
+  const isSstEpiFlow = isEpiUniformeReadyToForwardApproval(solicitation)
 
   if (!isSstEpiFlow) return { changed: false }
   if ((solicitation?.anexos?.length ?? 0) === 0) {
@@ -79,7 +75,7 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
     data: {
       solicitationId,
       status: 'AGUARDANDO_APROVACAO',
-      message: 'Documento anexado pelo SST. Solicitação encaminhada para aprovação nível 3.',
+      message: 'Ficha de EPI anexada pelo SST. Solicitação encaminhada para aprovação nível 3.',
     },
   })
 

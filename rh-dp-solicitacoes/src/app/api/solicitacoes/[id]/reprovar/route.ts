@@ -52,16 +52,14 @@ export const POST = withModuleLevel<RouteParams>(
       }
 
          const isNivel3 = !!(await prisma.userModuleAccess.findFirst({ where: { userId: me.id, level: 'NIVEL_3', module: { key: 'solicitacoes' } } }))
-      if (!isNivel3) {
-        return NextResponse.json({ error: 'Somente usuários nível 3 podem aprovar/reprovar.' }, { status: 403 })
-      }
 
       const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
       const tipoApproverIds = await resolveTipoApproverIds(solicit.tipoId)
       const canApproveByDepartment =
         userDepartmentIds.includes(solicit.departmentId) &&
-        me.moduleLevels?.solicitacoes === 'NIVEL_3'
+        isNivel3
       const canApproveSolicitation =
+        me.role === 'ADMIN' ||
         solicit.approverId === me.id ||
         tipoApproverIds.includes(me.id) ||
         canApproveByDepartment

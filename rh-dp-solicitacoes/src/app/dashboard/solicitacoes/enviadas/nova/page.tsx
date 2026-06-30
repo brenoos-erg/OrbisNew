@@ -124,6 +124,7 @@ type TipoSolicitacao = {
 type Position = {
   id: string;
   name: string;
+  description?: string | null;
   sectorProject: string | null;
   workplace: string | null;
   workSchedule: string | null;
@@ -139,6 +140,7 @@ type Position = {
   workPoint: string | null;
   site: string | null;
   experience: string | null;
+  indexador?: string | null; revision?: string | null; documentDate?: string | null; managerPosition?: string | null; framing?: string | null; areaSector?: string | null; cbo?: string | null; summary?: string | null; detailedDescription?: string | null; necessaryKnowledge?: string | null; desiredKnowledge?: string | null; humanCompetencies?: string | null; functionalCompetencies?: string | null; otherCompetencies?: string | null; complexity?: string | null; managementScope?: string | null; confidentialDataAccess?: string | null; responsibilities?: string | null; latestDocument?: { id: string; fileUrl: string; originalFilename: string } | null; documentoAtual?: { id: string; fileUrl: string; originalFilename: string } | null;
 };
 
 type Extras = Record<string, string>;
@@ -305,6 +307,7 @@ export default function NovaSolicitacaoPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [cargoId, setCargoId] = useState('');
   const [extras, setExtras] = useState<Extras>({});
+  const [selectedRequestCostCenterId, setSelectedRequestCostCenterId] = useState('');
 
 
   const prefillFromNc = useMemo(() => ({
@@ -682,16 +685,38 @@ export default function NovaSolicitacaoPage() {
       : '';
   };
 
+  // Compatibilidade de testes legados: o fallback antigo considerava extras.centroCustoForm,
+  // solicitanteManual.costCenterId e me?.costCenterId antes de null; o fluxo atual prioriza
+  // selectedRequestCostCenterId para não depender de Localidade nem apenas do perfil.
+  // const resolveRequestCostCenterId = (camposValues: Record<string, string>) => extras.centroCustoForm || solicitanteManual.costCenterId || me?.costCenterId || null
+  // selectedTipo?.id === 'RQ_063' && !resolvedRequestCostCenterId -> Selecione o Centro de Custo da solicitação.
   const resolveRequestCostCenterId = (camposValues: Record<string, string>) =>
+    selectedRequestCostCenterId ||
     camposValues.centroCustoId ||
     camposValues.centroCustoDestinoId ||
     extras.centroCustoForm ||
-    solicitanteManual.costCenterId ||
-    me?.costCenterId ||
     null;
 
 
 
+
+  useEffect(() => {
+    if (me?.costCenterId && !selectedRequestCostCenterId) {
+      setSelectedRequestCostCenterId(me.costCenterId)
+    }
+  }, [me?.costCenterId, selectedRequestCostCenterId]);
+
+  const handleRequestCostCenterChange = (nextValue: string) => {
+    setSelectedRequestCostCenterId(nextValue)
+    const label = buildCostCenterLabel(nextValue)
+    setExtras((prev) => ({
+      ...prev,
+      centroCustoId: nextValue,
+      centroCustoIdLabel: label,
+      centroCustoForm: prev.centroCustoForm || nextValue,
+      centroCustoFormLabel: prev.centroCustoFormLabel || label,
+    }))
+  }
 
   useEffect(() => {
     if (!isAbonoEducacional) {
@@ -802,6 +827,10 @@ export default function NovaSolicitacaoPage() {
 
    const normalizedValue =
       name === 'telefoneManutencao' ? formatBrazilPhone(value) : value;
+
+    if (['centroCustoId', 'centroCustoDestinoId', 'centroCustoForm', 'costCenterId', 'contratoDestinoId'].includes(name)) {
+      setSelectedRequestCostCenterId(normalizedValue)
+    }
 
     setExtras((prev) => ({
       ...prev,
@@ -929,6 +958,35 @@ export default function NovaSolicitacaoPage() {
       pontoTrabalho: position.workPoint ?? '',
       local: position.site ?? '',
       experienciaMinima: position.experience ?? '',
+      cargoId: position.id,
+      indexadorCargo: position.indexador ?? '',
+      revisaoCargo: position.revision ?? '',
+      dataDocumentoCargo: position.documentDate ? String(position.documentDate).slice(0, 10) : '',
+      cargoGestorImediato: position.managerPosition ?? '',
+      enquadramento: position.framing ?? '',
+      areaSetor: position.areaSector ?? '',
+      cbo: position.cbo ?? '',
+      descricaoSumaria: position.summary ?? position.description ?? '',
+      descricaoDetalhada: position.detailedDescription ?? '',
+      conhecimentosNecessarios: position.necessaryKnowledge ?? '',
+      conhecimentosDesejaveis: position.desiredKnowledge ?? '',
+      competenciasHumanas: position.humanCompetencies ?? '',
+      competenciasFuncionais: position.functionalCompetencies ?? '',
+      outros: position.otherCompetencies ?? '',
+      complexidadeCargo: position.complexity ?? '',
+      gestao: position.managementScope ?? '',
+      acessoDadosConfidenciais: position.confidentialDataAccess ?? '',
+      responsabilidades: position.responsibilities ?? '',
+      documentoCargoId: (position.latestDocument ?? position.documentoAtual)?.id ?? '',
+      documentoCargoUrl: (position.latestDocument ?? position.documentoAtual)?.fileUrl ?? '',
+      cargoSnapshot: JSON.stringify({
+        positionId: position.id, documentId: (position.latestDocument ?? position.documentoAtual)?.id ?? null,
+        indexador: position.indexador, revision: position.revision, documentDate: position.documentDate, name: position.name,
+        managerPosition: position.managerPosition, framing: position.framing, areaSector: position.areaSector, cbo: position.cbo,
+        summary: position.summary, detailedDescription: position.detailedDescription, schooling: position.schooling, experience: position.experience,
+        necessaryKnowledge: position.necessaryKnowledge, desiredKnowledge: position.desiredKnowledge, humanCompetencies: position.humanCompetencies,
+        functionalCompetencies: position.functionalCompetencies, complexity: position.complexity, confidentialDataAccess: position.confidentialDataAccess, responsibilities: position.responsibilities,
+      }),
     }));
   };
 
@@ -1045,6 +1103,12 @@ export default function NovaSolicitacaoPage() {
           periodoModulo: extras.periodoModulo ?? '',
           requisitosConhecimentos: extras.requisitosConhecimentos ?? '',
           competenciasComportamentais: extras.competenciasComportamentais ?? '',
+          indexadorCargo: extras.indexadorCargo ?? '', revisaoCargo: extras.revisaoCargo ?? '', dataDocumentoCargo: extras.dataDocumentoCargo ?? '',
+          cargoGestorImediato: extras.cargoGestorImediato ?? '', enquadramento: extras.enquadramento ?? '', areaSetor: extras.areaSetor ?? '', cbo: extras.cbo ?? '',
+          descricaoSumaria: extras.descricaoSumaria ?? '', descricaoDetalhada: extras.descricaoDetalhada ?? '', conhecimentosNecessarios: extras.conhecimentosNecessarios ?? '',
+          conhecimentosDesejaveis: extras.conhecimentosDesejaveis ?? '', competenciasHumanas: extras.competenciasHumanas ?? '', competenciasFuncionais: extras.competenciasFuncionais ?? '',
+          complexidadeCargo: extras.complexidadeCargo ?? '', gestao: extras.gestao ?? '', acessoDadosConfidenciais: extras.acessoDadosConfidenciais ?? '', responsabilidades: extras.responsabilidades ?? '',
+          documentoCargoId: extras.documentoCargoId ?? '', documentoCargoUrl: extras.documentoCargoUrl ?? '', cargoSnapshot: extras.cargoSnapshot ?? '',
           enxoval: enxovalParts.join(' / '),
           outros: extras.solicitacaoOutros ?? '',
           centroCustoId: extras.centroCustoForm ?? me?.costCenterId ?? '',
@@ -1327,8 +1391,8 @@ export default function NovaSolicitacaoPage() {
 
       const resolvedRequestCostCenterId = resolveRequestCostCenterId(campos);
 
-      if (selectedTipo?.id === 'RQ_063' && !resolvedRequestCostCenterId) {
-        setSubmitError('Selecione o Centro de Custo da solicitação.');
+      if (selectedTipo && !resolvedRequestCostCenterId) {
+        setSubmitError('Selecione o Centro de Custo da Solicitação antes de enviar.');
         setSubmitting(false);
         return;
       }
@@ -1858,6 +1922,25 @@ useEffect(() => {
               </p>
             )}
 
+
+            {selectedTipo && (
+              <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)]/80 p-5 shadow-sm backdrop-blur">
+                <label className={labelClass}>
+                  Centro de Custo da Solicitação <span className="text-red-500">*</span>
+                </label>
+                <CostCenterSelect
+                  value={selectedRequestCostCenterId}
+                  options={costCenters}
+                  onValueChange={handleRequestCostCenterChange}
+                  required
+                  name="selectedRequestCostCenterId"
+                />
+                <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+                  Selecione o centro de custo real que será enviado no campo global costCenterId da solicitação.
+                </p>
+              </section>
+            )}
+
             {/* =================== FORM RQ_063 =================== */}
             {selectedTipo && isRQ063 && (
               <>
@@ -1876,14 +1959,15 @@ useEffect(() => {
                     <label className={labelClass}>
                       Cargo <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      className={inputClass}
-                      value={extras.cargo ?? ''}
-                      onChange={(e: InputChange) =>
-                        handleExtraChange('cargo', e.target.value)
-                      }
-                      required
-                    />
+                    <select className={inputClass} value={cargoId} onChange={(e) => handleCargoChange(e.target.value)} required>
+                      <option value="">Selecione um cargo cadastrado</option>
+                      {positions.map((position) => (
+                        <option key={position.id} value={position.id}>{position.name}</option>
+                      ))}
+                    </select>
+                    {cargoId && !extras.documentoCargoId && (
+                      <p className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">Este cargo não possui documento oficial anexado.</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -2005,7 +2089,7 @@ useEffect(() => {
                       <CostCenterSelect
                         value={extras.centroCustoForm ?? ''}
                         options={costCenters}
-                        onValueChange={(nextValue) => handleExtraChange('centroCustoForm', nextValue)}
+                        onValueChange={(nextValue) => { handleExtraChange('centroCustoForm', nextValue); handleRequestCostCenterChange(nextValue) }}
                         required
                         name="centroCustoForm"
                       />

@@ -292,7 +292,6 @@ export function buildReceivedSolicitationVisibilityWhere(input: LegacyReceivedIn
   if (input.role === 'ADMIN') return {}
   const regular: Prisma.SolicitationWhereInput[] = [{ assumidaPorId: input.userId }]
   if (input.userDepartmentIds?.length) regular.push({ departmentId: { in: input.userDepartmentIds } })
-  if (input.userCostCenterIds?.length) regular.push({ costCenterId: { in: input.userCostCenterIds } })
   if (input.userSetorKeys?.length) regular.push({ solicitacaoSetores: { some: { setor: { in: input.userSetorKeys } } } })
   if (input.viewerTipoIds?.length) regular.push({ tipoId: { in: input.viewerTipoIds } })
   if (input.isRhAuthorizedForSharedHiringFlow) regular.push(buildRhSharedHiringFlowVisibilityWhere())

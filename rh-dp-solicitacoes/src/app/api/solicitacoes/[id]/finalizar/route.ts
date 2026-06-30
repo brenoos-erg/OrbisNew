@@ -62,9 +62,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Solicitação já encerrada.' }, { status: 400 })
     }
 
+    const isExperienceEvaluation = isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome })
+    const isExperienceEvaluationReadyForRh =
+      isExperienceEvaluation && solicitation.status === EXPERIENCE_EVALUATION_FINALIZATION_STATUS
+
     if (
-      isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId, codigo: solicitation.tipo?.codigo, nome: solicitation.tipo?.nome }) &&
-      solicitation.status !== EXPERIENCE_EVALUATION_FINALIZATION_STATUS
+      isExperienceEvaluation &&
+      !isExperienceEvaluationReadyForRh
     ) {
       return NextResponse.json(
         { error: 'A avaliação de experiência só pode ser finalizada após conclusão do gestor e retorno ao RH.' },
@@ -119,7 +123,7 @@ export async function PATCH(
       )
     }
 
-    if (!isUltimaEtapa && !(isNadaConsta && todosSetoresVerdes)) {
+    if (!isExperienceEvaluationReadyForRh && !isUltimaEtapa && !(isNadaConsta && todosSetoresVerdes)) {
       return NextResponse.json(
         { error: 'Só é possível finalizar chamados na última etapa do fluxo.' },
         { status: 400 },
@@ -160,9 +164,22 @@ export async function PATCH(
       payload: solicitation.payload,
     })
 
-    if (!canFinalize && !(isNadaConsta && canFinalizeNadaConsta)) {
+    const userDepartmentIds = new Set(userAccess.userDepartmentIds ?? ((userAccess.departmentIds?.filter(Boolean) as string[] | undefined) ?? []))
+    const isRhDpOfCurrentDepartment =
+      isExperienceEvaluationReadyForRh &&
+      ['RH', 'DP'].includes(String(me.role)) &&
+      Boolean(solicitation.departmentId && userDepartmentIds.has(solicitation.departmentId))
+    const canFinalizeExperienceEvaluationAsRh =
+      isExperienceEvaluationReadyForRh &&
+      (String(me.role) === 'ADMIN' ||
+        isRhDpOfCurrentDepartment ||
+        userAccess.isExperienceEvaluationCoordinator === true ||
+        userAccess.isRhAuthorizedForExperienceEvaluation === true ||
+        Boolean(solicitation.tipoId && userAccess.finalizerTipoIds?.includes(solicitation.tipoId)))
+
+    if (!canFinalize && !(isNadaConsta && canFinalizeNadaConsta) && !canFinalizeExperienceEvaluationAsRh) {
       return NextResponse.json(
-        { error: 'Você não pode finalizar solicitações desta etapa/departamento.' },
+        { error: isExperienceEvaluationReadyForRh ? 'Apenas finalizador do tipo, RH/DP do departamento atual, política autorizada ou administrador pode finalizar a avaliação de experiência.' : 'Você não pode finalizar solicitações desta etapa/departamento.' },
         { status: 403 },
       )
     }
@@ -180,9 +197,11 @@ export async function PATCH(
       data: {
         solicitationId: id,
         status: 'CONCLUIDA',
-        message: isNadaConsta
-          ? 'Nada Consta finalizado pelo DP após conclusão dos setores.'
-          : 'Solicitação finalizada na última etapa do fluxo.',
+        message: isExperienceEvaluationReadyForRh
+          ? 'Avaliação de experiência finalizada pelo RH.'
+          : isNadaConsta
+            ? 'Nada Consta finalizado pelo DP após conclusão dos setores.'
+            : 'Solicitação finalizada na última etapa do fluxo.',
       },
     })
     if (observacao) {
