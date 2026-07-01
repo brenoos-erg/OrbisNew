@@ -8,12 +8,17 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
 import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
-  applyReceivedInMemoryFilters,
   buildListAndCountArgs,
-  buildWhereFromSearchParams,
-  getAdvancedTextFilters,
-  hasReceivedInMemoryFilters,
 } from '@/lib/receivedSolicitationsQuery'
+import {
+  applyInMemorySearchFilter,
+  applyResponsibleTextFilter,
+  buildBaseWhereFromFilters,
+  buildPaginationFromFilters,
+  buildSortFromFilters,
+  parseSolicitationListFilters,
+} from '@/lib/solicitationListFilters'
+import { searchSolicitationIdsByText } from '@/lib/solicitationSearchIndex'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import {
   buildReceivedWhereByPolicy,
@@ -24,14 +29,9 @@ export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
     const { searchParams } = new URL(req.url)
-    const page = Math.max(
-      1,
-      Number.parseInt(searchParams.get('page') ?? '1', 10) || 1,
-    )
-    const pageSize =
-      Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
-
-    const skip = (page - 1) * pageSize
+    const filters = parseSolicitationListFilters(searchParams)
+    // Compatibilidade histórica: getAdvancedTextFilters(searchParams) foi consolidado no parser compartilhado.
+    const { page, pageSize, skip } = buildPaginationFromFilters(filters)
     const userAccess = await resolveUserAccessContext({
       userId: me.id,
       userLogin: me.login,
@@ -43,18 +43,39 @@ export async function GET(req: NextRequest) {
     })
     const dbWhere = buildReceivedWhereByPolicy(
       userAccess,
-      buildWhereFromSearchParams(searchParams),
+      buildBaseWhereFromFilters(filters),
       { excludePendingRq063: true },
     )
 
-    const advancedTextFilters = getAdvancedTextFilters(searchParams)
-    const hasInMemoryFilters = hasReceivedInMemoryFilters(advancedTextFilters)
+    const protocolLike = filters.q ? /^RQ\d{4,8}-\d{3,}$/.test(filters.q.trim().toUpperCase()) : false
+    const searchDiagnostics: Array<{ code: string; message: string }> = []
+    if (filters.q) {
+      const searchIds = protocolLike
+        ? (await prisma.solicitation.findMany({ where: { AND: [dbWhere, { protocolo: filters.q.trim() }] }, select: { id: true } })).map((row) => row.id)
+        : await searchSolicitationIdsByText(filters.q, dbWhere, 10000)
+      if (searchIds.length > 0) {
+        dbWhere.id = { in: searchIds }
+      } else if (protocolLike) {
+        dbWhere.id = { in: [] }
+        searchDiagnostics.push({ code: 'PROTOCOL_NOT_IN_SCOPE', message: 'O protocolo não existe, não está visível para seu usuário ou foi removido pelos filtros aplicados.' })
+      } else {
+        searchDiagnostics.push({ code: 'SEARCH_INDEX_EMPTY_FALLBACK', message: 'Índice de busca vazio ou sem resultado; usando fallback textual em memória após filtros de permissão.' })
+      }
+    }
+
+    const hasInMemoryFilters = Boolean((filters.q && !protocolLike && !('id' in dbWhere)) || filters.responsibleText)
+    const orderBy = buildSortFromFilters(filters)
     const { findManyArgs, countArgs } = buildListAndCountArgs(dbWhere, {
       skip,
       pageSize,
-      orderBy: [{ dataAbertura: 'desc' }],
+      orderBy,
       includeGlobalSearchData: hasInMemoryFilters,
     })
+
+    const inMemorySearchWindow = 2000
+    if (hasInMemoryFilters) {
+      findManyArgs.take = inMemorySearchWindow
+    }
 
     const [allSolicitations, dbTotal] = await Promise.all([
       prisma.solicitation.findMany(findManyArgs),
@@ -62,12 +83,21 @@ export async function GET(req: NextRequest) {
     ])
 
     const filteredSolicitations = hasInMemoryFilters
-      ? applyReceivedInMemoryFilters(allSolicitations, advancedTextFilters)
+      ? applyResponsibleTextFilter(
+          applyInMemorySearchFilter(allSolicitations, filters.q),
+          filters.responsibleText,
+        )
       : allSolicitations
     const total = hasInMemoryFilters ? filteredSolicitations.length : dbTotal
     const paginatedSolicitations = hasInMemoryFilters
       ? filteredSolicitations.slice(skip, skip + pageSize)
       : filteredSolicitations
+    const diagnostics = [
+      ...searchDiagnostics,
+      ...(hasInMemoryFilters && allSolicitations.length >= inMemorySearchWindow
+        ? [{ code: 'SEARCH_WINDOW_TRUNCATED', message: 'A busca textual em fallback foi limitada aos primeiros 2000 chamados já visíveis/filtrados. Recrie o índice para cobertura completa.' }]
+        : []),
+    ]
 
     const rows = paginatedSolicitations.map((s) => {
       const responsible = resolvePrimaryResponsibleForList({
@@ -100,7 +130,17 @@ export async function GET(req: NextRequest) {
     })
     })
 
-    return NextResponse.json({ rows, total })
+    return NextResponse.json({
+      rows,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      sortBy: filters.sortBy,
+      sortDir: filters.sortDir,
+      filtersApplied: filters,
+      diagnostics,
+    })
   } catch (err) {
     console.error('GET /api/solicitacoes/recebidas error', err)
     if (err instanceof Error && err.message === 'Usuário não autenticado') {

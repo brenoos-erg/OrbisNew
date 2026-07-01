@@ -297,6 +297,7 @@ model Solicitation {
   solicitacaoSetores               SolicitacaoSetor[]
   documents                        Document[]
   nonConformity                    NonConformity?         @relation(fields: [nonConformityId], references: [id])
+  searchIndex                      SolicitationSearchIndex?
 
   @@index([solicitanteId, dataAbertura])
   @@index([costCenterId, dataAbertura])
@@ -304,6 +305,27 @@ model Solicitation {
   @@index([requiresApproval, approvalStatus, dataAbertura])
   @@index([status, dataAbertura])
   @@index([nonConformityId])
+}
+
+model SolicitationSearchIndex {
+  id             String       @id @default(uuid())
+  solicitationId String       @unique
+  searchText     String       @db.LongText
+  protocolo      String?
+  tipoId         String?
+  status         String?
+  departmentId   String?
+  costCenterId   String?
+  solicitanteId  String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  solicitation   Solicitation @relation(fields: [solicitationId], references: [id], onDelete: Cascade)
+
+  @@index([tipoId])
+  @@index([status])
+  @@index([departmentId])
+  @@index([costCenterId])
+  @@index([solicitanteId])
 }
 
 model Document {

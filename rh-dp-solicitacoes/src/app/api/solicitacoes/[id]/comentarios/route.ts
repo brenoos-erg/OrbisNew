@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
@@ -142,6 +143,7 @@ export async function POST(
       dedupeKey: `COMMENT:${solicitationId}:${text.slice(0, 80)}` ,
     })
 
+    void safeUpsertSolicitationSearchIndex(solicitationId)
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('POST /api/solicitacoes/[id]/comentarios error', error)

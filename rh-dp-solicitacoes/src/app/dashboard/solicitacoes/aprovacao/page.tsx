@@ -17,6 +17,8 @@ export default function ApprovalsPage() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
 
   // estado do modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -32,7 +34,7 @@ export default function ApprovalsPage() {
       setError(null)
 
       const res = await fetch(
-        '/api/solicitacoes?scope=to-approve&page=1&pageSize=50',
+        `/api/solicitacoes?scope=to-approve&page=1&pageSize=50${q ? `&q=${encodeURIComponent(q)}` : ''}`,
       )
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -51,7 +53,7 @@ export default function ApprovalsPage() {
 
   useEffect(() => {
     loadApprovals()
-  }, [])
+  }, [q])
 
   // ===== ABRIR MODAL / CARREGAR DETALHE =====
   async function handleOpenPreview(row: Row) {
@@ -164,6 +166,22 @@ export default function ApprovalsPage() {
         >
           Atualizar
         </button>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+        <label className="block text-xs font-semibold uppercase text-slate-500">Buscar aprovação</label>
+        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+          <input
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            placeholder="Digite protocolo, solicitante, colaborador, tipo, cargo, centro de custo, departamento, payload, comentário ou anexo"
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') void loadApprovals() }}
+          />
+          <button type="button" className="rounded-md border px-3 py-2 text-xs font-semibold" onClick={() => setAdvancedFiltersOpen((open) => !open)}>Filtros avançados</button>
+          <button type="button" className="rounded-md border px-3 py-2 text-xs font-semibold" onClick={() => setQ('')}>Limpar</button>
+        </div>
+        {advancedFiltersOpen && <p className="mt-2 text-xs text-slate-500">A lista usa o parser compartilhado de solicitações; filtros por tipo, centro de custo, setor, data e status podem ser enviados por query string.</p>}
       </div>
 
       {error && (

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { NextResponse, type NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { resolveTipoApproverId } from '@/lib/solicitationTipoApprovers'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 })
   }
 
+  void safeUpsertSolicitationSearchIndex(solicitationId)
   return NextResponse.json({ items: created })
 }
 
@@ -134,6 +136,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Solicitação não está elegível para encaminhamento à aprovação.' }, { status: 409 })
   }
 
+  void safeUpsertSolicitationSearchIndex(solicitationId)
   return NextResponse.json({ ok: true })
 }
 
@@ -158,6 +161,9 @@ export async function DELETE(req: NextRequest) {
       const resolved = await resolveExistingAttachmentPath(row.url)
       if (resolved) await unlink(resolved.absolutePath)
     } catch {}
+  }
+  for (const solicitationId of new Set(rows.map((row) => row.solicitationId))) {
+    void safeUpsertSolicitationSearchIndex(solicitationId)
   }
   return NextResponse.json({ ok: true })
 }

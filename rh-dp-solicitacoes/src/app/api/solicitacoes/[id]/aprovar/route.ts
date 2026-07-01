@@ -3,6 +3,7 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import crypto from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEpiUniforme, isSolicitacaoPessoal, isSolicitacaoAgendamentoFerias, isSolicitacaoVeiculos } from '@/lib/solicitationTypes'
@@ -253,6 +254,7 @@ export async function POST(
       dedupeKey: `APPROVE:${updated.id}:${updated.departmentId}:${updated.approvalStatus}` ,
     })
 
+    void safeUpsertSolicitationSearchIndex(updated.id)
     return NextResponse.json(updated)
   } catch (e) {
     console.error('❌ POST /api/solicitacoes/[id]/aprovar error:', e)

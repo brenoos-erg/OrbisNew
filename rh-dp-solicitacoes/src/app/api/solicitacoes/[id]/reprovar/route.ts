@@ -4,6 +4,7 @@ export const revalidate = 0
 // src/app/api/solicitacoes/[id]/reprovar/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { ModuleLevel } from '@prisma/client'
@@ -111,7 +112,8 @@ export const POST = withModuleLevel<RouteParams>(
         dedupeKey: `REJECTED:${solicitationId}` ,
       })
 
-      return NextResponse.json(updated)
+      void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated)
     } catch (e) {
       console.error('POST /api/solicitacoes/[id]/reprovar error', e)
       return NextResponse.json(

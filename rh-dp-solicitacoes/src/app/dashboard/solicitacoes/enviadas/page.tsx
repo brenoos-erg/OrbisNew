@@ -674,7 +674,7 @@ export default function SentRequestsPage() {
             <label className="app-label">Texto no Formulário</label>
             <div className="relative mt-1">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 app-muted-text" />
-              <input value={formFilters.text} onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))} placeholder="Buscar por texto..." className="app-input pl-9 text-sm" />
+              <input aria-label="Buscar chamado" value={formFilters.text} onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))} placeholder="Digite protocolo, nome, matrícula, cargo, centro de custo, setor, responsável, texto do formulário, anexo ou comentário" className="app-input pl-9 text-sm" />
             </div>
           </div>
         </div>

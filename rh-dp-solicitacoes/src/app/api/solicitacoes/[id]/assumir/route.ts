@@ -4,6 +4,7 @@ export const revalidate = 0
 // src/app/api/solicitacoes/[id]/assumir/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import crypto from 'crypto'
@@ -104,6 +105,7 @@ export async function POST(
       dedupeKey: `ASSUMIR:${solicitationId}:${me.id}`,
     })
 
+    void safeUpsertSolicitationSearchIndex(updated.id)
     return NextResponse.json(updated)
   } catch (e) {
     console.error('❌ POST /api/solicitacoes/[id]/assumir error:', e)

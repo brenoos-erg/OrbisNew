@@ -4,6 +4,7 @@ export const revalidate = 0
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
@@ -231,6 +232,7 @@ export async function PATCH(
       dedupeKey: `FINALIZED:${id}`,
     })
 
+    void safeUpsertSolicitationSearchIndex(updated.id)
     return NextResponse.json(updated)
   } catch (error) {
     console.error('PATCH /api/solicitacoes/[id]/finalizar error', error)
