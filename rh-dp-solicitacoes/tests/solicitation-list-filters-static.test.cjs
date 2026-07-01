@@ -1,0 +1,35 @@
+const assert = require('assert');
+const fs = require('fs');
+
+const shared = fs.readFileSync('src/lib/solicitationListFilters.ts', 'utf8');
+const receivedApi = fs.readFileSync('src/app/api/solicitacoes/recebidas/route.ts', 'utf8');
+const receivedPage = fs.readFileSync('src/app/dashboard/solicitacoes/recebidas/page.tsx', 'utf8');
+const diagnostic = fs.readFileSync('src/app/api/solicitacoes/diagnostico-filtro/route.ts', 'utf8');
+const searchIndex = fs.readFileSync('src/lib/solicitationSearchIndex.ts', 'utf8');
+const schema = fs.readFileSync('prisma/schema.prisma', 'utf8');
+
+assert(shared.includes('export type SolicitationListFilters'), 'contrato único de filtros deve existir');
+assert(shared.includes("['q', 'text', 'protocolo', 'solicitanteNome', 'matricula']"), 'aliases legados devem alimentar q');
+assert(shared.includes('normalizeSolicitationFilterText'), 'busca deve normalizar acento/caixa');
+assert(shared.includes('buildSortFromFilters'), 'ordenação deve ser centralizada');
+assert(shared.includes('applyInMemorySearchFilter'), 'fallback em memória deve existir para busca global');
+assert(receivedApi.includes('parseSolicitationListFilters(searchParams)'), 'Recebidas deve usar parser compartilhado');
+assert(receivedApi.includes('buildSortFromFilters(filters)'), 'Recebidas deve respeitar sortBy/sortDir');
+assert(!receivedApi.includes("orderBy: [{ dataAbertura: 'desc' }]"), 'Recebidas não pode forçar dataAbertura desc ignorando a tela');
+assert(receivedApi.includes('inMemorySearchWindow = 2000'), 'fallback em memória deve ser limitado');
+assert(receivedApi.includes('SEARCH_WINDOW_TRUNCATED'), 'API deve avisar truncamento do fallback textual');
+assert(receivedPage.includes('Buscar chamado'), 'tela deve ter busca principal');
+assert(receivedPage.includes('Digite protocolo, nome, matrícula, cargo, centro de custo, setor, responsável, texto do formulário, anexo ou comentário'), 'placeholder da busca principal deve cobrir campos consolidados');
+assert(receivedPage.includes('advancedFiltersOpen'), 'filtros avançados devem ser recolhidos por padrão');
+assert(receivedPage.includes('setInterval(fetchList, 60000)'), 'auto-refresh deve ser maior e condicionado a ausência de filtros');
+assert(!receivedPage.includes('Login do solicitante'), 'login do solicitante não deve aparecer como filtro solto');
+assert(!receivedPage.includes('<label className="app-label">Matrícula</label>'), 'matrícula não deve aparecer como filtro solto');
+assert(!receivedPage.includes('<label className="app-label">Texto no formulário</label>'), 'texto no formulário não deve aparecer como filtro solto');
+assert(diagnostic.includes('diagnostico-filtro'), 'endpoint de diagnóstico deve existir');
+assert(diagnostic.includes('NO_PERMISSION'), 'diagnóstico sem permissão não deve vazar dados detalhados');
+assert(schema.includes('model SolicitationSearchIndex'), 'schema deve ter índice de busca');
+assert(searchIndex.includes('buildSolicitationSearchIndexText'), 'builder de índice deve existir');
+assert(searchIndex.includes('comentarios'), 'índice deve incluir comentários');
+assert(searchIndex.includes('anexos'), 'índice deve incluir anexos');
+assert(searchIndex.includes('payload?.cargoSnapshot'), 'índice deve incluir snapshot/cargo');
+console.log('solicitation-list-filters-static ok');

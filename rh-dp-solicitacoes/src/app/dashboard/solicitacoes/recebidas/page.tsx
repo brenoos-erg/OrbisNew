@@ -15,6 +15,7 @@ import { isSolicitacaoIncentivoEducacao } from '@/lib/solicitationTypes'
 import { useSessionMe } from '@/components/session/SessionProvider'
 
 type FilterState = {
+  q: string
   protocolo: string
   solicitanteNome: string
   solicitanteLogin: string
@@ -81,6 +82,7 @@ type CostCenterOption = {
 }
 
 const DEFAULT_FILTERS: FilterState = {
+  q: '',
   protocolo: '',
   solicitanteNome: '',
   solicitanteLogin: '',
@@ -127,6 +129,7 @@ const SITUACAO_OPTIONS = [
 type ActiveFilterChip = { key: keyof FilterState; label: string; value: string }
 
 const FILTER_KEYS: Array<keyof FilterState> = [
+  'q',
   'protocolo',
   'solicitanteNome',
   'solicitanteLogin',
@@ -208,6 +211,7 @@ function buildActiveFilterChips(
   },
 ): ActiveFilterChip[] {
   const labels: Partial<Record<keyof FilterState, string>> = {
+    q: 'Busca',
     protocolo: 'Protocolo',
     solicitanteNome: 'Nome do solicitante',
     solicitanteLogin: 'Login',
@@ -299,6 +303,7 @@ export default function ReceivedRequestsPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailMode, setDetailMode] = useState<'default' | 'approval'>('default')
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
 
   useEffect(() => {
     if (sessionLoading) return
@@ -330,7 +335,9 @@ export default function ReceivedRequestsPage() {
       params.set('sortBy', filters.sortBy)
       params.set('sortDir', filters.sortDir)
 
-      if (filters.protocolo) params.set('protocolo', filters.protocolo)
+      if (filters.q) params.set('q', filters.q)
+      if (filters.q) params.set('q', filters.q)
+    if (filters.protocolo) params.set('protocolo', filters.protocolo)
       if (filters.solicitanteNome) params.set('solicitanteNome', filters.solicitanteNome)
       if (filters.solicitanteLogin) params.set('solicitanteLogin', filters.solicitanteLogin)
       if (filters.matricula) params.set('matricula', filters.matricula)
@@ -465,7 +472,10 @@ export default function ReceivedRequestsPage() {
     if (!sessionData?.appUser) return
 
     fetchList()
-    const interval = setInterval(fetchList, 5000)
+    const hasActiveFilters = activeFilterChips.length > 0
+    if (hasActiveFilters) return
+
+    const interval = setInterval(fetchList, 60000)
 
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -538,6 +548,7 @@ export default function ReceivedRequestsPage() {
     params.set('pageSize', '1000')
     params.set('sortBy', filters.sortBy)
     params.set('sortDir', filters.sortDir)
+    if (filters.q) params.set('q', filters.q)
     if (filters.protocolo) params.set('protocolo', filters.protocolo)
     if (filters.solicitanteNome) params.set('solicitanteNome', filters.solicitanteNome)
     if (filters.solicitanteLogin) params.set('solicitanteLogin', filters.solicitanteLogin)
@@ -597,280 +608,125 @@ export default function ReceivedRequestsPage() {
         </p>
       </div>
 
-      <div className="app-filter-bar">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Filtros avançados</h2>
-          <span className="text-xs app-muted-text">Filtros ativos: {filterCount}</span>
-       </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="app-label">Protocolo</label>
+      <div className="app-filter-bar space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="flex-1">
+            <label className="app-label" htmlFor="received-search-main">Buscar chamado</label>
             <input
+              id="received-search-main"
               className="app-input mt-1"
-              placeholder="Código do protocolo"
-              value={formFilters.protocolo}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, protocolo: e.target.value }))}
+              placeholder="Digite protocolo, nome, matrícula, cargo, centro de custo, setor, responsável, texto do formulário, anexo ou comentário"
+              value={formFilters.q}
+              onChange={(e) => setFormFilters((prev) => ({ ...prev, q: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setFilters((prev) => ({ ...formFilters, page: 1, pageSize: prev.pageSize }))
+                }
+              }}
             />
           </div>
 
-          <div>
-            <label className="app-label">Nome do solicitante</label>
-            <input
-              className="app-input mt-1"
-              placeholder="Nome"
-              value={formFilters.solicitanteNome}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitanteNome: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Login do solicitante</label>
-            <input
-              className="app-input mt-1"
-              placeholder="Login"
-              value={formFilters.solicitanteLogin}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, solicitanteLogin: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Matrícula</label>
-            <input
-              className="app-input mt-1"
-              placeholder="Matrícula"
-              value={formFilters.matricula}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, matricula: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Tipo de solicitação</label>
-            <select
-              className="app-select mt-1"
-              value={formFilters.tipoId}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="app-button-primary disabled:opacity-50"
+              disabled={loading}
+              onClick={() => setFilters((prev) => ({ ...formFilters, page: 1, pageSize: prev.pageSize }))}
             >
-              <option value="">Todos</option>
-              {tipos.map((tipo) => (
-                <option key={tipo.id} value={tipo.id}>
-                  {tipo.codigo ? `${tipo.codigo} - ${tipo.nome}` : tipo.nome}
-                </option>
-              ))}
-            </select>
+              Pesquisar
+            </button>
+            <button type="button" className="app-button-secondary" disabled={loading} onClick={clearAllFilters}>
+              Limpar
+            </button>
+            <button type="button" className="app-button-secondary" onClick={() => setAdvancedFiltersOpen((open) => !open)}>
+              Filtros avançados {advancedFiltersOpen ? '▲' : '▼'}
+            </button>
+            <button type="button" className="app-button-secondary" disabled={loading} onClick={fetchList}>
+              Atualizar
+            </button>
+            <button type="button" className="app-button-secondary" onClick={exportExcel}>
+              Exportar
+            </button>
           </div>
-
-          <div>
-            <label className="app-label">Setor responsável</label>
-            <select
-              className="app-select mt-1"
-              value={formFilters.departmentId}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, departmentId: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="app-label">Centro de custo</label>
-            <select
-              className="app-select mt-1"
-              value={formFilters.costCenterId}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, costCenterId: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              {costCenters.map((center) => (
-                <option key={center.id} value={center.id}>
-                  {center.externalCode ?? center.code ?? '-'} - {center.description}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="app-label">Responsável atual / atendente</label>
-            <input
-              className="app-input mt-1"
-              placeholder="Nome do atendente"
-              value={formFilters.responsavel}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, responsavel: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Status do chamado</label>
-            <select
-              className="app-select mt-1"
-              value={formFilters.status}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, status: e.target.value }))}
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value || 'ALL'} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="app-label">Situação</label>
-            <select
-              className="app-select mt-1"
-              value={formFilters.situacao}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, situacao: e.target.value }))}
-            >
-              {SITUACAO_OPTIONS.map((option) => (
-                <option key={option.value || 'ALL'} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="app-label">Data de abertura</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.openedDate}
-              onChange={(e) =>
-                setFormFilters((prev) => ({
-                  ...prev,
-                  openedDate: e.target.value,
-                  openedStart: e.target.value ? '' : prev.openedStart,
-                  openedEnd: e.target.value ? '' : prev.openedEnd,
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Período abertura (inicial)</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.openedStart}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, openedStart: e.target.value, openedDate: '' }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Período abertura (final)</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.openedEnd}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, openedEnd: e.target.value, openedDate: '' }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Data de fechamento</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.closedDate}
-              onChange={(e) =>
-                setFormFilters((prev) => ({
-                  ...prev,
-                  closedDate: e.target.value,
-                  closedStart: e.target.value ? '' : prev.closedStart,
-                  closedEnd: e.target.value ? '' : prev.closedEnd,
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Período fechamento (inicial)</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.closedStart}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, closedStart: e.target.value, closedDate: '' }))}
-            />
-          </div>
-
-          <div>
-            <label className="app-label">Período fechamento (final)</label>
-            <input
-              type="date"
-              className="app-input mt-1"
-              value={formFilters.closedEnd}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, closedEnd: e.target.value, closedDate: '' }))}
-            />
-          </div>
-
-          <div className="sm:col-span-2 lg:col-span-4">
-            <label className="app-label">Texto no formulário</label>
-            <input
-              className="app-input mt-1"
-              placeholder="Buscar por texto..."
-              value={formFilters.text}
-              onChange={(e) => setFormFilters((prev) => ({ ...prev, text: e.target.value }))}
-            />
-          </div>
-           </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="app-button-primary disabled:opacity-50"
-            disabled={loading}
-            onClick={() => setFilters((prev) => ({ ...formFilters, page: 1, pageSize: prev.pageSize }))}
-          >
-            Pesquisar
-          </button>
-
-             <button
-            type="button"
-            className="app-button-secondary"
-            disabled={loading}
-            onClick={clearAllFilters}
-          >
-              Limpar filtros
-          </button>
-          <button
-            type="button"
-            className="app-button-secondary"
-            onClick={exportExcel}
-          >
-            Exportar Excel
-          </button>
         </div>
 
+        <div className="text-xs app-muted-text">
+          <p><strong>Status</strong> é o estado técnico do chamado. <strong>Situação</strong> é um agrupamento; se ambos forem preenchidos, Status prevalece.</p>
+          <p>Mostrando {rangeStart}-{rangeEnd} de {total} chamados. Filtros ativos: {filterCount}{filters.q ? ` • Busca: ${filters.q}` : ''}</p>
+        </div>
+
+        {advancedFiltersOpen && (
+          <div className="grid grid-cols-1 gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-4 lg:grid-cols-3">
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide app-muted-text">Classificação</h3>
+              <div>
+                <label className="app-label">Tipo de solicitação</label>
+                <select className="app-select mt-1" value={formFilters.tipoId} onChange={(e) => setFormFilters((prev) => ({ ...prev, tipoId: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {tipos.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.codigo ? `${tipo.codigo} - ${tipo.nome}` : tipo.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="app-label">Status</label>
+                <select className="app-select mt-1" value={formFilters.status} onChange={(e) => setFormFilters((prev) => ({ ...prev, status: e.target.value }))}>
+                  {STATUS_OPTIONS.map((option) => <option key={option.value || 'ALL'} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="app-label">Situação</label>
+                <select className="app-select mt-1" value={formFilters.situacao} onChange={(e) => setFormFilters((prev) => ({ ...prev, situacao: e.target.value }))}>
+                  {SITUACAO_OPTIONS.map((option) => <option key={option.value || 'ALL'} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide app-muted-text">Responsabilidade</h3>
+              <div>
+                <label className="app-label">Setor responsável</label>
+                <select className="app-select mt-1" value={formFilters.departmentId} onChange={(e) => setFormFilters((prev) => ({ ...prev, departmentId: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {departments.map((department) => <option key={department.id} value={department.id}>{department.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="app-label">Centro de custo</label>
+                <select className="app-select mt-1" value={formFilters.costCenterId} onChange={(e) => setFormFilters((prev) => ({ ...prev, costCenterId: e.target.value }))}>
+                  <option value="">Todos</option>
+                  {costCenters.map((center) => <option key={center.id} value={center.id}>{center.externalCode ?? center.code ?? '-'} - {center.description}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="app-label">Responsável/atendente</label>
+                <input className="app-input mt-1" placeholder="Nome do atendente" value={formFilters.responsavel} onChange={(e) => setFormFilters((prev) => ({ ...prev, responsavel: e.target.value }))} />
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide app-muted-text">Datas e escopo</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="app-label">Abertura inicial</label><input type="date" className="app-input mt-1" value={formFilters.openedStart} onChange={(e) => setFormFilters((prev) => ({ ...prev, openedStart: e.target.value, openedDate: '' }))} /></div>
+                <div><label className="app-label">Abertura final</label><input type="date" className="app-input mt-1" value={formFilters.openedEnd} onChange={(e) => setFormFilters((prev) => ({ ...prev, openedEnd: e.target.value, openedDate: '' }))} /></div>
+                <div><label className="app-label">Fechamento inicial</label><input type="date" className="app-input mt-1" value={formFilters.closedStart} onChange={(e) => setFormFilters((prev) => ({ ...prev, closedStart: e.target.value, closedDate: '' }))} /></div>
+                <div><label className="app-label">Fechamento final</label><input type="date" className="app-input mt-1" value={formFilters.closedEnd} onChange={(e) => setFormFilters((prev) => ({ ...prev, closedEnd: e.target.value, closedDate: '' }))} /></div>
+              </div>
+              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={false} disabled /> Apenas meus chamados <span className="app-muted-text">(em breve)</span></label>
+              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={false} disabled /> Apenas pendentes de ação minha <span className="app-muted-text">(em breve)</span></label>
+            </section>
+          </div>
+        )}
+
         {activeFilterChips.length > 0 && (
-          <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide app-muted-text">Filtros ativos</span>
-              <button
-                type="button"
-                className="app-button-secondary px-2 py-1 text-xs"
-                onClick={clearAllFilters}
-                disabled={loading}
-              >
-                Limpar todos os filtros
-              </button>
+              <button type="button" className="app-button-secondary px-2 py-1 text-xs" onClick={clearAllFilters} disabled={loading}>Limpar todos os filtros</button>
             </div>
             <div className="flex flex-wrap gap-2">
               {activeFilterChips.map((chip) => (
-                <span
-                  key={chip.key}
-                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-1 text-xs font-medium text-[var(--foreground)]"
-                >
+                <span key={chip.key} className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-1 text-xs font-medium text-[var(--foreground)]">
                   <span className="font-semibold">{chip.label}:</span> {chip.value}
-                  <button
-                    type="button"
-                    className="ml-1 rounded-full p-0.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-50"
-                    aria-label={`Remover filtro ${chip.label}`}
-                    onClick={() => removeFilter(chip.key)}
-                    disabled={loading}
-                  >
+                  <button type="button" className="ml-1 rounded-full p-0.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-50" aria-label={`Remover filtro ${chip.label}`} onClick={() => removeFilter(chip.key)} disabled={loading}>
                     <X size={12} />
                   </button>
                 </span>
