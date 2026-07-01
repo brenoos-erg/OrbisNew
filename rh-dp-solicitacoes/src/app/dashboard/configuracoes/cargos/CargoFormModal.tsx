@@ -49,7 +49,8 @@ export type Position = {
   confidentialDataAccess?: string | null
   responsibilities?: string | null
   active?: boolean
-  latestDocument?: { id: string; originalFilename: string; fileUrl: string } | null
+  latestDocument?: { id: string; originalFilename: string; fileUrl: string; isCurrent?: boolean; uploadedAt?: string } | null
+  documentHistory?: { id: string; originalFilename: string; fileUrl: string; isCurrent?: boolean; uploadedAt?: string }[]
 }
 export type PositionRow = Position & { id: string }
 
@@ -105,6 +106,8 @@ export function CargoFormModal({
   const [pendingDocument, setPendingDocument] = React.useState<{ tempFileToken: string; originalFilename: string; mimeType?: string | null; sizeBytes?: number | null; parsedText?: string | null; extracted?: Record<string, unknown> } | null>(null)
   const [uploadingDocument, setUploadingDocument] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [previewMessage, setPreviewMessage] = React.useState<string | null>(null)
+  const documentHistory = row?.documentHistory ?? (currentDocument ? [currentDocument] : [])
   
 
 
@@ -155,6 +158,7 @@ export function CargoFormModal({
         extracted: json.extracted ?? {},
       })
       applyExtracted(json.extracted ?? {})
+      setPreviewMessage('Documento lido. Revise os campos extraídos antes de salvar.')
     } finally {
       setUploadingDocument(false)
     }
@@ -263,6 +267,20 @@ export function CargoFormModal({
               </label>
             </div>
           </div>
+          {previewMessage && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800">{previewMessage}</p>}
+          {documentHistory.length > 0 && (
+            <div className="mt-3 rounded-md border border-orange-100 bg-white/70 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-600">Histórico de documentos do cargo</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {documentHistory.map((doc) => (
+                  <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{doc.originalFilename} {doc.isCurrent ? '(vigente)' : ''}</span>
+                    {row?.id && <a className="font-semibold text-blue-700 hover:underline" href={`/api/positions/${row.id}/documents/${doc.id}/download`} target="_blank">Baixar</a>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto pr-1">

@@ -306,6 +306,7 @@ export default function NovaSolicitacaoPage() {
   // ---------- RQ_063 / CARGOS ----------
   const [positions, setPositions] = useState<Position[]>([]);
   const [cargoId, setCargoId] = useState('');
+  const [cargoSearch, setCargoSearch] = useState('');
   const [extras, setExtras] = useState<Extras>({});
   const [selectedRequestCostCenterId, setSelectedRequestCostCenterId] = useState('');
 
@@ -729,6 +730,7 @@ export default function NovaSolicitacaoPage() {
       setExtras({});
       setExtraFiles({});
       setCargoId('');
+      setCargoSearch('');
       return;
     }
 
@@ -746,6 +748,7 @@ export default function NovaSolicitacaoPage() {
     setExtras(defaults);
     setExtraFiles({});
     setCargoId('');
+    setCargoSearch('');
   }, [selectedTipo]);
 
   useEffect(() => {
@@ -786,6 +789,21 @@ export default function NovaSolicitacaoPage() {
 
     loadPositions();
   }, []);
+
+  const formatPositionOptionLabel = (position: Position) =>
+    [position.name, position.indexador, position.cbo, position.areaSector ?? position.sectorProject].filter(Boolean).join(' • ')
+
+  const filteredPositionsForRq063 = useMemo(() => {
+    const term = cargoSearch.trim().toLowerCase()
+    if (!term) return positions
+    return positions.filter((position) => [
+      position.name,
+      position.indexador,
+      position.cbo,
+      position.areaSector,
+      position.sectorProject,
+    ].some((value) => String(value ?? '').toLowerCase().includes(term)))
+  }, [cargoSearch, positions])
 
   /* ============================================================
    5) EXTRAS / RQ_063 / ABONO
@@ -939,6 +957,7 @@ export default function NovaSolicitacaoPage() {
     setCargoId(id);
     const position = positions.find((p) => p.id === id);
     if (!position) return;
+    setCargoSearch(formatPositionOptionLabel(position));
 
     setExtras((prev) => ({
       ...prev,
@@ -1033,6 +1052,17 @@ export default function NovaSolicitacaoPage() {
       };
 
        if (isRQ063) {
+        if (!String(cargoId || extras.cargoId || '').trim()) {
+          setSubmitError('Selecione um cargo cadastrado antes de enviar a solicitação.');
+          setSubmitting(false);
+          return;
+        }
+        if (!String(extras.documentoCargoId ?? '').trim()) {
+          setSubmitError('Este cargo não possui documento oficial anexado. Regularize o cadastro antes de prosseguir.');
+          setSubmitting(false);
+          return;
+        }
+
         const motivoSelecionado =
           extras.motivoVagaTipo === 'SUBSTITUICAO'
             ? 'Substituição'
@@ -1085,7 +1115,9 @@ export default function NovaSolicitacaoPage() {
 
           campos = {
           ...extras,
-          cargo: extras.cargo ?? '',
+          cargoId: cargoId || extras.cargoId || '',
+          cargoNome: extras.cargoNome ?? '',
+          cargo: extras.cargoNome ?? '',
           setorProjeto: extras.setorProjeto ?? '',
           localTrabalho: extras.localTrabalho ?? '',
           horarioTrabalho: extras.horarioTrabalho ?? '',
@@ -1957,16 +1989,38 @@ useEffect(() => {
                   {/* Cargo */}
                   <div>
                     <label className={labelClass}>
-                      Cargo <span className="text-red-500">*</span>
+                      Cargo cadastrado <span className="text-red-500">*</span>
                     </label>
-                    <select className={inputClass} value={cargoId} onChange={(e) => handleCargoChange(e.target.value)} required>
+                    <input
+                      className={inputClass}
+                      value={cargoSearch}
+                      onChange={(e: InputChange) => {
+                        const typedValue = e.target.value
+                        setCargoSearch(typedValue)
+                        const matchedPosition = positions.find((position) => formatPositionOptionLabel(position) === typedValue)
+                        if (matchedPosition) {
+                          handleCargoChange(matchedPosition.id)
+                        } else {
+                          setCargoId('')
+                        }
+                      }}
+                      placeholder="Pesquise por nome, indexador, CBO ou área/setor"
+                      list="rq063-cargos-cadastrados"
+                      required={!cargoId}
+                    />
+                    <datalist id="rq063-cargos-cadastrados">
+                      {filteredPositionsForRq063.map((position) => (
+                        <option key={position.id} value={formatPositionOptionLabel(position)} />
+                      ))}
+                    </datalist>
+                    <select className={`${inputClass} mt-2`} value={cargoId} onChange={(e) => handleCargoChange(e.target.value)} required>
                       <option value="">Selecione um cargo cadastrado</option>
-                      {positions.map((position) => (
-                        <option key={position.id} value={position.id}>{position.name}</option>
+                      {filteredPositionsForRq063.map((position) => (
+                        <option key={position.id} value={position.id}>{formatPositionOptionLabel(position)}</option>
                       ))}
                     </select>
                     {cargoId && !extras.documentoCargoId && (
-                      <p className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">Este cargo não possui documento oficial anexado.</p>
+                      <p className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">Este cargo não possui documento oficial anexado. Regularize o cadastro antes de prosseguir.</p>
                     )}
                   </div>
 

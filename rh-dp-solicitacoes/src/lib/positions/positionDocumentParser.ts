@@ -72,10 +72,12 @@ export function parsePositionDescriptionText(text: string): ParsedPositionDocume
     parsed[found.key] = chunks.join('\n').trim() || null
   }
 
-  parsed.indexador = text.match(/DD\.RH\.\d+/i)?.[0]?.toUpperCase() || parsed.indexador || null
-  parsed.revision = text.match(/Revis[aã]o\s*:?\s*([0-9A-Za-z.-]+)/i)?.[1] || parsed.revision || null
+  const indexadorMatch = text.match(/\bDD\.RH\.\d+\b/i)
+  parsed.indexador = indexadorMatch?.[0]?.toUpperCase() || parsed.indexador?.replace(/\s+Revis[aã]o.*$/i, '').replace(/\s+Data.*$/i, '').trim() || null
+  parsed.revision = text.match(/Revis[aã]o\s*:?\s*([0-9A-Za-z.-]+)/i)?.[1] || parsed.revision?.replace(/\s+Data.*$/i, '').trim() || null
   parsed.documentDate = parseDate(text.match(/Data\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] || parsed.documentDate)
-  parsed.cbo = text.match(/CBO\s*:?\s*(\d{4}-\d{2})/i)?.[1] || parsed.cbo || null
+  const cboMatch = text.match(/(?:\bCBO\b\s*:?\s*)?(\d{4}-\d{2})\b/i)
+  parsed.cbo = cboMatch?.[1] || parsed.cbo || null
   return parsed
 }
 export function normalizePositionDocumentFields(parsed: ParsedPositionDocument) {
