@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { buildUtcDateRangeFilter, normalizeFilterText } from './solicitationFilters'
-import { buildReceivedFilterText, matchesNormalizedTerm, normalizeSearchText } from './receivedSolicitationsQuery'
+import { buildReceivedFilterText, buildReceivedResponsibleFilterText, matchesNormalizedTerm, normalizeSearchText } from './receivedSolicitationsQuery'
 import { isValidSolicitationStatus, onlyValidSolicitationStatuses } from './solicitationStatuses'
 
 export type SolicitationListFilters = {
@@ -145,7 +145,7 @@ export function applyInMemorySearchFilter<T extends Record<string, unknown>>(row
 export function applyResponsibleTextFilter<T extends Record<string, unknown>>(rows: T[], responsibleText?: string) {
   const term = normalizeSolicitationFilterText(responsibleText)
   if (!term) return rows
-  return rows.filter((row) => matchesNormalizedTerm(row, term))
+  return rows.filter((row) => matchesNormalizedTerm(buildReceivedResponsibleFilterText(row), term))
 }
 
 export function explainWhySolicitationDidNotAppear(protocol: string, filters: SolicitationListFilters, userAccess: unknown) {

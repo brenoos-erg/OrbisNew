@@ -66,15 +66,45 @@ export async function upsertSolicitationSearchIndex(solicitationId: string) {
   })
 }
 
-export async function rebuildSolicitationSearchIndexBatch({ apply = false, take = 500 } = {}) {
-  const solicitations = await prisma.solicitation.findMany({ take, orderBy: { dataAbertura: 'desc' }, select: { id: true } })
-  if (!apply) return { planned: solicitations.length, updated: 0 }
-  let updated = 0
-  for (const solicitation of solicitations) {
-    await upsertSolicitationSearchIndex(solicitation.id)
-    updated += 1
+export async function safeUpsertSolicitationSearchIndex(solicitationId: string) {
+  try {
+    return await upsertSolicitationSearchIndex(solicitationId)
+  } catch (err) {
+    console.error('safeUpsertSolicitationSearchIndex failed', { solicitationId, err })
+    return null
   }
-  return { planned: solicitations.length, updated }
+}
+
+export async function rebuildSolicitationSearchIndexBatch({ apply = false, take = 500, all = false, cleanOrphans = false } = {}) {
+  const pageSize = Math.max(1, take)
+  let cursor: string | undefined
+  let planned = 0
+  let updated = 0
+  let errors = 0
+
+  void cleanOrphans // reservado para limpeza por SQL operacional quando necessário.
+
+  do {
+    const solicitations = await prisma.solicitation.findMany({
+      take: pageSize,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    })
+    planned += solicitations.length
+    if (apply) {
+      for (const solicitation of solicitations) {
+        const result = await safeUpsertSolicitationSearchIndex(solicitation.id)
+        if (result) updated += 1
+        else errors += 1
+      }
+    }
+    cursor = solicitations.at(-1)?.id
+    if (!all) break
+    if (solicitations.length < pageSize) break
+  } while (cursor)
+
+  return { planned, updated, errors }
 }
 
 export async function searchSolicitationIdsByText(q: string, baseWhere: Prisma.SolicitationWhereInput = {}, limit = 1000) {

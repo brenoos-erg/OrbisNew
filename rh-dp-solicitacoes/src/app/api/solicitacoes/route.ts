@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { ModuleLevel, SolicitationPriority, Prisma, TipoApproverRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import crypto from 'crypto'
 import { withModuleLevel } from '@/lib/access'
 import { performance } from 'node:perf_hooks'
@@ -28,6 +29,8 @@ import {
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import { getEpiUniformeReceivedResponsibilityLabel } from '@/lib/epiUniformeFlow'
 import { validateSolicitationPayload } from '@/lib/solicitationPayloadValidation'
+import { buildBaseWhereFromFilters, buildPaginationFromFilters, buildSortFromFilters, parseSolicitationListFilters } from '@/lib/solicitationListFilters'
+import { searchSolicitationIdsByText } from '@/lib/solicitationSearchIndex'
 
 
 
@@ -127,17 +130,11 @@ export const GET = withModuleLevel(
         const { me } = ctx
         const { searchParams } = new URL(req.url)
 
-        const page = Math.max(
-          1,
-          Number.parseInt(searchParams.get('page') ?? '1', 10) || 1,
-        )
-        const pageSize =
-          Number.parseInt(searchParams.get('pageSize') ?? '10', 10) || 10
+        const filters = parseSolicitationListFilters(searchParams)
+        const { page, pageSize, skip } = buildPaginationFromFilters(filters)
+        const where: any = buildBaseWhereFromFilters(filters)
 
-        const skip = (page - 1) * pageSize
-        const where = buildWhereFromSearchParams(searchParams)
-
-        const scope = searchParams.get('scope') ?? 'sent' // sent, received, to-approve
+        const scope = searchParams.get('scope') ?? filters.scope ?? 'sent' // sent, received, to-approve
 
         if (scope === 'sent') {
           where.solicitanteId = me.id
@@ -171,13 +168,22 @@ export const GET = withModuleLevel(
           }
         }
 
+        if (filters.q) {
+          const protocolLike = /^RQ\d{4,8}-\d{3,}$/.test(filters.q.trim().toUpperCase())
+          const ids = protocolLike
+            ? (await prisma.solicitation.findMany({ where: { AND: [where, { protocolo: filters.q.trim() }] }, select: { id: true } })).map((row) => row.id)
+            : await searchSolicitationIdsByText(filters.q, where, 10000)
+          where.id = { in: ids }
+        }
+
         const listStartedAt = performance.now()
+        const orderBy = buildSortFromFilters(filters)
         const [solicitations, total] = await Promise.all([
           prisma.solicitation.findMany({
             where,
             skip,
             take: pageSize,
-            orderBy: { dataAbertura: 'desc' },
+            orderBy,
             include: {
               tipo: { select: { id: true, codigo: true, nome: true } },
               department: { select: { name: true, code: true } },
@@ -229,7 +235,7 @@ export const GET = withModuleLevel(
   costCenterId: s.costCenterId ?? null,
 })
         })
-        return NextResponse.json({ rows, total })
+        return NextResponse.json({ rows, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)), sortBy: filters.sortBy, sortDir: filters.sortDir, filtersApplied: filters })
       } catch (e) {
         console.error('GET /api/solicitacoes error', e)
         return NextResponse.json(
@@ -472,7 +478,8 @@ export const POST = withModuleLevel(
             },
           })
 
-          return NextResponse.json(updated, { status: 201 })
+          void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
         }
 
         if (isAvaliacaoExperiencia) {
@@ -518,7 +525,8 @@ export const POST = withModuleLevel(
             },
           })
 
-          return NextResponse.json(updated, { status: 201 })
+          void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
         }
 
          /* =====================================================================
@@ -584,7 +592,8 @@ export const POST = withModuleLevel(
               },
             })
 
-            return NextResponse.json(updated, { status: 201 })
+            void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
           }
 
           // qualquer coisa diferente de SIM exige aprovação
@@ -612,6 +621,7 @@ export const POST = withModuleLevel(
             },
           })
 
+    void safeUpsertSolicitationSearchIndex(updated.id)
     return NextResponse.json(updated, { status: 201 })
         }
 
@@ -659,7 +669,8 @@ export const POST = withModuleLevel(
             },
           })
 
-       return NextResponse.json(updated, { status: 201 })
+       void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
           4.1) RQ_247 - Solicitação de Desligamento de Pessoal
@@ -693,7 +704,8 @@ export const POST = withModuleLevel(
                 'Solicitação aprovada automaticamente e enviada ao centro de custo responsável.',
             },
           })
-          return NextResponse.json(updated, { status: 201 })
+          void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
         }
         /* =====================================================================
            4.2) RQ_300 - Nada Consta (encaminha para múltiplos setores)
@@ -716,7 +728,8 @@ export const POST = withModuleLevel(
             },
           })
 
-          return NextResponse.json(created, { status: 201 })
+          void safeUpsertSolicitationSearchIndex(created.id)
+    return NextResponse.json(created, { status: 201 })
         }
 
 
@@ -749,13 +762,15 @@ export const POST = withModuleLevel(
             },
           })
 
-          return NextResponse.json(updated, { status: 201 })
+          void safeUpsertSolicitationSearchIndex(updated.id)
+    return NextResponse.json(updated, { status: 201 })
         }
 
         // ======================================================================
         // 6) Demais tipos: segue fluxo simples, sem aprovação especial
         // ======================================================================
-        return NextResponse.json(created, { status: 201 })
+        void safeUpsertSolicitationSearchIndex(created.id)
+    return NextResponse.json(created, { status: 201 })
       } catch (e) {
         console.error('POST /api/solicitacoes error', e)
         return NextResponse.json(

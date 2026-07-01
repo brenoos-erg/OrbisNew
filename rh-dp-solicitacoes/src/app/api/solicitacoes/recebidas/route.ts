@@ -18,6 +18,7 @@ import {
   buildSortFromFilters,
   parseSolicitationListFilters,
 } from '@/lib/solicitationListFilters'
+import { searchSolicitationIdsByText } from '@/lib/solicitationSearchIndex'
 import { resolvePrimaryResponsibleForList } from '@/lib/solicitationResponsibility'
 import {
   buildReceivedWhereByPolicy,
@@ -46,7 +47,23 @@ export async function GET(req: NextRequest) {
       { excludePendingRq063: true },
     )
 
-    const hasInMemoryFilters = Boolean(filters.q || filters.responsibleText)
+    const protocolLike = filters.q ? /^RQ\d{4,8}-\d{3,}$/.test(filters.q.trim().toUpperCase()) : false
+    const searchDiagnostics: Array<{ code: string; message: string }> = []
+    if (filters.q) {
+      const searchIds = protocolLike
+        ? (await prisma.solicitation.findMany({ where: { AND: [dbWhere, { protocolo: filters.q.trim() }] }, select: { id: true } })).map((row) => row.id)
+        : await searchSolicitationIdsByText(filters.q, dbWhere, 10000)
+      if (searchIds.length > 0) {
+        dbWhere.id = { in: searchIds }
+      } else if (protocolLike) {
+        dbWhere.id = { in: [] }
+        searchDiagnostics.push({ code: 'PROTOCOL_NOT_IN_SCOPE', message: 'O protocolo não existe, não está visível para seu usuário ou foi removido pelos filtros aplicados.' })
+      } else {
+        searchDiagnostics.push({ code: 'SEARCH_INDEX_EMPTY_FALLBACK', message: 'Índice de busca vazio ou sem resultado; usando fallback textual em memória após filtros de permissão.' })
+      }
+    }
+
+    const hasInMemoryFilters = Boolean((filters.q && !protocolLike && !('id' in dbWhere)) || filters.responsibleText)
     const orderBy = buildSortFromFilters(filters)
     const { findManyArgs, countArgs } = buildListAndCountArgs(dbWhere, {
       skip,
@@ -75,9 +92,12 @@ export async function GET(req: NextRequest) {
     const paginatedSolicitations = hasInMemoryFilters
       ? filteredSolicitations.slice(skip, skip + pageSize)
       : filteredSolicitations
-    const diagnostics = hasInMemoryFilters && allSolicitations.length >= inMemorySearchWindow
-      ? [{ code: 'SEARCH_WINDOW_TRUNCATED', message: 'A busca textual foi limitada aos primeiros 2000 chamados visíveis e filtrados. Refine a busca ou reindexe a base.' }]
-      : []
+    const diagnostics = [
+      ...searchDiagnostics,
+      ...(hasInMemoryFilters && allSolicitations.length >= inMemorySearchWindow
+        ? [{ code: 'SEARCH_WINDOW_TRUNCATED', message: 'A busca textual em fallback foi limitada aos primeiros 2000 chamados já visíveis/filtrados. Recrie o índice para cobertura completa.' }]
+        : []),
+    ]
 
     const rows = paginatedSolicitations.map((s) => {
       const responsible = resolvePrimaryResponsibleForList({

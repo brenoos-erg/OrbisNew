@@ -304,6 +304,7 @@ export default function ReceivedRequestsPage() {
   const [detailMode, setDetailMode] = useState<'default' | 'approval'>('default')
   const [sessionExpired, setSessionExpired] = useState(false)
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
+  const [protocolDiagnostic, setProtocolDiagnostic] = useState<any>(null)
 
   useEffect(() => {
     if (sessionLoading) return
@@ -335,7 +336,6 @@ export default function ReceivedRequestsPage() {
       params.set('sortBy', filters.sortBy)
       params.set('sortDir', filters.sortDir)
 
-      if (filters.q) params.set('q', filters.q)
       if (filters.q) params.set('q', filters.q)
     if (filters.protocolo) params.set('protocolo', filters.protocolo)
       if (filters.solicitanteNome) params.set('solicitanteNome', filters.solicitanteNome)
@@ -514,6 +514,31 @@ export default function ReceivedRequestsPage() {
   const paginationItems = buildPaginationItems(page, totalPages)
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total)
+
+  useEffect(() => {
+    const q = filters.q.trim().toUpperCase()
+    if (!/^RQ\d{4,8}-\d{3,}$/.test(q) || loading || rows.length > 0) {
+      setProtocolDiagnostic(null)
+      return
+    }
+    const params = new URLSearchParams()
+    params.set('protocol', q)
+    params.set('scope', 'received')
+    if (filters.tipoId) params.set('tipoId', filters.tipoId)
+    if (filters.status) params.set('status', filters.status)
+    if (filters.situacao) params.set('situacao', filters.situacao)
+    if (filters.departmentId) params.set('departmentId', filters.departmentId)
+    if (filters.costCenterId) params.set('costCenterId', filters.costCenterId)
+    if (filters.openedStart) params.set('openedStart', filters.openedStart)
+    if (filters.openedEnd) params.set('openedEnd', filters.openedEnd)
+    if (filters.closedStart) params.set('closedStart', filters.closedStart)
+    if (filters.closedEnd) params.set('closedEnd', filters.closedEnd)
+    fetch(`/api/solicitacoes/diagnostico-filtro?${params.toString()}`)
+      .then((res) => res.json())
+      .then(setProtocolDiagnostic)
+      .catch(() => setProtocolDiagnostic(null))
+  }, [filters, loading, rows.length])
+
   function handleSort(sortBy: string) {
     setFilters((prev) => {
       const nextSortDir: 'asc' | 'desc' =
@@ -710,8 +735,6 @@ export default function ReceivedRequestsPage() {
                 <div><label className="app-label">Fechamento inicial</label><input type="date" className="app-input mt-1" value={formFilters.closedStart} onChange={(e) => setFormFilters((prev) => ({ ...prev, closedStart: e.target.value, closedDate: '' }))} /></div>
                 <div><label className="app-label">Fechamento final</label><input type="date" className="app-input mt-1" value={formFilters.closedEnd} onChange={(e) => setFormFilters((prev) => ({ ...prev, closedEnd: e.target.value, closedDate: '' }))} /></div>
               </div>
-              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={false} disabled /> Apenas meus chamados <span className="app-muted-text">(em breve)</span></label>
-              <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={false} disabled /> Apenas pendentes de ação minha <span className="app-muted-text">(em breve)</span></label>
             </section>
           </div>
         )}
@@ -735,6 +758,25 @@ export default function ReceivedRequestsPage() {
           </div>
         )}
       </div>
+
+      {protocolDiagnostic && rows.length === 0 && !loading && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-semibold">Diagnóstico do protocolo</p>
+          <p className="mt-1">{protocolDiagnostic.message}</p>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-4">
+            <div><dt className="text-xs font-semibold uppercase">Status atual</dt><dd>{protocolDiagnostic.currentStatus ?? '-'}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase">Setor atual</dt><dd>{protocolDiagnostic.currentDepartment ?? '-'}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase">Centro de custo</dt><dd>{protocolDiagnostic.currentCostCenter ?? '-'}</dd></div>
+            <div><dt className="text-xs font-semibold uppercase">Motivo</dt><dd>{protocolDiagnostic.reasonCode ?? '-'}</dd></div>
+          </dl>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {protocolDiagnostic.visibleToUser && protocolDiagnostic.suggestedUrl && (
+              <button type="button" className="app-button-primary" onClick={() => window.open(protocolDiagnostic.suggestedUrl, '_blank', 'noopener,noreferrer')}>Abrir chamado</button>
+            )}
+            <button type="button" className="app-button-secondary" onClick={clearAllFilters}>Limpar filtros</button>
+          </div>
+        </div>
+      )}
 
       {data?.protocolFilterDiagnostic?.status === 'visible_type_mismatch' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

@@ -17,7 +17,9 @@ assert(receivedApi.includes('parseSolicitationListFilters(searchParams)'), 'Rece
 assert(receivedApi.includes('buildSortFromFilters(filters)'), 'Recebidas deve respeitar sortBy/sortDir');
 assert(!receivedApi.includes("orderBy: [{ dataAbertura: 'desc' }]"), 'Recebidas não pode forçar dataAbertura desc ignorando a tela');
 assert(receivedApi.includes('inMemorySearchWindow = 2000'), 'fallback em memória deve ser limitado');
-assert(receivedApi.includes('SEARCH_WINDOW_TRUNCATED'), 'API deve avisar truncamento do fallback textual');
+assert(receivedApi.includes('searchSolicitationIdsByText(filters.q, dbWhere'), 'Recebidas deve usar SolicitationSearchIndex para q');
+assert(receivedApi.includes('PROTOCOL_NOT_IN_SCOPE'), 'protocolo exato deve ter diagnóstico de escopo/filtro');
+assert(receivedApi.includes('SEARCH_WINDOW_TRUNCATED'), 'API deve avisar truncamento apenas do fallback textual');
 assert(receivedPage.includes('Buscar chamado'), 'tela deve ter busca principal');
 assert(receivedPage.includes('Digite protocolo, nome, matrícula, cargo, centro de custo, setor, responsável, texto do formulário, anexo ou comentário'), 'placeholder da busca principal deve cobrir campos consolidados');
 assert(receivedPage.includes('advancedFiltersOpen'), 'filtros avançados devem ser recolhidos por padrão');
@@ -25,6 +27,8 @@ assert(receivedPage.includes('setInterval(fetchList, 60000)'), 'auto-refresh dev
 assert(!receivedPage.includes('Login do solicitante'), 'login do solicitante não deve aparecer como filtro solto');
 assert(!receivedPage.includes('<label className="app-label">Matrícula</label>'), 'matrícula não deve aparecer como filtro solto');
 assert(!receivedPage.includes('<label className="app-label">Texto no formulário</label>'), 'texto no formulário não deve aparecer como filtro solto');
+assert(!receivedPage.includes('(em breve)'), 'não deve haver filtros desabilitados em produção');
+assert(receivedPage.includes('/api/solicitacoes/diagnostico-filtro?'), 'Recebidas deve chamar diagnóstico visual por protocolo');
 assert(diagnostic.includes('diagnostico-filtro'), 'endpoint de diagnóstico deve existir');
 assert(diagnostic.includes('NO_PERMISSION'), 'diagnóstico sem permissão não deve vazar dados detalhados');
 assert(schema.includes('model SolicitationSearchIndex'), 'schema deve ter índice de busca');
@@ -32,4 +36,9 @@ assert(searchIndex.includes('buildSolicitationSearchIndexText'), 'builder de ín
 assert(searchIndex.includes('comentarios'), 'índice deve incluir comentários');
 assert(searchIndex.includes('anexos'), 'índice deve incluir anexos');
 assert(searchIndex.includes('payload?.cargoSnapshot'), 'índice deve incluir snapshot/cargo');
+assert(searchIndex.includes('safeUpsertSolicitationSearchIndex'), 'atualização segura do índice deve existir');
+const sentPage = fs.readFileSync('src/app/dashboard/solicitacoes/enviadas/page.tsx', 'utf8');
+const approvalPage = fs.readFileSync('src/app/dashboard/solicitacoes/aprovacao/page.tsx', 'utf8');
+assert(sentPage.includes('Buscar chamado'), 'Enviadas deve expor busca principal');
+assert(approvalPage.includes('Buscar aprovação'), 'Aprovações deve expor busca principal');
 console.log('solicitation-list-filters-static ok');

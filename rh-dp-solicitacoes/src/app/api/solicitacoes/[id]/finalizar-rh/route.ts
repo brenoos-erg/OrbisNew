@@ -4,6 +4,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { randomUUID } from 'crypto'
 import { isSolicitacaoDesligamento, isSolicitacaoEquipamento, isSolicitacaoIncentivoEducacao, isSolicitacaoPessoal } from '@/lib/solicitationTypes'
