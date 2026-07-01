@@ -1,5 +1,41 @@
 type GenericRecord = Record<string, unknown>
 
+
+const DATE_FIELD_HINTS = [
+  'data', 'dt', 'inicio', 'início', 'fim', 'retorno', 'gozo', 'aquisitivo',
+  'admissao', 'admissão', 'desligamento', 'nascimento', 'vencimento',
+]
+
+const NON_DATE_FIELD_HINTS = [
+  'cbo', 'matricula', 'matrícula', 'protocolo', 'telefone', 'phone', 'ramal',
+]
+
+function shouldFormatDateField(fieldName?: string) {
+  if (!fieldName) return true
+  const normalized = fieldName.toLowerCase()
+  if (NON_DATE_FIELD_HINTS.some((hint) => normalized.includes(hint))) return false
+  return DATE_FIELD_HINTS.some((hint) => normalized.includes(hint))
+}
+
+export function formatDateStringForDisplay(value: string, fieldName?: string) {
+  const trimmed = value.trim()
+  if (!trimmed || !shouldFormatDateField(fieldName)) return null
+
+  const pureDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (pureDateMatch) {
+    const [, yyyy, mm, dd] = pureDateMatch
+    return `${dd}/${mm}/${yyyy}`
+  }
+
+  const isoDateTimeMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:?\d{2})?$/)
+  if (isoDateTimeMatch) {
+    const [, yyyy, mm, dd, hh, min] = isoDateTimeMatch
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`
+  }
+
+  return null
+}
+
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -39,6 +75,7 @@ export function formatDisplayValueForUser(value: unknown, fieldName?: string) {
       .join(', ')
   }
   if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return formatDateStringForDisplay(value, fieldName) ?? value
   return String(value)
 }
 

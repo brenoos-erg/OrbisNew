@@ -3,7 +3,7 @@ export const positionSelect = {
   sectorProject: true, workplace: true, workSchedule: true, mainActivities: true, complementaryActivities: true, schooling: true, course: true, schoolingCompleted: true, courseInProgress: true, periodModule: true,
   requiredKnowledge: true, necessaryKnowledge: true, desiredKnowledge: true, behavioralCompetencies: true, humanCompetencies: true, functionalCompetencies: true, otherCompetencies: true,
   complexity: true, managementScope: true, confidentialDataAccess: true, responsibilities: true, workPoint: true, site: true, experience: true, active: true, latestDocumentId: true,
-  documents: { where: { isCurrent: true }, take: 1, orderBy: { uploadedAt: 'desc' as const }, select: { id: true, originalFilename: true, fileUrl: true, indexador: true, revision: true, documentDate: true, uploadedAt: true } },
+  documents: { orderBy: { uploadedAt: 'desc' as const }, select: { id: true, originalFilename: true, fileUrl: true, indexador: true, revision: true, documentDate: true, uploadedAt: true, isCurrent: true } },
 }
 
 const keys = ['name','description','departmentId','sectorProject','workplace','workSchedule','mainActivities','complementaryActivities','schooling','course','schoolingCompleted','courseInProgress','periodModule','requiredKnowledge','behavioralCompetencies','enxoval','uniform','others','workPoint','site','experience','indexador','revision','documentDate','managerPosition','framing','areaSector','cbo','summary','detailedDescription','necessaryKnowledge','desiredKnowledge','humanCompetencies','functionalCompetencies','otherCompetencies','complexity','managementScope','confidentialDataAccess','responsibilities','active']
@@ -17,7 +17,7 @@ export function positionDataFromBody(body: Record<string, any>) {
 }
 
 export function withCurrentDocument(position: any) {
-  const latestDocument = position.documents?.[0] ?? null
+  const latestDocument = position.documents?.find((document: any) => document.isCurrent) ?? position.documents?.[0] ?? null
   const { documents, ...rest } = position
-  return { ...rest, latestDocument, documentoAtual: latestDocument }
+  return { ...rest, latestDocument, documentoAtual: latestDocument, documentHistory: position.documents ?? [] }
 }

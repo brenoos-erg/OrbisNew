@@ -1,0 +1,12 @@
+require('ts-node/register/transpile-only')
+const assert = require('assert')
+const { formatDisplayValueForUser } = require('../src/lib/solicitationPresentation')
+
+assert.equal(formatDisplayValueForUser('2024-10-26', 'periodoAquisitivoInicio'), '26/10/2024')
+assert.equal(formatDisplayValueForUser('2025-10-25', 'periodoAquisitivoFim'), '25/10/2025')
+assert.equal(formatDisplayValueForUser('2026-07-20', 'inicioGozo'), '20/07/2026')
+assert.equal(formatDisplayValueForUser('2026-08-04', 'dataRetorno'), '04/08/2026')
+assert.equal(formatDisplayValueForUser('2026-07-20T13:45:10.000Z', 'dataAbertura'), '20/07/2026 13:45')
+assert.equal(formatDisplayValueForUser('2527-15', 'cbo'), '2527-15')
+assert.equal(formatDisplayValueForUser('RQ2026-12345', 'protocolo'), 'RQ2026-12345')
+console.log('solicitation presentation date format ok')
