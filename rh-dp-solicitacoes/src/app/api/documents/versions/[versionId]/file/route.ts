@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { requireActiveUser } from '@/lib/auth'
 import { buildControlledPdf } from '@/lib/documents/controlledPdfPipeline'
+import { buildContentDispositionHeader, buildDocumentDownloadFilename } from '@/lib/documents/documentDownloadFilename'
 
 function resolveIntentFromAuditAction(value: string | null): 'view' | 'download' | 'print' {
   const normalized = String(value ?? '').trim().toUpperCase()
@@ -24,12 +25,23 @@ export async function GET(
     if ('error' in resolved) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     if ('termChallenge' in resolved) return NextResponse.json(resolved.termChallenge, { status: resolved.status })
 
-    const encodedOutputName = encodeURIComponent(resolved.outputFileName)
+    const downloadFilename = buildDocumentDownloadFilename({
+      code: resolved.access.documentCode,
+      title: resolved.access.documentTitle,
+      revisionNumber: resolved.access.revisionNumber,
+      mimeType: resolved.mimeType,
+      storedPath: resolved.access.fileUrl,
+      originalFilename: resolved.outputFileName,
+    })
+    const encodedOutputName = encodeURIComponent(disposition === 'attachment' ? downloadFilename : resolved.outputFileName)
+    const contentDisposition = disposition === 'attachment'
+      ? buildContentDispositionHeader(downloadFilename)
+      : `inline; filename*=UTF-8''${encodedOutputName}`
 
     return new NextResponse(new Uint8Array(resolved.outputBuffer), {
       headers: {
         'Content-Type': resolved.mimeType,
-        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedOutputName}`,
+        'Content-Disposition': contentDisposition,
         'Cache-Control': 'private, max-age=0, no-cache',
         'X-Document-Copy-Type': resolved.controlledFlowApplied ? 'UNCONTROLLED' : 'ORIGINAL',
         'X-Document-Watermark': resolved.watermarkApplied ? 'CÓPIA CONTROLADA' : 'UNAVAILABLE',

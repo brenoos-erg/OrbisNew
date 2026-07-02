@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { executeControlledDocumentAction, type ControlledIntent } from '@/lib/documents/controlledAction'
+import { buildContentDispositionHeader, buildDocumentDownloadFilename } from '@/lib/documents/documentDownloadFilename'
 import { buildControlledPdf } from '@/lib/documents/controlledPdfPipeline'
 import { prisma } from '@/lib/prisma'
 
@@ -82,13 +83,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
       versionId: resolved.access.versionId,
     })
 
-    const disposition = action === 'download' ? 'attachment' : 'inline'
-    const encodedOutputName = encodeURIComponent(resolved.outputFileName)
+    const downloadFilename = buildDocumentDownloadFilename({
+      code: resolved.access.documentCode,
+      title: resolved.access.documentTitle,
+      revisionNumber: resolved.access.revisionNumber,
+      mimeType: resolved.mimeType,
+      storedPath: resolved.access.fileUrl,
+      originalFilename: resolved.outputFileName,
+    })
+    const encodedOutputName = encodeURIComponent(action === 'download' ? downloadFilename : resolved.outputFileName)
+    const contentDisposition = action === 'download'
+      ? buildContentDispositionHeader(downloadFilename)
+      : `inline; filename*=UTF-8''${encodedOutputName}`
 
     return new NextResponse(new Uint8Array(resolved.outputBuffer), {
       headers: {
         'Content-Type': resolved.mimeType,
-        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodedOutputName}`,
+        'Content-Disposition': contentDisposition,
         'Cache-Control': 'private, max-age=0, no-cache',
         'X-Document-Copy-Type': resolved.controlledFlowApplied ? 'UNCONTROLLED' : 'ORIGINAL',
         'X-Document-Watermark': resolved.watermarkApplied ? 'CÓPIA CONTROLADA' : 'UNAVAILABLE',
