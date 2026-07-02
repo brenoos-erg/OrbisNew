@@ -1,10 +1,10 @@
 const assert = require('assert');
 const fs = require('fs');
 
-const novo = fs.readFileSync('src/app/dashboard/configuracoes/cargos/novo/page.tsx', 'utf8');
-const edit = fs.readFileSync('src/app/dashboard/configuracoes/cargos/[id]/page.tsx', 'utf8');
-const list = fs.readFileSync('src/app/dashboard/configuracoes/cargos/page.tsx', 'utf8');
-const modal = fs.readFileSync('src/app/dashboard/configuracoes/cargos/CargoFormModal.tsx', 'utf8');
+const novo = fs.readFileSync('src/app/dashboard/rh/cargos/novo/page.tsx', 'utf8');
+const edit = fs.readFileSync('src/app/dashboard/rh/cargos/[id]/page.tsx', 'utf8');
+const list = fs.readFileSync('src/app/dashboard/rh/cargos/page.tsx', 'utf8');
+const modal = fs.readFileSync('src/app/dashboard/rh/cargos/CargoFormModal.tsx', 'utf8');
 const rq063 = fs.readFileSync('src/app/dashboard/solicitacoes/enviadas/nova/page.tsx', 'utf8');
 
 assert(novo.includes('CargoFormModal'), '/cargos/novo deve usar o fluxo compartilhado do CargoFormModal');
@@ -21,7 +21,7 @@ assert(edit.includes('fetch(`/api/positions/${cargoId}`)'), 'edição deve carre
 assert(modal.includes('Substituir documento'), 'edição deve permitir substituir documento vigente');
 assert(modal.includes('Histórico de documentos do cargo'), 'edição deve mostrar histórico de documentos');
 assert(modal.includes('/api/positions/${row.id}/documents/${doc.id}/download'), 'histórico deve baixar pela rota protegida');
-assert(list.includes('href="/dashboard/configuracoes/cargos/novo"'), 'listagem deve apontar novo cargo para a rota unificada');
+assert(list.includes('href="/dashboard/rh/cargos/novo"'), 'listagem deve apontar novo cargo para a rota RH');
 assert(list.includes("cargo.latestDocument ? 'Anexado'"), 'listagem deve exibir Documento Anexado quando houver documento');
 assert(!list.includes('CargoFormTrigger'), 'listagem não deve manter uma segunda experiência modal concorrente');
 assert(rq063.includes('filteredPositionsForRq063'), 'RQ_063 continua puxando cargos cadastrados');
