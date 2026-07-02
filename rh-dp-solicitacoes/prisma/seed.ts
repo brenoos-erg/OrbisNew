@@ -3081,6 +3081,7 @@ async function main() {
 
   const solicitacoesModule = await ensureModule(MODULE_KEYS.SOLICITACOES, 'Solicitações')
   const configModule = await ensureModule(MODULE_KEYS.CONFIGURACOES, 'Configurações')
+  const rhModule = await ensureModule(MODULE_KEYS.RH, 'RH')
   const fleetModule = await ensureModule(MODULE_KEYS.FROTAS, 'Gestão de Frotas')
   const refusalModule = await ensureModule(MODULE_KEYS.RECUSA, 'Direito de Recusa')
   const celularModule = await ensureModule(MODULE_KEYS.CELULAR, 'Celular')
@@ -3096,6 +3097,7 @@ async function main() {
  const allModules = [
     solicitacoesModule,
     configModule,
+    rhModule,
     fleetModule,
     refusalModule,
     celularModule,
@@ -3287,6 +3289,12 @@ async function main() {
         { key: FEATURE_KEYS.CONFIGURACOES.PERMISSOES, name: 'Permissões' },
         { key: FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, name: 'Centros de Custo' },
         { key: FEATURE_KEYS.CONFIGURACOES.CARGOS, name: 'Cargos' },
+      ],
+    },
+    {
+      moduleId: rhModule.id,
+      items: [
+        { key: FEATURE_KEYS.RH.CARGOS, name: 'Cargos' },
       ],
     },
     {

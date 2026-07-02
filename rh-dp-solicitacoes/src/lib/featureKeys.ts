@@ -3,6 +3,7 @@ import { Action } from '@prisma/client'
 export const MODULE_KEYS = {
   SOLICITACOES: 'solicitacoes',
   CONFIGURACOES: 'configuracoes',
+  RH: 'rh',
   FROTAS: 'gestao-de-frotas',
   RECUSA: 'direito-de-recusa',
   EQUIPAMENTOS_TI: 'controle-equipamentos-ti',
@@ -14,6 +15,9 @@ export const MODULE_KEYS = {
 } as const
 
 export const FEATURE_KEYS = {
+  RH: {
+    CARGOS: 'RH.CARGOS',
+  },
   CONFIGURACOES: {
     PAINEL: 'CONFIGURACOES.PAINEL',
     USUARIOS: 'CONFIGURACOES.USUARIOS',

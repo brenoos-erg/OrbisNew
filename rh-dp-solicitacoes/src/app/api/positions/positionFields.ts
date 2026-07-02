@@ -6,14 +6,46 @@ export const positionSelect = {
   documents: { orderBy: { uploadedAt: 'desc' as const }, select: { id: true, originalFilename: true, fileUrl: true, indexador: true, revision: true, documentDate: true, uploadedAt: true, isCurrent: true } },
 }
 
-const keys = ['name','description','departmentId','sectorProject','workplace','workSchedule','mainActivities','complementaryActivities','schooling','course','schoolingCompleted','courseInProgress','periodModule','requiredKnowledge','behavioralCompetencies','enxoval','uniform','others','workPoint','site','experience','indexador','revision','documentDate','managerPosition','framing','areaSector','cbo','summary','detailedDescription','necessaryKnowledge','desiredKnowledge','humanCompetencies','functionalCompetencies','otherCompetencies','complexity','managementScope','confidentialDataAccess','responsibilities','active']
+const textKeys = ['name','description','departmentId','sectorProject','workplace','workSchedule','mainActivities','complementaryActivities','schooling','course','schoolingCompleted','courseInProgress','periodModule','requiredKnowledge','behavioralCompetencies','enxoval','uniform','others','workPoint','site','experience','indexador','revision','managerPosition','framing','areaSector','cbo','summary','detailedDescription','necessaryKnowledge','desiredKnowledge','humanCompetencies','functionalCompetencies','otherCompetencies','complexity','managementScope','confidentialDataAccess','responsibilities'] as const
+const otherKeys = ['documentDate','active'] as const
+const keys = [...textKeys, ...otherKeys] as const
+
+export function normalizePositionTextValue(value: unknown) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed === '' ? null : trimmed
+}
 
 export function positionDataFromBody(body: Record<string, any>) {
   const data: Record<string, any> = {}
-  for (const key of keys) if (Object.prototype.hasOwnProperty.call(body, key)) data[key] = body[key] === '' ? null : body[key]
-  if (data.documentDate && typeof data.documentDate === 'string') data.documentDate = new Date(data.documentDate)
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue
+    data[key] = textKeys.includes(key as any) ? normalizePositionTextValue(body[key]) : body[key]
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'documentDate')) {
+    if (data.documentDate === '' || data.documentDate === null || data.documentDate === undefined) {
+      data.documentDate = null
+    } else if (typeof data.documentDate === 'string') {
+      const parsed = new Date(data.documentDate)
+      if (Number.isNaN(parsed.getTime())) throw new Error('Data do documento inválida.')
+      data.documentDate = parsed
+    }
+  }
   if (data.active === undefined) delete data.active
   return data
+}
+
+export function getPrismaP2002Message(error: unknown) {
+  const e = error as { code?: string }
+  if (e?.code !== 'P2002') return null
+  return 'Já existe um cargo cadastrado com este nome.'
+}
+
+export function getPrismaP2000Message(error: unknown) {
+  const e = error as { code?: string; meta?: { column_name?: string; column?: string; field_name?: string } }
+  if (e?.code !== 'P2000') return null
+  const field = e.meta?.column_name ?? e.meta?.column ?? e.meta?.field_name ?? 'desconhecido'
+  return `O texto de um dos campos do cargo excede o limite permitido. Campo afetado: ${field}.`
 }
 
 export function withCurrentDocument(position: any) {

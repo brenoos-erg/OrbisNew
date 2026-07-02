@@ -34,6 +34,7 @@ import { handleFleetUnauthorized } from '@/lib/fleet-auth'
 type Props = {
   showSolic: boolean
   showConfig: boolean
+  showRh: boolean
   showFleet: boolean
   showRefusal: boolean
   showSst: boolean
@@ -53,6 +54,9 @@ type Props = {
     usuarios: boolean
     permissoes: boolean
     centros: boolean
+    cargos: boolean
+  }
+  rhFeatures: {
     cargos: boolean
   }
   solicitacaoFeatures: {
@@ -101,6 +105,7 @@ type Props = {
 export default function Sidebar({
   showSolic,
   showConfig,
+  showRh,
   showFleet,
   showRefusal,
   showSst,
@@ -116,6 +121,7 @@ export default function Sidebar({
   canAccessRefusalPanel = false,
   canAccessExternalAdmissions = false,
   configFeatures,
+  rhFeatures,
   solicitacaoFeatures,
   fleetFeatures,
   refusalFeatures,
@@ -134,6 +140,7 @@ export default function Sidebar({
      const pathname = usePathname()
   const inSolic = pathname.startsWith('/dashboard/solicitacoes')
   const inConfig = pathname.startsWith('/dashboard/configuracoes')
+  const inRh = pathname.startsWith('/dashboard/rh')
   const inFleet = pathname.startsWith('/dashboard/gestao-de-frotas')
   const inRefusal = pathname.startsWith('/dashboard/direito-de-recusa')
   const inSst = pathname.startsWith('/dashboard/sgi/qualidade') || pathname.startsWith('/dashboard/sst')
@@ -144,6 +151,7 @@ export default function Sidebar({
 
   const [openSolic, setOpenSolic] = useState(inSolic)
   const [openConfig, setOpenConfig] = useState(inConfig)
+  const [openRh, setOpenRh] = useState(inRh)
   const [openFleet, setOpenFleet] = useState(inFleet)
   const [openRefusal, setOpenRefusal] = useState(inRefusal)
   const [openSst, setOpenSst] = useState(inSst)
@@ -162,16 +170,27 @@ export default function Sidebar({
       setOpenDocs(false)
     } else if (inConfig) {
       setOpenConfig(true)
+      setOpenRh(false)
       setOpenSolic(false)
       setOpenFleet(false)
       setOpenRefusal(false)
       setOpenSst(false)
         setOpenEquipment(false)
       setOpenDocs(false)
+    } else if (inRh) {
+      setOpenRh(true)
+      setOpenSolic(false)
+      setOpenConfig(false)
+      setOpenFleet(false)
+      setOpenRefusal(false)
+      setOpenSst(false)
+      setOpenEquipment(false)
+      setOpenDocs(false)
     } else if (inFleet) {
       setOpenFleet(true)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenRh(false)
       setOpenRefusal(false)
       setOpenSst(false)
       setOpenEquipment(false)
@@ -182,6 +201,7 @@ export default function Sidebar({
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenRh(false)
       setOpenEquipment(false)
       setOpenDocs(false)
     } else if (inSst) {
@@ -190,6 +210,7 @@ export default function Sidebar({
       setOpenFleet(false)
       setOpenSolic(false)
       setOpenConfig(false)
+      setOpenRh(false)
       setOpenEquipment(false)
       setOpenDocs(false)
     } else if (inEquipment) {
@@ -211,7 +232,7 @@ export default function Sidebar({
     } else {
       setOpenDocs(false)
     }
-  }, [inSolic, inConfig, inFleet, inRefusal, inSst, inEquipment, inDocs])
+  }, [inSolic, inConfig, inRh, inFleet, inRefusal, inSst, inEquipment, inDocs])
 
   // Lembra estado entre reloads
   useEffect(() => {
@@ -939,6 +960,37 @@ export default function Sidebar({
             </Link>
           )}
 
+          {showRh && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setOpenRh((v) => !v)}
+                className={`${baseSection} ${inRh ? activeSection : inactiveSection}`}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/10">
+                  <Users className="h-5 w-5 shrink-0" />
+                </span>
+                {!collapsed && <span className={labelBase}>RH</span>}
+              </button>
+              {openRh && !collapsed && (
+                <div className="mt-1 ml-9 flex flex-col gap-1">
+                  {rhFeatures.cargos && (
+                    <Link
+                      href="/dashboard/rh/cargos"
+                      className={`${submenuItemBase} ${
+                        pathname.startsWith('/dashboard/rh/cargos')
+                          ? 'bg-orange-500/90 text-white'
+                          : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
+                      }`}
+                    >
+                      <ClipboardList size={16} /> <span className={labelBase}>Cargos</span>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {showConfig && (
             <div>
               {/* Cabeçalho do grupo Configurações */}
@@ -1060,22 +1112,6 @@ export default function Sidebar({
                         }`}
                     >
                       <FolderCog size={16} /> <span className={labelBase}>Centros de Custo</span>
-                    </Link>
-                  )}
-
-                  {configFeatures.cargos && (
-                    <Link
-                      href="/dashboard/configuracoes/cargos"
-                      className={`${submenuItemBase}
-                        ${
-                           pathname.startsWith(
-                            '/dashboard/configuracoes/cargos',
-                          )
-                            ? 'bg-orange-500/90 text-white'
-                            : 'text-slate-200 hover:bg-orange-500/90 hover:text-white'
-                        }`}
-                    >
-                     <FolderCog size={16} /> <span className={labelBase}>Cargos</span>
                     </Link>
                   )}
 

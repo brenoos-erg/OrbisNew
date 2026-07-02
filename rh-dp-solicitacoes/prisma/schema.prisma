@@ -110,16 +110,16 @@ model CostCenter {
 model Position {
   id                      String      @id @default(uuid())
   name                    String      @unique
-  description             String?
+  description             String?     @db.LongText
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
-  behavioralCompetencies  String?
-  complementaryActivities String?
-  course                  String?
-  courseInProgress        String?
+  behavioralCompetencies  String?     @db.LongText
+  complementaryActivities String?     @db.LongText
+  course                  String?     @db.LongText
+  courseInProgress        String?     @db.LongText
   departmentId            String?
-  enxoval                 String?
-  experience              String?
+  enxoval                 String?     @db.LongText
+  experience              String?     @db.LongText
   indexador               String?
   revision                String?
   documentDate            DateTime?
@@ -134,24 +134,24 @@ model Position {
   humanCompetencies       String?     @db.LongText
   functionalCompetencies  String?     @db.LongText
   otherCompetencies       String?     @db.LongText
-  complexity              String?
+  complexity              String?     @db.LongText
   managementScope         String?     @db.LongText
-  confidentialDataAccess  String?
+  confidentialDataAccess  String?     @db.LongText
   responsibilities        String?     @db.LongText
   active                  Boolean     @default(true)
   latestDocumentId        String?
-  mainActivities          String?
-  others                  String?
-  periodModule            String?
-  requiredKnowledge       String?
-  schooling               String?
+  mainActivities          String?     @db.LongText
+  others                  String?     @db.LongText
+  periodModule            String?     @db.LongText
+  requiredKnowledge       String?     @db.LongText
+  schooling               String?     @db.LongText
   schoolingCompleted      String?
-  sectorProject           String?
+  sectorProject           String?     @db.LongText
   site                    String?
-  uniform                 String?
+  uniform                 String?     @db.LongText
   workPoint               String?
-  workSchedule            String?
-  workplace               String?
+  workSchedule            String?     @db.LongText
+  workplace               String?     @db.LongText
   department              Department? @relation(fields: [departmentId], references: [id])
   users                   User[]
   documents               PositionDocument[]

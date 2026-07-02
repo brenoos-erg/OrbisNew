@@ -99,6 +99,7 @@ export default async function DashboardLayout({
   // cálculo de módulos liberados com base na soma Departamento (NIVEL_1) + UserModuleAccess (sobrescrita)
   let showSolic = false
   let showConfig = false
+  let showRh = false
   let canApprove = false
   let showFleet = false
   let showRefusal = false
@@ -120,6 +121,7 @@ export default async function DashboardLayout({
     centros: false,
     cargos: false,
   }
+  let rhFeatures = { cargos: false }
   let solicitacaoFeatures = {
     enviadas: false,
     recebidas: false,
@@ -175,6 +177,7 @@ export default async function DashboardLayout({
 
       const solicitLevel = levels[MODULE_KEYS.SOLICITACOES]
       const configLevel = levels[MODULE_KEYS.CONFIGURACOES]
+      const rhLevel = levels[MODULE_KEYS.RH]
       const fleetLevel = levels[MODULE_KEYS.FROTAS]
       const refusalLevel = levels[MODULE_KEYS.RECUSA]
       const equipmentLevel = levels[MODULE_KEYS.EQUIPAMENTOS_TI]
@@ -189,6 +192,7 @@ export default async function DashboardLayout({
         canViewConfigPermissoes,
         canViewConfigCentros,
         canViewConfigCargos,
+        canViewRhCargosFeature,
         canViewSolicEnviadas,
         canViewSolicRecebidas,
         canViewSolicAprovacao,
@@ -224,6 +228,7 @@ export default async function DashboardLayout({
         canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.PERMISSOES, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CENTROS_DE_CUSTO, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, Action.VIEW),
+        canFeature(appUser.id, MODULE_KEYS.RH, FEATURE_KEYS.RH.CARGOS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.ENVIADAS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.RECEBIDAS, Action.VIEW),
         canFeature(appUser.id, MODULE_KEYS.SOLICITACOES, FEATURE_KEYS.SOLICITACOES.APROVACAO, Action.VIEW),
@@ -305,8 +310,11 @@ export default async function DashboardLayout({
         usuarios: canViewConfigUsuarios,
         permissoes: canViewConfigPermissoes,
         centros: canViewConfigCentros,
-        cargos: canViewConfigCargos,
+        cargos: false,
       }
+
+      const canViewRhCargos = userIsAdmin || canViewRhCargosFeature || canViewConfigCargos || canAccessExternalAdmissions
+      rhFeatures = { cargos: canViewRhCargos }
 
       solicitacaoFeatures = {
         enviadas: canViewSolicEnviadas,
@@ -357,6 +365,8 @@ export default async function DashboardLayout({
         hasStructure &&
         Object.values(solicitacaoFeatures).some(Boolean)
       showConfig = hasMinLevel(configLevel, ModuleLevel.NIVEL_1) && Object.values(configFeatures).some(Boolean)
+      showRh = userIsAdmin || hasMinLevel(rhLevel, ModuleLevel.NIVEL_1) || rhFeatures.cargos
+      showRh = showRh && Object.values(rhFeatures).some(Boolean)
       showFleet = hasMinLevel(fleetLevel, ModuleLevel.NIVEL_1) && Object.values(fleetFeatures).some(Boolean)
       showRefusal =
         hasMinLevel(refusalLevel, ModuleLevel.NIVEL_1) &&
@@ -410,6 +420,7 @@ export default async function DashboardLayout({
         <Sidebar
           showSolic={showSolic}
           showConfig={showConfig}
+          showRh={showRh}
           showFleet={showFleet}
           showRefusal={showRefusal}
           showSst={showSst}
@@ -425,6 +436,7 @@ export default async function DashboardLayout({
               canAccessRefusalPanel={canAccessRefusalPanel}
               canAccessExternalAdmissions={canAccessExternalAdmissions}
               configFeatures={configFeatures}
+              rhFeatures={rhFeatures}
           solicitacaoFeatures={solicitacaoFeatures}
           fleetFeatures={fleetFeatures}
           refusalFeatures={refusalFeatures}
