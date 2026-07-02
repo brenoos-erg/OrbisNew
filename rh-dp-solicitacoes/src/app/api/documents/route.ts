@@ -200,8 +200,8 @@ export async function POST(req: NextRequest)   {
     const requestedInitialRevisionNumber = resolveInitialRevisionNumber(payload.revisionNumber)
 
     failureStage = 'documents:check-existing-code'
-    const existing = await prisma.isoDocument.findUnique({
-      where: { code: payload.code },
+    const existing = await prisma.isoDocument.findFirst({
+      where: { activeCode: payload.code },
       select: {
         id: true,
         code: true,
@@ -333,6 +333,7 @@ export async function POST(req: NextRequest)   {
     const created = await prisma.isoDocument.create({
       data: {
         code: payload.code,
+        activeCode: payload.code,
         title: payload.title,
         documentTypeId: payload.documentTypeId,
         ownerDepartmentId: ownerCostCenter.departmentId ?? null,

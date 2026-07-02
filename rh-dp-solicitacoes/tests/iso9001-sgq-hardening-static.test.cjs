@@ -29,11 +29,18 @@ test('publicação direta controlada sem fluxo é bloqueada com mensagem exigida
   assert.match(routing, /directPublicationJustification/)
 })
 
-test('DELETE de documento ISO preserva histórico por cancelamento lógico', () => {
+test('DELETE de documento ISO preserva histórico por exclusão lógica de erro de postagem', () => {
   assert.doesNotMatch(deleteRoute, /isoDocument\.delete/)
-  assert.match(deleteRoute, /inactiveAt/)
-  assert.match(deleteRoute, /DocumentVersionStatus\.CANCELADO/)
+  assert.match(deleteRoute, /isoDocument\.update/)
+  assert.match(deleteRoute, /isActive: false/)
+  assert.match(deleteRoute, /activeCode: null/)
+  assert.match(deleteRoute, /documentVersion\.updateMany/)
+  assert.match(deleteRoute, /operationalUseBlocked: true/)
+  assert.match(deleteRoute, /inactiveAt: new Date/)
+  assert.match(deleteRoute, /inactiveById: ctx\.me\.id/)
+  assert.match(deleteRoute, /POSTING_ERROR/)
   assert.match(deleteRoute, /action: 'CANCEL'/)
+  assert.doesNotMatch(deleteRoute, /DocumentVersionStatus\.CANCELADO/)
 })
 
 test('cópia impressa registra tipo, número, validade e marca dágua', () => {

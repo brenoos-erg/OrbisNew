@@ -5,6 +5,7 @@ const {
   routingForStatus,
   existingCodeRevisionMessage,
   evaluateCodeAvailability,
+  postingErrorDeletedCodeMessage,
 } = require('../src/lib/iso-document-routing')
 
 function test(name, fn) {
@@ -73,4 +74,24 @@ test('mensagem de duplicidade continua explícita quando existe versão ativa', 
   const message = existingCodeRevisionMessage('DOC-200', DocumentVersionStatus.EM_ANALISE_QUALIDADE, 2)
   assert.match(message, /EM_ANALISE_QUALIDADE/)
   assert.match(message, /revisão atual 2/)
+})
+
+test('código novo não inicia fluxo de revisão automática', () => {
+  const available = evaluateCodeAvailability('RQ.ENG.196', null, null)
+  assert.equal(available.available, true)
+  assert.equal(available.isRevision, false)
+  assert.equal(available.currentRevisionNumber, null)
+})
+
+test('documento cancelado formalmente mantém regra de nova revisão', () => {
+  const canceled = evaluateCodeAvailability('RQ.ENG.196', DocumentVersionStatus.CANCELADO, 0)
+  assert.equal(canceled.available, true)
+  assert.equal(canceled.isRevision, true)
+  assert.equal(canceled.currentRevisionNumber, 0)
+  assert.match(canceled.message, /Último status: CANCELADO/)
+})
+
+test('exclusão por erro de postagem tem mensagem própria de código liberado', () => {
+  assert.match(postingErrorDeletedCodeMessage(), /Código disponível para novo cadastro/)
+  assert.match(postingErrorDeletedCodeMessage(), /excluído por erro de postagem/)
 })

@@ -519,7 +519,8 @@ model DocumentTypeApprovalFlow {
 
 model IsoDocument {
   id                 String                    @id @default(uuid())
-  code               String                    @unique
+  code               String
+  activeCode         String?                   @unique
   title              String
   documentTypeId     String
   ownerDepartmentId  String?
@@ -550,6 +551,7 @@ model IsoDocument {
   @@index([ownerDepartmentId])
   @@index([ownerCostCenterId])
   @@index([authorUserId])
+  @@index([code])
 }
 
 model DocumentVersion {

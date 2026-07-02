@@ -9,6 +9,12 @@ export type DocumentTermChallenge = {
 
 export type DocumentAccessIntent = 'view' | 'download' | 'print'
 
+const POSTING_ERROR_HISTORICAL_ACCESS_MESSAGE = 'Documento excluído por erro de postagem. Disponível apenas para consulta histórica autorizada.'
+
+function isPostingErrorInactiveDocument(document: { isActive?: boolean | null; inactiveReason?: string | null }) {
+  return document.isActive === false && String(document.inactiveReason ?? '').includes('POSTING_ERROR')
+}
+
 export async function resolveDocumentVersionAccess(
   versionId: string,
   userId: string,
@@ -83,6 +89,11 @@ export async function resolveDocumentVersionAccess(
     return { error: 'Sem acesso ao documento.', status: 403 as const }
   }
 
+  const canHistorical = me.role === 'ADMIN' || moduleAccess?.level === ModuleLevel.NIVEL_3
+  if (intent && isPostingErrorInactiveDocument(version.document) && !canHistorical) {
+    return { error: POSTING_ERROR_HISTORICAL_ACCESS_MESSAGE, status: 403 as const }
+  }
+
   const term = await prisma.documentResponsibilityTerm.findFirst({
     where: { active: true },
     orderBy: { updatedAt: 'desc' },
@@ -114,7 +125,6 @@ export async function resolveDocumentVersionAccess(
     }
   }
   if ((version.operationalUseBlocked || !version.isCurrentPublished) && intent) {
-    const canHistorical = me.role === 'ADMIN' || moduleAccess?.level === ModuleLevel.NIVEL_3
     if (!canHistorical) {
       return { error: 'Versões obsoletas são apenas para consulta histórica autorizada.', status: 403 as const }
     }
