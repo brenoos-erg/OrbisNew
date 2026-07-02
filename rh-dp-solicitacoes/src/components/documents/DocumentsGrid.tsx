@@ -71,6 +71,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   const [canManageDocuments, setCanManageDocuments] = useState(false)
   const [actionInFlight, setActionInFlight] = useState<'cancel' | 'delete' | null>(null)
   const [targetRow, setTargetRow] = useState<GridRow | null>(null)
+  const [postingErrorReason, setPostingErrorReason] = useState('')
   const [exportingFormat, setExportingFormat] = useState<'xlsx' | 'csv' | 'pdf' | null>(null)
   const [exportMessage, setExportMessage] = useState<{ type: 'error' | 'warning'; text: string } | null>(null)
 
@@ -391,8 +392,20 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const deleteDocument = async (row: GridRow) => {
+    const reason = postingErrorReason.trim()
+    if (!reason) {
+      alert('Informe o motivo da exclusão por erro de postagem.')
+      return
+    }
+
+    if (!confirm('Confirmar exclusão por erro de postagem? O código será liberado para novo cadastro sem gerar nova revisão.')) return
+
     setActionInFlight('delete')
-    const res = await fetch(`/api/documents/${row.documentId}`, { method: 'DELETE' })
+    const res = await fetch(`/api/documents/${row.documentId}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reason, deletionType: 'POSTING_ERROR' }),
+    })
     setActionInFlight(null)
 
     if (!res.ok) {
@@ -401,7 +414,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
       return
     }
 
-      setTargetRow(null)
+    setPostingErrorReason('')
+    setTargetRow(null)
     await load()
   }
  const createDocument = async () => {
@@ -721,8 +735,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                     ) : null}
                     {canManageDocuments ? (
                       <>
-                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100" onClick={() => setTargetRow(row)}><X size={14} />Cancelar</button>
-                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => setTargetRow(row)}><Trash2 size={14} />Excluir</button>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100" onClick={() => { setPostingErrorReason(''); setTargetRow(row) }}><X size={14} />Cancelar</button>
+                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => { setPostingErrorReason(''); setTargetRow(row) }}><Trash2 size={14} />Excluir por erro</button>
                       </>
                     ) : null}
                   </td>
@@ -753,8 +767,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             </div>
             {canManageDocuments ? (
               <div className="grid grid-cols-2 gap-2">
-                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700" onClick={() => setTargetRow(row)}><X size={14} />Cancelar</button>
-                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700" onClick={() => setTargetRow(row)}><Trash2 size={14} />Excluir</button>
+                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700" onClick={() => { setPostingErrorReason(''); setTargetRow(row) }}><X size={14} />Cancelar</button>
+                <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700" onClick={() => { setPostingErrorReason(''); setTargetRow(row) }}><Trash2 size={14} />Excluir por erro</button>
               </div>
             ) : null}
           </article>
@@ -790,7 +804,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             <h2 className="text-lg font-semibold text-slate-900">Gerenciar documento {targetRow.codigo}</h2>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-medium">Cancelar documento</p>
-              <p>O documento permanece no sistema, com status <strong>CANCELADO</strong>, preservando rastreabilidade e histórico.</p>
+              <p>O documento permanece no sistema com status <strong>CANCELADO</strong>, preservando rastreabilidade e histórico. Use quando o documento foi publicado, mas precisa ser cancelado formalmente.</p>
               <button
                 className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2 font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => cancelDocument(targetRow)}
@@ -800,18 +814,24 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
               </button>
             </div>
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
-              <p className="font-medium">Excluir documento</p>
-              <p>Exclusão definitiva do documento e de suas versões relacionadas. Use apenas quando realmente necessário.</p>
+              <p className="font-medium">Excluir por erro de postagem</p>
+              <p>Use apenas quando o documento foi cadastrado por engano ou com arquivo/código incorreto. Essa ação libera o código para novo cadastro sem gerar nova revisão.</p>
+              <textarea
+                className="mt-3 min-h-[80px] w-full rounded border border-rose-300 bg-white px-3 py-2 text-sm text-rose-950 outline-none"
+                placeholder="Motivo obrigatório da exclusão por erro de postagem"
+                value={postingErrorReason}
+                onChange={(event) => setPostingErrorReason(event.target.value)}
+              />
               <button
                 className="mt-3 rounded-lg border border-rose-300 bg-rose-100 px-3 py-2 font-medium text-rose-900 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => deleteDocument(targetRow)}
                 disabled={actionInFlight !== null}
               >
-                {actionInFlight === 'delete' ? 'Excluindo...' : 'Confirmar exclusão'}
+                {actionInFlight === 'delete' ? 'Excluindo...' : 'Excluir por erro de postagem'}
               </button>
             </div>
             <div className="flex justify-end">
-              <button className="rounded border px-3 py-2" onClick={() => setTargetRow(null)} disabled={actionInFlight !== null}>Fechar</button>
+              <button className="rounded border px-3 py-2" onClick={() => { setPostingErrorReason(''); setTargetRow(null) }} disabled={actionInFlight !== null}>Fechar</button>
             </div>
           </div>
         </div>

@@ -1,8 +1,16 @@
-import { DocumentVersionStatus, ModuleLevel } from '@prisma/client'
+import { ModuleLevel } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { withModuleLevel } from '@/lib/access'
 import { MODULE_KEYS } from '@/lib/featureKeys'
 import { prisma } from '@/lib/prisma'
+
+const POSTING_ERROR_MARKER = 'POSTING_ERROR'
+const DEFAULT_POSTING_ERROR_REASON = `${POSTING_ERROR_MARKER}: Exclusão por erro de postagem para liberar o código para novo cadastro sem nova revisão.`
+
+function buildPostingErrorReason(reason: string) {
+  const trimmed = reason.trim()
+  return trimmed.includes(POSTING_ERROR_MARKER) ? trimmed : `${POSTING_ERROR_MARKER}: ${trimmed}`
+}
 
 export const DELETE = withModuleLevel(
   MODULE_KEYS.CONTROLE_DOCUMENTOS,
@@ -10,16 +18,25 @@ export const DELETE = withModuleLevel(
   async (req, ctx) => {
     const { id } = await ctx.params
 
-    const exists = await prisma.isoDocument.findUnique({
+    const document = await prisma.isoDocument.findUnique({
       where: { id },
-      select: { id: true, versions: { orderBy: [{ isCurrentPublished: 'desc' }, { revisionNumber: 'desc' }], take: 1, select: { id: true } } },
+      select: {
+        id: true,
+        code: true,
+        isActive: true,
+        versions: {
+          orderBy: [{ isCurrentPublished: 'desc' }, { revisionNumber: 'desc' }, { createdAt: 'desc' }],
+          select: { id: true, revisionNumber: true, status: true },
+        },
+        printCopies: { take: 1, select: { id: true } },
+      },
     })
 
-    if (!exists) {
+    if (!document) {
       return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404 })
     }
 
-    let reason = 'Cancelamento via endpoint DELETE com preservação de histórico.'
+    let reason = DEFAULT_POSTING_ERROR_REASON
     try {
       const body = await req.json()
       reason = String(body?.reason ?? body?.motivo ?? reason).trim() || reason
@@ -27,31 +44,54 @@ export const DELETE = withModuleLevel(
       // DELETE pode não enviar corpo; usa motivo padrão auditável.
     }
 
-    const versionId = exists.versions[0]?.id
+    if (!reason || reason.length < 5) {
+      return NextResponse.json({ error: 'Informe o motivo da exclusão por erro de postagem.' }, { status: 400 })
+    }
+
+    if (document.printCopies.length > 0) {
+      return NextResponse.json(
+        { error: 'Documento possui cópia impressa registrada. Use cancelamento formal para preservar rastreabilidade.' },
+        { status: 409 },
+      )
+    }
+
+    const inactiveReason = buildPostingErrorReason(reason)
     await prisma.$transaction(async (tx) => {
       await tx.isoDocument.update({
         where: { id },
-        data: { isActive: false, inactiveAt: new Date(), inactiveById: ctx.me.id, inactiveReason: reason },
+        data: {
+          isActive: false,
+          activeCode: null,
+          inactiveAt: new Date(),
+          inactiveById: ctx.me.id,
+          inactiveReason,
+        },
       })
 
-      if (versionId) {
-        await tx.documentVersion.update({
-          where: { id: versionId },
-          data: {
-            status: DocumentVersionStatus.CANCELADO,
-            isCurrentPublished: false,
-            obsoleteAt: new Date(),
-            obsoletedById: ctx.me.id,
-            obsoleteReason: reason,
-            operationalUseBlocked: true,
-          },
-        })
+      await tx.documentVersion.updateMany({
+        where: { documentId: id },
+        data: {
+          isCurrentPublished: false,
+          operationalUseBlocked: true,
+          obsoleteAt: new Date(),
+          obsoletedById: ctx.me.id,
+          obsoleteReason: inactiveReason,
+        },
+      })
+
+      const mainVersion = document.versions[0]
+      if (mainVersion) {
         await tx.documentAuditLog.create({
-          data: { documentId: id, versionId, userId: ctx.me.id, action: 'CANCEL', reason },
+          data: { documentId: id, versionId: mainVersion.id, userId: ctx.me.id, action: 'CANCEL', reason: inactiveReason },
         })
       }
     })
 
-    return NextResponse.json({ ok: true, status: DocumentVersionStatus.CANCELADO })
+    return NextResponse.json({
+      ok: true,
+      deletionType: POSTING_ERROR_MARKER,
+      codeReleased: true,
+      message: `Documento ${document.code} marcado como excluído por erro de postagem. Código liberado para novo cadastro sem gerar revisão.`,
+    })
   },
 )

@@ -47,6 +47,7 @@ export function buildVersionWhere(filters: ReturnType<typeof parseGridParams>['f
   return {
     status: filters.status ?? undefined,
     document: {
+      isActive: true,
       code: filters.code ? { contains: filters.code } : undefined,
       title: filters.title ? { contains: filters.title } : undefined,
       documentTypeId: filters.documentTypeId,

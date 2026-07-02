@@ -17,10 +17,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const document = await prisma.isoDocument.findUnique({
-      where: { code },
+    const documents = await prisma.isoDocument.findMany({
+      where: { OR: [{ activeCode: code }, { code }] },
+      orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
       select: {
         id: true,
+        isActive: true,
+        activeCode: true,
+        inactiveReason: true,
         versions: {
           orderBy: [{ revisionNumber: 'desc' }, { createdAt: 'desc' }],
           take: 1,
@@ -29,16 +33,36 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    if (!document) {
-      return NextResponse.json({ available: true, message: 'Código disponível.' })
+    const activeDocument = documents.find((item) => item.activeCode === code || (item.isActive && item.activeCode === null && item.versions.length > 0))
+    if (activeDocument) {
+      const feedback = evaluateCodeAvailability(
+        code,
+        activeDocument.versions[0]?.status ?? null,
+        activeDocument.versions[0]?.revisionNumber ?? null,
+      )
+      return NextResponse.json(feedback)
     }
 
-    const feedback = evaluateCodeAvailability(
-      code,
-      document.versions[0]?.status ?? null,
-      document.versions[0]?.revisionNumber ?? null,
-    )
-    return NextResponse.json(feedback)
+    if (documents.length > 0 && documents.every((item) => String(item.inactiveReason ?? '').includes('POSTING_ERROR'))) {
+      return NextResponse.json({
+        available: true,
+        isRevision: false,
+        currentRevisionNumber: null,
+        message: 'Código disponível para novo cadastro. Documento anterior foi excluído por erro de postagem.',
+      })
+    }
+
+    if (documents.length > 0) {
+      const latest = documents[0]
+      const feedback = evaluateCodeAvailability(
+        code,
+        latest.versions[0]?.status ?? null,
+        latest.versions[0]?.revisionNumber ?? null,
+      )
+      return NextResponse.json(feedback)
+    }
+
+    return NextResponse.json({ available: true, isRevision: false, currentRevisionNumber: null, message: 'Código disponível.' })
   } catch (error) {
     console.error('Erro ao validar código de documento ISO', error)
     return NextResponse.json({ error: 'Erro ao validar código do documento.' }, { status: 500 })

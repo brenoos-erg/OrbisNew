@@ -110,6 +110,10 @@ export function orphanCodeMessage(code: string) {
   return `Já existe um cadastro com o código ${code}, mas sem versão ativa. O envio vai regularizar esse documento.`
 }
 
+export function postingErrorDeletedCodeMessage() {
+  return 'Código disponível para novo cadastro. Documento anterior foi excluído por erro de postagem.'
+}
+
 export function evaluateCodeAvailability(
   code: string,
   status: DocumentVersionStatus | null,
