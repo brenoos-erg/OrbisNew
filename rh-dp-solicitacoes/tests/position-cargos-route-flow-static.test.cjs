@@ -24,7 +24,7 @@ assert(modal.includes('/api/positions/${row.id}/documents/${doc.id}/download'), 
 assert(list.includes('href="/dashboard/rh/cargos/novo"'), 'listagem deve apontar novo cargo para a rota RH');
 assert(list.includes("cargo.latestDocument ? 'Anexado'"), 'listagem deve exibir Documento Anexado quando houver documento');
 assert(!list.includes('CargoFormTrigger'), 'listagem não deve manter uma segunda experiência modal concorrente');
-assert(rq063.includes('filteredPositionsForRq063'), 'RQ_063 continua puxando cargos cadastrados');
-assert(rq063.includes('Regularize o cadastro antes de prosseguir.'), 'RQ_063 continua exigindo documento oficial do cargo');
+assert(!rq063.includes('filteredPositionsForRq063'), 'RQ_063 não deve puxar cargos cadastrados como dependência');
+assert(rq063.includes('Informe o cargo solicitado'), 'RQ_063 deve aceitar cargo digitado manualmente');
 
 console.log('position-cargos-route-flow-static ok');

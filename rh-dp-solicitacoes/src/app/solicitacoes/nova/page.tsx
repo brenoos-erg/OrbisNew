@@ -17,29 +17,6 @@ type TipoSolicitacao = {
     descricao?: string
     camposEspecificos?: TipoCampo[]
 }
-
-type Position = {
-    id: string
-    name: string
-    sectorProject?: string | null
-    workplace?: string | null
-    workSchedule?: string | null
-    mainActivities?: string | null
-    complementaryActivities?: string | null
-    schooling?: string | null
-    course?: string | null
-    schoolingCompleted?: string | null
-    courseInProgress?: string | null
-    periodModule?: string | null
-    requiredKnowledge?: string | null
-    behavioralCompetencies?: string | null
-    enxoval?: string | null
-    uniform?: string | null
-    others?: string | null
-    workPoint?: string | null
-    site?: string | null
-}
-
 export default function NovaSolicitacaoPage() {
     const router = useRouter()
     // tipos de solicitação
@@ -59,10 +36,6 @@ export default function NovaSolicitacaoPage() {
     const [extras, setExtras] = useState<Record<string, any>>({})
     const [submitting, setSubmitting] = useState(false)
     const idempotencyKeyRef = useRef(globalThis.crypto.randomUUID())
-
-    // cargos (Position)
-    const [positions, setPositions] = useState<Position[]>([])
-
     // carregar tipos de solicitação
     useEffect(() => {
         async function loadTipos() {
@@ -83,25 +56,6 @@ export default function NovaSolicitacaoPage() {
     }, [])
 
 
-    // carregar cargos
-    useEffect(() => {
-        async function loadPositions() {
-            try {
-                const res = await fetch('/api/positions')
-                if (!res.ok) {
-                    console.error('Erro ao carregar cargos')
-                    return
-                }
-                const data = await res.json()
-                setPositions(data)
-            } catch (err) {
-                console.error('Erro ao carregar cargos', err)
-            }
-        }
-
-        loadPositions()
-    }, [])
-
     // campos fixos
     const onChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -109,41 +63,6 @@ export default function NovaSolicitacaoPage() {
         setForm({ ...form, [e.target.name]: e.target.value })
     }
 
-    // quando escolher um cargo
-    function handleCargoChange(positionId: string) {
-        const pos = positions.find((p) => p.id === positionId)
-
-        if (!pos) {
-            setExtras((prev) => ({ ...prev, cargoId: positionId, cargo: '' }))
-            return
-        }
-
-        setExtras((prev) => ({
-            ...prev,
-
-            cargoId: positionId,
-            cargo: pos.name,
-
-            // mapeamento: Position -> campos do schemaJson da RQ_063
-            setorOuProjeto: pos.sectorProject ?? '',
-            localTrabalho: pos.workplace ?? '',
-            horarioTrabalho: pos.workSchedule ?? '',
-            principaisAtividades: pos.mainActivities ?? '',
-            atividadesComplementares: pos.complementaryActivities ?? '',
-            escolaridade: pos.schooling ?? '',
-            curso: pos.course ?? '',
-            escolaridadeCompleta: pos.schoolingCompleted ?? '',
-            cursoEmAndamento: pos.courseInProgress ?? '',
-            periodoModulo: pos.periodModule ?? '',
-            requisitosConhecimentos: pos.requiredKnowledge ?? '',
-            competenciasComportamentais: pos.behavioralCompetencies ?? '',
-            enxoval: pos.enxoval ?? '',
-            uniforme: pos.uniform ?? '',
-            outros: pos.others ?? '',
-            pontoTrabalho: pos.workPoint ?? '',
-            localMatrizFilial: pos.site ?? '',
-        }))
-    }
 
     // enviar formulário
     const onSubmit = async (e: React.FormEvent) => {
@@ -223,27 +142,6 @@ export default function NovaSolicitacaoPage() {
                         <p className="mb-2 font-medium">Campos específicos</p>
 
                         {camposEspecificos.map((c) => {
-                            // campo de cargo vira SELECT ligado na tabela Position
-                            if (c.name === 'cargo') {
-                                return (
-                                    <div key={c.name} className="mb-2">
-                                        <label className="mb-1 block text-sm">{c.label}</label>
-                                        <select
-                                            className="w-full rounded border p-2"
-                                            value={extras.cargoId || ''}
-                                            onChange={(e) => handleCargoChange(e.target.value)}
-                                        >
-                                            <option value="">Selecione...</option>
-                                            {positions.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )
-                            }
-
                             // demais campos continuam genéricos
                             return (
                                 <div key={c.name} className="mb-2">
