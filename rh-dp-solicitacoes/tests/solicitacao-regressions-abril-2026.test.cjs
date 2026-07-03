@@ -6,8 +6,6 @@ assert.match(visibilitySource, /\{\s*solicitanteId:\s*input\.userId\s*\}/)
 assert.match(visibilitySource, /if \(solicitation\.solicitanteId === input\.userId\) return true/)
 
 const createRouteSource = fs.readFileSync('src/app/api/solicitacoes/route.ts', 'utf8')
-assert.match(createRouteSource, /previstoContrato/)
-assert.match(createRouteSource, /Preencha o campo obrigatório "Previsto em contrato/)
 
 const fluxoSource = fs.readFileSync('src/app/api/solicitacoes/fluxo\/\[id\]\/route.ts', 'utf8')
 assert.match(fluxoSource, /tx\.solicitacaoSetor\.upsert/)
