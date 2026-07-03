@@ -121,27 +121,6 @@ type TipoSolicitacao = {
   camposEspecificos?: CampoEspecifico[];
 };
 
-type Position = {
-  id: string;
-  name: string;
-  description?: string | null;
-  sectorProject: string | null;
-  workplace: string | null;
-  workSchedule: string | null;
-  mainActivities: string | null;
-  complementaryActivities: string | null;
-  schooling: string | null;
-  course: string | null;
-  schoolingCompleted: string | null;
-  courseInProgress: string | null;
-  periodModule: string | null;
-  requiredKnowledge: string | null;
-  behavioralCompetencies: string | null;
-  workPoint: string | null;
-  site: string | null;
-  experience: string | null;
-  indexador?: string | null; revision?: string | null; documentDate?: string | null; managerPosition?: string | null; framing?: string | null; areaSector?: string | null; cbo?: string | null; summary?: string | null; detailedDescription?: string | null; necessaryKnowledge?: string | null; desiredKnowledge?: string | null; humanCompetencies?: string | null; functionalCompetencies?: string | null; otherCompetencies?: string | null; complexity?: string | null; managementScope?: string | null; confidentialDataAccess?: string | null; responsibilities?: string | null; latestDocument?: { id: string; fileUrl: string; originalFilename: string } | null; documentoAtual?: { id: string; fileUrl: string; originalFilename: string } | null;
-};
 
 type Extras = Record<string, string>;
 
@@ -304,9 +283,8 @@ export default function NovaSolicitacaoPage() {
   const [tipoId, setTipoId] = useState('');
 
   // ---------- RQ_063 / CARGOS ----------
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [cargoId, setCargoId] = useState('');
-  const [cargoSearch, setCargoSearch] = useState('');
+  // O cargo da RQ_063 voltou a ser texto livre. Os metadados de cargo
+  // cadastrado permanecem no payload apenas por compatibilidade quando já existirem.
   const [extras, setExtras] = useState<Extras>({});
   const [selectedRequestCostCenterId, setSelectedRequestCostCenterId] = useState('');
 
@@ -729,8 +707,6 @@ export default function NovaSolicitacaoPage() {
     if (!selectedTipo) {
       setExtras({});
       setExtraFiles({});
-      setCargoId('');
-      setCargoSearch('');
       return;
     }
 
@@ -747,8 +723,6 @@ export default function NovaSolicitacaoPage() {
 
     setExtras(defaults);
     setExtraFiles({});
-    setCargoId('');
-    setCargoSearch('');
   }, [selectedTipo]);
 
   useEffect(() => {
@@ -763,50 +737,7 @@ export default function NovaSolicitacaoPage() {
   }, [extras.dataFimExperiencia, extras.motivoTerminoExperiencia, isRQ247]);
 
   /* ============================================================
-   4) /api/positions
-  ============================================================ */
-  useEffect(() => {
-    async function loadPositions() {
-      try {
-        const res = await fetch('/api/positions?pageSize=200');
-        if (!res.ok) {
-          const text = await res.text();
-          console.error('Erro /api/positions:', text);
-          throw new Error('Erro ao buscar cargos');
-        }
-
-        const json = await res.json();
-        const items: Position[] = Array.isArray(json)
-          ? json
-          : (json.items ?? []);
-
-        setPositions(items || []);
-      } catch (err) {
-        console.error(err);
-        setPositions([]);
-      }
-    }
-
-    loadPositions();
-  }, []);
-
-  const formatPositionOptionLabel = (position: Position) =>
-    [position.name, position.indexador, position.cbo, position.areaSector ?? position.sectorProject].filter(Boolean).join(' • ')
-
-  const filteredPositionsForRq063 = useMemo(() => {
-    const term = cargoSearch.trim().toLowerCase()
-    if (!term) return positions
-    return positions.filter((position) => [
-      position.name,
-      position.indexador,
-      position.cbo,
-      position.areaSector,
-      position.sectorProject,
-    ].some((value) => String(value ?? '').toLowerCase().includes(term)))
-  }, [cargoSearch, positions])
-
-  /* ============================================================
-   5) EXTRAS / RQ_063 / ABONO
+   4) EXTRAS / RQ_063 / ABONO
   ============================================================ */
   const handleExtraChange = (name: string, value: string) => {
      if (name === 'itemManutencao') {
@@ -952,63 +883,6 @@ export default function NovaSolicitacaoPage() {
   };
 
 
-
-  const handleCargoChange = (id: string) => {
-    setCargoId(id);
-    const position = positions.find((p) => p.id === id);
-    if (!position) return;
-    setCargoSearch(formatPositionOptionLabel(position));
-
-    setExtras((prev) => ({
-      ...prev,
-      cargoNome: position.name ?? '',
-      setorProjeto: position.sectorProject ?? '',
-      localTrabalho: position.workplace ?? '',
-      horarioTrabalho: position.workSchedule ?? '',
-      principaisAtividades: position.mainActivities ?? '',
-      atividadesComplementares: position.complementaryActivities ?? '',
-      escolaridade: position.schooling ?? '',
-      curso: position.course ?? '',
-      escolaridadeCompleta: position.schoolingCompleted ?? '',
-      cursoEmAndamento: position.courseInProgress ?? '',
-      periodoModulo: position.periodModule ?? '',
-      requisitosConhecimentos: position.requiredKnowledge ?? '',
-      competenciasComportamentais: position.behavioralCompetencies ?? '',
-      pontoTrabalho: position.workPoint ?? '',
-      local: position.site ?? '',
-      experienciaMinima: position.experience ?? '',
-      cargoId: position.id,
-      indexadorCargo: position.indexador ?? '',
-      revisaoCargo: position.revision ?? '',
-      dataDocumentoCargo: position.documentDate ? String(position.documentDate).slice(0, 10) : '',
-      cargoGestorImediato: position.managerPosition ?? '',
-      enquadramento: position.framing ?? '',
-      areaSetor: position.areaSector ?? '',
-      cbo: position.cbo ?? '',
-      descricaoSumaria: position.summary ?? position.description ?? '',
-      descricaoDetalhada: position.detailedDescription ?? '',
-      conhecimentosNecessarios: position.necessaryKnowledge ?? '',
-      conhecimentosDesejaveis: position.desiredKnowledge ?? '',
-      competenciasHumanas: position.humanCompetencies ?? '',
-      competenciasFuncionais: position.functionalCompetencies ?? '',
-      outros: position.otherCompetencies ?? '',
-      complexidadeCargo: position.complexity ?? '',
-      gestao: position.managementScope ?? '',
-      acessoDadosConfidenciais: position.confidentialDataAccess ?? '',
-      responsabilidades: position.responsibilities ?? '',
-      documentoCargoId: (position.latestDocument ?? position.documentoAtual)?.id ?? '',
-      documentoCargoUrl: (position.latestDocument ?? position.documentoAtual)?.fileUrl ?? '',
-      cargoSnapshot: JSON.stringify({
-        positionId: position.id, documentId: (position.latestDocument ?? position.documentoAtual)?.id ?? null,
-        indexador: position.indexador, revision: position.revision, documentDate: position.documentDate, name: position.name,
-        managerPosition: position.managerPosition, framing: position.framing, areaSector: position.areaSector, cbo: position.cbo,
-        summary: position.summary, detailedDescription: position.detailedDescription, schooling: position.schooling, experience: position.experience,
-        necessaryKnowledge: position.necessaryKnowledge, desiredKnowledge: position.desiredKnowledge, humanCompetencies: position.humanCompetencies,
-        functionalCompetencies: position.functionalCompetencies, complexity: position.complexity, confidentialDataAccess: position.confidentialDataAccess, responsibilities: position.responsibilities,
-      }),
-    }));
-  };
-
   /* ============================================================
    6) SUBMIT
   ============================================================ */
@@ -1052,13 +926,8 @@ export default function NovaSolicitacaoPage() {
       };
 
        if (isRQ063) {
-        if (!String(cargoId || extras.cargoId || '').trim()) {
-          setSubmitError('Selecione um cargo cadastrado antes de enviar a solicitação.');
-          setSubmitting(false);
-          return;
-        }
-        if (!String(extras.documentoCargoId ?? '').trim()) {
-          setSubmitError('Este cargo não possui documento oficial anexado. Regularize o cadastro antes de prosseguir.');
+        if (!String(extras.cargoNome ?? extras.cargo ?? '').trim()) {
+          setSubmitError('Informe o cargo solicitado.');
           setSubmitting(false);
           return;
         }
@@ -1115,9 +984,9 @@ export default function NovaSolicitacaoPage() {
 
           campos = {
           ...extras,
-          cargoId: cargoId || extras.cargoId || '',
-          cargoNome: extras.cargoNome ?? '',
-          cargo: extras.cargoNome ?? '',
+          cargoId: extras.cargoId ?? '',
+          cargoNome: extras.cargoNome ?? extras.cargo ?? '',
+          cargo: extras.cargoNome ?? extras.cargo ?? '',
           setorProjeto: extras.setorProjeto ?? '',
           localTrabalho: extras.localTrabalho ?? '',
           horarioTrabalho: extras.horarioTrabalho ?? '',
@@ -1989,39 +1858,22 @@ useEffect(() => {
                   {/* Cargo */}
                   <div>
                     <label className={labelClass}>
-                      Cargo cadastrado <span className="text-red-500">*</span>
+                      Cargo <span className="text-red-500">*</span>
                     </label>
                     <input
                       className={inputClass}
-                      value={cargoSearch}
+                      value={extras.cargoNome ?? extras.cargo ?? ''}
                       onChange={(e: InputChange) => {
-                        const typedValue = e.target.value
-                        setCargoSearch(typedValue)
-                        const matchedPosition = positions.find((position) => formatPositionOptionLabel(position) === typedValue)
-                        if (matchedPosition) {
-                          handleCargoChange(matchedPosition.id)
-                        } else {
-                          setCargoId('')
-                        }
+                        const value = e.target.value
+                        setExtras((prev) => ({
+                          ...prev,
+                          cargoNome: value,
+                          cargo: value,
+                        }))
                       }}
-                      placeholder="Pesquise por nome, indexador, CBO ou área/setor"
-                      list="rq063-cargos-cadastrados"
-                      required={!cargoId}
+                      placeholder="Informe o cargo solicitado"
+                      required
                     />
-                    <datalist id="rq063-cargos-cadastrados">
-                      {filteredPositionsForRq063.map((position) => (
-                        <option key={position.id} value={formatPositionOptionLabel(position)} />
-                      ))}
-                    </datalist>
-                    <select className={`${inputClass} mt-2`} value={cargoId} onChange={(e) => handleCargoChange(e.target.value)} required>
-                      <option value="">Selecione um cargo cadastrado</option>
-                      {filteredPositionsForRq063.map((position) => (
-                        <option key={position.id} value={position.id}>{formatPositionOptionLabel(position)}</option>
-                      ))}
-                    </select>
-                    {cargoId && !extras.documentoCargoId && (
-                      <p className="mt-2 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">Este cargo não possui documento oficial anexado. Regularize o cadastro antes de prosseguir.</p>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

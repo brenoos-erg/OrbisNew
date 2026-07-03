@@ -59,7 +59,7 @@ assert.match(access, /FEATURE_KEYS\.CONFIGURACOES\.CARGOS/, 'legacy CONFIGURACOE
 assert.match(access, /userHasRhAccess/, 'RH access fallback must be preserved')
 
 const rq063 = read('src/app/dashboard/solicitacoes/enviadas/nova/page.tsx')
-assert.match(rq063, /fetch\('\/api\/positions/, 'RQ_063 must continue consuming /api/positions')
-assert.doesNotMatch(rq063, /includeInactive=true/, 'RQ_063 must rely on /api/positions default active-only listing')
+assert.doesNotMatch(rq063, /fetch\('\/api\/positions/, 'RQ_063 must not require /api/positions to submit personnel requests')
+assert.match(rq063, /Informe o cargo solicitado/, 'RQ_063 must ask for a free-text requested position')
 
 console.log('rh-positions-static.test.cjs passed')
