@@ -945,13 +945,6 @@ export default function NovaSolicitacaoPage() {
           return;
         }
 
-        if (!String(extras.previstoContrato ?? '').trim()) {
-          setSubmitError(
-            'Preencha o campo obrigatório "Previsto em contrato (Salários, Benefícios, Carga Horária e outros)".',
-          );
-          setSubmitting(false);
-          return;
-        }
         if (!String(extras.vagaSigilosa ?? '').trim()) {
           setSubmitError('Informe se a vaga é sigilosa.');
           setSubmitting(false);
@@ -2456,8 +2449,10 @@ useEffect(() => {
                       onChange={(e: TextAreaChange) =>
                         handleExtraChange('previstoContrato', e.target.value)
                       }
-                      required
                     />
+                    <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                      Campo opcional na abertura; o RH poderá complementar antes da admissão.
+                    </p>
                   </div>
                 </section>
 
