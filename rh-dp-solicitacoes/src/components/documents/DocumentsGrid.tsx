@@ -449,7 +449,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     }
 
      if (!createForm.file) {
-      setCreateError('Anexe um arquivo PDF, DOC ou DOCX.')
+      setCreateError('Anexe um arquivo válido: PDF, DOC, DOCX, XLS ou XLSX.')
       return
     }
 
@@ -901,7 +901,7 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                   value={createForm.revisionReason}
                   onChange={(e) => setCreateForm((v) => ({ ...v, revisionReason: e.target.value }))}
                 />
-              ) : null}              <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, file: e.target.files?.[0] ?? null }))} />
+              ) : null}              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="rounded border px-3 py-2" onChange={(e) => setCreateForm((v) => ({ ...v, file: e.target.files?.[0] ?? null }))} />
             </div>
             {createError ? <p className="text-sm text-red-600">{createError}</p> : null}
             <div className="flex justify-end gap-2">

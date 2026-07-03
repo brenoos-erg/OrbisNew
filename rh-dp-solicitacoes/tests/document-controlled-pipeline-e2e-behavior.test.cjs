@@ -1,10 +1,13 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 
 const { buildControlledPdfWithDeps } = require('../src/lib/documents/controlledPdfPipeline')
 
 const PDF_BUFFER = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n', 'latin1')
 const DOC_BUFFER = Buffer.from('DOC-DATA')
 const DOCX_BUFFER = Buffer.from('DOCX-DATA')
+const XLSX_BUFFER = Buffer.from('XLSX-DATA')
 
 function makeDeps(options) {
   const steps = []
@@ -16,7 +19,7 @@ function makeDeps(options) {
         documentId: 'doc-1',
         fileUrl: `/uploads/documents/${options.fileName}`,
         revisionNumber: 2,
-        documentCode: 'DOC-001',
+        documentCode: options.documentCode ?? 'PG-001',
         documentTitle: 'Documento',
       }
     },
@@ -54,6 +57,10 @@ function makeDeps(options) {
     },
     applyWatermark: (buffer) => {
       steps.push('apply-watermark')
+      return Buffer.from(buffer)
+    },
+    applyHeader: (buffer) => {
+      steps.push('apply-header')
       return Buffer.from(buffer)
     },
   }
@@ -98,6 +105,12 @@ async function assertFlowForSource({ sourceName, extension, sourceBuffer, looksL
 }
 
 async function run() {
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
+  fs.mkdirSync(uploadDir, { recursive: true })
+  for (const filename of ['native.pdf', 'word-doc.doc', 'word-docx.docx', 'rq-196.xlsx']) {
+    fs.writeFileSync(path.join(uploadDir, filename), Buffer.from('test'))
+  }
+
   await assertFlowForSource({
     sourceName: 'native',
     extension: '.pdf',
@@ -125,6 +138,32 @@ async function run() {
     isConvertible: true,
   })
 
+
+  {
+    const { deps, steps } = makeDeps({
+      documentCode: 'RQ.196',
+      extension: '.xlsx',
+      sourceBuffer: XLSX_BUFFER,
+      looksLikePdf: false,
+      isPdfByExtension: false,
+      isConvertible: true,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fileName: 'rq-196.xlsx',
+      baseName: 'rq-196',
+    })
+
+    const result = await buildControlledPdfWithDeps('v-rq-196', 'u-1', 'download', deps)
+    assert.equal('outputBuffer' in result, true, 'RQ .xlsx should resolve with output')
+    assert.equal(result.outputBuffer, XLSX_BUFFER, 'RQ .xlsx must return source buffer')
+    assert.equal(result.outputFileName, 'rq-196.xlsx', 'RQ .xlsx must keep original filename')
+    assert.equal(result.mimeType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'RQ .xlsx must return Excel content type')
+    assert.equal(result.convertedToPdf, false, 'RQ must not be converted to PDF')
+    assert.equal(result.controlledFlowApplied, false, 'RQ must not apply controlled-pdf flow')
+    assert.equal(steps.some((step) => step.startsWith('convert:')), false, 'RQ must not call PDF conversion')
+    assert.equal(steps.includes('apply-watermark'), false, 'RQ must not apply watermark')
+    assert.equal(steps.includes('apply-header'), false, 'RQ must not apply controlled header')
+  }
+
   const blocked = await buildControlledPdfWithDeps('v-2', 'u-2', 'view', {
     resolveAccess: async () => ({
       termChallenge: { requiresTerm: true, term: { id: 't1', title: 'Termo', content: 'Conteúdo' } },
@@ -141,6 +180,7 @@ async function run() {
     validatePdf: () => ({ valid: true }),
     hasWatermark: () => false,
     applyWatermark: (buffer) => buffer,
+    applyHeader: (buffer) => buffer,
   })
 
   assert.equal('termChallenge' in blocked, true, 'must block flow when term is not accepted')
