@@ -4,9 +4,11 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/msword': 'doc',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 }
 
-const SUPPORTED_EXTENSIONS = new Set(['pdf', 'docx', 'doc'])
+const SUPPORTED_EXTENSIONS = new Set(['pdf', 'docx', 'doc', 'xls', 'xlsx'])
 
 function cleanExtension(value?: string | null): string | null {
   if (!value) return null

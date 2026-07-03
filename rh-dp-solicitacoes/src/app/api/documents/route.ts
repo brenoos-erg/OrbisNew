@@ -125,7 +125,7 @@ export async function POST(req: NextRequest)   {
 
     
     if (!payload.fileUrl) {
-      return NextResponse.json({ error: 'Anexe um arquivo válido (PDF, DOC ou DOCX) para criar o documento.' }, { status: 400 })
+      return NextResponse.json({ error: 'Anexe um arquivo válido: PDF, DOC, DOCX, XLS ou XLSX.' }, { status: 400 })
     }
 
     failureStage = 'validation:document-type'

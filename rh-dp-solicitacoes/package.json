@@ -33,7 +33,8 @@
     "test:regression": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" node -r ts-node/register -r tsconfig-paths/register tests/epi-flow-behavior.test.cjs && node tests/epi-admin-scripts-static.test.cjs && node tests/epi-approval-flow-static.test.cjs && node tests/epi-attachment-download-static.test.cjs && node tests/experience-evaluation-finalization-rh.test.cjs && node -r tsconfig-paths/register tests/solicitation-presentation-date-format.test.cjs && node tests/position-document-parser.test.cjs && node tests/position-document-snapshot.test.cjs && node tests/position-document-upload-static.test.cjs && node tests/position-cargos-route-flow-static.test.cjs && node tests/rh-positions-static.test.cjs && node tests/position-rq063-prefill.test.cjs && node tests/request-cost-center-global.test.cjs && node tests/solicitation-list-filters-static.test.cjs && node tests/solicitation-list-filters-behavior.test.cjs && node -r ts-node/register -r tsconfig-paths/register tests/document-download-filename.test.cjs && node tests/document-posting-error-delete-static.test.cjs",
     "solicitacoes:rebuild-search-index": "ts-node -r tsconfig-paths/register scripts/rebuild-solicitation-search-index.ts",
     "solicitacoes:diagnose-filters": "ts-node -r tsconfig-paths/register scripts/diagnose-solicitation-filters.ts",
-    "documents:fix-deleted-code": "ts-node -r tsconfig-paths/register scripts/fix-deleted-document-code-availability.ts"
+    "documents:fix-deleted-code": "ts-node -r tsconfig-paths/register scripts/fix-deleted-document-code-availability.ts",
+    "documents:diagnose-file": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" node -r ts-node/register -r tsconfig-paths/register scripts/diagnose-document-files.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
