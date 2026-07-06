@@ -1,5 +1,5 @@
-const NON_CONTROLLED_PREFIXES = new Set(['DOCEXT', 'RQ', 'LEG', 'DD', 'MAN'])
-const CONTROLLED_PREFIXES = new Set(['PG', 'IT', 'COD', 'POL', 'MSIG'])
+const NON_CONTROLLED_PREFIXES = new Set(['POL', 'DOCEXT', 'RQ', 'LEG', 'MAN'])
+const CONTROLLED_PREFIXES = new Set(['PG', 'IT', 'DD', 'MSIG'])
 
 export type DocumentPipelineFamily = 'non-controlled-native' | 'controlled-pdf'
 
