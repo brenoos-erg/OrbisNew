@@ -1,4 +1,11 @@
+require('ts-node/register')
+require('tsconfig-paths/register')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+
+const source = fs.readFileSync('src/lib/pdf/uncontrolledCopyWatermark.ts', 'utf8')
+assert.match(source, /const WATERMARK_TEXT = 'COPIA CONTROLADA'/)
+assert.match(source, /const LEGACY_WATERMARK_TEXT = 'CÓPIA CONTROLADA'/)
 
 const {
   applyUncontrolledCopyWatermark,
@@ -28,11 +35,13 @@ assert.equal(validation.valid, true)
 const output = applyUncontrolledCopyWatermark(twoPagePdf)
 assert.equal(validatePdfBuffer(output).valid, true)
 assert.equal(hasUncontrolledCopyWatermark(output), true)
+assert.equal(hasUncontrolledCopyWatermark(Buffer.from('COPIA CONTROLADA', 'latin1')), true)
+assert.equal(hasUncontrolledCopyWatermark(Buffer.from('CÓPIA CONTROLADA', 'latin1')), true)
 
 const rendered = output.toString('latin1')
 const watermarkStreams = (rendered.match(/\/GSWm gs/g) || []).length
 assert.equal(watermarkStreams, 2, 'watermark should be injected on every page')
-const watermarkTextDrawCommands = (rendered.match(/\(CÓPIA CONTROLADA\) Tj/g) || []).length
+const watermarkTextDrawCommands = (rendered.match(/\(COPIA CONTROLADA\) Tj/g) || []).length
 assert.equal(watermarkTextDrawCommands, 2, 'watermark text should be drawn once per page')
 
 const badPdf = Buffer.from('%PDF-1.4\nsem eof', 'latin1')

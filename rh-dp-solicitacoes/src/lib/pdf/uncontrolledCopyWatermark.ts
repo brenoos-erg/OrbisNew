@@ -1,4 +1,5 @@
-const WATERMARK_TEXT = 'CÓPIA CONTROLADA'
+const WATERMARK_TEXT = 'COPIA CONTROLADA'
+const LEGACY_WATERMARK_TEXT = 'CÓPIA CONTROLADA'
 
 const TEXT_COLOR = '0.45 0.45 0.45'
 const DEFAULT_PAGE_WIDTH = 595
@@ -117,7 +118,8 @@ const ensureContentsArray = (pageBody: string, streamObjectId: number) => {
 
 export function hasUncontrolledCopyWatermark(pdfBuffer: Buffer): boolean {
   if (!pdfBuffer?.length) return false
-  return pdfBuffer.toString('latin1').includes(WATERMARK_TEXT)
+  const source = pdfBuffer.toString('latin1')
+  return source.includes(WATERMARK_TEXT) || source.includes(LEGACY_WATERMARK_TEXT)
 }
 export function applyUncontrolledCopyWatermark(pdfBuffer: Buffer): Buffer {
   const inputValidation = validatePdfBuffer(pdfBuffer)
