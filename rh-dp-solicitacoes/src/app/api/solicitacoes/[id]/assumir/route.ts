@@ -10,7 +10,6 @@ import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotificati
 import crypto from 'crypto'
 import { canAssumeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
-import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -26,14 +25,11 @@ export async function POST(
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
-      include: {
-        solicitacaoSetores: { select: { setor: true } },
-        tipo: { select: { id: true, codigo: true, nome: true } },
-      },
+      include: { solicitacaoSetores: { select: { setor: true } } },
     })
 
 
-    if (!solic) {
+     if (!solic) {
       return NextResponse.json(
         { error: 'Solicitação não encontrada.' },
         { status: 404 },
@@ -59,7 +55,6 @@ export async function POST(
       departmentId: solic.departmentId,
       solicitacaoSetores: solic.solicitacaoSetores,
       payload: solic.payload,
-      tipo: solic.tipo,
     })
     if (!canAssume) {
       return NextResponse.json(
@@ -75,33 +70,25 @@ export async function POST(
       )
     }
 
-    const isExperienceEvaluation = isExperienceEvaluationTipo({
-      id: solic.tipo?.id ?? solic.tipoId,
-      codigo: solic.tipo?.codigo,
-      nome: solic.tipo?.nome,
-    })
-
-    const nextStatus = isExperienceEvaluation ? solic.status : 'EM_ATENDIMENTO'
-
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
         // 👇 responsável pelo atendimento
         assumidaPorId: me.id,
         assumidaEm: new Date(),
-        ...(isExperienceEvaluation ? {} : { status: 'EM_ATENDIMENTO' }),
+        status: 'EM_ATENDIMENTO',
       },
     })
 
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
-        status: nextStatus,
+        status: 'EM_ATENDIMENTO',
         message: `Chamado assumido por ${me.fullName ?? me.id}.`,
       },
     })
 
-    await prisma.event.create({
+     await prisma.event.create({
       data: {
         id: crypto.randomUUID(),
         solicitationId,
