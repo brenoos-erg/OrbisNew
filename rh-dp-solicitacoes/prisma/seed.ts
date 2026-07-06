@@ -2264,11 +2264,10 @@ async function main() {
     console.log('✅ Tipo "RQ.SST.092 SOLICITAÇÃO DE EXAMES" ok.')
     const requisicaoEpiUniformesSchema = {
       meta: {
-          departamentos: logisticaDepartment ? [logisticaDepartment.id] : [sstDepartment.id],
-        categoria: 'SERVIÇOS DE LOGÍSTICA',
-        centroResponsavelLabel: 'LOGÍSTICA',
-        requiresApproval: true,
-        destinoAposAprovacao: logisticaDepartment?.id,
+        departamentos: [sstDepartment.id],
+        categoria: 'SEGURANÇA DO TRABALHO',
+        centroResponsavelLabel: 'SEGURANÇA DO TRABALHO',
+        requiresApproval: false,
         requiresAttachment: false,
       },
       camposEspecificos: [
@@ -2362,7 +2361,7 @@ async function main() {
       update: {
         codigo: 'RQ.SST.043',
          nome: 'Requisição de EPI s/uniformes',
-        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
+        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
       },
@@ -2370,7 +2369,7 @@ async function main() {
         id: 'RQ_043',
         codigo: 'RQ.SST.043',
         nome: 'Requisição de EPI s/uniformes',
-        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação > logística',
+        descricao: 'Solicitação de EPI e uniformes com fluxo SST > aprovação',
         schemaJson: requisicaoEpiUniformesSchema,
         updatedAt: new Date(),
       },

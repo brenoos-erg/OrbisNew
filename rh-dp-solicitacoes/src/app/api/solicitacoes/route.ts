@@ -13,6 +13,7 @@ import { formatCostCenterLabel } from '@/lib/costCenter'
 import {
   isSolicitacaoAgendamentoFerias,
   isSolicitacaoDesligamento,
+  isSolicitacaoEpiUniforme,
   isSolicitacaoNadaConsta,
   NADA_CONSTA_SETORES,
 } from '@/lib/solicitationTypes'
@@ -342,6 +343,7 @@ export const POST = withModuleLevel(
          const protocolo = generateProtocolo()
         const titulo = tipo.nome
         const descricao = null
+        const isSolicitacaoEpi = isSolicitacaoEpiUniforme(tipo)
         const tipoMeta = (tipo.schemaJson as {
           meta?: { defaultPrioridade?: SolicitationPriority; defaultSlaHours?: number }
         } | null)?.meta
@@ -381,13 +383,18 @@ export const POST = withModuleLevel(
         // resolveSolicitationApprovers e buildApprovalSnapshot permanecem como contrato do fluxo de aprovação.
         // workflowSnapshotJson: approvalSnapshots.workflowSnapshotJson
 
+        const sstDepartment = isSolicitacaoEpi
+          ? await prisma.department.findUnique({ where: { code: '19' }, select: { id: true } })
+          : null
+        const initialDepartmentId = sstDepartment?.id ?? departmentId
+
         // 1) cria a solicitação básica
         const created = await prisma.solicitation.create({
           data: {
             protocolo,
             tipoId,
             costCenterId: resolvedCostCenterId,
-            departmentId,
+            departmentId: initialDepartmentId,
             solicitanteId,
             titulo,
             descricao,
