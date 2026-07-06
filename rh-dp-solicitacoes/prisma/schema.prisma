@@ -1394,7 +1394,7 @@ model NonConformityActionItem {
   nonConformityId          String?
   origemPlano              NonConformityActionPlanOrigin @default(NAO_CONFORMIDADE)
   createdById              String?
-  descricao                String
+  descricao                String                        @db.LongText
   motivoBeneficio          String?                       @db.LongText
   atividadeComo            String?                       @db.LongText
   centroImpactadoId        String?

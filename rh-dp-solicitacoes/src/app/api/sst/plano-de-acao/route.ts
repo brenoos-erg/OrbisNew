@@ -74,6 +74,22 @@ function normalizeEvidenceText(value: unknown) {
 }
 
 
+function getValueTooLongMessage(error: unknown) {
+  const err = error as { code?: string; meta?: { column_name?: string; column?: string; field_name?: string }; message?: string }
+  const field = err?.meta?.column_name ?? err?.meta?.column ?? err?.meta?.field_name
+
+  if (err?.code === 'P2000') {
+    return `O texto informado é muito longo para o campo ${field ?? 'preenchido'}. Reduza o conteúdo e tente novamente.`
+  }
+
+  if (typeof err?.message === 'string' && /too long for the column|data too long|value too long/i.test(err.message)) {
+    return `O texto informado é muito longo para o campo ${field ?? 'preenchido'}. Reduza o conteúdo e tente novamente.`
+  }
+
+  return null
+}
+
+
 export async function GET(req: NextRequest) {
   try {
     const me = await requireActiveUser()
@@ -262,15 +278,24 @@ export async function POST(req: NextRequest) {
     })
 
 
-    await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_CREATED')
-    if (created.responsavelId) {
-      await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_ASSIGNED')
-    } else if (created.responsavelNome) {
-      console.warn('Ação criada com responsável em texto livre; sem notificação automática por ausência de usuário vinculado.')
+    try {
+      await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_CREATED')
+      if (created.responsavelId) {
+        await notifyActionItemUpdate(created.id, 'STANDALONE_ACTION_ASSIGNED')
+      } else if (created.responsavelNome) {
+        console.warn('Ação criada com responsável em texto livre; sem notificação automática por ausência de usuário vinculado.')
+      }
+    } catch (notificationError) {
+      console.error('Falha ao notificar criação de plano de ação avulso.', notificationError)
     }
 
     return NextResponse.json(created, { status: 201 })
   } catch (error) {
+    const valueTooLongMessage = getValueTooLongMessage(error)
+    if (valueTooLongMessage) {
+      return NextResponse.json({ error: valueTooLongMessage }, { status: 400 })
+    }
+
     return NextResponse.json({ error: 'Erro ao criar plano de ação avulso.', detail: devErrorDetail(error) }, { status: 500 })
   }
 }

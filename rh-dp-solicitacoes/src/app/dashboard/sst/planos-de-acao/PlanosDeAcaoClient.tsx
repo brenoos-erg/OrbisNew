@@ -68,6 +68,7 @@ function isOverdue(action: ActionRow) {
 export default function PlanosDeAcaoClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [items, setItems] = useState<ActionRow[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -195,11 +196,12 @@ export default function PlanosDeAcaoClient() {
     e.preventDefault()
     const descricao = createForm.descricao.trim()
     if (!descricao) {
-      setError('Preencha a descrição da ação para registrar.')
+      setCreateError('Preencha a descrição da ação para registrar.')
       return
     }
     try {
       setCreating(true)
+      setCreateError(null)
       const res = await fetch('/api/sst/plano-de-acao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,9 +222,10 @@ export default function PlanosDeAcaoClient() {
         status: NonConformityActionStatus.PENDENTE,
       })
       setError(null)
+      setCreateError(null)
       await load()
     } catch (e: any) {
-      setError(e?.message || 'Erro ao registrar ação.')
+      setCreateError(e?.message || 'Erro ao registrar ação.')
     } finally {
       setCreating(false)
     }
@@ -389,7 +392,7 @@ export default function PlanosDeAcaoClient() {
                 <textarea
                   value={createForm.descricao}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, descricao: e.target.value }))}
-                  className="input min-h-24"
+                  className="app-input w-full min-h-24"
                   required
                 />
               </Field>
@@ -421,6 +424,7 @@ export default function PlanosDeAcaoClient() {
                   </select>
                 </Field>
               </div>
+              {createError ? <p className="text-sm text-rose-700">{createError}</p> : null}
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setCreateModalOpen(false)} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={creating} className="rounded bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
