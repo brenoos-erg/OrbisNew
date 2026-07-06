@@ -36,7 +36,7 @@ assert.match(
 )
 assert.match(
   client,
-  /className="app-input w-full min-h-24"/,
+  /className="app-input w-full min-h-32 resize-y"/,
   'textarea da descrição deve ocupar largura total',
 )
 assert.match(
