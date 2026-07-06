@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
+import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import crypto from 'crypto'
@@ -25,7 +26,10 @@ export async function POST(
 
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
-      include: { solicitacaoSetores: { select: { setor: true } } },
+      include: {
+        solicitacaoSetores: { select: { setor: true } },
+        tipo: { select: { id: true, codigo: true, nome: true } },
+      },
     })
 
 
@@ -48,6 +52,7 @@ export async function POST(
 
     const canAssume = canAssumeSolicitation(userAccess, {
       tipoId: solic.tipoId,
+      tipo: solic.tipo,
       status: solic.status,
       solicitanteId: solic.solicitanteId,
       approverId: solic.approverId,
@@ -70,20 +75,28 @@ export async function POST(
       )
     }
 
+    const isExperienceEvaluation = isExperienceEvaluationTipo({
+      id: solic.tipo?.id ?? solic.tipoId,
+      codigo: solic.tipo?.codigo,
+      nome: solic.tipo?.nome,
+    })
+
+    const nextStatus = isExperienceEvaluation ? solic.status : 'EM_ATENDIMENTO'
+
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
         // 👇 responsável pelo atendimento
         assumidaPorId: me.id,
         assumidaEm: new Date(),
-        status: 'EM_ATENDIMENTO',
+        ...(isExperienceEvaluation ? {} : { status: 'EM_ATENDIMENTO' }),
       },
     })
 
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
-        status: 'EM_ATENDIMENTO',
+        status: nextStatus,
         message: `Chamado assumido por ${me.fullName ?? me.id}.`,
       },
     })
