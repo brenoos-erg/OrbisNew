@@ -26,6 +26,12 @@ type ActionRow = {
 
 type PriorityFilter = 'TODAS' | 'ALTA' | 'MEDIA' | 'BAIXA'
 
+type ResponsavelOption = {
+  id: string
+  fullName: string
+  email: string
+}
+
 const ACTION_STATUS_FILTER_OPTIONS = ['TODOS', ...Object.values(NonConformityActionStatus)] as const
 
 type FilterStatus = (typeof ACTION_STATUS_FILTER_OPTIONS)[number]
@@ -73,8 +79,12 @@ export default function PlanosDeAcaoClient() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [responsaveis, setResponsaveis] = useState<ResponsavelOption[]>([])
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false)
+  const [responsaveisError, setResponsaveisError] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState({
     descricao: '',
+    responsavelId: '',
     responsavelNome: '',
     prazo: '',
     status: NonConformityActionStatus.PENDENTE as NonConformityActionStatus,
@@ -134,6 +144,33 @@ export default function PlanosDeAcaoClient() {
   useEffect(() => {
     load()
   }, [numeroProcesso, responsavel, status, emAtraso])
+
+  useEffect(() => {
+    if (!createModalOpen || responsaveis.length > 0) return
+
+    let cancelled = false
+
+    async function loadResponsaveis() {
+      try {
+        setLoadingResponsaveis(true)
+        setResponsaveisError(null)
+        const res = await fetch('/api/sst/plano-de-acao/responsaveis', { cache: 'no-store' })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || 'Erro ao carregar responsáveis.')
+        if (!cancelled) setResponsaveis(Array.isArray(data.users) ? data.users : [])
+      } catch (e: any) {
+        if (!cancelled) setResponsaveisError(e?.message || 'Não foi possível carregar a lista de responsáveis.')
+      } finally {
+        if (!cancelled) setLoadingResponsaveis(false)
+      }
+    }
+
+    loadResponsaveis()
+
+    return () => {
+      cancelled = true
+    }
+  }, [createModalOpen, responsaveis.length])
 
   const filteredItems = useMemo(() => {
     const criacaoIni = toDateOnly(dataCriacaoInicio)
@@ -202,12 +239,14 @@ export default function PlanosDeAcaoClient() {
     try {
       setCreating(true)
       setCreateError(null)
+      const selectedResponsavel = responsaveis.find((user) => user.id === createForm.responsavelId)
       const res = await fetch('/api/sst/plano-de-acao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           descricao,
-          responsavelNome: createForm.responsavelNome.trim() || null,
+          responsavelId: createForm.responsavelId || null,
+          responsavelNome: (selectedResponsavel?.fullName ?? createForm.responsavelNome.trim()) || null,
           prazo: createForm.prazo || null,
           status: createForm.status,
         }),
@@ -217,6 +256,7 @@ export default function PlanosDeAcaoClient() {
       setCreateModalOpen(false)
       setCreateForm({
         descricao: '',
+        responsavelId: '',
         responsavelNome: '',
         prazo: '',
         status: NonConformityActionStatus.PENDENTE,
@@ -382,50 +422,70 @@ export default function PlanosDeAcaoClient() {
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
       {createModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
+          <div className="w-full max-w-5xl rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h2 className="text-lg font-semibold text-slate-900">Registrar ação do plano</h2>
               <button type="button" onClick={() => setCreateModalOpen(false)} className="rounded border px-2 py-1 text-sm">Fechar</button>
             </div>
-            <form onSubmit={handleCreateAction} className="space-y-4 p-4">
-              <Field label="Descrição *">
-                <textarea
-                  value={createForm.descricao}
-                  onChange={(e) => setCreateForm((prev) => ({ ...prev, descricao: e.target.value }))}
-                  className="app-input w-full min-h-24"
-                  required
-                />
-              </Field>
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label="Responsável">
-                  <input
-                    value={createForm.responsavelNome}
-                    onChange={(e) => setCreateForm((prev) => ({ ...prev, responsavelNome: e.target.value }))}
-                    className="input"
+            <form onSubmit={handleCreateAction} className="grid grid-cols-1 gap-4 p-4 md:grid-cols-12">
+              <div className="col-span-full">
+                <Field label="Descrição *">
+                  <textarea
+                    value={createForm.descricao}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, descricao: e.target.value }))}
+                    className="app-input w-full min-h-32 resize-y"
+                    required
                   />
                 </Field>
-                <Field label="Prazo">
+              </div>
+              <div className="col-span-full grid gap-3 md:grid-cols-12">
+                <div className="md:col-span-6">
+                  <Field label="Responsável">
+                    <input
+                      list="sst-plano-acao-responsaveis"
+                      value={createForm.responsavelNome}
+                      onChange={(e) => {
+                        const responsavelNome = e.target.value
+                        const selected = responsaveis.find((user) => (user.fullName + ' (' + user.email + ')') === responsavelNome || user.fullName === responsavelNome)
+                        setCreateForm((prev) => ({ ...prev, responsavelId: selected?.id || '', responsavelNome }))
+                      }}
+                      className="app-input w-full min-h-10"
+                      placeholder={loadingResponsaveis ? 'Carregando responsáveis...' : 'Digite ou selecione um responsável'}
+                    />
+                    <datalist id="sst-plano-acao-responsaveis">
+                      {responsaveis.map((user) => (
+                        <option key={user.id} value={user.fullName + ' (' + user.email + ')'} />
+                      ))}
+                    </datalist>
+                    {responsaveisError ? <p className="mt-1 text-xs text-amber-700">{responsaveisError} Você ainda pode digitar o nome manualmente.</p> : null}
+                  </Field>
+                </div>
+                <div className="md:col-span-3">
+                  <Field label="Prazo">
                   <input
                     type="date"
                     value={createForm.prazo}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, prazo: e.target.value }))}
-                    className="input"
+                    className="app-input w-full min-h-10"
                   />
-                </Field>
-                <Field label="Status">
+                  </Field>
+                </div>
+                <div className="md:col-span-3">
+                  <Field label="Status">
                   <select
                     value={createForm.status}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, status: e.target.value as NonConformityActionStatus }))}
-                    className="input"
+                    className="app-select w-full min-h-10"
                   >
                     {Object.values(NonConformityActionStatus).map((option) => (
                       <option key={option} value={option}>{actionStatusLabel[option]}</option>
                     ))}
                   </select>
-                </Field>
+                  </Field>
+                </div>
               </div>
-              {createError ? <p className="text-sm text-rose-700">{createError}</p> : null}
-              <div className="flex justify-end gap-2">
+              {createError ? <p className="col-span-full text-sm text-rose-700">{createError}</p> : null}
+              <div className="col-span-full flex justify-end gap-2">
                 <button type="button" onClick={() => setCreateModalOpen(false)} className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                 <button type="submit" disabled={creating} className="rounded bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
                   {creating ? 'Registrando...' : 'Registrar'}
