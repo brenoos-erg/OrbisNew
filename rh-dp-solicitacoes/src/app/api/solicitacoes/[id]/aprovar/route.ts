@@ -146,11 +146,9 @@ export async function POST(
       approverId: me.id,
       approvalComment: approvalComment ?? null,
       requiresApproval: isFerias && !isFeriasDpStage,
-      status: isSolicitacaoEpi
-        ? 'EM_ATENDIMENTO'
-        : isFerias && !isFeriasDpStage
-          ? 'AGUARDANDO_APROVACAO'
-          : 'ABERTA',
+      status: isFerias && !isFeriasDpStage
+        ? 'AGUARDANDO_APROVACAO'
+        : 'ABERTA',
     }
 
   if (isDesligamento && dpDepartment) {
@@ -166,18 +164,8 @@ export async function POST(
         updateData.approverId = null
         updateData.approvalAt = null
       }
-    } else if ((isVeiculos || isSolicitacaoEpi) && logisticaDepartment) {
+    } else if (isVeiculos && logisticaDepartment) {
       updateData.departmentId = logisticaDepartment.id
-    }
-
-    if (isSolicitacaoEpi && logisticaDepartment) {
-      updateData.payload = {
-        ...((solic.payload as Record<string, any> | null) ?? {}),
-        epiUniforme: {
-          ...(((solic.payload as Record<string, any> | null)?.epiUniforme as Record<string, any> | undefined) ?? {}),
-          centroResponsavelLabel: logisticaDepartment.name,
-        },
-      }
     }
 
     const updated = await prisma.solicitation.update({
@@ -197,8 +185,8 @@ export async function POST(
       timelineMessage = `Solicitação aprovada pelo ${dpDepartment.name} e liberada para atendimento.`
     } else if (isVeiculos && logisticaDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
-    } else if (isSolicitacaoEpi && logisticaDepartment) {
-      timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
+    } else if (isSolicitacaoEpi) {
+      timelineMessage = `Solicitação de EPI aprovada e liberada para atendimento do SST.`
     } else if (isSolicitacaoPessoalTipo && rhDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para o departamento ${rhDepartment.name}.`
     } else {
@@ -206,31 +194,13 @@ export async function POST(
     }
 
 
-     if (isSolicitacaoEpi && logisticaDepartment) {
-      await prisma.solicitationTimeline.create({
-        data: {
-          solicitationId,
-          status: 'APROVADO_SETOR',
-          message: `Solicitação aprovada por ${me.fullName ?? me.id}.`,
-        },
-      })
-
-      await prisma.solicitationTimeline.create({
-        data: {
-          solicitationId,
-          status: 'ENCAMINHADA_LOGISTICA',
-          message: `Solicitação de EPI aprovada e encaminhada para ${logisticaDepartment.name}.`,
-        },
-       })
-    } else {
-      await prisma.solicitationTimeline.create({
-        data: {
-          solicitationId,
-          status: isFerias && !isFeriasDpStage ? 'AGUARDANDO_APROVACAO' : 'AGUARDANDO_ATENDIMENTO',
-          message: timelineMessage,
-        },
-      })
-    }
+     await prisma.solicitationTimeline.create({
+      data: {
+        solicitationId,
+        status: isFerias && !isFeriasDpStage ? 'AGUARDANDO_APROVACAO' : 'AGUARDANDO_ATENDIMENTO',
+        message: timelineMessage,
+      },
+    })
 
     await prisma.event.create({
       data: {
