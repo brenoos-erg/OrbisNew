@@ -5,6 +5,8 @@ import * as React from 'react'
 
 const INPUT =
   'mt-1 w-full rounded-md border border-[var(--input-border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-300'
+const SECTION = 'rounded-xl border bg-white/80 p-4 shadow-sm'
+const SECTION_TITLE = 'mb-3 text-sm font-semibold uppercase tracking-wide text-slate-700'
 
 export type Position = {
   id?: string
@@ -49,8 +51,8 @@ export type Position = {
   confidentialDataAccess?: string | null
   responsibilities?: string | null
   active?: boolean
-  latestDocument?: { id: string; originalFilename: string; fileUrl: string; isCurrent?: boolean; uploadedAt?: string } | null
-  documentHistory?: { id: string; originalFilename: string; fileUrl: string; isCurrent?: boolean; uploadedAt?: string }[]
+  latestDocument?: { id: string; originalFilename: string; fileUrl: string; indexador?: string | null; revision?: string | null; documentDate?: string | null; isCurrent?: boolean; uploadedById?: string | null; uploadedAt?: string; uploadedBy?: { id: string; fullName?: string | null; email?: string | null } | null } | null
+  documentHistory?: { id: string; originalFilename: string; fileUrl: string; indexador?: string | null; revision?: string | null; documentDate?: string | null; isCurrent?: boolean; uploadedById?: string | null; uploadedAt?: string; uploadedBy?: { id: string; fullName?: string | null; email?: string | null } | null }[]
 }
 export type PositionRow = Position & { id: string }
 
@@ -106,10 +108,21 @@ export function CargoFormModal({
   const [pendingDocument, setPendingDocument] = React.useState<{ tempFileToken: string; originalFilename: string; mimeType?: string | null; sizeBytes?: number | null; parsedText?: string | null; extracted?: Record<string, unknown> } | null>(null)
   const [uploadingDocument, setUploadingDocument] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
   const [previewMessage, setPreviewMessage] = React.useState<string | null>(null)
   const documentHistory = row?.documentHistory ?? (currentDocument ? [currentDocument] : [])
-  
+  const pendingDocumentWithoutIndexador = !!pendingDocument && !indexador
 
+  function formatDate(value?: string | null, withTime = false) {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 10)
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', ...(withTime ? { timeStyle: 'short' } : {}) }).format(date)
+  }
+
+  function uploaderName(doc?: Position['latestDocument']) {
+    return doc?.uploadedBy?.fullName || doc?.uploadedBy?.email || doc?.uploadedById || '—'
+  }
 
   function applyExtracted(extracted: Partial<Position>) {
     if (extracted.name) setName(extracted.name)
@@ -158,12 +171,30 @@ export function CargoFormModal({
         extracted: json.extracted ?? {},
       })
       applyExtracted(json.extracted ?? {})
-      setPreviewMessage('Documento lido. Revise os campos extraídos antes de salvar.')
+      setPreviewMessage(json.extracted?.indexador ? 'Documento lido. Revise os campos extraídos antes de salvar.' : 'Documento sem indexador identificado. Informe o código manualmente.')
     } finally {
       setUploadingDocument(false)
     }
   }
 
+
+  async function handleDelete() {
+    if (!row?.id) return
+    if (!confirm(`Tem certeza que deseja excluir o cargo \"${name || row.name}\"?`)) return
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/positions/${row.id}`, { method: 'DELETE' })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        alert(json?.error || 'Falha ao excluir cargo.')
+        return
+      }
+      alert(json?.softDeleted ? 'Cargo inativado porque possui vínculos.' : 'Cargo excluído com sucesso.')
+      onSaved()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -239,8 +270,8 @@ export function CargoFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="w-full max-w-5xl rounded-2xl bg-[var(--card)] p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-[var(--card)] shadow-xl">
+        <div className="flex items-center justify-between border-b p-6">
           <h3 className="text-lg font-semibold">
             {isEdit ? 'Editar cargo' : 'Novo cargo'}
           </h3>
@@ -252,12 +283,23 @@ export function CargoFormModal({
           </button>
         </div>
 
-        <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50/60 p-4 text-sm text-slate-800">
+        <div className="overflow-y-auto p-6">
+        <section className={SECTION}>
+          <h4 className={SECTION_TITLE}>Identificação do documento</h4>
+        <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 text-sm text-slate-800">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold">Documento oficial do cargo</p>
+              <p className="font-semibold">Documento vigente do cargo</p>
+              <p className="text-[11px] text-slate-600">Documento oficial do cargo</p>
               <p className="text-xs">{pendingDocument?.originalFilename ? `${pendingDocument.originalFilename} (prévia pendente de salvar)` : currentDocument?.originalFilename ?? 'Nenhum documento anexado.'}</p>
-              {(indexador || revision || documentDate) && <p className="mt-1 text-xs">Indexador: {indexador || '—'} • Revisão: {revision || '—'} • Data: {documentDate || '—'}</p>}
+              <div className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+                <p><strong>Código/Indexador:</strong> {indexador || currentDocument?.indexador || '—'}</p>
+                <p><strong>Revisão:</strong> {revision || currentDocument?.revision || '—'}</p>
+                <p><strong>Data do documento:</strong> {formatDate(documentDate || currentDocument?.documentDate)}</p>
+                <p><strong>Status:</strong> {currentDocument?.isCurrent === false ? 'Histórico' : 'Vigente'}</p>
+                <p><strong>Enviado por:</strong> {uploaderName(currentDocument)}</p>
+                <p><strong>Enviado em:</strong> {formatDate(currentDocument?.uploadedAt, true)}</p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {currentDocument?.id && row?.id && <a className="rounded-md border px-3 py-2 text-xs font-semibold" href={`/api/positions/${row.id}/documents/${currentDocument.id}/download`} target="_blank">Baixar documento</a>}
@@ -268,13 +310,15 @@ export function CargoFormModal({
             </div>
           </div>
           {previewMessage && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800">{previewMessage}</p>}
+          {pendingDocumentWithoutIndexador && <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">Documento sem indexador identificado. Informe o código manualmente.</p>}
           {documentHistory.length > 0 && (
             <div className="mt-3 rounded-md border border-orange-100 bg-white/70 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-600">Histórico de documentos do cargo</p>
+              <p className="text-xs font-semibold uppercase text-slate-600">Histórico de versões</p>
+              <p className="sr-only">Histórico de documentos do cargo</p>
               <ul className="mt-2 space-y-1 text-xs">
                 {documentHistory.map((doc) => (
                   <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2">
-                    <span>{doc.originalFilename} {doc.isCurrent ? '(vigente)' : ''}</span>
+                    <span>{doc.originalFilename} {doc.isCurrent ? '(vigente)' : ''} — Código/Indexador: {doc.indexador || '—'} • Revisão: {doc.revision || '—'} • Data do documento: {formatDate(doc.documentDate)} • Enviado por: {uploaderName(doc)} • Enviado em: {formatDate(doc.uploadedAt, true)}</span>
                     {row?.id && <a className="font-semibold text-blue-700 hover:underline" href={`/api/positions/${row.id}/documents/${doc.id}/download`} target="_blank">Baixar</a>}
                   </li>
                 ))}
@@ -282,8 +326,11 @@ export function CargoFormModal({
             </div>
           )}
         </div>
+        </section>
 
-        <div className="max-h-[70vh] overflow-y-auto pr-1">
+        <div className="mt-4 space-y-4">
+        <section className={SECTION}>
+        <h4 className={SECTION_TITLE}>Dados do cargo</h4>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Nome */}
           <div className="sm:col-span-2">
@@ -319,6 +366,12 @@ export function CargoFormModal({
           <div><label className="block text-xs font-semibold uppercase">Enquadramento</label><input className={INPUT} value={framing} onChange={(e) => setFraming(e.target.value)} /></div>
           <div><label className="block text-xs font-semibold uppercase">Área/Setor</label><input className={INPUT} value={areaSector} onChange={(e) => setAreaSector(e.target.value)} /></div>
           <div><label className="block text-xs font-semibold uppercase">Complexidade</label><input className={INPUT} value={complexity} onChange={(e) => setComplexity(e.target.value)} /></div>
+        </div>
+        </section>
+
+        <section className={SECTION}>
+        <h4 className={SECTION_TITLE}>Descrição e atividades</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2"><label className="block text-xs font-semibold uppercase">Descrição sumária</label><textarea className={INPUT} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} /></div>
           <div className="sm:col-span-2"><label className="block text-xs font-semibold uppercase">Descrição detalhada</label><textarea className={INPUT} rows={4} value={detailedDescription} onChange={(e) => setDetailedDescription(e.target.value)} /></div>
 
@@ -394,6 +447,12 @@ export function CargoFormModal({
             />
           </div>
 
+        </div>
+        </section>
+
+        <section className={SECTION}>
+        <h4 className={SECTION_TITLE}>Formação e requisitos</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Escolaridade / Curso */}
           <div>
             <label className="block text-xs font-semibold uppercase">
@@ -463,6 +522,12 @@ export function CargoFormModal({
             />
           </div>
 
+        </div>
+        </section>
+
+        <section className={SECTION}>
+        <h4 className={SECTION_TITLE}>Competências e responsabilidades</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="block text-xs font-semibold uppercase">
               Competências comportamentais exigidas
@@ -485,6 +550,12 @@ export function CargoFormModal({
           <div><label className="block text-xs font-semibold uppercase">Acesso a dados confidenciais</label><input className={INPUT} value={confidentialDataAccess} onChange={(e) => setConfidentialDataAccess(e.target.value)} /></div>
           <div className="sm:col-span-2"><label className="block text-xs font-semibold uppercase">Responsabilidades</label><textarea className={INPUT} rows={3} value={responsibilities} onChange={(e) => setResponsibilities(e.target.value)} /></div>
 
+        </div>
+        </section>
+
+        <section className={SECTION}>
+        <h4 className={SECTION_TITLE}>Local de trabalho</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Local / ponto de trabalho */}
           <div>
             <label className="block text-xs font-semibold uppercase">
@@ -508,24 +579,40 @@ export function CargoFormModal({
             />
           </div>
 
-          {/* Botões */}
-          <div className="sm:col-span-2 mt-4 flex justify-end gap-2">
+        </div>
+        </section>
+        </div>
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-[var(--card)] p-4">
+          <div>
+            {row?.id && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="inline-flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                disabled={saving || deleting}
+              >
+                {deleting ? 'Excluindo...' : 'Excluir cargo'}
+              </button>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
             <button
               onClick={onClose}
               className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm"
-              disabled={saving}
+              disabled={saving || deleting}
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950 disabled:opacity-50"
-              disabled={saving}
+              disabled={saving || deleting}
             >
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
-        </div>
         </div>
       </div>
     </div>
@@ -554,7 +641,7 @@ export function CargoFormTrigger({ row }: { row?: PositionRow }) {
         <CargoFormModal
           row={row ?? null}
           onClose={() => setOpen(false)}
-          onSaved={() => window.location.reload()}
+          onSaved={() => { setOpen(false); window.dispatchEvent(new Event('positions:changed')) }}
         />
       )}
     </>
@@ -567,8 +654,11 @@ export function CargoFormTrigger({ row }: { row?: PositionRow }) {
 export function CargoDeleteButton({ id }: { id: string }) {
   async function handleDelete() {
     if (!confirm('Tem certeza que deseja excluir este cargo?')) return
-    await fetch(`/api/positions/${id}`, { method: 'DELETE' })
-    window.location.reload()
+    const response = await fetch(`/api/positions/${id}`, { method: 'DELETE' })
+    const json = await response.json().catch(() => ({}))
+    if (!response.ok) { alert(json?.error || 'Falha ao excluir cargo.'); return }
+    alert(json?.softDeleted ? 'Cargo inativado porque possui vínculos.' : 'Cargo excluído com sucesso.')
+    window.dispatchEvent(new Event('positions:changed'))
   }
 
   return (

@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireActiveUser } from '@/lib/auth'
 import { withRequestMetrics } from "@/lib/request-metrics"
-import { getPrismaP2000Message, getPrismaP2002Message, positionDataFromBody, positionSelect, withCurrentDocument } from './positionFields'
+import { ensureUniqueActiveIndexador, getPrismaP2000Message, getPrismaP2002Message, positionDataFromBody, positionSelect, withCurrentDocument } from './positionFields'
 import { attachPreviewedPositionDocument } from '@/lib/positions/positionDocumentStorage'
 import { canAccessRhPositions } from '@/lib/rhPositionsAccess'
 
@@ -41,6 +41,9 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     if (!body?.name?.trim()) return NextResponse.json({ error: 'Nome do cargo é obrigatório.' }, { status: 400 })
+    const effectiveIndexador = body.extractedDocument?.indexador ?? body.indexador
+    if (body.extractedDocument?.indexador && !String(body.indexador ?? body.extractedDocument.indexador).trim()) return NextResponse.json({ error: 'Documento com indexador identificado exige código/indexador do cargo.' }, { status: 400 })
+    await ensureUniqueActiveIndexador(prisma, effectiveIndexador)
     const created = await prisma.position.create({ data: positionDataFromBody(body) as any, select: positionSelect })
 
     if (body.tempFileToken) {
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
     if (p2000Message) return NextResponse.json({ error: p2000Message }, { status: 400 })
     const p2002Message = getPrismaP2002Message(error)
     if (p2002Message) return NextResponse.json({ error: p2002Message }, { status: 400 })
+    if ((error as Error)?.message === 'Já existe um cargo ativo com este código/indexador.') return NextResponse.json({ error: 'Já existe um cargo ativo com este código/indexador.' }, { status: 409 })
     if ((error as Error)?.message === 'Data do documento inválida.') return NextResponse.json({ error: 'Data do documento inválida.' }, { status: 400 })
     if ((error as Error)?.message === 'Usuário não autenticado') return NextResponse.json({ error: 'Usuário não autenticado' }, { status: 401 })
     console.error('POST /api/positions error', error)
