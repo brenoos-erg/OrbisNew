@@ -97,6 +97,8 @@ export async function attachPreviewedPositionDocument({
   await fs.rename(sourcePath, path.join(finalDir, storedFilename))
 
   const payload = extracted ?? {}
+  const positionUpdateData: Record<string, any> = Object.fromEntries(Object.entries(mapParsedDocumentToPositionPayload(payload as any)).filter(([, value]) => value !== null && value !== undefined && value !== ''))
+  if (positionUpdateData.documentDate) positionUpdateData.documentDate = new Date(positionUpdateData.documentDate as string)
   return prisma.$transaction(async (tx: any) => {
     await tx.positionDocument.updateMany({ where: { positionId }, data: { isCurrent: false } })
     const document = await tx.positionDocument.create({
@@ -116,7 +118,7 @@ export async function attachPreviewedPositionDocument({
         isCurrent: true,
       },
     })
-    await tx.position.update({ where: { id: positionId }, data: { latestDocumentId: document.id } })
+    await tx.position.update({ where: { id: positionId }, data: { ...positionUpdateData, latestDocumentId: document.id } })
     return document
   })
 }

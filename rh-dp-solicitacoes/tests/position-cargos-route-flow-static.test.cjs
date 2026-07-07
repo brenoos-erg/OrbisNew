@@ -25,6 +25,18 @@ assert(list.includes('href="/dashboard/rh/cargos/novo"'), 'listagem deve apontar
 assert(list.includes("cargo.latestDocument ? 'Anexado'"), 'listagem deve exibir Documento Anexado quando houver documento');
 assert(!list.includes('CargoFormTrigger'), 'listagem não deve manter uma segunda experiência modal concorrente');
 assert(!rq063.includes('filteredPositionsForRq063'), 'RQ_063 não deve puxar cargos cadastrados como dependência');
+
+assert(list.includes('Excluir'), 'listagem deve mostrar botão Excluir')
+assert(list.includes("fetch(`/api/positions/${cargo.id}`, { method: 'DELETE' })"), 'listagem deve usar DELETE /api/positions/[id]')
+assert(list.includes('Cargo inativado porque possui vínculos.') && list.includes('Cargo excluído com sucesso.'), 'listagem deve avisar se inativou ou excluiu')
+assert(modal.includes('Excluir cargo'), 'modal deve mostrar botão Excluir cargo na edição')
+assert(modal.includes("fetch(`/api/positions/${row.id}`, { method: 'DELETE' })"), 'modal deve usar DELETE /api/positions/[id]')
+assert(modal.includes('sticky bottom-0'), 'modal deve ter rodapé sticky')
+for (const section of ['Identificação do documento','Dados do cargo','Descrição e atividades','Formação e requisitos','Competências e responsabilidades','Local de trabalho']) {
+  assert(modal.includes(section), `modal deve exibir seção ${section}`)
+}
+assert(list.includes('StatusBadge') && list.includes('DocumentBadge'), 'listagem deve usar badges de status e documento')
+
 assert(rq063.includes('Informe o cargo solicitado'), 'RQ_063 deve aceitar cargo digitado manualmente');
 
 console.log('position-cargos-route-flow-static ok');

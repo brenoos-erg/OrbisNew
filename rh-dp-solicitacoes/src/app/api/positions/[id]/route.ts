@@ -5,7 +5,7 @@ import { Action } from '@prisma/client'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
-import { getPrismaP2000Message, getPrismaP2002Message, positionDataFromBody, positionSelect, withCurrentDocument } from '../positionFields'
+import { ensureUniqueActiveIndexador, getPrismaP2000Message, getPrismaP2002Message, positionDataFromBody, positionSelect, withCurrentDocument } from '../positionFields'
 import { attachPreviewedPositionDocument } from '@/lib/positions/positionDocumentStorage'
 import { canAccessRhPositions } from '@/lib/rhPositionsAccess'
 
@@ -45,6 +45,9 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const id = (await params).id
     const body = await request.json()
+    const effectiveIndexador = body.extractedDocument?.indexador ?? body.indexador
+    if (body.extractedDocument?.indexador && !String(body.indexador ?? body.extractedDocument.indexador).trim()) return NextResponse.json({ error: 'Documento com indexador identificado exige código/indexador do cargo.' }, { status: 400 })
+    await ensureUniqueActiveIndexador(prisma, effectiveIndexador, id)
     await prisma.position.update({ where: { id }, data: positionDataFromBody(body), select: positionSelect })
 
     if (body.tempFileToken) {
@@ -68,6 +71,7 @@ export async function PATCH(request: Request, { params }: Params) {
     if (p2000Message) return NextResponse.json({ error: p2000Message }, { status: 400 })
     const p2002Message = getPrismaP2002Message(e)
     if (p2002Message) return NextResponse.json({ error: p2002Message }, { status: 400 })
+    if ((e as Error)?.message === 'Já existe um cargo ativo com este código/indexador.') return NextResponse.json({ error: 'Já existe um cargo ativo com este código/indexador.' }, { status: 409 })
     if ((e as Error)?.message === 'Data do documento inválida.') return NextResponse.json({ error: 'Data do documento inválida.' }, { status: 400 })
     const unauthorized = unauthorizedResponse(e)
     if (unauthorized) return unauthorized
@@ -93,7 +97,9 @@ export async function DELETE(_request: Request, { params }: Params) {
         ],
       } as any,
     })
-    if (usersCount > 0 || solicitationsCount > 0) {
+    const hasLinkedRecords = usersCount > 0 || solicitationsCount > 0
+
+    if (hasLinkedRecords) {
       await prisma.position.update({ where: { id }, data: { active: false } })
       return NextResponse.json({ ok: true, softDeleted: true })
     }
