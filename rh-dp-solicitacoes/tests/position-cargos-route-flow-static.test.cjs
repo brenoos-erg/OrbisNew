@@ -26,6 +26,18 @@ assert(list.includes("cargo.latestDocument ? 'Anexado'"), 'listagem deve exibir 
 assert(!list.includes('CargoFormTrigger'), 'listagem não deve manter uma segunda experiência modal concorrente');
 assert(!rq063.includes('filteredPositionsForRq063'), 'RQ_063 não deve puxar cargos cadastrados como dependência');
 
+
+assert(list.includes('function getCargoIndexador') && list.includes("cargo.indexador || cargo.latestDocument?.indexador || '—'"), 'listagem deve exibir cargo.indexador ou latestDocument.indexador')
+assert(list.includes('Exibir'), 'listagem deve mostrar botão Exibir')
+assert(list.includes('?mode=view'), 'botão Exibir deve abrir rota em modo view')
+assert(list.includes('Editar'), 'listagem deve manter botão Editar')
+assert(list.includes('Excluir'), 'listagem deve manter botão Excluir')
+assert(modal.includes('readOnly?: boolean'), 'CargoFormModal deve possuir prop readOnly')
+assert(modal.includes("readOnly ? 'Exibir cargo'"), 'CargoFormModal deve mostrar Exibir cargo quando readOnly')
+assert(modal.includes('!readOnly && (') && modal.includes("{saving ? 'Salvando...' : 'Salvar'}"), 'CargoFormModal deve esconder Salvar quando readOnly')
+assert(modal.includes('if (readOnly || !file) return') && modal.includes('!readOnly && (') && modal.includes('Importar documento do cargo'), 'CargoFormModal não deve permitir upload quando readOnly')
+assert(modal.includes('Baixar documento'), 'CargoFormModal deve manter Baixar documento')
+
 assert(list.includes('Excluir'), 'listagem deve mostrar botão Excluir')
 assert(list.includes("fetch(`/api/positions/${cargo.id}`, { method: 'DELETE' })"), 'listagem deve usar DELETE /api/positions/[id]')
 assert(list.includes('Cargo inativado porque possui vínculos.') && list.includes('Cargo excluído com sucesso.'), 'listagem deve avisar se inativou ou excluiu')

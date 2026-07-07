@@ -58,6 +58,14 @@ assert.match(access, /FEATURE_KEYS\.RH\.CARGOS/, 'RH.CARGOS permission must acce
 assert.match(access, /FEATURE_KEYS\.CONFIGURACOES\.CARGOS/, 'legacy CONFIGURACOES.CARGOS permission must access RH positions')
 assert.match(access, /userHasRhAccess/, 'RH access fallback must be preserved')
 
+
+const cargosList = read('src/app/dashboard/rh/cargos/page.tsx')
+assert.match(cargosList, /cargo\.indexador \|\| cargo\.latestDocument\?\.indexador \|\| '—'/, 'RH cargos list must show Código/Indexador from cargo or latestDocument')
+assert.match(cargosList, /Exibir/, 'RH cargos list must include Exibir action')
+assert.match(cargosList, /Editar/, 'RH cargos list must include Editar action')
+assert.match(cargosList, /Excluir/, 'RH cargos list must include Excluir action')
+assert.match(cargosList, /\?mode=view/, 'RH cargos Exibir action must link to mode=view')
+
 const rq063 = read('src/app/dashboard/solicitacoes/enviadas/nova/page.tsx')
 assert.doesNotMatch(rq063, /fetch\('\/api\/positions/, 'RQ_063 must not require /api/positions to submit personnel requests')
 assert.match(rq063, /Informe o cargo solicitado/, 'RQ_063 must ask for a free-text requested position')
