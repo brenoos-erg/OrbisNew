@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
-type Cargo = { id: string; name: string; sectorProject: string | null; indexador?: string | null; revision?: string | null; areaSector?: string | null; cbo?: string | null; active?: boolean; latestDocument?: { id: string } | null };
+type Cargo = { id: string; name: string; sectorProject: string | null; indexador?: string | null; revision?: string | null; areaSector?: string | null; cbo?: string | null; active?: boolean; latestDocument?: { id: string; indexador?: string | null } | null };
+
+function getCargoIndexador(cargo: Cargo) {
+  return cargo.indexador || cargo.latestDocument?.indexador || '—';
+}
 
 function StatusBadge({ active }: { active?: boolean }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${active === false ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>{active === false ? 'Inativo' : 'Ativo'}</span>
@@ -105,7 +109,7 @@ export default function CargosPage() {
                 cargos.map((cargo) => (
                   <tr key={cargo.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-900">{cargo.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{cargo.indexador ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{getCargoIndexador(cargo)}</td>
                     <td className="px-4 py-3">{cargo.revision ?? '—'}</td>
                     <td className="px-4 py-3">{cargo.areaSector ?? cargo.sectorProject ?? '—'}</td>
                     <td className="px-4 py-3">{cargo.cbo ?? '—'}</td>
@@ -114,6 +118,7 @@ export default function CargosPage() {
                     <td className="px-4 py-3"><StatusBadge active={cargo.active} /></td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <Link href={`/dashboard/rh/cargos/${cargo.id}?mode=view`} className="rounded-md border px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Exibir</Link>
                         <Link href={`/dashboard/rh/cargos/${cargo.id}`} className="rounded-md border px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Editar</Link>
                         <button type="button" onClick={() => handleDelete(cargo)} disabled={deletingId === cargo.id} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">{deletingId === cargo.id ? 'Excluindo...' : 'Excluir'}</button>
                       </div>

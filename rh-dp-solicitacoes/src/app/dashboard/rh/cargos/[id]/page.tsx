@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { use, useEffect, useState } from 'react'
 
 import { CargoFormModal, type PositionRow } from '@/app/dashboard/rh/cargos/CargoFormModal'
@@ -11,6 +11,8 @@ export default function EditarCargoPage({
   params: Promise<{ id: string }>
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const readOnly = searchParams.get('mode') === 'view'
   const { id: cargoId } = use(params)
   const [cargo, setCargo] = useState<PositionRow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -73,14 +75,14 @@ export default function EditarCargoPage({
     <main className="p-6 max-w-5xl mx-auto space-y-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Editar cargo</h1>
+          <h1 className="text-xl font-semibold">{readOnly ? 'Exibir cargo' : 'Editar cargo'}</h1>
           <p className="text-xs text-gray-500">
             Atualize o cadastro oficial do cargo, substitua o documento vigente quando necessário e mantenha o histórico para a RQ_063.
           </p>
         </div>
       </header>
 
-      <CargoFormModal row={cargo} onClose={backToList} onSaved={backToList} />
+      <CargoFormModal row={cargo} onClose={backToList} onSaved={backToList} readOnly={readOnly} />
     </main>
   )
 }

@@ -63,10 +63,12 @@ export function CargoFormModal({
   row,
   onClose,
   onSaved,
+  readOnly = false,
 }: {
   row?: PositionRow | null
   onClose: () => void
   onSaved: () => void
+  readOnly?: boolean
 }) {
   const isEdit = !!row?.id
   const [name, setName] = React.useState(row?.name ?? '')
@@ -112,6 +114,7 @@ export function CargoFormModal({
   const [previewMessage, setPreviewMessage] = React.useState<string | null>(null)
   const documentHistory = row?.documentHistory ?? (currentDocument ? [currentDocument] : [])
   const pendingDocumentWithoutIndexador = !!pendingDocument && !indexador
+  const disabled = saving || deleting || readOnly
 
   function formatDate(value?: string | null, withTime = false) {
     if (!value) return '—'
@@ -154,7 +157,7 @@ export function CargoFormModal({
   }
 
   async function handleDocumentUpload(file: File | null) {
-    if (!file) return
+    if (readOnly || !file) return
     setUploadingDocument(true)
     try {
       const form = new FormData()
@@ -179,7 +182,7 @@ export function CargoFormModal({
 
 
   async function handleDelete() {
-    if (!row?.id) return
+    if (readOnly || !row?.id) return
     if (!confirm(`Tem certeza que deseja excluir o cargo \"${name || row.name}\"?`)) return
     setDeleting(true)
     try {
@@ -197,6 +200,7 @@ export function CargoFormModal({
   }
 
   async function handleSave() {
+    if (readOnly) return
     if (!name.trim()) {
       alert('Nome do cargo é obrigatório.')
       return
@@ -273,7 +277,7 @@ export function CargoFormModal({
       <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-[var(--card)] shadow-xl">
         <div className="flex items-center justify-between border-b p-6">
           <h3 className="text-lg font-semibold">
-            {isEdit ? 'Editar cargo' : 'Novo cargo'}
+            {readOnly ? 'Exibir cargo' : isEdit ? 'Editar cargo' : 'Novo cargo'}
           </h3>
           <button
             onClick={onClose}
@@ -283,7 +287,7 @@ export function CargoFormModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto p-6">
+        <fieldset disabled={disabled} className="overflow-y-auto p-6 disabled:opacity-100">
         <section className={SECTION}>
           <h4 className={SECTION_TITLE}>Identificação do documento</h4>
         <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 text-sm text-slate-800">
@@ -303,10 +307,12 @@ export function CargoFormModal({
             </div>
             <div className="flex flex-wrap gap-2">
               {currentDocument?.id && row?.id && <a className="rounded-md border px-3 py-2 text-xs font-semibold" href={`/api/positions/${row.id}/documents/${currentDocument.id}/download`} target="_blank">Baixar documento</a>}
-              <label className="cursor-pointer rounded-md bg-orange-600 px-3 py-2 text-xs font-semibold text-white">
-                {uploadingDocument ? 'Importando...' : currentDocument ? 'Substituir documento' : 'Importar documento do cargo'}
-                <input type="file" accept=".docx,.pdf,.doc" className="hidden" disabled={uploadingDocument} onChange={(event) => handleDocumentUpload(event.target.files?.[0] ?? null)} />
-              </label>
+              {!readOnly && (
+                <label className="cursor-pointer rounded-md bg-orange-600 px-3 py-2 text-xs font-semibold text-white">
+                  {uploadingDocument ? 'Importando...' : currentDocument ? 'Substituir documento' : 'Importar documento do cargo'}
+                  <input type="file" accept=".docx,.pdf,.doc" className="hidden" disabled={disabled || uploadingDocument} onChange={(event) => handleDocumentUpload(event.target.files?.[0] ?? null)} />
+                </label>
+              )}
             </div>
           </div>
           {previewMessage && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-800">{previewMessage}</p>}
@@ -582,16 +588,16 @@ export function CargoFormModal({
         </div>
         </section>
         </div>
-        </div>
+        </fieldset>
 
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-[var(--card)] p-4">
           <div>
-            {row?.id && (
+            {!readOnly && row?.id && (
               <button
                 type="button"
                 onClick={handleDelete}
                 className="inline-flex items-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                disabled={saving || deleting}
+                disabled={disabled}
               >
                 {deleting ? 'Excluindo...' : 'Excluir cargo'}
               </button>
@@ -603,15 +609,17 @@ export function CargoFormModal({
               className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm"
               disabled={saving || deleting}
             >
-              Cancelar
+              {readOnly ? 'Fechar' : 'Cancelar'}
             </button>
-            <button
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950 disabled:opacity-50"
-              disabled={saving || deleting}
-            >
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
+            {!readOnly && (
+              <button
+                onClick={handleSave}
+                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950 disabled:opacity-50"
+                disabled={disabled}
+              >
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+            )}
           </div>
         </div>
       </div>
