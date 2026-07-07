@@ -8,7 +8,7 @@ const responsaveisRoute = read('src/app/api/sst/plano-de-acao/responsaveis/route
 assert.match(client, /Registrar plano de ação/, 'modal deve registrar o plano pai')
 assert.match(client, /Field label="Título \*"/, 'plano pai deve ter título obrigatório')
 assert.match(client, /Field label="Responsável"/, 'plano pai deve permitir responsável textual')
-assert.match(client, /Field label="Fim previsto"/, 'plano pai deve permitir prazo final previsto')
+assert.doesNotMatch(client, /Field label="Fim previsto"/, 'modal inicial do plano pai não deve pedir prazo final previsto')
 assert.match(client, /responsavelNome/, 'formulário deve enviar nome do responsável no body do POST')
 assert.match(client, /fetch\('\/api\/sst\/planos-de-acao'/, 'formulário deve criar plano pai na nova API')
 assert.match(client, /<button type="submit" disabled=\{creating\} className="app-button-primary">/, 'botão Registrar deve continuar desabilitado durante creating')

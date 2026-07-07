@@ -15,6 +15,25 @@ function actionWhere(planId: string, actionId: string) {
   return { id: actionId, qualityActionPlanId: planId, nonConformityId: null, origemPlano: NonConformityActionPlanOrigin.PLANO_AVULSO }
 }
 
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ planId: string; actionId: string }> }) {
+  try {
+    await ensurePlanAccess(Action.VIEW)
+    const { planId, actionId } = await params
+    const action = await prisma.nonConformityActionItem.findFirst({
+      where: actionWhere(planId, actionId),
+      include: { centroResponsavel: { select: { description: true } }, centroImpactado: { select: { description: true } } },
+    })
+    if (!action) return NextResponse.json({ error: 'Ação não encontrada neste plano avulso.' }, { status: 404 })
+    const plan = await prisma.qualityActionPlan.findUnique({ where: { id: planId } })
+    if (!plan) return NextResponse.json({ error: 'Plano avulso não encontrado.' }, { status: 404 })
+    return NextResponse.json({ item: { action, plan, editable: true } })
+  } catch (error) {
+    if ((error as Error).message === 'NO_ACCESS') return NextResponse.json({ error: 'Usuário não possui acesso ao módulo SST.' }, { status: 403 })
+    return NextResponse.json({ error: 'Erro ao carregar ação do plano.', detail: devErrorDetail(error) }, { status: 500 })
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ planId: string; actionId: string }> }) {
   try {
     await ensurePlanAccess(Action.UPDATE)
@@ -32,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pl
         origem: toOptionalString(body?.origem),
         centroResponsavelId: body?.centroResponsavelId !== undefined ? (body.centroResponsavelId ? String(body.centroResponsavelId) : null) : undefined,
         centroImpactadoId: body?.centroImpactadoId !== undefined ? (body.centroImpactadoId ? String(body.centroImpactadoId) : null) : undefined,
+        centroImpactadoDescricao: toOptionalString(body?.centroImpactadoDescricao),
         responsavelId: body?.responsavelId !== undefined ? (body.responsavelId ? String(body.responsavelId) : null) : undefined,
         responsavelNome: toOptionalString(body?.responsavelNome),
         dataInicioPrevista: toDate(body?.dataInicioPrevista),
@@ -49,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pl
         autonomia: toOptionalNumber(body?.autonomia, 1, 5),
         beneficio: toOptionalNumber(body?.beneficio, 1, 5),
         evidencias: body?.evidencias !== undefined ? normalizeEvidenceText(body.evidencias) : undefined,
+        referencia: toOptionalString(body?.referencia),
       },
     })
     return NextResponse.json(updated)
