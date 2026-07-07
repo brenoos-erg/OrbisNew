@@ -4,8 +4,8 @@ import JSZip from 'jszip'
 export type ParsedPositionDocument = Record<string, string | null>
 
 const FIELD_LABELS = [
-  ['indexador', 'Indexador'], ['revision', 'Revisão'], ['documentDate', 'Data'], ['name', 'Cargo'],
-  ['managerPosition', 'Cargo do Gestor Imediato'], ['framing', 'Enquadramento'], ['areaSector', 'Área/Setor'], ['cbo', 'CBO'],
+  ['indexador', 'Indexador'], ['revision', 'Revisão'], ['documentDate', 'Data'],
+  ['managerPosition', 'Cargo do Gestor Imediato'], ['name', 'Cargo'], ['framing', 'Enquadramento'], ['areaSector', 'Área/Setor'], ['cbo', 'CBO'],
   ['summary', 'Descrição Sumária'], ['detailedDescription', 'Descrição Detalhada'], ['schooling', 'Escolaridade'], ['experience', 'Experiência'],
   ['necessaryKnowledge', 'Conhecimentos/Habilidades necessários'], ['desiredKnowledge', 'Conhecimentos/Habilidades desejáveis'],
   ['humanCompetencies', 'Competências humanas Gesto.Com'], ['functionalCompetencies', 'Competências funcionais Gesto.Com'],
@@ -40,13 +40,38 @@ function escapeRegex(value: string) {
 
 function prepareTextForParsing(text: string) {
   let prepared = text.replace(/\r/g, '\n').replace(/[ \t]*:[ \t]*/g, ': ')
-  const labelsByLength = [...FIELD_LABELS].map(([, label]) => label).sort((a, b) => b.length - a.length)
+  const labelsByLength = [...FIELD_LABELS]
+    .map(([, label]) => label)
+    .filter((label) => label !== 'Cargo')
+    .sort((a, b) => b.length - a.length)
   for (const label of labelsByLength) {
     const escaped = escapeRegex(label)
-    prepared = prepared.replace(new RegExp(`(?!^)(?<!\\n)(\\s+)(${escaped})(\\s*:?)`, 'gi'), '\n$2$3')
+    prepared = prepared.replace(new RegExp(`(?!^)(?<!\\n)(\\s+)(${escaped})(\\s*:?)`, 'g'), '\n$2$3')
   }
   prepared = prepared.replace(/(^|\n)(Cargo)(\s+)(?!do Gestor Imediato)([^:\n]+)/gi, '$1Cargo: $4')
+  prepared = prepared.replace(/(^|\n)(Cargo:\s*[^\n]+?)\s+(Cargo do Gestor Imediato:?)/gi, '$1$2\n$3')
   return prepared
+}
+
+function cleanParsedValue(value: string | null) {
+  return value?.replace(/[☐☒☑■]/g, '').replace(/(^|\s)[xX](?=\s|$)/g, ' ').replace(/[ \t]+/g, ' ').trim() || null
+}
+
+function extractMarkedOption(value: string | null) {
+  if (!value) return null
+  const oneLine = value.replace(/\s+/g, ' ').trim()
+  const marked = oneLine.match(/(?:☒|☑|■|(?:^|\s)[xX](?=\s))\s*([^☐☒☑■]+)/)
+  if (!marked?.[1]) return cleanParsedValue(value)
+  return cleanParsedValue(marked[1].replace(/\s*(?:☐|☒|☑|■|\b[xX]\b).*$/g, ''))
+}
+
+function postProcessParsedFields(parsed: ParsedPositionDocument) {
+  parsed.complexity = extractMarkedOption(parsed.complexity)
+  parsed.managementScope = extractMarkedOption(parsed.managementScope)
+  parsed.confidentialDataAccess = extractMarkedOption(parsed.confidentialDataAccess)
+  parsed.responsibilities = extractMarkedOption(parsed.responsibilities)
+  for (const key of Object.keys(parsed)) parsed[key] = cleanParsedValue(parsed[key])
+  return parsed
 }
 
 export function parsePositionDescriptionText(text: string): ParsedPositionDocument {
@@ -58,7 +83,10 @@ export function parsePositionDescriptionText(text: string): ParsedPositionDocume
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
     const normalizedLine = normalizeLabel(line.split(':')[0] ?? line)
-    const found = labels.find((item) => normalizedLine === item.normalized || normalizedLine.endsWith(item.normalized))
+    const found = labels.find((item) => {
+      if (item.key === 'name') return normalizedLine === item.normalized
+      return normalizedLine === item.normalized || normalizedLine.endsWith(item.normalized)
+    })
     if (!found) continue
     const inlineValue = line.includes(':') ? line.slice(line.indexOf(':') + 1).trim() : ''
     const chunks: string[] = []
@@ -66,7 +94,7 @@ export function parsePositionDescriptionText(text: string): ParsedPositionDocume
     for (let j = i + 1; j < lines.length; j += 1) {
       const next = lines[j]
       const nextLabel = normalizeLabel(next.split(':')[0] ?? next)
-      if (labels.some((item) => nextLabel === item.normalized || nextLabel.endsWith(item.normalized))) break
+      if (labels.some((item) => (item.key === 'name' ? nextLabel === item.normalized : nextLabel === item.normalized || nextLabel.endsWith(item.normalized)))) break
       chunks.push(next)
     }
     parsed[found.key] = chunks.join('\n').trim() || null
@@ -78,7 +106,7 @@ export function parsePositionDescriptionText(text: string): ParsedPositionDocume
   parsed.documentDate = parseDate(text.match(/Data\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] || parsed.documentDate)
   const cboMatch = text.match(/(?:\bCBO\b\s*:?\s*)?(\d{4}-\d{2})\b/i)
   parsed.cbo = cboMatch?.[1] || parsed.cbo || null
-  return parsed
+  return postProcessParsedFields(parsed)
 }
 export function normalizePositionDocumentFields(parsed: ParsedPositionDocument) {
   return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])) as ParsedPositionDocument
