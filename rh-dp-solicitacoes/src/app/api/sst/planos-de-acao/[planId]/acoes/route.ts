@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pla
   try {
     const me = await ensurePlanAccess(Action.CREATE)
     const { planId } = await params
-    const plan = await prisma.qualityActionPlan.findUnique({ where: { id: planId }, select: { id: true } })
+    const plan = await prisma.qualityActionPlan.findUnique({ where: { id: planId }, select: { id: true, numeroPlano: true } })
     if (!plan) return NextResponse.json({ error: 'Plano avulso não encontrado.' }, { status: 404 })
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
     const descricao = String(body?.descricao || body?.oQue || '').trim()
@@ -46,7 +46,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pla
         descricao,
         motivoBeneficio: toOptionalString(body?.motivoBeneficio),
         atividadeComo: toOptionalString(body?.atividadeComo),
-        origem: toOptionalString(body?.origem),
+        origem: toOptionalString(body?.origem) ?? 'PLANO AVULSO',
+        referencia: toOptionalString(body?.referencia) ?? plan.numeroPlano,
         centroResponsavelId: body?.centroResponsavelId ? String(body.centroResponsavelId) : null,
         centroImpactadoId: body?.centroImpactadoId ? String(body.centroImpactadoId) : null,
         responsavelId: body?.responsavelId ? String(body.responsavelId) : null,

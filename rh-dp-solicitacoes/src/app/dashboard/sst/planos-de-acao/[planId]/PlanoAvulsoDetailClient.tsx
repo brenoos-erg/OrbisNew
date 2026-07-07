@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type PlanStatus = 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO'
 type ActionStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA'
@@ -50,35 +51,6 @@ type PlanAction = {
   centroImpactado?: { description: string } | null
 }
 
-type ActionForm = {
-  id?: string
-  descricao: string
-  motivoBeneficio: string
-  atividadeComo: string
-  origem: string
-  responsavelNome: string
-  prazo: string
-  status: ActionStatus
-  rapidez: string
-  autonomia: string
-  beneficio: string
-  evidencias: string
-}
-
-const emptyActionForm: ActionForm = {
-  descricao: '',
-  motivoBeneficio: '',
-  atividadeComo: '',
-  origem: '',
-  responsavelNome: '',
-  prazo: '',
-  status: 'PENDENTE',
-  rapidez: '',
-  autonomia: '',
-  beneficio: '',
-  evidencias: '',
-}
-
 const planStatusLabel: Record<PlanStatus, string> = {
   ABERTO: 'Aberto',
   EM_ANDAMENTO: 'Em andamento',
@@ -109,14 +81,13 @@ function priorityScore(action: PlanAction) {
 }
 
 export default function PlanoAvulsoDetailClient({ planId }: { planId: string }) {
+  const router = useRouter()
   const [plan, setPlan] = useState<Plan | null>(null)
   const [actions, setActions] = useState<PlanAction[]>([])
   const [tab, setTab] = useState<'dados' | 'acoes' | 'evidencias' | 'historico'>('dados')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [actionModalOpen, setActionModalOpen] = useState(false)
-  const [actionForm, setActionForm] = useState<ActionForm>(emptyActionForm)
 
   async function load() {
     try {
@@ -180,60 +151,33 @@ export default function PlanoAvulsoDetailClient({ planId }: { planId: string }) 
     }
   }
 
-  function openNewAction() {
-    setActionForm(emptyActionForm)
-    setActionModalOpen(true)
-  }
-
-  function openEditAction(action: PlanAction) {
-    setActionForm({
-      id: action.id,
-      descricao: action.descricao || '',
-      motivoBeneficio: action.motivoBeneficio || '',
-      atividadeComo: action.atividadeComo || '',
-      origem: action.origem || '',
-      responsavelNome: action.responsavelNome || '',
-      prazo: dateInputValue(action.prazo),
-      status: action.status,
-      rapidez: action.rapidez ? String(action.rapidez) : '',
-      autonomia: action.autonomia ? String(action.autonomia) : '',
-      beneficio: action.beneficio ? String(action.beneficio) : '',
-      evidencias: action.evidencias || '',
-    })
-    setActionModalOpen(true)
-  }
-
-  async function saveAction(e: FormEvent) {
-    e.preventDefault()
-    const url = actionForm.id
-      ? `/api/sst/planos-de-acao/${planId}/acoes/${actionForm.id}`
-      : `/api/sst/planos-de-acao/${planId}/acoes`
-
+  async function openNewAction() {
+    if (!plan) return
     try {
-      const res = await fetch(url, {
-        method: actionForm.id ? 'PATCH' : 'POST',
+      const res = await fetch(`/api/sst/planos-de-acao/${planId}/acoes`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          descricao: actionForm.descricao,
-          motivoBeneficio: actionForm.motivoBeneficio,
-          atividadeComo: actionForm.atividadeComo,
-          origem: actionForm.origem,
-          responsavelNome: actionForm.responsavelNome,
-          prazo: actionForm.prazo || null,
-          status: actionForm.status,
-          rapidez: actionForm.rapidez || null,
-          autonomia: actionForm.autonomia || null,
-          beneficio: actionForm.beneficio || null,
-          evidencias: actionForm.evidencias,
+          descricao: 'Nova ação',
+          status: 'PENDENTE',
+          origem: 'PLANO AVULSO',
+          referencia: plan.numeroPlano,
+          qualityActionPlanId: planId,
+          nonConformityId: null,
+          origemPlano: 'PLANO_AVULSO',
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Erro ao salvar ação.')
-      setActionModalOpen(false)
-      await load()
+      if (!res.ok) throw new Error(data?.error || 'Erro ao criar ação.')
+      const action = data?.item || data
+      router.push(`/dashboard/sgi/qualidade/planos-de-acao/${planId}/acoes/${action.id}`)
     } catch (e: any) {
-      setError(e?.message || 'Erro ao salvar ação.')
+      setError(e?.message || 'Erro ao criar ação.')
     }
+  }
+
+  function openEditAction(action: PlanAction) {
+    router.push(`/dashboard/sgi/qualidade/planos-de-acao/${planId}/acoes/${action.id}`)
   }
 
   async function deleteAction(action: PlanAction) {
@@ -335,7 +279,6 @@ export default function PlanoAvulsoDetailClient({ planId }: { planId: string }) 
       </div>
 
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
-      {actionModalOpen ? <ActionModal form={actionForm} setForm={setActionForm} onClose={() => setActionModalOpen(false)} onSubmit={saveAction} /> : null}
     </div>
   )
 }
@@ -352,28 +295,6 @@ function EvidenceList({ actions }: { actions: PlanAction[] }) {
   const evidences = actions.filter((action) => action.evidencias)
   if (evidences.length === 0) return <p className="text-sm text-slate-600">Nenhuma evidência registrada nas ações deste plano.</p>
   return <div className="space-y-3">{evidences.map((action) => <div key={action.id} className="rounded border border-slate-200 p-3"><p className="font-medium">{action.descricao}</p><pre className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{action.evidencias}</pre></div>)}</div>
-}
-
-function ActionModal({ form, setForm, onClose, onSubmit }: { form: ActionForm; setForm: (form: ActionForm) => void; onClose: () => void; onSubmit: (e: FormEvent) => void }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4">
-      <form onSubmit={onSubmit} className="w-full max-w-4xl rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4"><h2 className="text-lg font-semibold">{form.id ? 'Exibir/Editar ação' : 'Nova ação'}</h2><button type="button" onClick={onClose} className="rounded border px-2 py-1 text-sm">Fechar</button></div>
-        <div className="grid gap-4 p-5 md:grid-cols-2">
-          <Field label="O quê? *"><textarea required className="app-input min-h-24 w-full resize-y" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></Field>
-          <Field label="Responsável"><input className="app-input w-full" value={form.responsavelNome} onChange={(e) => setForm({ ...form, responsavelNome: e.target.value })} /></Field>
-          <Field label="Por quê?"><textarea className="app-input min-h-20 w-full resize-y" value={form.motivoBeneficio} onChange={(e) => setForm({ ...form, motivoBeneficio: e.target.value })} /></Field>
-          <Field label="Como?"><textarea className="app-input min-h-20 w-full resize-y" value={form.atividadeComo} onChange={(e) => setForm({ ...form, atividadeComo: e.target.value })} /></Field>
-          <Field label="Onde/origem"><input className="app-input w-full" value={form.origem} onChange={(e) => setForm({ ...form, origem: e.target.value })} /></Field>
-          <Field label="Prazo"><input type="date" className="app-input w-full" value={form.prazo} onChange={(e) => setForm({ ...form, prazo: e.target.value })} /></Field>
-          <Field label="Status"><select className="app-select w-full" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ActionStatus })}>{Object.entries(actionStatusLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field>
-          <div className="grid grid-cols-3 gap-2"><Field label="Rapidez"><input type="number" min="1" max="5" className="app-input w-full" value={form.rapidez} onChange={(e) => setForm({ ...form, rapidez: e.target.value })} /></Field><Field label="Autonomia"><input type="number" min="1" max="5" className="app-input w-full" value={form.autonomia} onChange={(e) => setForm({ ...form, autonomia: e.target.value })} /></Field><Field label="Benefício"><input type="number" min="1" max="5" className="app-input w-full" value={form.beneficio} onChange={(e) => setForm({ ...form, beneficio: e.target.value })} /></Field></div>
-          <div className="md:col-span-2"><Field label="Evidências"><textarea className="app-input min-h-24 w-full resize-y" value={form.evidencias} onChange={(e) => setForm({ ...form, evidencias: e.target.value })} /></Field></div>
-        </div>
-        <div className="flex justify-end gap-2 border-t px-5 py-4"><button type="button" onClick={onClose} className="app-button-secondary">Cancelar</button><button type="submit" className="app-button-primary">Salvar ação</button></div>
-      </form>
-    </div>
-  )
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

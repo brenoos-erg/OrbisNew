@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import SstModuleTabs from '@/components/sst/SstModuleTabs'
 
 type PlanStatus = 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO'
@@ -28,26 +29,12 @@ type PlanRow = {
 
 type PlanForm = {
   titulo: string
-  objetivo: string
-  resultadoEsperado: string
-  origem: string
-  referencia: string
   responsavelNome: string
-  dataInicioPrevista: string
-  dataFimPrevista: string
-  investimento: string
 }
 
 const emptyForm: PlanForm = {
   titulo: '',
-  objetivo: '',
-  resultadoEsperado: '',
-  origem: '',
-  referencia: '',
   responsavelNome: '',
-  dataInicioPrevista: '',
-  dataFimPrevista: '',
-  investimento: '',
 }
 
 const statusLabel: Record<PlanStatus, string> = {
@@ -64,6 +51,7 @@ function formatDate(value?: string | null) {
 }
 
 export default function PlanosDeAcaoClient() {
+  const router = useRouter()
   const [items, setItems] = useState<PlanRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -143,18 +131,41 @@ export default function PlanosDeAcaoClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
-          investimento: form.investimento || null,
-          dataInicioPrevista: form.dataInicioPrevista || null,
-          dataFimPrevista: form.dataFimPrevista || null,
+          titulo: form.titulo,
+          responsavelNome: form.responsavelNome,
+          status: 'ABERTO',
         }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Erro ao registrar plano.')
 
+      const plan = data?.item || data
+      const planId = plan?.id
+      if (!planId) throw new Error('Plano criado sem identificador.')
+
+      const actionRes = await fetch(`/api/sst/planos-de-acao/${planId}/acoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao: form.titulo,
+          responsavelNome: form.responsavelNome,
+          origemPlano: 'PLANO_AVULSO',
+          qualityActionPlanId: planId,
+          nonConformityId: null,
+          status: 'PENDENTE',
+          origem: 'PLANO AVULSO',
+          referencia: plan?.numeroPlano,
+        }),
+      })
+      const actionData = await actionRes.json().catch(() => ({}))
+      if (!actionRes.ok) throw new Error(actionData?.error || 'Erro ao criar primeira ação do plano.')
+      const action = actionData?.item || actionData
+      const actionId = action?.id
+      if (!actionId) throw new Error('Ação criada sem identificador.')
+
       setModalOpen(false)
       setForm(emptyForm)
-      await load()
+      router.push(`/dashboard/sgi/qualidade/planos-de-acao/${planId}/acoes/${actionId}`)
     } catch (e: any) {
       setCreateError(e?.message || 'Erro ao registrar plano.')
     } finally {
@@ -280,7 +291,7 @@ export default function PlanosDeAcaoClient() {
 
       {modalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4">
-          <form onSubmit={createPlan} className="w-full max-w-4xl rounded-xl bg-white shadow-xl">
+          <form onSubmit={createPlan} className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="text-lg font-semibold text-slate-900">Registrar plano de ação</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="rounded border px-2 py-1 text-sm">Fechar</button>
@@ -288,14 +299,6 @@ export default function PlanosDeAcaoClient() {
             <div className="grid gap-4 p-5 md:grid-cols-2">
               <Field label="Título *"><input required value={form.titulo} onChange={(e) => setForm((prev) => ({ ...prev, titulo: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
               <Field label="Responsável"><input value={form.responsavelNome} onChange={(e) => setForm((prev) => ({ ...prev, responsavelNome: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Origem"><input value={form.origem} onChange={(e) => setForm((prev) => ({ ...prev, origem: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Referência"><input value={form.referencia} onChange={(e) => setForm((prev) => ({ ...prev, referencia: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Início previsto"><input type="date" value={form.dataInicioPrevista} onChange={(e) => setForm((prev) => ({ ...prev, dataInicioPrevista: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Fim previsto"><input type="date" value={form.dataFimPrevista} onChange={(e) => setForm((prev) => ({ ...prev, dataFimPrevista: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Investimento"><input type="number" step="0.01" value={form.investimento} onChange={(e) => setForm((prev) => ({ ...prev, investimento: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <div />
-              <Field label="Objetivo"><textarea value={form.objetivo} onChange={(e) => setForm((prev) => ({ ...prev, objetivo: e.target.value }))} className="app-input min-h-24 w-full resize-y" /></Field>
-              <Field label="Resultado esperado"><textarea value={form.resultadoEsperado} onChange={(e) => setForm((prev) => ({ ...prev, resultadoEsperado: e.target.value }))} className="app-input min-h-24 w-full resize-y" /></Field>
               {createError ? <p className="md:col-span-2 text-sm text-rose-700">{createError}</p> : null}
             </div>
             <div className="flex justify-end gap-2 border-t px-5 py-4">
