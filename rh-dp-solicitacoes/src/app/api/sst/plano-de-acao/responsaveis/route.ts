@@ -31,10 +31,11 @@ export async function GET() {
         id: true,
         fullName: true,
         email: true,
+        department: { select: { name: true } },
       },
     })
 
-    return NextResponse.json({ users })
+    return NextResponse.json({ users: users.map((user) => ({ ...user, department: user.department?.name ?? null })) })
   } catch (error) {
     console.error('GET /api/sst/plano-de-acao/responsaveis error', error)
     return NextResponse.json(
