@@ -27,13 +27,22 @@ type PlanRow = {
   centroImpactado?: { description: string } | null
 }
 
+type ResponsavelOption = {
+  id: string
+  fullName: string
+  email: string
+  department?: string | null
+}
+
 type PlanForm = {
   titulo: string
+  responsavelId: string
   responsavelNome: string
 }
 
 const emptyForm: PlanForm = {
   titulo: '',
+  responsavelId: '',
   responsavelNome: '',
 }
 
@@ -50,6 +59,22 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR')
 }
 
+function cleanPlanTitle(plan: PlanRow) {
+  const raw = plan.titulo || ''
+  const number = plan.numeroPlano || ''
+  if (number && raw.startsWith(`${number} - `)) {
+    return raw.slice(`${number} - `.length).trim()
+  }
+  if (number && raw.startsWith(`${number} – `)) {
+    return raw.slice(`${number} – `.length).trim()
+  }
+  return raw
+}
+
+function responsavelLabel(user: ResponsavelOption) {
+  return `${user.fullName} — ${user.email}`
+}
+
 export default function PlanosDeAcaoClient() {
   const router = useRouter()
   const [items, setItems] = useState<PlanRow[]>([])
@@ -59,6 +84,9 @@ export default function PlanosDeAcaoClient() {
   const [modalOpen, setModalOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<PlanForm>(emptyForm)
+  const [responsaveis, setResponsaveis] = useState<ResponsavelOption[]>([])
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false)
+  const [responsavelSearch, setResponsavelSearch] = useState('')
 
   const [numeroPlanoDraft, setNumeroPlanoDraft] = useState('')
   const [tituloDraft, setTituloDraft] = useState('')
@@ -121,6 +149,35 @@ export default function PlanosDeAcaoClient() {
     setEmAtraso(false)
   }
 
+  async function loadResponsaveis() {
+    try {
+      setLoadingResponsaveis(true)
+      const res = await fetch('/api/sst/planos-de-acao/responsaveis', { cache: 'no-store' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Erro ao carregar responsáveis.')
+      const users = Array.isArray(data.users) ? data.users : []
+      setResponsaveis(users)
+    } catch {
+      setResponsaveis([])
+    } finally {
+      setLoadingResponsaveis(false)
+    }
+  }
+
+  useEffect(() => {
+    if (modalOpen) loadResponsaveis()
+  }, [modalOpen])
+
+  function selectResponsavelByLabel(label: string) {
+    setResponsavelSearch(label)
+    const responsavel = responsaveis.find((user) => responsavelLabel(user) === label)
+    setForm((prev) => ({
+      ...prev,
+      responsavelId: responsavel?.id || '',
+      responsavelNome: responsavel?.fullName || '',
+    }))
+  }
+
   async function createPlan(e: FormEvent) {
     e.preventDefault()
     setCreateError(null)
@@ -132,6 +189,7 @@ export default function PlanosDeAcaoClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titulo: form.titulo,
+          responsavelId: form.responsavelId || null,
           responsavelNome: form.responsavelNome,
           status: 'ABERTO',
         }),
@@ -148,6 +206,7 @@ export default function PlanosDeAcaoClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           descricao: form.titulo,
+          responsavelId: form.responsavelId || null,
           responsavelNome: form.responsavelNome,
           origemPlano: 'PLANO_AVULSO',
           qualityActionPlanId: planId,
@@ -165,6 +224,7 @@ export default function PlanosDeAcaoClient() {
 
       setModalOpen(false)
       setForm(emptyForm)
+      setResponsavelSearch('')
       router.push(`/dashboard/sgi/qualidade/planos-de-acao/${planId}/acoes/${actionId}`)
     } catch (e: any) {
       setCreateError(e?.message || 'Erro ao registrar plano.')
@@ -258,7 +318,7 @@ export default function PlanosDeAcaoClient() {
             {rows.map((plan) => (
               <tr key={plan.id} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-semibold text-slate-900">{plan.numeroPlano}</td>
-                <td className="px-3 py-2 text-slate-700">{plan.titulo}</td>
+                <td className="px-3 py-2 text-slate-700">{cleanPlanTitle(plan)}</td>
                 <td className="px-3 py-2 text-slate-700">{plan.responsavelNome || '-'}</td>
                 <td className="px-3 py-2 text-slate-700">{plan.centroResponsavel?.description || '-'}</td>
                 <td className="px-3 py-2 text-slate-700">{plan.centroImpactado?.description || '-'}</td>
@@ -298,7 +358,21 @@ export default function PlanosDeAcaoClient() {
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-2">
               <Field label="Título *"><input required value={form.titulo} onChange={(e) => setForm((prev) => ({ ...prev, titulo: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
-              <Field label="Responsável"><input value={form.responsavelNome} onChange={(e) => setForm((prev) => ({ ...prev, responsavelNome: e.target.value }))} className="app-input min-h-10 w-full" /></Field>
+              <Field label="Responsável">
+                <input
+                  list="responsaveis-plano-avulso"
+                  value={responsavelSearch}
+                  onChange={(e) => selectResponsavelByLabel(e.target.value)}
+                  className="app-input min-h-10 w-full"
+                  placeholder={loadingResponsaveis ? 'Carregando responsáveis...' : 'Pesquise por nome ou e-mail'}
+                />
+                <datalist id="responsaveis-plano-avulso">
+                  {responsaveis.map((user) => (
+                    <option key={user.id} value={responsavelLabel(user)} />
+                  ))}
+                </datalist>
+                {!loadingResponsaveis && responsaveis.length === 0 ? <p className="mt-1 text-xs text-slate-500">Nenhum responsável encontrado.</p> : null}
+              </Field>
               {createError ? <p className="md:col-span-2 text-sm text-rose-700">{createError}</p> : null}
             </div>
             <div className="flex justify-end gap-2 border-t px-5 py-4">

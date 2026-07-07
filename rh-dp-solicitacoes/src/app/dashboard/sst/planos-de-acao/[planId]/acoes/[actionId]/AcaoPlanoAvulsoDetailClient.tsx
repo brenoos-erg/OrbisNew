@@ -7,6 +7,11 @@ import { useRouter } from 'next/navigation'
 import { actionStatusLabel } from '@/lib/sst/serializers'
 
 type CostCenter = { id: string; code: string; description: string }
+type ResponsavelOption = { id: string; fullName: string; email: string; department?: string | null }
+
+function responsavelLabel(user: ResponsavelOption) {
+  return `${user.fullName} — ${user.email}`
+}
 
 type DetailPayload = {
   action: {
@@ -27,6 +32,7 @@ type DetailPayload = {
     rapidez?: number | null
     autonomia?: number | null
     beneficio?: number | null
+    responsavelId?: string | null
     responsavelNome?: string | null
     prazo?: string | null
     status: NonConformityActionStatus
@@ -125,6 +131,7 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [costCenters, setCostCenters] = useState<CostCenter[]>([])
+  const [responsaveis, setResponsaveis] = useState<ResponsavelOption[]>([])
 
   const [descricao, setDescricao] = useState('')
   const [motivoBeneficio, setMotivoBeneficio] = useState('')
@@ -132,7 +139,9 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
   const [centroImpactadoId, setCentroImpactadoId] = useState('')
   const [centroImpactadoDescricao, setCentroImpactadoDescricao] = useState('')
   const [centroResponsavelId, setCentroResponsavelId] = useState('')
+  const [responsavelId, setResponsavelId] = useState('')
   const [responsavelNome, setResponsavelNome] = useState('')
+  const [responsavelSearch, setResponsavelSearch] = useState('')
   const [dataInicioPrevista, setDataInicioPrevista] = useState('')
   const [dataFimPrevista, setDataFimPrevista] = useState('')
   const [custo, setCusto] = useState('')
@@ -149,9 +158,10 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
   async function load() {
     try {
       setLoading(true)
-      const [res, centersRes] = await Promise.all([
+      const [res, centersRes, responsaveisRes] = await Promise.all([
         fetch(`/api/sst/planos-de-acao/${planId}/acoes/${actionId}`, { cache: 'no-store' }),
         fetch('/api/cost-centers/select', { cache: 'no-store' }),
+        fetch('/api/sst/planos-de-acao/responsaveis', { cache: 'no-store' }),
       ])
 
        const data = await res.json().catch(() => ({}))
@@ -160,6 +170,12 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
       if (centersRes.ok) {
         const centersData = await centersRes.json().catch(() => [])
         setCostCenters(Array.isArray(centersData) ? centersData : [])
+      }
+      if (responsaveisRes.ok) {
+        const responsaveisData = await responsaveisRes.json().catch(() => ({}))
+        setResponsaveis(Array.isArray(responsaveisData.users) ? responsaveisData.users : [])
+      } else {
+        setResponsaveis([])
       }
      const payload: DetailPayload = data.item
       setItem(payload)
@@ -171,7 +187,9 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
       setCentroImpactadoId(action.centroImpactadoId || '')
       setCentroImpactadoDescricao(action.centroImpactadoDescricao || '')
       setCentroResponsavelId(action.centroResponsavelId || '')
+      setResponsavelId(action.responsavelId || '')
       setResponsavelNome(action.responsavelNome || '')
+      setResponsavelSearch(action.responsavelId ? '' : (action.responsavelNome || ''))
       setDataInicioPrevista(toDateInput(action.dataInicioPrevista))
       setDataFimPrevista(toDateInput(action.dataFimPrevista))
       setCusto(action.custo !== null && action.custo !== undefined ? String(action.custo) : '')
@@ -198,6 +216,13 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
 
   const readOnly = useMemo(() => !item?.editable, [item?.editable])
 
+  function selectResponsavelByLabel(label: string) {
+    setResponsavelSearch(label)
+    const responsavel = responsaveis.find((user) => responsavelLabel(user) === label)
+    setResponsavelId(responsavel?.id || '')
+    setResponsavelNome(responsavel?.fullName || '')
+  }
+
   async function patchAction(partial: Record<string, unknown> = {}) {
     if (readOnly) return
 
@@ -214,6 +239,7 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
           centroImpactadoId: centroImpactadoId || null,
           centroImpactadoDescricao: centroImpactadoDescricao || null,
           centroResponsavelId: centroResponsavelId || null,
+          responsavelId: responsavelId || null,
           responsavelNome,
           dataInicioPrevista: dataInicioPrevista || null,
           dataFimPrevista: dataFimPrevista || null,
@@ -321,7 +347,26 @@ export default function AcaoPlanoAvulsoDetailClient({ planId, actionId }: { plan
                     </select>
                   </label>
                   <label className="block text-sm font-medium text-slate-700">Quem?
-                    <input value={responsavelNome} onChange={(e) => setResponsavelNome(e.target.value)} disabled={readOnly || saving} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" />
+                    {responsaveis.length > 0 ? (
+                      <>
+                        <input
+                          list="responsaveis-acao-plano-avulso"
+                          value={responsavelSearch || (responsavelId ? responsavelLabel(responsaveis.find((user) => user.id === responsavelId) || { id: responsavelId, fullName: responsavelNome, email: '' }) : responsavelNome)}
+                          onChange={(e) => selectResponsavelByLabel(e.target.value)}
+                          disabled={readOnly || saving}
+                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal"
+                          placeholder="Pesquise por nome ou e-mail"
+                        />
+                        <datalist id="responsaveis-acao-plano-avulso">
+                          {responsaveis.map((user) => (<option key={user.id} value={responsavelLabel(user)} />))}
+                        </datalist>
+                      </>
+                    ) : (
+                      <>
+                        <input value={responsavelNome} onChange={(e) => { setResponsavelId(''); setResponsavelNome(e.target.value) }} disabled={readOnly || saving} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal" />
+                        <p className="mt-1 text-xs text-slate-500">Nenhum responsável encontrado.</p>
+                      </>
+                    )}
                   </label>
                 </div>
 
