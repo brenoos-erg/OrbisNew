@@ -31,7 +31,7 @@ export default function SstModuleTabs({ active }: SstModuleTabsProps) {
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
           }`}
         >
-          Plano de ação (submódulo)
+          Planos de ação avulsos
         </Link>
       </div>
     </nav>

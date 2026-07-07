@@ -11,7 +11,7 @@ import { resolveAutomaticActionStatus } from '@/lib/sst/actionStatusAutomation'
 import { notifyActionItemUpdate } from '@/lib/sst/actionPlanNotifications'
 
 function canAccessAction(
-  action: { createdById: string | null; responsavelId: string | null; nonConformity?: { solicitanteId: string } | null },
+  action: { createdById: string | null; responsavelId: string | null; nonConformity?: { solicitanteId: string } | null; qualityActionPlanId?: string | null },
   userId: string,
   isLevel2OrMore: boolean,
 ) {
@@ -92,6 +92,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ act
     }
     if (action.nonConformityId) {
       return NextResponse.json({ error: 'Use a rota de não conformidades para ações vinculadas à NC.' }, { status: 400 })
+    }
+    if (action.qualityActionPlanId) {
+      return NextResponse.redirect(new URL(`/dashboard/sgi/qualidade/planos-de-acao/${action.qualityActionPlanId}`, _req.url))
     }
 
     return NextResponse.json({ item: action })

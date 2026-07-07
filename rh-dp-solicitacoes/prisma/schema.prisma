@@ -77,49 +77,51 @@ model Event {
 }
 
 model CostCenter {
-  id                         String                       @id @default(uuid())
-  createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime                     @updatedAt
-  abbreviation               String?
-  area                       String?
-  code                       String?
-  description                String
-  externalCode               String?                      @unique(map: "CostCenter_externalCode_uq")
-  managementType             String?
-  status                     CCStatus                     @default(ACTIVE)
-  groupName                  String?                      @map("group_name")
-  observations               String?
-  departmentId               String?
-  department                 Department?                  @relation(fields: [departmentId], references: [id])
-  modules                    CostCenterModule[]
-  solicitations              Solicitation[]
-  users                      User[]
-  userLinks                  UserCostCenter[]
-  vehicleCostCenters         VehicleCostCenter[]
-  displacementCheckins       VehicleDisplacementCheckin[]
-  tiEquipmentSnapshots       TiEquipment[]
-  nonConformitiesDetected    NonConformity[]              @relation("NonConformityDetectedCenter")
-  nonConformitiesOriginated  NonConformity[]              @relation("NonConformityOriginCenter")
-  ncActionsImpactCenter      NonConformityActionItem[]    @relation("NcActionImpactCenter")
-  ncActionsResponsibleCenter NonConformityActionItem[]    @relation("NcActionResponsibleCenter")
-  isoDocuments               IsoDocument[]
+  id                            String                       @id @default(uuid())
+  createdAt                     DateTime                     @default(now())
+  updatedAt                     DateTime                     @updatedAt
+  abbreviation                  String?
+  area                          String?
+  code                          String?
+  description                   String
+  externalCode                  String?                      @unique(map: "CostCenter_externalCode_uq")
+  managementType                String?
+  status                        CCStatus                     @default(ACTIVE)
+  groupName                     String?                      @map("group_name")
+  observations                  String?
+  departmentId                  String?
+  department                    Department?                  @relation(fields: [departmentId], references: [id])
+  modules                       CostCenterModule[]
+  solicitations                 Solicitation[]
+  users                         User[]
+  userLinks                     UserCostCenter[]
+  vehicleCostCenters            VehicleCostCenter[]
+  displacementCheckins          VehicleDisplacementCheckin[]
+  tiEquipmentSnapshots          TiEquipment[]
+  nonConformitiesDetected       NonConformity[]              @relation("NonConformityDetectedCenter")
+  nonConformitiesOriginated     NonConformity[]              @relation("NonConformityOriginCenter")
+  ncActionsImpactCenter         NonConformityActionItem[]    @relation("NcActionImpactCenter")
+  ncActionsResponsibleCenter    NonConformityActionItem[]    @relation("NcActionResponsibleCenter")
+  qualityActionPlansResponsible QualityActionPlan[]          @relation("QualityActionPlanResponsibleCenter")
+  qualityActionPlansImpact      QualityActionPlan[]          @relation("QualityActionPlanImpactCenter")
+  isoDocuments                  IsoDocument[]
 
   @@map("CostCenter")
 }
 
 model Position {
-  id                      String      @id @default(uuid())
-  name                    String      @unique
-  description             String?     @db.LongText
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  behavioralCompetencies  String?     @db.LongText
-  complementaryActivities String?     @db.LongText
-  course                  String?     @db.LongText
-  courseInProgress        String?     @db.LongText
+  id                      String             @id @default(uuid())
+  name                    String             @unique
+  description             String?            @db.LongText
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  behavioralCompetencies  String?            @db.LongText
+  complementaryActivities String?            @db.LongText
+  course                  String?            @db.LongText
+  courseInProgress        String?            @db.LongText
   departmentId            String?
-  enxoval                 String?     @db.LongText
-  experience              String?     @db.LongText
+  enxoval                 String?            @db.LongText
+  experience              String?            @db.LongText
   indexador               String?
   revision                String?
   documentDate            DateTime?
@@ -127,32 +129,32 @@ model Position {
   framing                 String?
   areaSector              String?
   cbo                     String?
-  summary                 String?     @db.LongText
-  detailedDescription     String?     @db.LongText
-  necessaryKnowledge      String?     @db.LongText
-  desiredKnowledge        String?     @db.LongText
-  humanCompetencies       String?     @db.LongText
-  functionalCompetencies  String?     @db.LongText
-  otherCompetencies       String?     @db.LongText
-  complexity              String?     @db.LongText
-  managementScope         String?     @db.LongText
-  confidentialDataAccess  String?     @db.LongText
-  responsibilities        String?     @db.LongText
-  active                  Boolean     @default(true)
+  summary                 String?            @db.LongText
+  detailedDescription     String?            @db.LongText
+  necessaryKnowledge      String?            @db.LongText
+  desiredKnowledge        String?            @db.LongText
+  humanCompetencies       String?            @db.LongText
+  functionalCompetencies  String?            @db.LongText
+  otherCompetencies       String?            @db.LongText
+  complexity              String?            @db.LongText
+  managementScope         String?            @db.LongText
+  confidentialDataAccess  String?            @db.LongText
+  responsibilities        String?            @db.LongText
+  active                  Boolean            @default(true)
   latestDocumentId        String?
-  mainActivities          String?     @db.LongText
-  others                  String?     @db.LongText
-  periodModule            String?     @db.LongText
-  requiredKnowledge       String?     @db.LongText
-  schooling               String?     @db.LongText
+  mainActivities          String?            @db.LongText
+  others                  String?            @db.LongText
+  periodModule            String?            @db.LongText
+  requiredKnowledge       String?            @db.LongText
+  schooling               String?            @db.LongText
   schoolingCompleted      String?
-  sectorProject           String?     @db.LongText
+  sectorProject           String?            @db.LongText
   site                    String?
-  uniform                 String?     @db.LongText
+  uniform                 String?            @db.LongText
   workPoint               String?
-  workSchedule            String?     @db.LongText
-  workplace               String?     @db.LongText
-  department              Department? @relation(fields: [departmentId], references: [id])
+  workSchedule            String?            @db.LongText
+  workplace               String?            @db.LongText
+  department              Department?        @relation(fields: [departmentId], references: [id])
   users                   User[]
   documents               PositionDocument[]
 
@@ -160,21 +162,21 @@ model Position {
 }
 
 model PositionDocument {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   positionId       String
   originalFilename String
   storedFilename   String
-  fileUrl          String   @db.Text
+  fileUrl          String    @db.Text
   mimeType         String?
   sizeBytes        Int?
   uploadedById     String
-  uploadedAt       DateTime @default(now())
-  parsedText       String?  @db.LongText
+  uploadedAt       DateTime  @default(now())
+  parsedText       String?   @db.LongText
   extractedJson    Json?
   indexador        String?
   revision         String?
   documentDate     DateTime?
-  isCurrent        Boolean  @default(true)
+  isCurrent        Boolean   @default(true)
 
   position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
   uploadedBy User     @relation(fields: [uploadedById], references: [id])
@@ -223,12 +225,12 @@ model TipoSolicitacaoApprover {
 }
 
 model Department {
-  id              String             @id @default(uuid())
+  id              String                     @id @default(uuid())
   name            String
-  sigla           String             @unique
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  code            String             @unique
+  sigla           String                     @unique
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  code            String                     @unique
   costCenters     CostCenter[]
   modules         DepartmentModule[]
   positions       Position[]
@@ -242,40 +244,40 @@ model Department {
 }
 
 model Solicitation {
-  id                               String                 @id @default(uuid())
+  id                               String                        @id @default(uuid())
   titulo                           String
   descricao                        String?
   tipoId                           String
   payload                          Json
-  createdAt                        DateTime               @default(now())
-  updatedAt                        DateTime               @updatedAt
+  createdAt                        DateTime                      @default(now())
+  updatedAt                        DateTime                      @updatedAt
   approvalAt                       DateTime?
   approvalComment                  String?
-  approvalStatus                   ApprovalStatus         @default(NAO_PRECISA)
+  approvalStatus                   ApprovalStatus                @default(NAO_PRECISA)
   approverId                       String?
   costCenterId                     String?
-  dataAbertura                     DateTime               @default(now())
+  dataAbertura                     DateTime                      @default(now())
   dataCancelamento                 DateTime?
   dataFechamento                   DateTime?
   dataPrevista                     DateTime?
   departmentId                     String
   prioridade                       SolicitationPriority?
-  protocolo                        String                 @unique
-  idempotencyKey                   String?                @unique
-  requiresApproval                 Boolean                @default(false)
+  protocolo                        String                        @unique
+  idempotencyKey                   String?                       @unique
+  requiresApproval                 Boolean                       @default(false)
   solicitanteId                    String
-  status                           SolicitationStatus     @default(ABERTA)
+  status                           SolicitationStatus            @default(ABERTA)
   parentId                         String?
-  vagaPrevista                     Boolean                @default(false)
+  vagaPrevista                     Boolean                       @default(false)
   assumidaPorId                    String?
   assumidaEm                       DateTime?
   cancelamentoStatus               String?
   cancelamentoSolicitadoPorId      String?
   cancelamentoSolicitadoEm         DateTime?
-  cancelamentoMotivo               String?                @db.Text
+  cancelamentoMotivo               String?                       @db.Text
   cancelamentoAnalisadoPorId       String?
   cancelamentoAnalisadoEm          DateTime?
-  cancelamentoJustificativaAnalise String?                @db.Text
+  cancelamentoJustificativaAnalise String?                       @db.Text
   cancelamentoOrigem               String?
   nonConformityId                  String?
   workflowSnapshotJson             Json?
@@ -284,19 +286,19 @@ model Solicitation {
   anexos                           Attachment[]
   comentarios                      Comment[]
   eventos                          Event[]
-  approver                         User?                  @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
-  assumidaPor                      User?                  @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
-  costCenter                       CostCenter?            @relation(fields: [costCenterId], references: [id])
-  department                       Department             @relation(fields: [departmentId], references: [id])
-  parent                           Solicitation?          @relation("SolicitationParent", fields: [parentId], references: [id])
-  children                         Solicitation[]         @relation("SolicitationParent")
-  solicitante                      User                   @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
-  tipo                             TipoSolicitacao        @relation(fields: [tipoId], references: [id])
+  approver                         User?                         @relation("SolicitationAprovador", fields: [approverId], references: [id], onUpdate: NoAction)
+  assumidaPor                      User?                         @relation("SolicitationAssumidaPor", fields: [assumidaPorId], references: [id], onUpdate: NoAction)
+  costCenter                       CostCenter?                   @relation(fields: [costCenterId], references: [id])
+  department                       Department                    @relation(fields: [departmentId], references: [id])
+  parent                           Solicitation?                 @relation("SolicitationParent", fields: [parentId], references: [id])
+  children                         Solicitation[]                @relation("SolicitationParent")
+  solicitante                      User                          @relation("SolicitationSolicitante", fields: [solicitanteId], references: [id])
+  tipo                             TipoSolicitacao               @relation(fields: [tipoId], references: [id])
   timelines                        SolicitationTimeline[]
   notificationLogs                 SolicitationNotificationLog[]
   solicitacaoSetores               SolicitacaoSetor[]
   documents                        Document[]
-  nonConformity                    NonConformity?         @relation(fields: [nonConformityId], references: [id])
+  nonConformity                    NonConformity?                @relation(fields: [nonConformityId], references: [id])
   searchIndex                      SolicitationSearchIndex?
 
   @@index([solicitanteId, dataAbertura])
@@ -439,6 +441,8 @@ model User {
   nonConformitiesAsEffectivenessApprover     NonConformity[]                @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
   nonConformityActionItemsCreated            NonConformityActionItem[]      @relation("NonConformityActionItemCreatedBy")
+  qualityActionPlansCreated                  QualityActionPlan[]            @relation("QualityActionPlanCreatedBy")
+  qualityActionPlansResponsible              QualityActionPlan[]            @relation("QualityActionPlanResponsible")
   nonConformityAttachments                   NonConformityAttachment[]
   nonConformityComments                      NonConformityComment[]
   nonConformityTimelineEvents                NonConformityTimeline[]
@@ -449,8 +453,8 @@ model User {
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
   auditLogs                                  AuditLog[]
-  permissionAuditLogsAsActor                 PermissionAuditLog[]             @relation("PermissionAuditActor")
-  permissionAuditLogsAsTarget                PermissionAuditLog[]             @relation("PermissionAuditTarget")
+  permissionAuditLogsAsActor                 PermissionAuditLog[]           @relation("PermissionAuditActor")
+  permissionAuditLogsAsTarget                PermissionAuditLog[]           @relation("PermissionAuditTarget")
   tipoSolicitacaoAuditLogs                   TipoSolicitacaoAuditLog[]
   solicitationWorkflowAuditLogs              SolicitationWorkflowAuditLog[]
   solicitationNotificationLogs               SolicitationNotificationLog[]
@@ -567,9 +571,9 @@ model DocumentVersion {
   nextReviewAt          DateTime?
   isCurrentPublished    Boolean                        @default(false)
   obsoleteAt            DateTime?
-  obsoleteReason        String?                         @db.LongText
+  obsoleteReason        String?                        @db.LongText
   obsoletedById         String?
-  operationalUseBlocked Boolean                         @default(false)
+  operationalUseBlocked Boolean                        @default(false)
   document              IsoDocument                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
   approvals             DocumentApproval[]
   attachments           DocumentAttachment[]
@@ -786,11 +790,11 @@ model ReadReceipt {
 }
 
 model PrintCopy {
-  id         String          @id @default(uuid())
-  documentId String
-  versionId  String
-  type       PrintCopyType
-  issuedById String
+  id           String          @id @default(uuid())
+  documentId   String
+  versionId    String
+  type         PrintCopyType
+  issuedById   String
   issuedAt     DateTime        @default(now())
   copyNumber   String          @unique
   validUntil   DateTime?
@@ -799,9 +803,9 @@ model PrintCopy {
   canceledAt   DateTime?
   canceledById String?
   cancelReason String?         @db.LongText
-  document   IsoDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  version    DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  issuedBy   User            @relation("IsoPrintCopyIssuedBy", fields: [issuedById], references: [id])
+  document     IsoDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  issuedBy     User            @relation("IsoPrintCopyIssuedBy", fields: [issuedById], references: [id])
 }
 
 model Module {
@@ -959,17 +963,17 @@ model UserCostCenter {
 }
 
 model SolicitationWorkflow {
-  id            String                          @id @default(uuid())
+  id            String                           @id @default(uuid())
   name          String
   tipoId        String
   departmentId  String?
-  active        Boolean                         @default(true)
-  createdAt     DateTime                        @default(now())
-  updatedAt     DateTime                        @default(now()) @updatedAt
+  active        Boolean                          @default(true)
+  createdAt     DateTime                         @default(now())
+  updatedAt     DateTime                         @default(now()) @updatedAt
   createdById   String?
   updatedById   String?
-  tipo          TipoSolicitacao                 @relation(fields: [tipoId], references: [id], onDelete: Cascade)
-  department    Department?                     @relation(fields: [departmentId], references: [id])
+  tipo          TipoSolicitacao                  @relation(fields: [tipoId], references: [id], onDelete: Cascade)
+  department    Department?                      @relation(fields: [departmentId], references: [id])
   steps         SolicitationWorkflowStep[]
   transitions   SolicitationWorkflowTransition[]
   auditLogs     SolicitationWorkflowAuditLog[]
@@ -1000,7 +1004,7 @@ model SolicitationWorkflowStep {
   posX                        Float?
   posY                        Float?
   workflow                    SolicitationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  defaultDepartment           Department?           @relation(fields: [defaultDepartmentId], references: [id])
+  defaultDepartment           Department?          @relation(fields: [defaultDepartmentId], references: [id])
 
   @@unique([workflowId, stepKey])
   @@index([workflowId, order])
@@ -1343,11 +1347,11 @@ model NonConformityAlertRecipient {
 }
 
 model NonConformity {
-  id                               String                      @id @default(cuid())
-  numeroRnc                        String                      @unique
+  id                               String                           @id @default(cuid())
+  numeroRnc                        String                           @unique
   tipoNc                           NonConformityType
-  evidenciaObjetiva                String                      @db.LongText
-  empresa                          String                      @default("ERG ENGENHARIA")
+  evidenciaObjetiva                String                           @db.LongText
+  empresa                          String                           @default("ERG ENGENHARIA")
   centroQueDetectouId              String
   centroQueOriginouId              String
   prazoAtendimento                 DateTime
@@ -1356,27 +1360,27 @@ model NonConformity {
   gravidade                        Int?
   urgencia                         Int?
   tendencia                        Int?
-  descricao                        String                      @db.LongText
+  descricao                        String                           @db.LongText
   aprovadoQualidadeEm              DateTime?
   aprovadoQualidadePorId           String?
-  aprovadoQualidadeStatus          NonConformityApprovalStatus @default(PENDENTE)
-  aprovadoQualidadeObservacao      String?                     @db.LongText
+  aprovadoQualidadeStatus          NonConformityApprovalStatus      @default(PENDENTE)
+  aprovadoQualidadeObservacao      String?                          @db.LongText
   solicitanteId                    String
   solicitanteNome                  String
   solicitanteEmail                 String
-  status                           NonConformityStatus         @default(ABERTA)
-  acoesImediatas                   String?                     @db.LongText
-  causaRaiz                        String?                     @db.LongText
-  verificacaoEficaciaTexto         String?                     @db.LongText
+  status                           NonConformityStatus              @default(ABERTA)
+  acoesImediatas                   String?                          @db.LongText
+  causaRaiz                        String?                          @db.LongText
+  verificacaoEficaciaTexto         String?                          @db.LongText
   verificacaoEficaciaData          DateTime?
   verificacaoEficaciaAprovadoPorId String?
-  createdAt                        DateTime                    @default(now())
-  updatedAt                        DateTime                    @updatedAt
-  centroQueDetectou                CostCenter                  @relation("NonConformityDetectedCenter", fields: [centroQueDetectouId], references: [id])
-  centroQueOriginou                CostCenter                  @relation("NonConformityOriginCenter", fields: [centroQueOriginouId], references: [id])
-  solicitante                      User                        @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
-  aprovadoQualidadePor             User?                       @relation("NonConformityQualityApprover", fields: [aprovadoQualidadePorId], references: [id])
-  verificacaoEficaciaAprovadoPor   User?                       @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
+  createdAt                        DateTime                         @default(now())
+  updatedAt                        DateTime                         @updatedAt
+  centroQueDetectou                CostCenter                       @relation("NonConformityDetectedCenter", fields: [centroQueDetectouId], references: [id])
+  centroQueOriginou                CostCenter                       @relation("NonConformityOriginCenter", fields: [centroQueOriginouId], references: [id])
+  solicitante                      User                             @relation("NonConformityRequester", fields: [solicitanteId], references: [id])
+  aprovadoQualidadePor             User?                            @relation("NonConformityQualityApprover", fields: [aprovadoQualidadePorId], references: [id])
+  verificacaoEficaciaAprovadoPor   User?                            @relation("NonConformityEffectivenessApprover", fields: [verificacaoEficaciaAprovadoPorId], references: [id])
   planoDeAcao                      NonConformityActionItem[]
   estudoCausa                      NonConformityCauseItem[]
   anexos                           NonConformityAttachment[]
@@ -1392,6 +1396,7 @@ model NonConformity {
 model NonConformityActionItem {
   id                       String                        @id @default(cuid())
   nonConformityId          String?
+  qualityActionPlanId      String?
   origemPlano              NonConformityActionPlanOrigin @default(NAO_CONFORMIDADE)
   createdById              String?
   descricao                String                        @db.LongText
@@ -1418,12 +1423,52 @@ model NonConformityActionItem {
   createdAt                DateTime                      @default(now())
   updatedAt                DateTime                      @updatedAt
   nonConformity            NonConformity?                @relation(fields: [nonConformityId], references: [id], onDelete: Cascade)
+  qualityActionPlan        QualityActionPlan?            @relation(fields: [qualityActionPlanId], references: [id], onDelete: Cascade)
   responsavel              User?                         @relation(fields: [responsavelId], references: [id])
   createdBy                User?                         @relation("NonConformityActionItemCreatedBy", fields: [createdById], references: [id])
   centroImpactado          CostCenter?                   @relation("NcActionImpactCenter", fields: [centroImpactadoId], references: [id])
   centroResponsavel        CostCenter?                   @relation("NcActionResponsibleCenter", fields: [centroResponsavelId], references: [id])
 
   @@index([nonConformityId, status])
+  @@index([qualityActionPlanId, status])
+}
+
+model QualityActionPlan {
+  id                  String                  @id @default(cuid())
+  numeroPlano         String                  @unique
+  titulo              String
+  objetivo            String?                 @db.LongText
+  resultadoEsperado   String?                 @db.LongText
+  origem              String?                 @db.VarChar(120)
+  referencia          String?                 @db.VarChar(120)
+  status              QualityActionPlanStatus @default(ABERTO)
+  createdById         String?
+  responsavelId       String?
+  responsavelNome     String?
+  centroResponsavelId String?
+  centroImpactadoId   String?
+  dataInicioPrevista  DateTime?
+  dataFimPrevista     DateTime?
+  dataConclusao       DateTime?
+  investimento        Decimal?                @db.Decimal(12, 2)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  createdBy         User?                     @relation("QualityActionPlanCreatedBy", fields: [createdById], references: [id])
+  responsavel       User?                     @relation("QualityActionPlanResponsible", fields: [responsavelId], references: [id])
+  centroResponsavel CostCenter?               @relation("QualityActionPlanResponsibleCenter", fields: [centroResponsavelId], references: [id])
+  centroImpactado   CostCenter?               @relation("QualityActionPlanImpactCenter", fields: [centroImpactadoId], references: [id])
+  actions           NonConformityActionItem[]
+
+  @@index([status, createdAt])
+  @@index([numeroPlano])
+}
+
+model QualityActionPlanSequence {
+  year      Int      @id
+  lastValue Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model NonConformityAttachment {
@@ -1619,6 +1664,13 @@ enum NonConformityType {
   OUTROS
   PROCESSOS
   NOTIFICACOES_CLIENTE
+}
+
+enum QualityActionPlanStatus {
+  ABERTO
+  EM_ANDAMENTO
+  CONCLUIDO
+  CANCELADO
 }
 
 enum NonConformityActionStatus {
