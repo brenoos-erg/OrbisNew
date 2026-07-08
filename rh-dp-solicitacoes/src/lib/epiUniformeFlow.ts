@@ -10,6 +10,27 @@ type EpiSolicitationLike = {
   department?: { code?: string | null; name?: string | null } | null
 }
 
+type WarehouseDepartmentLike = {
+  id: string
+  name: string
+  sigla?: string | null
+  code?: string | null
+}
+
+type WarehouseCostCenterLike = {
+  id: string
+  departmentId?: string | null
+}
+
+type WarehouseResolverClient = {
+  department: {
+    findFirst(args: unknown): Promise<WarehouseDepartmentLike | null>
+  }
+  costCenter?: {
+    findFirst(args: unknown): Promise<WarehouseCostCenterLike | null>
+  }
+}
+
 export function isEpiUniformeApprovalPending(solicitation?: EpiSolicitationLike | null) {
   return Boolean(
     solicitation &&
@@ -95,6 +116,61 @@ export function buildEpiUniformeForwardApprovalData(approverId: string) {
     approverId,
     status: 'AGUARDANDO_APROVACAO' as const,
   }
+}
+
+export function buildEpiUniformeForwardToWarehouseData({
+  warehouseDepartmentId,
+  warehouseCostCenterId,
+}: {
+  warehouseDepartmentId: string
+  warehouseCostCenterId?: string | null
+}) {
+  return {
+    departmentId: warehouseDepartmentId,
+    ...(warehouseCostCenterId ? { costCenterId: warehouseCostCenterId } : { costCenterId: null }),
+    status: 'ABERTA' as const,
+    requiresApproval: false,
+    approvalStatus: 'APROVADO' as const,
+    approverId: null,
+    assumidaPorId: null,
+    assumidaEm: null,
+  }
+}
+
+export async function resolveWarehouseDepartment(prismaClient: WarehouseResolverClient) {
+  return prismaClient.department.findFirst({
+    where: {
+      OR: [
+        { code: '12' },
+        { name: { contains: 'Almoxarifado' } },
+        { name: { contains: 'Estoque' } },
+        { sigla: { contains: 'ALMOX' } },
+        { sigla: { contains: 'ESTOQUE' } },
+      ],
+    },
+    select: { id: true, name: true, sigla: true, code: true },
+  })
+}
+
+export async function resolveWarehouseCostCenter(
+  prismaClient: WarehouseResolverClient,
+  warehouseDepartmentId: string,
+) {
+  if (!prismaClient.costCenter) return null
+  return prismaClient.costCenter.findFirst({
+    where: {
+      OR: [
+        { departmentId: warehouseDepartmentId },
+        { description: { contains: 'Almoxarifado' } },
+        { description: { contains: 'Estoque' } },
+        { abbreviation: { contains: 'ALMOX' } },
+        { abbreviation: { contains: 'ESTOQUE' } },
+        { code: { contains: 'ALMOX' } },
+        { code: { contains: 'ESTOQUE' } },
+      ],
+    },
+    select: { id: true, departmentId: true },
+  })
 }
 
 

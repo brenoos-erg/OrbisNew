@@ -12,6 +12,7 @@ import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotificati
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
+import { buildEpiUniformeForwardToWarehouseData, resolveWarehouseCostCenter, resolveWarehouseDepartment } from '@/lib/epiUniformeFlow'
 
 export async function POST(
   req: NextRequest,
@@ -128,6 +129,17 @@ export async function POST(
     const rhDepartmentId = rhDepartment?.id
     const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
+    const warehouseDepartment = isSolicitacaoEpi ? await resolveWarehouseDepartment(prisma) : null
+    const warehouseCostCenter = warehouseDepartment ? await resolveWarehouseCostCenter(prisma, warehouseDepartment.id) : null
+
+    if (isSolicitacaoEpi && !warehouseDepartment) {
+      return NextResponse.json(
+        {
+          error: 'Departamento de Almoxarifado não encontrado para encaminhar a solicitação de EPI aprovada.',
+        },
+        { status: 400 },
+      )
+    }
 
     if (isDesligamento && !dpDepartment) {
       return NextResponse.json(
@@ -166,12 +178,25 @@ export async function POST(
       }
     } else if (isVeiculos && logisticaDepartment) {
       updateData.departmentId = logisticaDepartment.id
+    } else if (isSolicitacaoEpi && warehouseDepartment) {
+      Object.assign(updateData, buildEpiUniformeForwardToWarehouseData({
+        warehouseDepartmentId: warehouseDepartment.id,
+        warehouseCostCenterId: warehouseCostCenter?.id ?? null,
+      }))
     }
 
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: updateData,
     })
+
+    if (isSolicitacaoEpi && warehouseDepartment) {
+      await prisma.solicitacaoSetor.upsert({
+        where: { solicitacaoId_setor: { solicitacaoId: solicitationId, setor: 'ALMOX' } },
+        update: { status: 'PENDENTE', finalizadoEm: null, finalizadoPor: null },
+        create: { solicitacaoId: solicitationId, setor: 'ALMOX', status: 'PENDENTE' },
+      })
+    }
 
       let timelineMessage: string
 
@@ -185,8 +210,8 @@ export async function POST(
       timelineMessage = `Solicitação aprovada pelo ${dpDepartment.name} e liberada para atendimento.`
     } else if (isVeiculos && logisticaDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para ${logisticaDepartment.name}.`
-    } else if (isSolicitacaoEpi) {
-      timelineMessage = `Solicitação de EPI aprovada e liberada para atendimento do SST.`
+    } else if (isSolicitacaoEpi && warehouseDepartment) {
+      timelineMessage = `Solicitação de EPI aprovada pelo SST e encaminhada para o Almoxarifado.`
     } else if (isSolicitacaoPessoalTipo && rhDepartment) {
       timelineMessage = `Solicitação aprovada e encaminhada para o departamento ${rhDepartment.name}.`
     } else {
