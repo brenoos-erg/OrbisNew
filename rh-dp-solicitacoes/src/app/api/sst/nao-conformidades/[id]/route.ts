@@ -9,7 +9,7 @@ import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature, canFeature, getUserModuleLevel } from '@/lib/permissions'
 import { canApproveNc, isApproved, shouldSetClosedAt } from '@/lib/sst/nonConformity'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
-import { canUserAccessNc, canUserTreatNc, getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { canUserAccessNc, canUserTreatNc, getUserSectorCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
 import { type NonConformityNotificationEvent } from '@/lib/sst/nonConformityAlertRules'
 import { canEditFirstScreen } from '@/lib/sst/nonConformityPermissions'
@@ -96,7 +96,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
    if (!nc) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
-     const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+     const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserSectorCostCenterIds(me.id)
     const canAccess = canUserAccessNc({
       userId: me.id,
       level,
@@ -162,7 +162,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     if (!current) return NextResponse.json({ error: 'Não conformidade não encontrada.' }, { status: 404 })
 
-    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserCostCenterIds(me.id)
+    const userCostCenterIds = hasMinLevel(level, ModuleLevel.NIVEL_2) ? [] : await getUserSectorCostCenterIds(me.id)
     const canTreat = canUserTreatNc({
       userId: me.id,
       level,

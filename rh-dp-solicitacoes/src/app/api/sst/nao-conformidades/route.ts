@@ -8,7 +8,7 @@ import { hasMinLevel, normalizeSstLevel } from '@/lib/sst/access'
 import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { assertCanFeature } from '@/lib/permissions'
 import { appendNonConformityTimelineEvent } from '@/lib/sst/nonConformityTimeline'
-import { getUserCostCenterIds } from '@/lib/sst/nonConformityAccess'
+import { getUserSectorCostCenterIds } from '@/lib/sst/nonConformityAccess'
 import { notifyNonConformityStakeholders } from '@/lib/sst/nonConformityNotifications'
 
 export const dynamic = 'force-dynamic'
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     const where: Prisma.NonConformityWhereInput = {}
     const userCostCenterIds = !hasMinLevel(level, ModuleLevel.NIVEL_2)
-      ? await getUserCostCenterIds(me.id)
+      ? await getUserSectorCostCenterIds(me.id)
       : []
 
     if (!hasMinLevel(level, ModuleLevel.NIVEL_2)) {
