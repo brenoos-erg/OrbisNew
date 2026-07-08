@@ -98,3 +98,65 @@ assert.deepStrictEqual(
 assert.equal(false && Boolean(buildEpiUniformeMoveToSstData('dep-19').departmentId), false, 'Sem --move-to-sst, o script apenas diagnostica e não muda departamento')
 
 console.log('epi-flow-behavior ok')
+
+const {
+  buildEpiUniformeForwardToWarehouseData,
+  resolveWarehouseDepartment,
+} = require('../src/lib/epiUniformeFlow')
+const warehouseContext = {
+  userId: 'thiago-id',
+  role: 'COLABORADOR',
+  departmentIds: ['dep-almox'],
+  tipoApproverTipoIds: [],
+  solicitationModuleLevel: 'NIVEL_1',
+}
+const nonWarehouseContext = { ...warehouseContext, userId: 'outro-id', departmentIds: ['dep-outro'] }
+const approvedBySst = { ...forwarded, approvalStatus: 'APROVADO', status: 'ABERTA', approverId: 'sst-id' }
+const routedToWarehouse = {
+  ...approvedBySst,
+  ...buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: 'dep-almox', warehouseCostCenterId: 'cc-almox' }),
+}
+assert.deepStrictEqual(
+  {
+    departmentId: routedToWarehouse.departmentId,
+    costCenterId: routedToWarehouse.costCenterId,
+    status: routedToWarehouse.status,
+    requiresApproval: routedToWarehouse.requiresApproval,
+    approvalStatus: routedToWarehouse.approvalStatus,
+    approverId: routedToWarehouse.approverId,
+    assumidaPorId: routedToWarehouse.assumidaPorId,
+    assumidaEm: routedToWarehouse.assumidaEm,
+  },
+  {
+    departmentId: 'dep-almox',
+    costCenterId: 'cc-almox',
+    status: 'ABERTA',
+    requiresApproval: false,
+    approvalStatus: 'APROVADO',
+    approverId: null,
+    assumidaPorId: null,
+    assumidaEm: null,
+  },
+  'RQ_043 aprovada pelo SST deve ser reaberta para atendimento do Almoxarifado',
+)
+assert.equal(canSeeReceivedByDepartment(routedToWarehouse, warehouseContext), true, 'Usuário do Almoxarifado vê RQ_043 aprovada em Recebidas')
+assert.equal(canSeeReceivedByDepartment(routedToWarehouse, nonWarehouseContext), false, 'Usuário fora do Almoxarifado não vê RQ_043 aprovada indevidamente')
+assert.equal(buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: 'dep-almox' }).costCenterId, null, 'Sem centro de custo de Almoxarifado, roteamento limpa costCenterId')
+assert.equal(buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: 'dep-almox' }).approvalStatus, 'APROVADO', 'Roteamento ao Almoxarifado só preserva EPI aprovada')
+
+const otherTipo = { id: 'RQ_999', codigo: 'RQ.999', nome: 'Outro tipo' }
+assert.equal(isEpiUniformeWaitingFicha({ ...epiWithoutFicha, tipo: otherTipo }), false, 'Outros tipos não entram na regra sem ficha de EPI')
+assert.equal(isEpiUniformeReadyToForwardApproval({ ...epiWithFicha, tipo: otherTipo }), false, 'Outros tipos não entram na regra com ficha de EPI')
+
+resolveWarehouseDepartment({
+  department: {
+    async findFirst(args) {
+      const text = JSON.stringify(args)
+      assert.match(text, /Almoxarifado/, 'Resolver deve procurar departamento por Almoxarifado')
+      assert.match(text, /Estoque/, 'Resolver deve procurar departamento por Estoque')
+      return { id: 'dep-almox', name: 'Almoxarifado', sigla: 'ALMOX', code: '20' }
+    },
+  },
+}).then((department) => {
+  assert.equal(department.id, 'dep-almox', 'Resolver retorna departamento de Almoxarifado sem hardcodar ID')
+})
