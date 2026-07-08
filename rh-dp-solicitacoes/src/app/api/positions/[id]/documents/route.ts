@@ -3,11 +3,17 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { Action } from '@prisma/client'
+import { canAccessRhPositions } from '@/lib/rhPositionsAccess'
 import { attachPreviewedPositionDocument, createPositionDocumentPreview } from '@/lib/positions/positionDocumentStorage'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function GET(_request: Request, { params }: Params) {
+  const me = await requireActiveUser()
+  if (!(await canAccessRhPositions(me, Action.VIEW))) {
+    return NextResponse.json({ error: 'Acesso restrito ao departamento de Recursos Humanos.' }, { status: 403 })
+  }
   const documents = await prisma.positionDocument.findMany({ where: { positionId: (await params).id }, orderBy: { uploadedAt: 'desc' }, select: { id: true, originalFilename: true, fileUrl: true, mimeType: true, sizeBytes: true, uploadedAt: true, indexador: true, revision: true, documentDate: true, isCurrent: true } })
   return NextResponse.json({ items: documents })
 }
@@ -15,7 +21,7 @@ export async function GET(_request: Request, { params }: Params) {
 export async function POST(request: Request, { params }: Params) {
   try {
     const me = await requireActiveUser()
-    if (!['ADMIN', 'RH'].includes(String(me.role))) return NextResponse.json({ error: 'Apenas RH ou administradores podem anexar documentos de cargo.' }, { status: 403 })
+    if (!(await canAccessRhPositions(me, Action.CREATE))) return NextResponse.json({ error: 'Somente usuários do RH podem anexar documentos de cargo.' }, { status: 403 })
     const positionId = (await params).id
     const form = await request.formData()
     const file = form.get('file')

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
-import { resolveWarehouseDepartment } from '@/lib/epiUniformeFlow'
+import { resolveEpiWarehouseDepartments } from '@/lib/epiUniformeFlow'
 import { buildReceivedWhereByPolicy, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
 
 function readArg(name: string) {
@@ -12,6 +12,7 @@ function readArg(name: string) {
 
 const protocols = (readArg('protocols') || readArg('protocol') || '').split(',').map((item) => item.trim()).filter(Boolean)
 const userEmail = readArg('user-email') || 'estoque@ergengenharia.com.br'
+const logisticsUserEmail = readArg('logistica-user-email') || 'anacr@ergengenharia.com.br'
 
 async function appearsInReceivedForUser(solicitationId: string, userEmailOrLogin: string) {
   const user = await prisma.user.findFirst({ where: { OR: [{ email: userEmailOrLogin }, { login: userEmailOrLogin }] }, include: { department: true } })
@@ -27,12 +28,15 @@ function possibleReason(solicitation: any, warehouseDepartmentId?: string | null
   if (solicitation.departmentId !== warehouseDepartmentId) return 'Solicitação aprovada permanece em outro departamento; precisa ser encaminhada ao Almoxarifado.'
   if (['CANCELADA', 'CONCLUIDA'].includes(String(solicitation.status))) return `status=${solicitation.status}; fora da fila de Recebidas.`
   if (solicitation.assumidaPorId) return `assumidaPorId=${solicitation.assumidaPorId}; já está assumida.`
-  return 'Roteamento parece correto; conferir vínculo/permissão do usuário ao departamento do Almoxarifado.'
+  return 'Roteamento parece correto; conferir vínculo/permissão do usuário ao grupo Almoxarifado/Logística.'
 }
 
 async function main() {
-  const warehouse = await resolveWarehouseDepartment(prisma)
+  const epiWarehouseDepartments = await resolveEpiWarehouseDepartments(prisma)
+  const warehouse = epiWarehouseDepartments.almoxarifado
+  const logistics = epiWarehouseDepartments.logistica
   console.log(`Almoxarifado resolvido: ${warehouse ? `${warehouse.id} | ${warehouse.code ?? '-'} | ${warehouse.sigla ?? '-'} | ${warehouse.name}` : 'não encontrado'}`)
+  console.log(`Logística resolvida: ${logistics ? `${logistics.id} | ${logistics.code ?? '-'} | ${logistics.sigla ?? '-'} | ${logistics.name}` : 'não encontrada'}`)
   const solicitations = await prisma.solicitation.findMany({
     where: { ...(protocols.length ? { protocolo: { in: protocols } } : { approvalStatus: 'APROVADO' }) },
     include: { tipo: true, department: { select: { id: true, code: true, name: true, sigla: true } }, costCenter: { select: { id: true, code: true, description: true, abbreviation: true } }, anexos: { select: { id: true, filename: true } }, solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } } },
@@ -43,6 +47,7 @@ async function main() {
   if (epiApproved.length === 0) console.log('Nenhuma RQ_043 aprovada encontrada para os filtros informados.')
   for (const solicitation of epiApproved) {
     const visibility = await appearsInReceivedForUser(solicitation.id, userEmail)
+    const logisticsVisibility = await appearsInReceivedForUser(solicitation.id, logisticsUserEmail)
     console.log(`\n${solicitation.protocolo}`)
     console.log(`  - status: ${solicitation.status}`)
     console.log(`  - approvalStatus: ${solicitation.approvalStatus}`)
@@ -52,7 +57,8 @@ async function main() {
     console.log(`  - tem ficha/anexo: ${solicitation.anexos.length > 0 ? 'sim' : 'não'}`)
     console.log('  - já foi aprovada: sim')
     console.log('  - deveria estar no Almoxarifado: sim')
-    console.log(`  - aparece em Recebidas para ${visibility.user?.fullName ?? userEmail}: ${visibility.appears ? 'sim' : 'não'}`)
+    console.log(`  - aparece em Recebidas para Almoxarifado (${visibility.user?.fullName ?? userEmail}): ${visibility.appears ? 'sim' : 'não'}`)
+    console.log(`  - aparece em Recebidas para Logística (${logisticsVisibility.user?.fullName ?? logisticsUserEmail}): ${logisticsVisibility.appears ? 'sim' : 'não'}`)
     console.log(`  - possível motivo de não aparecer para o Thiago/equipe: ${visibility.appears ? 'Sem bloqueio identificado na política de Recebidas.' : possibleReason(solicitation, warehouse?.id)}`)
   }
 }

@@ -25,6 +25,7 @@ type WarehouseCostCenterLike = {
 type WarehouseResolverClient = {
   department: {
     findFirst(args: unknown): Promise<WarehouseDepartmentLike | null>
+    findMany?(args: unknown): Promise<WarehouseDepartmentLike[]>
   }
   costCenter?: {
     findFirst(args: unknown): Promise<WarehouseCostCenterLike | null>
@@ -138,18 +139,52 @@ export function buildEpiUniformeForwardToWarehouseData({
 }
 
 export async function resolveWarehouseDepartment(prismaClient: WarehouseResolverClient) {
-  return prismaClient.department.findFirst({
-    where: {
-      OR: [
-        { code: '12' },
-        { name: { contains: 'Almoxarifado' } },
-        { name: { contains: 'Estoque' } },
-        { sigla: { contains: 'ALMOX' } },
-        { sigla: { contains: 'ESTOQUE' } },
-      ],
-    },
-    select: { id: true, name: true, sigla: true, code: true },
-  })
+  const departments = await resolveEpiWarehouseDepartments(prismaClient)
+  return departments.almoxarifado ?? null
+}
+
+export async function resolveEpiWarehouseDepartments(prismaClient: WarehouseResolverClient) {
+  const select = { id: true, name: true, sigla: true, code: true }
+  const where = {
+    OR: [
+      { code: '12' },
+      { sigla: { contains: 'ALMOX' } },
+      { name: { contains: 'Almoxarifado' } },
+      { name: { contains: 'Estoque' } },
+      { sigla: { contains: 'ESTOQUE' } },
+      { code: '11' },
+      { sigla: { contains: 'LOG' } },
+      { name: { contains: 'Logística' } },
+      { name: { contains: 'Logistica' } },
+    ],
+  }
+  const rows = prismaClient.department.findMany
+    ? await prismaClient.department.findMany({ where, select })
+    : (await Promise.all([
+        prismaClient.department.findFirst({ where: { OR: [{ code: '12' }, { sigla: { contains: 'ALMOX' } }, { name: { contains: 'Almoxarifado' } }, { name: { contains: 'Estoque' } }, { sigla: { contains: 'ESTOQUE' } }] }, select }),
+        prismaClient.department.findFirst({ where: { OR: [{ code: '11' }, { sigla: { contains: 'LOG' } }, { name: { contains: 'Logística' } }, { name: { contains: 'Logistica' } }] }, select }),
+      ])).filter((department): department is WarehouseDepartmentLike => Boolean(department))
+
+  const isAlmoxarifado = (department: WarehouseDepartmentLike) =>
+    department.code?.trim() === '12' ||
+    department.sigla?.toUpperCase().includes('ALMOX') ||
+    department.name.toUpperCase().includes('ALMOX') ||
+    department.name.toUpperCase().includes('ESTOQUE')
+  const isLogistica = (department: WarehouseDepartmentLike) =>
+    department.code?.trim() === '11' ||
+    department.sigla?.toUpperCase().includes('LOG') ||
+    department.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().includes('LOGISTICA')
+
+  const uniqueRows = Array.from(new Map(rows.map((department) => [department.id, department])).values())
+  return {
+    almoxarifado: uniqueRows.find(isAlmoxarifado) ?? null,
+    logistica: uniqueRows.find(isLogistica) ?? null,
+    all: uniqueRows.filter((department) => isAlmoxarifado(department) || isLogistica(department)),
+  }
+}
+
+export function getEpiWarehouseSetorKeys() {
+  return ['ALMOX', 'LOGISTICA'] as const
 }
 
 export async function resolveWarehouseCostCenter(

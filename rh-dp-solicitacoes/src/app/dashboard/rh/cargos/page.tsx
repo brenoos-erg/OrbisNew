@@ -16,7 +16,7 @@ type Cargo = {
 };
 
 function getCargoIndexador(cargo: Cargo) {
-  return cargo.indexador || cargo.latestDocument?.indexador || "—";
+  return cargo.indexador || cargo.latestDocument?.indexador || '—';
 }
 
 function StatusBadge({ active }: { active?: boolean }) {
@@ -44,6 +44,7 @@ export default function CargosPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   async function loadCargos() {
     setLoading(true);
@@ -51,12 +52,19 @@ export default function CargosPage() {
       ? `/api/positions?q=${encodeURIComponent(search)}&includeInactive=true`
       : `/api/positions?includeInactive=true`;
     const res = await fetch(url);
+    if (res.status === 403) {
+      setAccessDenied(true);
+      setCargos([]);
+      setLoading(false);
+      return;
+    }
     if (!res.ok) {
       console.error("Erro ao carregar cargos");
       setCargos([]);
       setLoading(false);
       return;
     }
+    setAccessDenied(false);
     const json = await res.json();
     setCargos(Array.isArray(json) ? json : (json.items ?? []));
     setLoading(false);
@@ -97,6 +105,24 @@ export default function CargosPage() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  if (accessDenied) {
+    return (
+      <main className="space-y-6 p-6">
+        <section className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-wide text-orange-600">
+            RH • Cargos
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+            Controle de cargos
+          </h1>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+            Esta tela é exclusiva do departamento de Recursos Humanos.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   return (

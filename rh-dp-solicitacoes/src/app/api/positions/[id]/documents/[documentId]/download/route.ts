@@ -5,23 +5,17 @@ import fs from 'node:fs/promises'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveUser } from '@/lib/auth'
+import { Action } from '@prisma/client'
+import { canAccessRhPositions } from '@/lib/rhPositionsAccess'
 
 type Params = { params: Promise<{ id: string; documentId: string }> }
-
-function canDownloadPositionDocument(user: Awaited<ReturnType<typeof requireActiveUser>>) {
-  return (
-    user.role === 'ADMIN' ||
-    user.role === 'RH' ||
-    user.moduleLevels?.configuracoes === 'NIVEL_3'
-  )
-}
 
 export async function GET(_request: Request, { params }: Params) {
   try {
     const me = await requireActiveUser()
-    if (!canDownloadPositionDocument(me)) {
+    if (!(await canAccessRhPositions(me, Action.VIEW))) {
       return NextResponse.json(
-        { error: 'Apenas RH, administradores ou usuários de Configurações nível 3 podem baixar documentos de cargo.' },
+        { error: 'Acesso restrito ao departamento de Recursos Humanos.' },
         { status: 403 },
       )
     }

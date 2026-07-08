@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { buildEpiUniformeForwardToWarehouseData, resolveWarehouseCostCenter, resolveWarehouseDepartment } from '@/lib/epiUniformeFlow'
+import { buildEpiUniformeForwardToWarehouseData, getEpiWarehouseSetorKeys, resolveEpiWarehouseDepartments, resolveWarehouseCostCenter } from '@/lib/epiUniformeFlow'
 import { isSolicitacaoEpiUniforme } from '@/lib/solicitationTypes'
 
 const apply = process.argv.includes('--apply')
@@ -13,7 +13,8 @@ const protocols = (readArg('protocols') || readArg('protocol') || '').split(',')
 
 async function main() {
   if (protocols.length === 0) throw new Error('Informe --protocol ou --protocols. Correção em massa não é permitida.')
-  const warehouse = await resolveWarehouseDepartment(prisma)
+  const epiWarehouseDepartments = await resolveEpiWarehouseDepartments(prisma)
+  const warehouse = epiWarehouseDepartments.almoxarifado
   if (!warehouse) throw new Error('Departamento de Almoxarifado/Estoque não encontrado.')
   const warehouseCostCenter = await resolveWarehouseCostCenter(prisma, warehouse.id)
   const solicitations = await prisma.solicitation.findMany({ where: { protocolo: { in: protocols } }, include: { tipo: true, department: { select: { code: true, name: true } } } })
@@ -23,8 +24,8 @@ async function main() {
     console.log(`${apply ? 'Corrigindo' : 'Simularia corrigir'} ${solicitation.protocolo}: ${solicitation.department?.code ?? '-'} / ${solicitation.department?.name ?? '-'} -> ${warehouse.code ?? '-'} / ${warehouse.name}`)
     if (!apply) continue
     await prisma.solicitation.update({ where: { id: solicitation.id }, data: buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: warehouse.id, warehouseCostCenterId: warehouseCostCenter?.id ?? null }) })
-    await prisma.solicitacaoSetor.upsert({ where: { solicitacaoId_setor: { solicitacaoId: solicitation.id, setor: 'ALMOX' } }, update: { status: 'PENDENTE', finalizadoEm: null, finalizadoPor: null }, create: { solicitacaoId: solicitation.id, setor: 'ALMOX', status: 'PENDENTE' } })
-    await prisma.solicitationTimeline.create({ data: { solicitationId: solicitation.id, status: 'AGUARDANDO_ATENDIMENTO', message: 'Correção técnica: solicitação de EPI aprovada pelo SST encaminhada para o Almoxarifado.' } })
+    for (const setor of getEpiWarehouseSetorKeys()) { await prisma.solicitacaoSetor.upsert({ where: { solicitacaoId_setor: { solicitacaoId: solicitation.id, setor } }, update: { status: 'PENDENTE', finalizadoEm: null, finalizadoPor: null }, create: { solicitacaoId: solicitation.id, setor, status: 'PENDENTE' } }) }
+    await prisma.solicitationTimeline.create({ data: { solicitationId: solicitation.id, status: 'AGUARDANDO_ATENDIMENTO', message: 'Correção técnica: solicitação de EPI aprovada pelo SST encaminhada para Almoxarifado/Logística.' } })
   }
 }
 

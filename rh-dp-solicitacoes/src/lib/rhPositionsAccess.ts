@@ -1,19 +1,18 @@
 import { Action } from '@prisma/client'
-import { canFeature } from '@/lib/permissions'
-import { FEATURE_KEYS, MODULE_KEYS } from '@/lib/featureKeys'
 import { userHasRhAccess } from '@/lib/rhAccess'
 
 export async function canAccessRhPositions(
   user: { id: string; role?: string | null; departmentId?: string | null },
   action: Action = Action.VIEW,
 ) {
-  if (user.role === 'ADMIN') return true
+  void action
+  return userHasRhAccess(user)
+}
 
-  const [hasRhFeature, hasLegacyFeature, hasRhAccess] = await Promise.all([
-    canFeature(user.id, MODULE_KEYS.RH, FEATURE_KEYS.RH.CARGOS, action),
-    canFeature(user.id, MODULE_KEYS.CONFIGURACOES, FEATURE_KEYS.CONFIGURACOES.CARGOS, action),
-    userHasRhAccess(user),
-  ])
-
-  return hasRhFeature || hasLegacyFeature || hasRhAccess
+export async function assertCanAccessRhPositions(
+  user: { id: string; role?: string | null; departmentId?: string | null },
+) {
+  if (!(await canAccessRhPositions(user))) {
+    throw new Error('Acesso restrito ao departamento de Recursos Humanos.')
+  }
 }
