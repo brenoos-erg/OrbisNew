@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: Params) {
   try {
     const user = await requireActiveUser()
     if (!(await canAccessRhPositions(user, Action.VIEW))) {
-      return NextResponse.json({ error: 'Sem permissão para visualizar cargos.' }, { status: 403 })
+      return NextResponse.json({ error: 'Acesso restrito ao departamento de Recursos Humanos.' }, { status: 403 })
     }
 
     const id = (await params).id
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
   try {
     const user = await requireActiveUser()
     if (!(await canAccessRhPositions(user, Action.UPDATE))) {
-      return NextResponse.json({ error: 'Sem permissão para atualizar cargos.' }, { status: 403 })
+      return NextResponse.json({ error: 'Somente usuários do RH podem editar cargos.' }, { status: 403 })
     }
 
     const id = (await params).id
@@ -84,7 +84,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   try {
     const user = await requireActiveUser()
     if (!(await canAccessRhPositions(user, Action.DELETE))) {
-      return NextResponse.json({ error: 'Sem permissão para excluir cargos.' }, { status: 403 })
+      return NextResponse.json({ error: 'Somente usuários do RH podem excluir cargos.' }, { status: 403 })
     }
 
     const id = (await params).id

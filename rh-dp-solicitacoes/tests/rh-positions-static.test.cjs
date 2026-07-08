@@ -30,17 +30,19 @@ assert.match(positionFields, /code !== 'P2000'/, 'P2000 helper should detect Pri
 const api = read('src/app/api/positions/route.ts')
 assert.match(api, /Nome do cargo é obrigatório\./, 'POST must validate name')
 assert.match(api, /getPrismaP2000Message\(error\)/, 'POST must handle P2000')
-assert.match(api, /await requireActiveUser\(\)/, 'GET /api/positions must require an authenticated user')
+assert.match(api, /const user = await requireActiveUser\(\)/, 'GET /api/positions must require an authenticated user')
+assert.match(api, /canAccessRhPositions\(user, Action\.VIEW\)/, 'GET /api/positions must require RH VIEW access')
+assert.match(api, /Acesso restrito ao departamento de Recursos Humanos\./, 'GET forbidden message must be RH restricted')
 assert.match(api, /canAccessRhPositions\(user, Action\.CREATE\)/, 'POST /api/positions must require CREATE permission')
-assert.match(api, /Sem permissão para criar cargos\./, 'POST forbidden message must be clear')
+assert.match(api, /Somente usuários do RH podem criar cargos\./, 'POST forbidden message must be RH restricted')
 assert.match(positionFields, /Já existe um cargo cadastrado com este nome\./, 'P2002 duplicate name must return a clear message')
 
 const apiId = read('src/app/api/positions/[id]/route.ts')
 assert.match(apiId, /canAccessRhPositions\(user, Action\.VIEW\)/, 'GET /api/positions/[id] must require VIEW permission')
 assert.match(apiId, /canAccessRhPositions\(user, Action\.UPDATE\)/, 'PATCH /api/positions/[id] must require UPDATE permission')
 assert.match(apiId, /canAccessRhPositions\(user, Action\.DELETE\)/, 'DELETE /api/positions/[id] must require DELETE permission')
-assert.match(apiId, /Sem permissão para atualizar cargos\./, 'PATCH forbidden message must be clear')
-assert.match(apiId, /Sem permissão para excluir cargos\./, 'DELETE forbidden message must be clear')
+assert.match(apiId, /Somente usuários do RH podem editar cargos\./, 'PATCH forbidden message must be RH restricted')
+assert.match(apiId, /Somente usuários do RH podem excluir cargos\./, 'DELETE forbidden message must be RH restricted')
 
 const sidebar = read('src/components/layout/Sidebar.tsx')
 assert.match(sidebar, /RH/, 'Sidebar must render RH group')
@@ -53,10 +55,10 @@ assert.match(read('src/app/dashboard/configuracoes/cargos/page.tsx'), /redirect\
 assert.match(read('src/app/dashboard/configuracoes/cargos/novo/page.tsx'), /redirect\('\/dashboard\/rh\/cargos\/novo'\)/)
 
 const access = read('src/lib/rhPositionsAccess.ts')
-assert.match(access, /role === 'ADMIN'/, 'ADMIN must access RH positions')
-assert.match(access, /FEATURE_KEYS\.RH\.CARGOS/, 'RH.CARGOS permission must access RH positions')
-assert.match(access, /FEATURE_KEYS\.CONFIGURACOES\.CARGOS/, 'legacy CONFIGURACOES.CARGOS permission must access RH positions')
-assert.match(access, /userHasRhAccess/, 'RH access fallback must be preserved')
+assert.doesNotMatch(access, /role === 'ADMIN'/, 'ADMIN must not access RH positions automatically')
+assert.doesNotMatch(access, /FEATURE_KEYS\.RH\.CARGOS/, 'RH.CARGOS permission must not access RH positions automatically')
+assert.doesNotMatch(access, /FEATURE_KEYS\.CONFIGURACOES\.CARGOS/, 'legacy CONFIGURACOES.CARGOS permission must not access RH positions automatically')
+assert.match(access, /return userHasRhAccess\(user\)/, 'RH positions access must use RH department access as the central rule')
 
 
 const cargosList = read('src/app/dashboard/rh/cargos/page.tsx')

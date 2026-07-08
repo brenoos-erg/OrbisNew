@@ -2,13 +2,15 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { requireActiveUser } from '@/lib/auth'
+import { Action } from '@prisma/client'
+import { canAccessRhPositions } from '@/lib/rhPositionsAccess'
 import { createPositionDocumentPreview } from '@/lib/positions/positionDocumentStorage'
 
 export async function POST(request: Request) {
   try {
     const me = await requireActiveUser()
-    if (!['ADMIN', 'RH'].includes(String(me.role))) {
-      return NextResponse.json({ error: 'Apenas RH ou administradores podem importar documentos de cargo.' }, { status: 403 })
+    if (!(await canAccessRhPositions(me, Action.CREATE))) {
+      return NextResponse.json({ error: 'Somente usuários do RH podem importar documentos de cargo.' }, { status: 403 })
     }
 
     const form = await request.formData()

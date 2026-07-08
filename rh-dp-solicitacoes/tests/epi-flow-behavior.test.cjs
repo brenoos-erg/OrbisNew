@@ -1,3 +1,6 @@
+process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'commonjs', moduleResolution: 'node' })
+require('ts-node/register')
+require('tsconfig-paths/register')
 const assert = require('node:assert')
 const {
   buildEpiUniformeForwardApprovalData,
@@ -101,6 +104,8 @@ console.log('epi-flow-behavior ok')
 
 const {
   buildEpiUniformeForwardToWarehouseData,
+  getEpiWarehouseSetorKeys,
+  resolveEpiWarehouseDepartments,
   resolveWarehouseDepartment,
 } = require('../src/lib/epiUniformeFlow')
 const warehouseContext = {
@@ -110,7 +115,8 @@ const warehouseContext = {
   tipoApproverTipoIds: [],
   solicitationModuleLevel: 'NIVEL_1',
 }
-const nonWarehouseContext = { ...warehouseContext, userId: 'outro-id', departmentIds: ['dep-outro'] }
+const logisticsContext = { ...warehouseContext, userId: 'ana-id', departmentIds: ['dep-log'], userSetorKeys: ['LOGISTICA'] }
+const nonWarehouseContext = { ...warehouseContext, userId: 'outro-id', departmentIds: ['dep-outro'], userSetorKeys: [] }
 const approvedBySst = { ...forwarded, approvalStatus: 'APROVADO', status: 'ABERTA', approverId: 'sst-id' }
 const routedToWarehouse = {
   ...approvedBySst,
@@ -140,7 +146,10 @@ assert.deepStrictEqual(
   'RQ_043 aprovada pelo SST deve ser reaberta para atendimento do Almoxarifado',
 )
 assert.equal(canSeeReceivedByDepartment(routedToWarehouse, warehouseContext), true, 'Usuário do Almoxarifado vê RQ_043 aprovada em Recebidas')
-assert.equal(canSeeReceivedByDepartment(routedToWarehouse, nonWarehouseContext), false, 'Usuário fora do Almoxarifado não vê RQ_043 aprovada indevidamente')
+assert.equal(getEpiWarehouseSetorKeys().includes('ALMOX'), true, 'RQ_043 aprovada deve criar vínculo setorial com Almoxarifado')
+assert.equal(getEpiWarehouseSetorKeys().includes('LOGISTICA'), true, 'RQ_043 aprovada deve criar vínculo setorial com Logística')
+assert.equal(logisticsContext.userSetorKeys.includes('LOGISTICA'), true, 'Usuário da Logística vê RQ_043 por solicitacaoSetores LOGISTICA')
+assert.equal(canSeeReceivedByDepartment(routedToWarehouse, nonWarehouseContext), false, 'Usuário fora de Almoxarifado/Logística não vê RQ_043 aprovada indevidamente')
 assert.equal(buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: 'dep-almox' }).costCenterId, null, 'Sem centro de custo de Almoxarifado, roteamento limpa costCenterId')
 assert.equal(buildEpiUniformeForwardToWarehouseData({ warehouseDepartmentId: 'dep-almox' }).approvalStatus, 'APROVADO', 'Roteamento ao Almoxarifado só preserva EPI aprovada')
 
@@ -150,13 +159,35 @@ assert.equal(isEpiUniformeReadyToForwardApproval({ ...epiWithFicha, tipo: otherT
 
 resolveWarehouseDepartment({
   department: {
-    async findFirst(args) {
+    async findFirst() { return null },
+    async findMany(args) {
       const text = JSON.stringify(args)
       assert.match(text, /Almoxarifado/, 'Resolver deve procurar departamento por Almoxarifado')
       assert.match(text, /Estoque/, 'Resolver deve procurar departamento por Estoque')
-      return { id: 'dep-almox', name: 'Almoxarifado', sigla: 'ALMOX', code: '20' }
+      return [{ id: 'dep-almox', name: 'Almoxarifado', sigla: 'ALMOX', code: '20' }]
     },
   },
 }).then((department) => {
   assert.equal(department.id, 'dep-almox', 'Resolver retorna departamento de Almoxarifado sem hardcodar ID')
+})
+
+resolveEpiWarehouseDepartments({
+  department: {
+    async findFirst() { return null },
+    async findMany(args) {
+      const text = JSON.stringify(args)
+      assert.match(text, /code":"12/, 'Resolver operacional deve procurar Almoxarifado por código 12')
+      assert.match(text, /ALMOX/, 'Resolver operacional deve procurar Almoxarifado por sigla')
+      assert.match(text, /code":"11/, 'Resolver operacional deve procurar Logística por código 11')
+      assert.match(text, /Logística|Logistica/, 'Resolver operacional deve procurar Logística por nome')
+      return [
+        { id: 'dep-almox', name: 'Almoxarifado', sigla: 'ALMOX', code: '12' },
+        { id: 'dep-log', name: 'Logística', sigla: 'LOG', code: '11' },
+      ]
+    },
+  },
+}).then((departments) => {
+  assert.equal(departments.almoxarifado.id, 'dep-almox', 'Resolver retorna Almoxarifado')
+  assert.equal(departments.logistica.id, 'dep-log', 'Resolver retorna Logística')
+  assert.deepStrictEqual(departments.all.map((department) => department.id).sort(), ['dep-almox', 'dep-log'], 'Resolver retorna ambos os departamentos operacionais')
 })

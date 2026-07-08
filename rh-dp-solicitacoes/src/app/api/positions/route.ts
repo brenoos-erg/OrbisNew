@@ -20,7 +20,13 @@ import { canAccessRhPositions } from "@/lib/rhPositionsAccess";
 export async function GET(req: Request) {
   return withRequestMetrics("GET /api/positions", async () => {
     try {
-      await requireActiveUser();
+      const user = await requireActiveUser();
+      if (!(await canAccessRhPositions(user, Action.VIEW))) {
+        return NextResponse.json(
+          { error: "Acesso restrito ao departamento de Recursos Humanos." },
+          { status: 403 },
+        );
+      }
       const url = new URL(req.url);
       const includeInactive =
         url.searchParams.get("includeInactive") === "true";
@@ -74,7 +80,7 @@ export async function POST(request: Request) {
     const user = await requireActiveUser();
     if (!(await canAccessRhPositions(user, Action.CREATE))) {
       return NextResponse.json(
-        { error: "Sem permissão para criar cargos." },
+        { error: "Somente usuários do RH podem criar cargos." },
         { status: 403 },
       );
     }

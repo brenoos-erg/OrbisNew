@@ -12,7 +12,7 @@ import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotificati
 import { resolveTipoApproverIds } from '@/lib/solicitationTipoApprovers'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 import { getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
-import { buildEpiUniformeForwardToWarehouseData, resolveWarehouseCostCenter, resolveWarehouseDepartment } from '@/lib/epiUniformeFlow'
+import { buildEpiUniformeForwardToWarehouseData, getEpiWarehouseSetorKeys, resolveEpiWarehouseDepartments, resolveWarehouseCostCenter } from '@/lib/epiUniformeFlow'
 
 export async function POST(
   req: NextRequest,
@@ -129,7 +129,8 @@ export async function POST(
     const rhDepartmentId = rhDepartment?.id
     const dpDepartment = await prisma.department.findUnique({ where: { code: '08' }, select: { id: true, name: true } })
     const logisticaDepartment = await prisma.department.findUnique({ where: { code: '11' }, select: { id: true, name: true } })
-    const warehouseDepartment = isSolicitacaoEpi ? await resolveWarehouseDepartment(prisma) : null
+    const epiWarehouseDepartments = isSolicitacaoEpi ? await resolveEpiWarehouseDepartments(prisma) : null
+    const warehouseDepartment = epiWarehouseDepartments?.almoxarifado ?? null
     const warehouseCostCenter = warehouseDepartment ? await resolveWarehouseCostCenter(prisma, warehouseDepartment.id) : null
 
     if (isSolicitacaoEpi && !warehouseDepartment) {
@@ -191,11 +192,13 @@ export async function POST(
     })
 
     if (isSolicitacaoEpi && warehouseDepartment) {
-      await prisma.solicitacaoSetor.upsert({
-        where: { solicitacaoId_setor: { solicitacaoId: solicitationId, setor: 'ALMOX' } },
-        update: { status: 'PENDENTE', finalizadoEm: null, finalizadoPor: null },
-        create: { solicitacaoId: solicitationId, setor: 'ALMOX', status: 'PENDENTE' },
-      })
+      for (const setor of getEpiWarehouseSetorKeys()) {
+        await prisma.solicitacaoSetor.upsert({
+          where: { solicitacaoId_setor: { solicitacaoId: solicitationId, setor } },
+          update: { status: 'PENDENTE', finalizadoEm: null, finalizadoPor: null },
+          create: { solicitacaoId: solicitationId, setor, status: 'PENDENTE' },
+        })
+      }
     }
 
       let timelineMessage: string
