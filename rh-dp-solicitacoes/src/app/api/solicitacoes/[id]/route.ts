@@ -1,16 +1,29 @@
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // src/app/api/solicitacoes/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import crypto from 'crypto'
-import { requireActiveUser } from '@/lib/auth'
-import { getUserModuleLevel } from '@/lib/access'
-import { ModuleLevel } from '@prisma/client'
-import { buildSolicitationVisibilityContext } from '@/lib/solicitationAccessPolicy'
-import { canUserViewSolicitationByFallback } from '@/lib/solicitationVisibility'
-import { normalizeStoredAttachmentUrl } from '@/lib/files/attachmentStorage'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
+import { requireActiveUser } from "@/lib/auth";
+import { getUserModuleLevel } from "@/lib/access";
+import { ModuleLevel } from "@prisma/client";
+import {
+  buildSolicitationVisibilityContext,
+  resolveUserAccessContext,
+  isViewerOnlyByPolicy,
+  canAssumeSolicitation,
+  canApproveSolicitation,
+  canEditSolicitation,
+  canFinalizeSolicitation,
+  canCancelSolicitation,
+  canManageCancellationRequest,
+  canCommentSolicitation,
+  canFinalizeNadaConstaGlobal,
+  canPrintExperienceEvaluationPdf,
+} from "@/lib/solicitationAccessPolicy";
+import { canUserViewSolicitationByFallback } from "@/lib/solicitationVisibility";
+import { normalizeStoredAttachmentUrl } from "@/lib/files/attachmentStorage";
 
 /**
  * GET /api/solicitacoes/[id]
@@ -21,7 +34,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const me = await requireActiveUser()
+    const me = await requireActiveUser();
     const item = await prisma.solicitation.findUnique({
       where: { id: (await params).id },
       include: {
@@ -34,18 +47,18 @@ export async function GET(
               select: { id: true, fullName: true, email: true },
             },
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
         },
-         // anexos buscados separadamente (abaixo)
+        // anexos buscados separadamente (abaixo)
         parent: true,
         eventos: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
         },
         timelines: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
         },
         solicitacaoSetores: {
-          orderBy: { setor: 'asc' },
+          orderBy: { setor: "asc" },
         },
         // 👇 filhos vinculados
         children: {
@@ -53,58 +66,88 @@ export async function GET(
             tipo: { select: { nome: true } },
             department: { select: { name: true } },
           },
-          orderBy: { dataAbertura: 'asc' },
+          orderBy: { dataAbertura: "asc" },
         },
       },
-    })
+    });
 
     if (!item) {
       return NextResponse.json(
-        { error: 'Solicitação não encontrada.' },
+        { error: "Solicitação não encontrada." },
         { status: 404 },
-      )
+      );
     }
 
-    const visibilityContext = await buildSolicitationVisibilityContext(me)
+    const visibilityContext = await buildSolicitationVisibilityContext(me);
     const visibility = canUserViewSolicitationByFallback(
       visibilityContext,
       item,
-    )
+    );
 
     if (!visibility.canView) {
       return NextResponse.json(
-        { error: 'Você não possui acesso a esta solicitação.' },
+        { error: "Você não possui acesso a esta solicitação." },
         { status: 403 },
-      )
+      );
     }
 
-    const attachmentIds = [item.id, item.parentId].filter(Boolean) as string[]
+    const attachmentIds = [item.id, item.parentId].filter(Boolean) as string[];
     const allAttachments = await prisma.attachment.findMany({
       where: { solicitationId: { in: attachmentIds } },
-      orderBy: { createdAt: 'asc' },
-    })
+      orderBy: { createdAt: "asc" },
+    });
 
     // Junta anexos da própria solicitação e, se houver, da solicitação de origem
-    const seenUrls = new Set<string>()
+    const seenUrls = new Set<string>();
     const dedupedAttachments = allAttachments.filter((a) => {
-      const already = seenUrls.has(a.url)
+      const already = seenUrls.has(a.url);
       if (!already) {
-        seenUrls.add(a.url)
+        seenUrls.add(a.url);
       }
-      return !already
-    })
+      return !already;
+    });
 
-    const canApproveByRule = item.requiresApproval === true && item.approvalStatus === 'PENDENTE' && (
-      me.role === 'ADMIN' ||
-      item.approverId === me.id ||
-      Boolean(item.tipoId && visibilityContext.tipoApproverTipoIds?.includes(item.tipoId)) ||
-      (visibilityContext.solicitationModuleLevel === ModuleLevel.NIVEL_3 &&
-        Boolean(item.departmentId && visibilityContext.departmentIds?.includes(item.departmentId)))
-    )
+    const canApproveByRule =
+      item.requiresApproval === true &&
+      item.approvalStatus === "PENDENTE" &&
+      (me.role === "ADMIN" ||
+        item.approverId === me.id ||
+        Boolean(
+          item.tipoId &&
+          visibilityContext.tipoApproverTipoIds?.includes(item.tipoId),
+        ) ||
+        (visibilityContext.solicitationModuleLevel === ModuleLevel.NIVEL_3 &&
+          Boolean(
+            item.departmentId &&
+            visibilityContext.departmentIds?.includes(item.departmentId),
+          )));
+
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    });
+
+    const accessSolicitation = {
+      tipoId: item.tipoId,
+      tipo: item.tipo,
+      status: item.status,
+      solicitanteId: item.solicitanteId,
+      approverId: item.approverId,
+      assumidaPorId: item.assumidaPorId,
+      departmentId: item.departmentId,
+      costCenterId: item.costCenterId,
+      solicitacaoSetores: item.solicitacaoSetores,
+      payload: item.payload,
+    };
 
     // Mapeia para o formato que o front espera
     const result = {
-   id: item.id,
+      id: item.id,
       protocolo: item.protocolo,
       titulo: item.titulo,
       descricao: item.descricao,
@@ -116,7 +159,27 @@ export async function GET(
       solicitanteId: item.solicitanteId,
       departmentId: item.departmentId,
       costCenterId: item.costCenterId,
-      canApprove: canApproveByRule,
+      viewerOnly: isViewerOnlyByPolicy(userAccess, accessSolicitation),
+      canAssume: canAssumeSolicitation(userAccess, accessSolicitation),
+      canApprove:
+        canApproveByRule ||
+        canApproveSolicitation(userAccess, accessSolicitation),
+      canEdit: canEditSolicitation(userAccess, accessSolicitation),
+      canFinalize: canFinalizeSolicitation(userAccess, accessSolicitation),
+      canCancel: canCancelSolicitation(userAccess, accessSolicitation),
+      canManageCancellationRequest: canManageCancellationRequest(
+        userAccess,
+        accessSolicitation,
+      ),
+      canComment: canCommentSolicitation(userAccess, accessSolicitation),
+      canFinalizeNadaConstaGlobal: canFinalizeNadaConstaGlobal(
+        userAccess,
+        accessSolicitation,
+      ),
+      canPrintExperienceEvaluationPdf: canPrintExperienceEvaluationPdf(
+        userAccess,
+        accessSolicitation,
+      ),
 
       dataAbertura: item.dataAbertura?.toISOString(),
       dataPrevista: item.dataPrevista?.toISOString() ?? null,
@@ -137,7 +200,7 @@ export async function GET(
             externalCode: item.costCenter.externalCode,
           }
         : null,
-        department: item.department
+      department: item.department
         ? {
             id: item.department.id,
             name: item.department.name,
@@ -198,15 +261,15 @@ export async function GET(
         tipo: child.tipo ? { nome: child.tipo.nome } : null,
         setorDestino: (child as any).department?.name ?? null,
       })),
-    }
+    };
 
-    return NextResponse.json(result)
+    return NextResponse.json(result);
   } catch (e) {
-    console.error('❌ GET /api/solicitacoes/[id] error:', e)
+    console.error("❌ GET /api/solicitacoes/[id] error:", e);
     return NextResponse.json(
-      { error: 'Erro interno ao buscar solicitação.' },
+      { error: "Erro interno ao buscar solicitação." },
       { status: 500 },
-    )
+    );
   }
 }
 
@@ -223,45 +286,45 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const me = await requireActiveUser() // usuário logado
-    const { id: solicitationId } = await params
+    const me = await requireActiveUser(); // usuário logado
+    const { id: solicitationId } = await params;
 
-    const body = await req.json().catch(() => ({}))
-    const comment: string | undefined = body.comment
+    const body = await req.json().catch(() => ({}));
+    const comment: string | undefined = body.comment;
 
     if (!comment || !comment.trim()) {
       return NextResponse.json(
-        { error: 'Motivo é obrigatório.' },
+        { error: "Motivo é obrigatório." },
         { status: 400 },
-      )
+      );
     }
 
     // 1) Buscar solicitação
     const solicitation = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
-    })
+    });
 
     if (!solicitation) {
       return NextResponse.json(
-        { error: 'Solicitação não encontrada.' },
+        { error: "Solicitação não encontrada." },
         { status: 404 },
-      )
+      );
     }
 
     // Só aprova/reprova se estiver pendente de aprovação
     if (
       !solicitation.requiresApproval ||
-      solicitation.approvalStatus !== 'PENDENTE'
+      solicitation.approvalStatus !== "PENDENTE"
     ) {
       return NextResponse.json(
-        { error: 'Solicitação não está pendente de aprovação.' },
+        { error: "Solicitação não está pendente de aprovação." },
         { status: 400 },
-      )
+      );
     }
 
     // Se tiver aprovador definido, só ele pode reprovar — exceto nível 3
-    const moduleLevel = await getUserModuleLevel(me.id, 'solicitacoes')
-    const isNivel3 = moduleLevel === ModuleLevel.NIVEL_3
+    const moduleLevel = await getUserModuleLevel(me.id, "solicitacoes");
+    const isNivel3 = moduleLevel === ModuleLevel.NIVEL_3;
 
     if (
       solicitation.approverId &&
@@ -269,31 +332,31 @@ export async function PATCH(
       !isNivel3
     ) {
       return NextResponse.json(
-        { error: 'Você não é o aprovador desta solicitação.' },
+        { error: "Você não é o aprovador desta solicitação." },
         { status: 403 },
-      )
+      );
     }
 
     // 2) Atualizar como REPROVADO / CANCELADA
     const updated = await prisma.solicitation.update({
       where: { id: solicitationId },
       data: {
-        approvalStatus: 'REPROVADO',
+        approvalStatus: "REPROVADO",
         approvalAt: new Date(),
         approvalComment: comment,
         requiresApproval: false,
-        status: 'CANCELADA',
+        status: "CANCELADA",
       },
-    })
+    });
 
     // 3) Timeline
     await prisma.solicitationTimeline.create({
       data: {
         solicitationId,
-        status: 'REPROVADO',
+        status: "REPROVADO",
         message: `Reprovado por ${me.fullName ?? me.id}: ${comment}`,
       },
-    })
+    });
 
     // 4) Evento
     await prisma.event.create({
@@ -301,16 +364,16 @@ export async function PATCH(
         id: crypto.randomUUID(),
         solicitationId,
         actorId: me.id,
-        tipo: 'REPROVACAO',
+        tipo: "REPROVACAO",
       },
-    })
+    });
 
-    return NextResponse.json(updated)
+    return NextResponse.json(updated);
   } catch (e) {
-    console.error('❌ PATCH /api/solicitacoes/[id] (reprovar) error:', e)
+    console.error("❌ PATCH /api/solicitacoes/[id] (reprovar) error:", e);
     return NextResponse.json(
-      { error: 'Erro ao reprovar a solicitação.' },
+      { error: "Erro ao reprovar a solicitação." },
       { status: 500 },
-    )
+    );
   }
 }
