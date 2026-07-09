@@ -176,7 +176,7 @@ assert(
     modal.includes("method: 'DELETE'"),
   "modal deve usar DELETE /api/positions/[id]",
 );
-assert(modal.includes("sticky bottom-0"), "modal deve ter rodapé sticky");
+assert(modal.includes("shrink-0 flex items-center justify-between gap-3 border-t"), "modal deve ter rodapé fixo no flex");
 for (const section of [
   "Identificação do documento",
   "Dados do cargo",

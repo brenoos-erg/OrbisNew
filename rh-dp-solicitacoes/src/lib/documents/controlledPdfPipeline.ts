@@ -45,6 +45,48 @@ export type BuildControlledPdfResult = {
   access: DocumentAccessResolved
 }
 
+
+type ControlledPdfFailureStage =
+  | 'FILE_NOT_FOUND'
+  | 'SOURCE_READ_FAILED'
+  | 'CONVERSION_FAILED'
+  | 'INTERMEDIATE_PDF_INVALID'
+  | 'WATERMARK_FAILED'
+  | 'HEADER_FAILED'
+  | 'FINAL_PDF_INVALID'
+  | 'UNSUPPORTED_SOURCE'
+
+export class ControlledPdfPipelineError extends Error {
+  code: ControlledPdfFailureStage
+  details?: Record<string, unknown>
+  cause?: unknown
+
+  constructor(code: ControlledPdfFailureStage, message: string, details?: Record<string, unknown>, cause?: unknown) {
+    super(message)
+    this.name = 'ControlledPdfPipelineError'
+    this.code = code
+    this.details = details
+    this.cause = cause
+  }
+}
+
+function logAndThrowControlledPdfError(
+  code: ControlledPdfFailureStage,
+  message: string,
+  details: Record<string, unknown>,
+  cause?: unknown,
+): never {
+  console.error('[documents.controlled-pdf] stage-failed', {
+    stage: code,
+    ...details,
+    errorName: cause instanceof Error ? cause.name : undefined,
+    errorMessage: cause instanceof Error ? cause.message : cause ? String(cause) : undefined,
+    errorCode: (cause as NodeJS.ErrnoException | undefined)?.code,
+    stack: cause instanceof Error ? cause.stack : undefined,
+  })
+  throw new ControlledPdfPipelineError(code, message, details, cause)
+}
+
 type BuildControlledPdfDeps = {
   resolveAccess: typeof resolveDocumentVersionAccess
   readSourceFile: (absolutePath: string) => Promise<Buffer>
@@ -112,13 +154,28 @@ export async function buildControlledPdfWithDeps(
   })
 
   if (!pathResolution.exists) {
-    const error = new Error(`Arquivo físico do documento não encontrado para ${normalizedFileUrl}`)
-    ;(error as NodeJS.ErrnoException).code = 'ENOENT'
-    throw error
+    logAndThrowControlledPdfError('FILE_NOT_FOUND', `Arquivo físico do documento não encontrado para ${normalizedFileUrl}`, {
+      versionId,
+      intent,
+      fileUrl: access.fileUrl,
+      resolvedFileUrl: pathResolution.resolvedFileUrl,
+      absolutePath: pathResolution.absolutePath,
+      attemptedAbsolutePaths: pathResolution.attemptedAbsolutePaths,
+    })
   }
 
   const absolutePath = pathResolution.absolutePath
-  const sourceBuffer = await deps.readSourceFile(absolutePath)
+  let sourceBuffer: Buffer
+  try {
+    sourceBuffer = await deps.readSourceFile(absolutePath)
+  } catch (error) {
+    logAndThrowControlledPdfError('SOURCE_READ_FAILED', `Falha ao ler arquivo físico do documento para ${normalizedFileUrl}`, {
+      versionId,
+      intent,
+      fileUrl: access.fileUrl,
+      absolutePath,
+    }, error)
+  }
   const originalFileName = path.basename(normalizedFileUrl)
   const sourceType = deps.detectFileType(access.fileUrl)
   const bufferLooksLikePdf = deps.detectPdfBuffer(sourceBuffer)
@@ -170,10 +227,21 @@ export async function buildControlledPdfWithDeps(
       sourceExtension: sourceType.extension,
     })
 
-    const converted = await deps.convertToPdf({
-      fileUrl: access.fileUrl,
-      sourceAbsolutePath: absolutePath,
-    })
+    let converted
+    try {
+      converted = await deps.convertToPdf({
+        fileUrl: access.fileUrl,
+        sourceAbsolutePath: absolutePath,
+      })
+    } catch (error) {
+      logAndThrowControlledPdfError('CONVERSION_FAILED', 'Falha ao converter documento para PDF.', {
+        versionId,
+        intent,
+        fileUrl: access.fileUrl,
+        absolutePath,
+        sourceExtension: sourceType.extension,
+      }, error)
+    }
 
     pdfSourceBuffer = converted.pdfBuffer
     outputFileName = converted.outputFileName
@@ -195,7 +263,12 @@ export async function buildControlledPdfWithDeps(
       extension: sourceType.extension,
       mimeType: sourceType.mimeType,
     })
-    throw new Error(`Formato ${sourceType.extension || 'desconhecido'} não suportado para saída final em PDF.`)
+    logAndThrowControlledPdfError('UNSUPPORTED_SOURCE', `Formato ${sourceType.extension || 'desconhecido'} não suportado para saída final em PDF.`, {
+      versionId,
+      intent,
+      extension: sourceType.extension,
+      mimeType: sourceType.mimeType,
+    })
   }
 
   const convertedValidation = deps.validatePdf(pdfSourceBuffer)
@@ -205,7 +278,11 @@ export async function buildControlledPdfWithDeps(
       intent,
       reason: convertedValidation.reason,
     })
-    throw new Error(`O PDF intermediário está inválido: ${convertedValidation.reason}`)
+    logAndThrowControlledPdfError('INTERMEDIATE_PDF_INVALID', `O PDF intermediário está inválido: ${convertedValidation.reason}`, {
+      versionId,
+      intent,
+      reason: convertedValidation.reason,
+    })
   }
 
   let finalPdfBuffer: Buffer = Buffer.from(pdfSourceBuffer)
@@ -213,11 +290,25 @@ export async function buildControlledPdfWithDeps(
   const headerLine = buildHeaderLine(access)
 
   if (!watermarkApplied) {
-    finalPdfBuffer = deps.applyWatermark(pdfSourceBuffer)
-    watermarkApplied = true
+    try {
+      finalPdfBuffer = deps.applyWatermark(pdfSourceBuffer)
+      watermarkApplied = true
+    } catch (error) {
+      logAndThrowControlledPdfError('WATERMARK_FAILED', 'Falha ao aplicar marca d\'água no PDF final.', {
+        versionId,
+        intent,
+      }, error)
+    }
   }
 
-  finalPdfBuffer = deps.applyHeader(finalPdfBuffer, headerLine)
+  try {
+    finalPdfBuffer = deps.applyHeader(finalPdfBuffer, headerLine)
+  } catch (error) {
+    logAndThrowControlledPdfError('HEADER_FAILED', 'Falha ao aplicar cabeçalho no PDF final.', {
+      versionId,
+      intent,
+    }, error)
+  }
 
   console.info('[documents.controlled-pdf] watermark-step-complete', {
     versionId,
@@ -232,7 +323,11 @@ export async function buildControlledPdfWithDeps(
       intent,
       reason: finalValidation.reason,
     })
-    throw new Error(`O PDF final com marca d'água ficou inválido: ${finalValidation.reason}`)
+    logAndThrowControlledPdfError('FINAL_PDF_INVALID', `O PDF final com marca d'água ficou inválido: ${finalValidation.reason}`, {
+      versionId,
+      intent,
+      reason: finalValidation.reason,
+    })
   }
 
   console.info('[documents.controlled-pdf] final-pdf-validated', {

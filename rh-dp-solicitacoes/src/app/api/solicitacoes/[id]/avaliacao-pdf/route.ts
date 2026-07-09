@@ -9,6 +9,7 @@ import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
   hasExperienceEvaluationPrintableData,
   normalizeExperienceEvaluationPayload,
+  resolveExperienceEvaluationAssignedEvaluator,
 } from '@/lib/experienceEvaluation'
 import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import {
@@ -28,6 +29,15 @@ function escapeHtml(input: unknown) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
+}
+
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim())
+}
+
+function shouldResolveEvaluatorName(value: string) {
+  const normalized = value.trim()
+  return !normalized || normalized === '-' || looksLikeUuid(normalized)
 }
 
 function toPdfDisplayValue(input: unknown) {
@@ -114,6 +124,27 @@ export async function GET(
     console.log('Gerando PDF de avaliação de experiência', { protocolo: solicitation.protocolo, status: solicitation.status, userId: me.id })
 
     const evaluation = normalizeExperienceEvaluationPayload(solicitation.payload, solicitation)
+    if (shouldResolveEvaluatorName(evaluation.gestorImediatoAvaliador)) {
+      const assigned = resolveExperienceEvaluationAssignedEvaluator(solicitation.payload)
+      const evaluatorFilters = [
+        assigned.id ? { id: assigned.id } : null,
+        assigned.login ? { login: assigned.login } : null,
+        assigned.email ? { email: assigned.email } : null,
+        assigned.fullName ? { fullName: assigned.fullName } : null,
+      ].filter(Boolean) as Array<{ id: string } | { login: string } | { email: string } | { fullName: string }>
+      const evaluatorUser = evaluatorFilters.length > 0
+        ? await prisma.user.findFirst({
+            where: { OR: evaluatorFilters },
+            select: { fullName: true, email: true, login: true },
+          })
+        : null
+      evaluation.gestorImediatoAvaliador =
+        evaluatorUser?.fullName ||
+        assigned.fullName ||
+        evaluatorUser?.email ||
+        evaluatorUser?.login ||
+        evaluation.gestorImediatoAvaliador
+    }
 
     const baseRows: Array<[string, string]> = [
       ['Colaborador avaliado', evaluation.colaboradorAvaliado],

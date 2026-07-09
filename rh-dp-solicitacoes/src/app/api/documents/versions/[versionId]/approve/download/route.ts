@@ -31,7 +31,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
 
     return NextResponse.json({ url: result.downloadUrl })
   } catch (error) {
-    console.error('Falha ao preparar download de aprovação via pipeline central.', { versionId, error })
-    return NextResponse.json({ error: 'Não foi possível preparar o PDF final para download.' }, { status: 422 })
+    const err = error as (Error & { code?: unknown }) | undefined
+    console.error('[documents.approve-download] failed to prepare final pdf', {
+      versionId,
+      userId: me.id,
+      errorName: err?.name,
+      errorMessage: err?.message,
+      errorCode: err?.code,
+      stack: err?.stack,
+    })
+    return NextResponse.json(
+      {
+        error: 'Não foi possível preparar o PDF final do documento.',
+        code: 'DOCUMENT_FINAL_PDF_PREPARE_FAILED',
+      },
+      { status: 422 },
+    )
   }
 }
