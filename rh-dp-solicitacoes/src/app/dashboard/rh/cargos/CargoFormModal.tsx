@@ -273,9 +273,9 @@ export function CargoFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-[var(--card)] shadow-xl">
-        <div className="flex items-center justify-between border-b p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="flex h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-[var(--card)] shadow-xl">
+        <div className="shrink-0 flex items-center justify-between border-b p-6">
           <h3 className="text-lg font-semibold">
             {readOnly ? 'Exibir cargo' : isEdit ? 'Editar cargo' : 'Novo cargo'}
           </h3>
@@ -287,7 +287,7 @@ export function CargoFormModal({
           </button>
         </div>
 
-        <fieldset disabled={disabled} className="overflow-y-auto p-6 disabled:opacity-100">
+        <fieldset disabled={disabled} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 disabled:opacity-100">
         <section className={SECTION}>
           <h4 className={SECTION_TITLE}>Identificação do documento</h4>
         <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 text-sm text-slate-800">
@@ -590,7 +590,7 @@ export function CargoFormModal({
         </div>
         </fieldset>
 
-        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-[var(--card)] p-4">
+        <div className="shrink-0 flex items-center justify-between gap-3 border-t bg-[var(--card)] p-4">
           <div>
             {!readOnly && row?.id && (
               <button

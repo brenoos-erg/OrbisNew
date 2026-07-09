@@ -60,6 +60,28 @@ assert.equal(missingNormalized.comentarioFinal, '-', 'comentário final ausente 
 assert.equal(hasExperienceEvaluationPrintableData(missingFieldsPayload), true, 'campos faltantes não bloqueiam quando há ao menos uma nota')
 assert.equal(hasExperienceEvaluationPrintableData({ campos: { colaboradorAvaliado: 'Sem avaliação' } }), false, 'sem dados de avaliação deve retornar mensagem clara')
 
+
+assert.equal(
+  normalizeExperienceEvaluationPayload({ campos: { gestorImediatoAvaliador: 'Maria Gestora' } }).gestorImediatoAvaliador,
+  'Maria Gestora',
+  'payload antigo com gestor em string deve preservar o nome',
+)
+assert.equal(
+  normalizeExperienceEvaluationPayload({ campos: { gestorImediatoAvaliador: { id: 'user-1', fullName: 'Maria Gestora' } } }).gestorImediatoAvaliador,
+  'Maria Gestora',
+  'payload com gestor em objeto deve exibir fullName',
+)
+assert.equal(
+  normalizeExperienceEvaluationPayload({ campos: { gestorImediatoAvaliador: { value: 'user-1', label: 'Maria Gestora' } } }).gestorImediatoAvaliador,
+  'Maria Gestora',
+  'payload com gestor label/value deve exibir label',
+)
+assert.notEqual(
+  normalizeExperienceEvaluationPayload({ campos: { gestorImediatoAvaliador: { id: 'user-1', fullName: 'Maria Gestora' } } }).gestorImediatoAvaliador,
+  '[object Object]',
+  'PDF não deve renderizar [object Object] para gestor',
+)
+
 const newPayload = {
   formData: {
     colaboradorAvaliado: 'Payload novo',
@@ -117,6 +139,8 @@ assert.equal(canPrintExperienceEvaluationPdf({ ...baseCtx, role: 'ADMIN' }, canc
 const pdfRoute = fs.readFileSync('src/app/api/solicitacoes/[id]/avaliacao-pdf/route.ts', 'utf8')
 const detailModal = fs.readFileSync('src/components/solicitacoes/SolicitationDetailModal.tsx', 'utf8')
 assert.match(pdfRoute, /normalizeExperienceEvaluationPayload\(solicitation\.payload,\s*solicitation\)/, 'rota PDF deve usar a normalização compartilhada')
+assert.match(pdfRoute, /resolveExperienceEvaluationAssignedEvaluator\(solicitation\.payload\)/, 'rota PDF deve tentar resolver o avaliador atribuído quando só houver identificador')
+assert.match(pdfRoute, /prisma\.user\.findFirst/, 'rota PDF deve consultar o usuário do avaliador quando possível')
 assert.match(pdfRoute, /question\.description/, 'rota PDF deve renderizar descrições das competências')
 assert.match(pdfRoute, /<strong>Nota:<\/strong>/, 'rota PDF deve renderizar as notas das competências')
 assert.match(pdfRoute, /A avaliação ainda não possui dados suficientes para impressão\./, 'rota PDF deve retornar mensagem clara quando sem avaliação')

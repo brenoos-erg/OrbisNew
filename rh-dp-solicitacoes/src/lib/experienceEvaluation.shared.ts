@@ -45,6 +45,20 @@ function readDisplayString(value: unknown): string {
   if (typeof value === 'string') return value.trim()
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return value.map(readDisplayString).filter(Boolean).join(', ')
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return (
+      readDisplayString(record.fullName) ||
+      readDisplayString(record.name) ||
+      readDisplayString(record.nome) ||
+      readDisplayString(record.label) ||
+      readDisplayString(record.displayName) ||
+      readDisplayString(record.text) ||
+      readDisplayString(record.email) ||
+      readDisplayString(record.login) ||
+      readDisplayString(record.id)
+    )
+  }
   return ''
 }
 
