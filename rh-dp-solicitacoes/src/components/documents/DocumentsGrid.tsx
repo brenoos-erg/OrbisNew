@@ -201,7 +201,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     if (format) params.set('format', format)
 
     Object.entries(appliedFilters).forEach(([key, value]) => {
-      if (value) params.set(key, value)
+      const trimmedValue = String(value ?? '').trim()
+      if (trimmedValue) params.set(key, trimmedValue)
     })
 
     return params.toString()
@@ -569,7 +570,14 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
   const onSearch = () => {
     setPage(1)
-    setAppliedFilters({ ...draftFilters, status: fixedStatus ?? draftFilters.status })
+    setAppliedFilters({
+      code: draftFilters.code.trim(),
+      title: draftFilters.title.trim(),
+      documentTypeId: draftFilters.documentTypeId.trim(),
+      ownerCostCenterId: draftFilters.ownerCostCenterId.trim(),
+      authorUserId: draftFilters.authorUserId.trim(),
+      status: fixedStatus ?? draftFilters.status.trim(),
+    })
   }
 
   const clearFilters = () => {

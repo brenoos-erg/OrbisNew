@@ -21,6 +21,32 @@ id: true,
 
 export type GridSortBy = 'publishedAt' | 'code' | 'revisionNumber' | 'expiresAt'
 
+function cleanFilter(value: string | null) {
+  const trimmed = String(value ?? '').trim()
+  return trimmed || undefined
+}
+
+export function normalizeDocumentCodeSearch(value: string) {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+}
+
+export function buildDocumentCodeSearchVariants(value: string) {
+  const rawCode = String(value ?? '').trim()
+  if (!rawCode) return []
+
+  return Array.from(new Set([
+    rawCode,
+    rawCode.replace(/\s+/g, '.'),
+    rawCode.replace(/\s+/g, ''),
+    rawCode.replace(/-/g, '.'),
+    rawCode.replace(/[\s-]+/g, '.'),
+    rawCode.replace(/[.\s\-/]+/g, ''),
+  ].filter(Boolean)))
+}
+
 export function parseGridParams(params: URLSearchParams) {
   const page = Number(params.get('page') ?? '1') || 1
   const pageSize = Number(params.get('pageSize') ?? '20') || 20
@@ -33,22 +59,25 @@ export function parseGridParams(params: URLSearchParams) {
     sortBy,
     sortOrder,
     filters: {
-      code: params.get('code') ?? undefined,
-      title: params.get('title') ?? undefined,
-      documentTypeId: params.get('documentTypeId') ?? undefined,
-      ownerCostCenterId: params.get('ownerCostCenterId') ?? undefined,
-      authorUserId: params.get('authorUserId') ?? undefined,
-      status: params.get('status') as DocumentVersionStatus | null,
+      code: cleanFilter(params.get('code')),
+      title: cleanFilter(params.get('title')),
+      documentTypeId: cleanFilter(params.get('documentTypeId')),
+      ownerCostCenterId: cleanFilter(params.get('ownerCostCenterId')),
+      authorUserId: cleanFilter(params.get('authorUserId')),
+      status: cleanFilter(params.get('status')) as DocumentVersionStatus | undefined | null,
     },
   }
 }
 
-export function buildVersionWhere(filters: ReturnType<typeof parseGridParams>['filters']) {
+export function buildVersionWhere(filters: ReturnType<typeof parseGridParams>['filters'], options?: { omitCode?: boolean }) {
+  const rawCode = String(filters.code ?? '').trim()
+  const codeVariants = options?.omitCode ? [] : buildDocumentCodeSearchVariants(rawCode)
+
   return {
     status: filters.status ?? undefined,
     document: {
       isActive: true,
-      code: filters.code ? { contains: filters.code } : undefined,
+      OR: codeVariants.length ? codeVariants.map((variant) => ({ code: { contains: variant } })) : undefined,
       title: filters.title ? { contains: filters.title } : undefined,
       documentTypeId: filters.documentTypeId,
       ownerCostCenterId: filters.ownerCostCenterId,
@@ -78,7 +107,10 @@ export async function fetchGrid(
   pageSize: number,
   sortBy: GridSortBy,
   sortOrder: Prisma.SortOrder,
+  codeSearch?: string,
+  fallbackWhere?: Prisma.DocumentVersionWhereInput,
 ) {
+  const codeNormalized = normalizeDocumentCodeSearch(codeSearch ?? '')
   const [total, rows] = await Promise.all([
     prisma.documentVersion.count({ where }),
     prisma.documentVersion.findMany({
@@ -90,6 +122,23 @@ export async function fetchGrid(
     }),
   ])
 
+  if (total === 0 && codeNormalized && fallbackWhere) {
+    const fallbackRows = await prisma.documentVersion.findMany({
+      where: fallbackWhere,
+      orderBy: buildOrderBy(sortBy, sortOrder),
+      take: 500,
+      select: ISO_GRID_SELECT,
+    })
+    const matchedRows = fallbackRows.filter((row) => normalizeDocumentCodeSearch(row.document.code).includes(codeNormalized))
+    const pagedRows = matchedRows.slice((page - 1) * pageSize, page * pageSize)
+
+    return formatGridResult(matchedRows.length, page, pageSize, pagedRows)
+  }
+
+  return formatGridResult(total, page, pageSize, rows)
+}
+
+function formatGridResult(total: number, page: number, pageSize: number, rows: Prisma.DocumentVersionGetPayload<{ select: typeof ISO_GRID_SELECT }>[]) {
   return {
     total,
     page,
