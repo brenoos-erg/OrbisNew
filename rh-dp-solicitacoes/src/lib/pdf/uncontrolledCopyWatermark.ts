@@ -50,13 +50,23 @@ const parseMediaBox = (objectBody: string) => {
   return { width, height }
 }
 
+export function buildSafeWatermarkGeometry(width: number, height: number) {
+  const maxFontSize = 42
+  const minFontSize = 26
+  const fontSize = Math.max(minFontSize, Math.min(maxFontSize, Math.round(Math.min(width, height) * 0.052)))
+  const estimatedTextWidth = WATERMARK_TEXT.length * fontSize * 0.62
+  const safeMargin = Math.max(32, Math.min(width, height) * 0.055)
+  const angle = -28
+  const centerX = Math.max(safeMargin, Math.min(width - safeMargin, (width - estimatedTextWidth * 0.72) / 2))
+  const centerY = Math.max(safeMargin, Math.min(height - safeMargin, height * 0.52))
+  return { fontSize, centerX, centerY, angle, estimatedTextWidth }
+}
+
 const buildWatermarkStream = (width: number, height: number) => {
-  const fontSize = Math.max(34, Math.min(54, Math.round(Math.min(width, height) * 0.064)))
-  const radians = (-32 * Math.PI) / 180
+  const { fontSize, centerX, centerY, angle } = buildSafeWatermarkGeometry(width, height)
+  const radians = (angle * Math.PI) / 180
   const cos = Math.cos(radians).toFixed(5)
   const sin = Math.sin(radians).toFixed(5)
-  const centerX = width * 0.18
-  const centerY = height * 0.52
 
   const commands = [
     'q',

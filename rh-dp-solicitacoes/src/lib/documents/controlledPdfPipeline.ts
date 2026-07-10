@@ -6,7 +6,7 @@ import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 import { normalizeStoredDocumentUrl, resolvePublicDocumentPath } from '@/lib/documents/documentStorage'
 import { DOCUMENT_PDF_MIME, isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
-import { applyDocumentHeaderStamp } from '@/lib/pdf/documentHeaderStamp'
+import { applyDocumentCornerRevisionStamp, applyDocumentHeaderStamp } from '@/lib/pdf/documentHeaderStamp'
 import {
   applyUncontrolledCopyWatermark,
   hasUncontrolledCopyWatermark,
@@ -97,6 +97,7 @@ type BuildControlledPdfDeps = {
   hasWatermark: typeof hasUncontrolledCopyWatermark
   applyWatermark: typeof applyUncontrolledCopyWatermark
   applyHeader: typeof applyDocumentHeaderStamp
+  applyCornerRevisionStamp: typeof applyDocumentCornerRevisionStamp
 }
 const defaultDeps: BuildControlledPdfDeps = {
   resolveAccess: resolveDocumentVersionAccess,
@@ -108,6 +109,7 @@ const defaultDeps: BuildControlledPdfDeps = {
   hasWatermark: hasUncontrolledCopyWatermark,
   applyWatermark: applyUncontrolledCopyWatermark,
   applyHeader: applyDocumentHeaderStamp,
+  applyCornerRevisionStamp: applyDocumentCornerRevisionStamp,
 }
 
 function formatPublicationDate(value?: Date | null): string {
@@ -303,6 +305,10 @@ export async function buildControlledPdfWithDeps(
 
   try {
     finalPdfBuffer = deps.applyHeader(finalPdfBuffer, headerLine)
+    finalPdfBuffer = deps.applyCornerRevisionStamp(finalPdfBuffer, {
+      documentCode: access.documentCode,
+      revisionNumber: access.revisionNumber,
+    })
   } catch (error) {
     logAndThrowControlledPdfError('HEADER_FAILED', 'Falha ao aplicar cabeçalho no PDF final.', {
       versionId,

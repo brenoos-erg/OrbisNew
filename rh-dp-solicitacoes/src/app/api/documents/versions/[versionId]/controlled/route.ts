@@ -5,7 +5,7 @@ import { requireActiveUser } from '@/lib/auth'
 import { registerDocumentAuditLog } from '@/lib/documentAudit'
 import { executeControlledDocumentAction, type ControlledIntent } from '@/lib/documents/controlledAction'
 import { buildContentDispositionHeader, buildDocumentDownloadFilename } from '@/lib/documents/documentDownloadFilename'
-import { buildControlledPdf } from '@/lib/documents/controlledPdfPipeline'
+import { buildControlledPdf, ControlledPdfPipelineError } from '@/lib/documents/controlledPdfPipeline'
 import { prisma } from '@/lib/prisma'
 
 type Payload = { intent?: string }
@@ -106,8 +106,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
       },
     })
   } catch (error) {
-    console.error('Falha ao executar ação controlada de documento (GET).', { versionId, action, error })
-    return NextResponse.json({ error: 'Não foi possível preparar o PDF final do documento.' }, { status: 422 })
+    const err = error as (Error & { code?: unknown }) | undefined
+    console.error('Falha ao executar ação controlada de documento (GET).', {
+      versionId,
+      action,
+      errorName: err?.name,
+      errorMessage: err?.message,
+      errorCode: err?.code,
+      stack: err?.stack,
+      stage: error instanceof ControlledPdfPipelineError ? error.code : undefined,
+    })
+    return NextResponse.json({ error: 'Não foi possível preparar o PDF final do documento.', code: 'DOCUMENT_FINAL_PDF_PREPARE_FAILED' }, { status: 422 })
   }
 }
 
@@ -127,7 +136,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ver
     if ('termChallenge' in result) return NextResponse.json(result.termChallenge, { status: result.status })
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Falha ao executar ação no pipeline único de PDF controlado.', { versionId, intent, error })
-    return NextResponse.json({ error: 'Não foi possível preparar o PDF final do documento.' }, { status: 422 })
+    const err = error as (Error & { code?: unknown }) | undefined
+    console.error('Falha ao executar ação no pipeline único de PDF controlado.', {
+      versionId,
+      intent,
+      errorName: err?.name,
+      errorMessage: err?.message,
+      errorCode: err?.code,
+      stack: err?.stack,
+      stage: error instanceof ControlledPdfPipelineError ? error.code : undefined,
+    })
+    return NextResponse.json({ error: 'Não foi possível preparar o PDF final do documento.', code: 'DOCUMENT_FINAL_PDF_PREPARE_FAILED' }, { status: 422 })
   }
 }

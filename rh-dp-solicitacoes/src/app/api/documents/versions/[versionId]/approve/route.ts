@@ -65,6 +65,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ve
         ? await finalizeToPublishedPdf({
           sourceFileUrl: version.fileUrl,
           documentCode: version.document.code,
+          revisionNumber: version.revisionNumber,
         })
         : version.fileUrl
       console.info('[documents.approve] publication-file-finalized', {

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { applyUncontrolledCopyWatermark, hasUncontrolledCopyWatermark, validatePdfBuffer } from '@/lib/pdf/uncontrolledCopyWatermark'
+import { applyDocumentCornerRevisionStamp } from '@/lib/pdf/documentHeaderStamp'
 import { isPdfBuffer, resolveDocumentFileType } from '@/lib/documents/fileType'
 import { convertDocumentToPdf } from '@/lib/documents/wordToPdf'
 import {
@@ -14,6 +15,7 @@ import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
 type Input = {
   sourceFileUrl: string
   documentCode: string
+  revisionNumber: number
 }
 
 export class DocumentPublishPipelineError extends Error {
@@ -26,7 +28,7 @@ export class DocumentPublishPipelineError extends Error {
   }
 }
 
-export async function finalizeToPublishedPdf({ sourceFileUrl, documentCode }: Input): Promise<string> {
+export async function finalizeToPublishedPdf({ sourceFileUrl, documentCode, revisionNumber }: Input): Promise<string> {
   const familyRule = resolveDocumentFamilyRule(documentCode)
   if (familyRule.family === 'non-controlled-native') {
     console.info('[documents.finalize-published-pdf] bypassed-for-non-controlled-native', {
@@ -88,9 +90,11 @@ const fileType = resolveDocumentFileType(sourceFileUrl)
     throw new DocumentPublishPipelineError(`PDF inválido para publicação: ${validation.reason}`, 'CONVERSION')
   }
 
-  const finalPdfBuffer = hasUncontrolledCopyWatermark(pdfBuffer)
+  const watermarkedPdfBuffer = hasUncontrolledCopyWatermark(pdfBuffer)
     ? pdfBuffer
     : applyUncontrolledCopyWatermark(pdfBuffer)
+
+  const finalPdfBuffer = applyDocumentCornerRevisionStamp(watermarkedPdfBuffer, { documentCode, revisionNumber })
 
   const outputValidation = validatePdfBuffer(finalPdfBuffer)
   if (!outputValidation.valid) {

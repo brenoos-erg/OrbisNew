@@ -119,3 +119,66 @@ export function applyDocumentHeaderStamp(pdfBuffer: Buffer, headerLine: string):
 
   return Buffer.from(`${updatedSource}\n${appendedObjects.join('')}\n%%EOF\n`, 'latin1')
 }
+
+export function hasDocumentCornerRevisionStamp(pdfBuffer: Buffer, documentCode: string, revisionNumber: number): boolean {
+  if (!pdfBuffer?.length) return false
+  const marker = `DOC_REV_STAMP:${documentCode}:REV:${revisionNumber}`
+  return pdfBuffer.toString('latin1').includes(marker)
+}
+
+const buildCornerRevisionStream = (width: number, height: number, documentCode: string, revisionNumber: number) => {
+  const label = `${documentCode} | Rev. ${String(revisionNumber).padStart(2, '0')}`
+  const marker = `DOC_REV_STAMP:${documentCode}:REV:${revisionNumber}`
+  const fontSize = 7
+  const textWidth = Math.min(width - 32, label.length * fontSize * 0.55)
+  const x = Math.max(16, width - textWidth - 18)
+  const y = Math.max(16, height - 18)
+  const commands = [
+    `% ${escapePdfText(marker)}`,
+    'q',
+    '1 1 1 rg',
+    `${(x - 3).toFixed(2)} ${(y - 3).toFixed(2)} ${(textWidth + 6).toFixed(2)} 11 re f`,
+    '0.2 0.2 0.2 rg',
+    '/Fdh 7 Tf',
+    `1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm`,
+    `(${escapePdfText(label)}) Tj`,
+    'Q',
+  ].join('\n')
+  return `${commands}\n`
+}
+
+export function applyDocumentCornerRevisionStamp(pdfBuffer: Buffer, options: { documentCode: string; revisionNumber: number }): Buffer {
+  const documentCode = options.documentCode?.trim()
+  if (!pdfBuffer?.length || !documentCode || options.revisionNumber === undefined || options.revisionNumber === null) return pdfBuffer
+  if (hasDocumentCornerRevisionStamp(pdfBuffer, documentCode, options.revisionNumber)) return pdfBuffer
+
+  const source = pdfBuffer.toString('latin1')
+  if (/\/Type\s*\/XRef/.test(source) || /\/Type\s*\/ObjStm/.test(source)) {
+    throw new Error('PDF incompatível com carimbo de revisão (usa xref stream/object stream).')
+  }
+
+  const objectRegex = /(\d+)\s+(\d+)\s+obj([\s\S]*?)endobj/g
+  const objects: Array<{ id: number; generation: number; full: string; body: string }> = []
+  let objectMatch: RegExpExecArray | null
+  while ((objectMatch = objectRegex.exec(source)) !== null) {
+    objects.push({ id: Number(objectMatch[1]), generation: Number(objectMatch[2]), full: objectMatch[0], body: objectMatch[3] })
+  }
+  const pageObjects = objects.filter((entry) => /\/Type\s*\/Page(?!s)/.test(entry.body))
+  if (!pageObjects.length) return pdfBuffer
+
+  let nextObjectId = Math.max(...objects.map((entry) => entry.id)) + 1
+  const fontObjectId = nextObjectId++
+  const appendedObjects: string[] = [`${fontObjectId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`]
+  let updatedSource = source
+
+  for (const pageObject of pageObjects) {
+    const streamObjectId = nextObjectId++
+    const { width, height } = parseMediaBox(pageObject.body)
+    const stream = buildCornerRevisionStream(width, height, documentCode, options.revisionNumber)
+    appendedObjects.push(`${streamObjectId} 0 obj\n<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}endstream\nendobj\n`)
+    let updatedPageBody = ensureResources(pageObject.body, fontObjectId)
+    updatedPageBody = ensureContentsArray(updatedPageBody, streamObjectId)
+    updatedSource = updatedSource.replace(pageObject.full, `${pageObject.id} ${pageObject.generation} obj${updatedPageBody}endobj`)
+  }
+  return Buffer.from(`${updatedSource}\n${appendedObjects.join('')}\n%%EOF\n`, 'latin1')
+}
