@@ -151,6 +151,12 @@ export default function PlanoAvulsoDetailClient({ planId }: { planId: string }) 
     }
   }
 
+  async function cancelPlan() {
+    const confirmed = window.confirm('Deseja realmente cancelar este plano de ação?')
+    if (!confirmed) return
+    await savePlan('CANCELADO')
+  }
+
   async function openNewAction() {
     if (!plan) return
     try {
@@ -204,7 +210,7 @@ export default function PlanoAvulsoDetailClient({ planId }: { planId: string }) 
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => savePlan()} disabled={saving} className="app-button-primary">Salvar/Atualizar</button>
-          <button type="button" onClick={() => savePlan('CANCELADO')} disabled={saving} className="app-button-secondary">Cancelar plano</button>
+          <button type="button" onClick={cancelPlan} disabled={saving} className="app-button-secondary">Cancelar plano</button>
           <button type="button" onClick={() => savePlan('CONCLUIDO')} disabled={saving} className="app-button-secondary">Concluir plano</button>
           <Link href="/dashboard/sgi/qualidade/planos-de-acao" className="app-button-secondary">Sair/Voltar</Link>
         </div>

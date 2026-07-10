@@ -32,6 +32,12 @@ const STATUS_META: Record<Status, { label: string; badgeClass: string }> = {
   CANCELADA: { label: 'Cancelada', badgeClass: 'app-status-badge app-status-badge--danger' },
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR')
+}
+
 export default function NaoConformidadesClient() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(false)
@@ -136,16 +142,17 @@ export default function NaoConformidadesClient() {
         <table>
           <thead className="app-table-header text-left text-xs uppercase">
             <tr>
-              <th className="px-3 py-2">RNC</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Prazo</th><th className="px-3 py-2">Detectou</th><th className="px-3 py-2">Originou</th><th className="px-3 py-2">Solicitante</th><th className="px-3 py-2" />
+              <th className="px-3 py-2">RNC</th><th className="px-3 py-2">Data criação</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Prazo</th><th className="px-3 py-2">Detectou</th><th className="px-3 py-2">Originou</th><th className="px-3 py-2">Solicitante</th><th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.id} className="app-table-row">
                 <td className="px-3 py-2 font-semibold">{item.numeroRnc}</td>
+                <td className="px-3 py-2">{formatDate(item.createdAt)}</td>
                 <td className="px-3 py-2"><span className={STATUS_META[item.status].badgeClass}>{STATUS_META[item.status].label}</span></td>
                 <td className="px-3 py-2">{nonConformityTypeLabel[item.tipoNc as keyof typeof nonConformityTypeLabel] || item.tipoNc}</td>
-                <td className="px-3 py-2">{new Date(item.prazoAtendimento).toLocaleDateString('pt-BR')}</td>
+                <td className="px-3 py-2">{formatDate(item.prazoAtendimento)}</td>
                 <td className="px-3 py-2 app-muted-text">{item.centroQueDetectou?.description || '-'}</td>
                 <td className="px-3 py-2 app-muted-text">{item.centroQueOriginou?.description || '-'}</td>
                 <td className="px-3 py-2 app-muted-text">{item.solicitanteNome}</td>
