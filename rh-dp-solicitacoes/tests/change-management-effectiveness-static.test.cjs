@@ -1,0 +1,10 @@
+const assert = require('assert');
+const { seed, read, assertIncludesAll } = require('./change-management-test-utils.cjs');
+const source = seed();
+const finalizar = read('src/app/api/solicitacoes/[id]/finalizar/route.ts');
+assert.match(source, /closeRules:\s*\{ requiresEffectivenessVerification:\s*true \}/, 'schema deve declarar bloqueio de encerramento sem eficácia');
+assertIncludesAll(source, ['eficaciaResultadoEsperado', 'eficaciaImpactosNaoPrevistos', 'detalharImpactosNaoPrevistos', 'eficaciaControlesImplementados', 'eficaciaAcaoComplementar', 'eficaciaResultadoFinal', 'responsavelAvaliacaoEficacia', 'dataAvaliacaoEficacia', 'observacoesEficacia'], 'verificação de eficácia');
+assert.match(source, /requiredForClosure:\s*true/, 'campos de eficácia devem ser obrigatórios para encerramento');
+assert.match(finalizar, /getMissingRequiredEffectivenessFieldsForClosure/, 'rota de finalizar deve verificar eficácia antes de encerrar');
+assert.match(finalizar, /RQ_QUA_148/, 'bloqueio deve ser específico para Gestão de Mudanças');
+console.log('change management effectiveness static ok');
