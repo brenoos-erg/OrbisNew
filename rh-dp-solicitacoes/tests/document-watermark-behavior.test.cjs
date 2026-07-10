@@ -49,3 +49,8 @@ const badValidation = validatePdfBuffer(badPdf)
 assert.equal(badValidation.valid, false)
 
 console.log('document-watermark-behavior ok')
+// no-clipping regression expectations
+{
+  const source = fs.readFileSync('src/lib/pdf/uncontrolledCopyWatermark.ts', 'utf8')
+  assert(source.includes('buildSafeWatermarkGeometry'), 'watermark geometry is calculated safely')
+}

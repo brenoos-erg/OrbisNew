@@ -116,3 +116,28 @@ export async function fetchGrid(
     })),
   }
 }
+export async function explainPublishedVisibility(code: string, where: Prisma.DocumentVersionWhereInput, totalFound: number) {
+  const document = await prisma.isoDocument.findFirst({
+    where: { code },
+    select: {
+      id: true,
+      code: true,
+      isActive: true,
+      versions: { select: { status: true, fileUrl: true, obsoleteAt: true } },
+    },
+  })
+
+  let reason: string | undefined
+  if (!document) reason = 'NOT_FOUND'
+  else if (!document.isActive) reason = 'DOCUMENT_INACTIVE'
+  else {
+    const published = document.versions.filter((version) => version.status === DocumentVersionStatus.PUBLICADO)
+    if (!published.length) {
+      if (document.versions.length && document.versions.every((version) => version.status === DocumentVersionStatus.CANCELADO)) reason = 'ONLY_CANCELADO'
+      else if (document.versions.length && document.versions.every((version) => version.obsoleteAt)) reason = 'ONLY_OBSOLETE'
+      else reason = 'NO_PUBLICADO_VERSION'
+    } else if (published.every((version) => !version.fileUrl)) reason = 'MISSING_FILE_URL'
+  }
+
+  return { filtersApplied: where, totalFound, documentExists: Boolean(document), appearsInPublishedGrid: Boolean(document && !reason), reason }
+}

@@ -1,7 +1,6 @@
-import { ModuleLevel } from '@prisma/client'
 import { NextResponse } from 'next/server'
-import { withModuleLevel } from '@/lib/access'
-import { MODULE_KEYS } from '@/lib/featureKeys'
+import { requireActiveUser } from '@/lib/auth'
+import { QUALITY_DOCUMENT_MANAGER_FORBIDDEN_MESSAGE, requireQualityDocumentManager } from '@/lib/documents/documentManagementAccess'
 import { prisma } from '@/lib/prisma'
 
 const POSTING_ERROR_MARKER = 'POSTING_ERROR'
@@ -12,10 +11,12 @@ function buildPostingErrorReason(reason: string) {
   return trimmed.includes(POSTING_ERROR_MARKER) ? trimmed : `${POSTING_ERROR_MARKER}: ${trimmed}`
 }
 
-export const DELETE = withModuleLevel(
-  MODULE_KEYS.CONTROLE_DOCUMENTOS,
-  ModuleLevel.NIVEL_3,
-  async (req, ctx) => {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+    const me = await requireActiveUser()
+    const access = await requireQualityDocumentManager(me.id)
+    if (!access.canManage) {
+      return NextResponse.json({ error: QUALITY_DOCUMENT_MANAGER_FORBIDDEN_MESSAGE }, { status: 403 })
+    }
     const { id } = await ctx.params
 
     const document = await prisma.isoDocument.findUnique({
@@ -63,7 +64,7 @@ export const DELETE = withModuleLevel(
           isActive: false,
           activeCode: null,
           inactiveAt: new Date(),
-          inactiveById: ctx.me.id,
+          inactiveById: me.id,
           inactiveReason,
         },
       })
@@ -74,7 +75,7 @@ export const DELETE = withModuleLevel(
           isCurrentPublished: false,
           operationalUseBlocked: true,
           obsoleteAt: new Date(),
-          obsoletedById: ctx.me.id,
+          obsoletedById: me.id,
           obsoleteReason: inactiveReason,
         },
       })
@@ -82,7 +83,7 @@ export const DELETE = withModuleLevel(
       const mainVersion = document.versions[0]
       if (mainVersion) {
         await tx.documentAuditLog.create({
-          data: { documentId: id, versionId: mainVersion.id, userId: ctx.me.id, action: 'CANCEL', reason: inactiveReason },
+          data: { documentId: id, versionId: mainVersion.id, userId: me.id, action: 'CANCEL', reason: inactiveReason },
         })
       }
     })
@@ -93,5 +94,4 @@ export const DELETE = withModuleLevel(
       codeReleased: true,
       message: `Documento ${document.code} marcado como excluído por erro de postagem. Código liberado para novo cadastro sem gerar revisão.`,
     })
-  },
-)
+}

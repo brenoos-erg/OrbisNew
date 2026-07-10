@@ -4,6 +4,7 @@ import { DocumentVersionStatus } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { executeControlledDocumentAction } from '@/lib/documents/controlledAction'
+import { ControlledPdfPipelineError } from '@/lib/documents/controlledPdfPipeline'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const me = await requireActiveUser()
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ vers
       errorMessage: err?.message,
       errorCode: err?.code,
       stack: err?.stack,
+      stage: error instanceof ControlledPdfPipelineError ? error.code : undefined,
     })
     return NextResponse.json(
       {

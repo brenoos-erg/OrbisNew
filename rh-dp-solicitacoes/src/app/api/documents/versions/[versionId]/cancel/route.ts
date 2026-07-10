@@ -1,13 +1,15 @@
-import { DocumentVersionStatus, ModuleLevel } from '@prisma/client'
+import { DocumentVersionStatus } from '@prisma/client'
 import { NextResponse } from 'next/server'
-import { withModuleLevel } from '@/lib/access'
-import { MODULE_KEYS } from '@/lib/featureKeys'
+import { requireActiveUser } from '@/lib/auth'
+import { QUALITY_DOCUMENT_MANAGER_FORBIDDEN_MESSAGE, requireQualityDocumentManager } from '@/lib/documents/documentManagementAccess'
 import { prisma } from '@/lib/prisma'
 
-export const PATCH = withModuleLevel(
-  MODULE_KEYS.CONTROLE_DOCUMENTOS,
-  ModuleLevel.NIVEL_3,
-  async (_req, ctx) => {
+export async function PATCH(_req: Request, ctx: { params: Promise<{ versionId: string }> }) {
+    const me = await requireActiveUser()
+    const access = await requireQualityDocumentManager(me.id)
+    if (!access.canManage) {
+      return NextResponse.json({ error: QUALITY_DOCUMENT_MANAGER_FORBIDDEN_MESSAGE }, { status: 403 })
+    }
     const { versionId } = await ctx.params
 
     const version = await prisma.documentVersion.findUnique({
@@ -36,5 +38,4 @@ export const PATCH = withModuleLevel(
     })
 
     return NextResponse.json({ ok: true, status: DocumentVersionStatus.CANCELADO })
-  },
-)
+}

@@ -22,7 +22,7 @@ import { logDocumentNotificationFailure, resolvePublicationNotificationEvent } f
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
 }
-async function saveUploadedDocument(file: File, documentCode: string) {
+async function saveUploadedDocument(file: File, documentCode: string, revisionNumber = 0) {
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
   await fs.mkdir(uploadDir, { recursive: true })
   const extension = path.extname(file.name || '').toLowerCase() || '.bin'
@@ -45,7 +45,7 @@ async function saveUploadedDocument(file: File, documentCode: string) {
   })
 
   if (shouldFinalizeToPdf) {
-    savedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode })
+    savedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode, revisionNumber })
   }
 
   console.info('[documents.create] upload-persisted', {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest)   {
 
       if (uploadedFile instanceof File && uploadedFile.size > 0) {
         failureStage = 'file:save-uploaded-document'
-        fileUrl = await saveUploadedDocument(uploadedFile, code)
+        fileUrl = await saveUploadedDocument(uploadedFile, code, resolveInitialRevisionNumber(form.get('revisionNumber')))
       }
 
       payload = {
