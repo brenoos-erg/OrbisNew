@@ -92,6 +92,17 @@ type CampoEspecifico = {
     equals?: string;
     includes?: string;
   };
+  requiredWhen?: {
+    field: string;
+    equals?: string;
+    includes?: string;
+  };
+  readOnly?: boolean;
+  allowMultiple?: boolean;
+  fields?: string[];
+  approvals?: string[];
+  questions?: string[];
+  responseOptions?: string[];
 };
 
 type TipoSolicitacao = {
@@ -122,7 +133,7 @@ type TipoSolicitacao = {
 };
 
 
-type Extras = Record<string, string>;
+type Extras = Record<string, any>;
 
 type CoordinatorOption = {
   id: string;
@@ -630,23 +641,37 @@ export default function NovaSolicitacaoPage() {
     isRQ106Dependentes,
   ]);
 
-  const isFieldVisibleByRule = (campo: CampoEspecifico) => {
-    const rule = campo.visibleWhen;
+  const normalizeRuleValueList = (value: unknown) => {
+    if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+    if (typeof value === 'string') {
+      return value.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    if (value === null || value === undefined) return [];
+    return [String(value).trim()].filter(Boolean);
+  };
+
+  const matchesConditionalRule = (rule: CampoEspecifico['visibleWhen'] | CampoEspecifico['requiredWhen']) => {
     if (!rule?.field) return true;
 
-    const currentValue = extras[rule.field] ?? '';
-    if (rule.equals !== undefined) return currentValue === rule.equals;
-    if (rule.includes !== undefined) {
-      return currentValue
-        .split(',')
-        .map((item) => item.trim())
-        .includes(rule.includes);
-    }
+    const currentValue = extras[rule.field];
+    if (rule.equals !== undefined) return String(currentValue ?? '') === rule.equals;
+    if (rule.includes !== undefined) return normalizeRuleValueList(currentValue).includes(rule.includes);
     return true;
   };
 
+  const isFieldVisibleByRule = (campo: CampoEspecifico) => matchesConditionalRule(campo.visibleWhen);
+
+  const isCampoRequired = (campo: CampoEspecifico) =>
+    Boolean(campo.required || (campo.requiredWhen ? matchesConditionalRule(campo.requiredWhen) : false));
+
+  const hasFieldValue = (value: unknown) => {
+    if (Array.isArray(value)) return value.length > 0;
+    if (value === null || value === undefined) return false;
+    return String(value).trim().length > 0;
+  };
+
   const shouldFieldUseFullWidth = (campo: CampoEspecifico) =>
-    campo.type === 'textarea' || campo.name === 'observacoes';
+    ['textarea', 'risk_matrix', 'repeater', 'action_plan', 'approval_grid', 'multi_select'].includes(campo.type ?? '') || campo.name === 'observacoes';
 
   const isPedidoDemissaoSemAviso =
     isRQ247 &&
@@ -739,7 +764,7 @@ export default function NovaSolicitacaoPage() {
   /* ============================================================
    4) EXTRAS / RQ_063 / ABONO
   ============================================================ */
-  const handleExtraChange = (name: string, value: string) => {
+  const handleExtraChange = (name: string, value: any) => {
      if (name === 'itemManutencao') {
       setExtras((prev) => ({
         ...prev,
@@ -777,7 +802,7 @@ export default function NovaSolicitacaoPage() {
    const normalizedValue =
       name === 'telefoneManutencao' ? formatBrazilPhone(value) : value;
 
-    if (['centroCustoId', 'centroCustoDestinoId', 'centroCustoForm', 'costCenterId', 'contratoDestinoId'].includes(name)) {
+    if (['centroCustoId', 'centroCustoDestinoId', 'centroCustoForm', 'costCenterId', 'contratoDestinoId'].includes(name) && typeof normalizedValue === 'string') {
       setSelectedRequestCostCenterId(normalizedValue)
     }
 
@@ -825,6 +850,55 @@ export default function NovaSolicitacaoPage() {
       ...prev,
       [name]: name === 'phone' ? formatBrazilPhone(value) : value,
     }));
+  };
+
+  const handleMultiSelectChange = (name: string, option: string, checked: boolean) => {
+    setExtras((prev) => {
+      const current = normalizeRuleValueList(prev[name]);
+      const next = checked
+        ? Array.from(new Set([...current, option]))
+        : current.filter((item) => item !== option);
+      return { ...prev, [name]: next.join(', ') };
+    });
+  };
+
+  const getObjectRows = (name: string) => Array.isArray(extras[name]) ? extras[name] as Array<Record<string, string>> : [];
+
+  const addObjectRow = (name: string, fields: string[], initial?: Record<string, string>) => {
+    setExtras((prev) => ({
+      ...prev,
+      [name]: [
+        ...(Array.isArray(prev[name]) ? prev[name] : []),
+        initial ?? Object.fromEntries(fields.map((field) => [field, ''])),
+      ],
+    }));
+  };
+
+  const updateObjectRow = (name: string, index: number, field: string, value: string) => {
+    setExtras((prev) => {
+      const rows = Array.isArray(prev[name]) ? [...prev[name]] : [];
+      rows[index] = { ...(rows[index] ?? {}), [field]: value };
+      return { ...prev, [name]: rows };
+    });
+  };
+
+  const removeObjectRow = (name: string, index: number) => {
+    setExtras((prev) => ({
+      ...prev,
+      [name]: (Array.isArray(prev[name]) ? prev[name] : []).filter((_: unknown, rowIndex: number) => rowIndex !== index),
+    }));
+  };
+
+  const handleRiskMatrixChange = (name: string, question: string, field: 'resposta' | 'detalheComplemento', value: string) => {
+    setExtras((prev) => {
+      const rows = Array.isArray(prev[name]) ? [...prev[name]] : [];
+      const index = rows.findIndex((row: any) => row?.pergunta === question);
+      const current = index >= 0 ? rows[index] : { pergunta: question, resposta: '', detalheComplemento: '' };
+      const next = { ...current, [field]: value };
+      if (index >= 0) rows[index] = next;
+      else rows.push(next);
+      return { ...prev, [name]: rows };
+    });
   };
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
@@ -900,7 +974,7 @@ export default function NovaSolicitacaoPage() {
     setSubmitError(null);
     setSubmitting(true);
     try {
-      let campos: Record<string, string> = {};
+      let campos: Record<string, any> = {};
 
       const uploadExtrasFiles = async (solicitacaoId: string) => {
         const entries = Object.entries(extraFiles).filter(([, files]) => files.length > 0);
@@ -1037,10 +1111,10 @@ export default function NovaSolicitacaoPage() {
         }
 
         const obrigatoriosTexto = camposSolicitanteComTi
-          .filter((c) => c.required && c.type !== 'file')
+          .filter((c) => isFieldVisibleByRule(c) && isCampoRequired(c) && c.type !== 'file')
           .map((c) => c.name);
 
-        const faltantes = obrigatoriosTexto.filter((name) => !extras[name]);
+        const faltantes = obrigatoriosTexto.filter((name) => !hasFieldValue(extras[name]));
         if (faltantes.length > 0) {
           setSubmitError('Preencha os campos obrigatórios do formulário.');
           setSubmitting(false);
@@ -1048,7 +1122,7 @@ export default function NovaSolicitacaoPage() {
         }
 
         const obrigatoriosArquivo = camposSolicitanteComTi
-          .filter((c) => c.required && c.type === 'file')
+          .filter((c) => isFieldVisibleByRule(c) && isCampoRequired(c) && c.type === 'file')
           .map((c) => c.name);
         const faltandoArquivoObrigatorio = obrigatoriosArquivo.some(
           (fieldName) => (extraFiles[fieldName]?.length ?? 0) < 1,
@@ -1199,7 +1273,7 @@ export default function NovaSolicitacaoPage() {
           }
         }
 
-        campos = camposSolicitanteComTi.reduce<Record<string, string>>(
+        campos = camposSolicitanteComTi.reduce<Record<string, any>>(
          (acc, campo) => {
             const nextValue = extras[campo.name] ?? '';
             acc[campo.name] = campo.name === 'placaVeiculo' ? nextValue.trim().toUpperCase() : nextValue;
@@ -2993,7 +3067,7 @@ useEffect(() => {
                             />
                              <span className="text-gray-700 leading-snug">
                               {campo.label}
-                              {campo.required && (
+                              {isCampoRequired(campo) && (
                                 <span className="ml-1 text-red-500">*</span>
                               )}
                             </span>
@@ -3006,10 +3080,156 @@ useEffect(() => {
                         (campo.name === 'nomeSistemaManutencao' && extras.itemManutencao === 'Sistema') ||
                         (campo.name === 'tipoEquipamentoManutencao' && extras.itemManutencao === 'Equipamento');
 
+                      if (normalizedType === 'multi_select') {
+                        const selectedOptions = normalizeRuleValueList(value);
+                        return (
+                          <div key={campo.name} className="md:col-span-2">
+                            <fieldset className="rounded-lg border border-[var(--border-subtle)] p-3">
+                              <legend className="px-1 text-xs font-semibold text-gray-700">
+                                {getDisplayLabel(campo)} {isCampoRequired(campo) && <span className="text-red-500">*</span>}
+                              </legend>
+                              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                                {(campo.options ?? []).map((option) => (
+                                  <label key={option} className="flex items-center gap-2 text-xs text-gray-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedOptions.includes(option)}
+                                      onChange={(event) => handleMultiSelectChange(campo.name, option, event.target.checked)}
+                                    />
+                                    <span>{option}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </fieldset>
+                          </div>
+                        );
+                      }
+
+                      if (normalizedType === 'risk_matrix') {
+                        const rows = getObjectRows(campo.name);
+                        const responseOptions = campo.responseOptions ?? ['SIM', 'NAO', 'NA'];
+                        return (
+                          <div key={campo.name} className="md:col-span-2 overflow-x-auto">
+                            <p className="mb-2 text-xs font-semibold text-gray-700">{getDisplayLabel(campo)}</p>
+                            <table className="min-w-full border border-[var(--border-subtle)] text-xs">
+                              <thead className="bg-[var(--muted)]/40">
+                                <tr>
+                                  <th className="border border-[var(--border-subtle)] px-2 py-2 text-left">Pergunta</th>
+                                  <th className="border border-[var(--border-subtle)] px-2 py-2 text-left">Resposta</th>
+                                  <th className="border border-[var(--border-subtle)] px-2 py-2 text-left">Detalhe / complemento</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(campo.questions ?? []).map((question) => {
+                                  const row = rows.find((item) => item.pergunta === question) ?? {};
+                                  return (
+                                    <tr key={question}>
+                                      <td className="border border-[var(--border-subtle)] px-2 py-2 align-top">{question}</td>
+                                      <td className="border border-[var(--border-subtle)] px-2 py-2 align-top">
+                                        <select
+                                          className="w-full rounded border border-[var(--border-subtle)] bg-[var(--card)] px-2 py-1"
+                                          value={row.resposta ?? ''}
+                                          onChange={(event) => handleRiskMatrixChange(campo.name, question, 'resposta', event.target.value)}
+                                        >
+                                          <option value="">Selecione...</option>
+                                          {responseOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                                        </select>
+                                      </td>
+                                      <td className="border border-[var(--border-subtle)] px-2 py-2 align-top">
+                                        <textarea
+                                          className="min-h-[64px] w-full rounded border border-[var(--border-subtle)] bg-[var(--card)] px-2 py-1"
+                                          value={row.detalheComplemento ?? ''}
+                                          onChange={(event) => handleRiskMatrixChange(campo.name, question, 'detalheComplemento', event.target.value)}
+                                        />
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      }
+
+                      if (normalizedType === 'repeater' || normalizedType === 'action_plan' || normalizedType === 'approval_grid') {
+                        const fields = campo.fields ?? (normalizedType === 'action_plan'
+                          ? ['itemOrdem', 'acao', 'responsavel', 'dataInicial', 'dataFinal', 'status', 'evidencias']
+                          : ['nome', 'usuario', 'dataHora', 'decisao', 'observacaoJustificativa']);
+                        const rows = getObjectRows(campo.name);
+                        const isApprovalGrid = normalizedType === 'approval_grid';
+                        const defaultApprovalRows = isApprovalGrid && rows.length === 0
+                          ? (campo.approvals ?? []).map((approval) => ({ papel: approval, nome: '', usuario: '', dataHora: '', decisao: '', observacaoJustificativa: '' }))
+                          : rows;
+                        const renderedRows = defaultApprovalRows.length > 0 ? defaultApprovalRows : rows;
+                        return (
+                          <div key={campo.name} className="md:col-span-2 overflow-x-auto">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <p className="text-xs font-semibold text-gray-700">{getDisplayLabel(campo)}</p>
+                              {!isApprovalGrid && (
+                                <button
+                                  type="button"
+                                  className="rounded bg-orange-500 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-600"
+                                  onClick={() => addObjectRow(campo.name, fields)}
+                                >
+                                  Adicionar linha
+                                </button>
+                              )}
+                            </div>
+                            <table className="min-w-full border border-[var(--border-subtle)] text-xs">
+                              <thead className="bg-[var(--muted)]/40">
+                                <tr>
+                                  {isApprovalGrid && <th className="border border-[var(--border-subtle)] px-2 py-2 text-left">Aprovação necessária</th>}
+                                  {fields.map((field) => <th key={field} className="border border-[var(--border-subtle)] px-2 py-2 text-left">{field}</th>)}
+                                  {!isApprovalGrid && <th className="border border-[var(--border-subtle)] px-2 py-2 text-left">Ações</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {renderedRows.length === 0 && (
+                                  <tr>
+                                    <td colSpan={fields.length + (isApprovalGrid ? 1 : 1)} className="border border-[var(--border-subtle)] px-2 py-3 text-center text-[var(--muted-foreground)]">
+                                      Nenhuma linha cadastrada.
+                                    </td>
+                                  </tr>
+                                )}
+                                {renderedRows.map((row, rowIndex) => (
+                                  <tr key={`${campo.name}-${rowIndex}`}>
+                                    {isApprovalGrid && <td className="border border-[var(--border-subtle)] px-2 py-2 align-top">{row.papel}</td>}
+                                    {fields.map((field) => (
+                                      <td key={field} className="border border-[var(--border-subtle)] px-2 py-2 align-top">
+                                        {isApprovalGrid ? (
+                                          <input
+                                            className="w-full rounded border border-[var(--border-subtle)] bg-gray-100 px-2 py-1 text-gray-600"
+                                            value={(row as Record<string, string>)[field] ?? ''}
+                                            readOnly
+                                            aria-readonly="true"
+                                          />
+                                        ) : (
+                                          <input
+                                            className="w-full rounded border border-[var(--border-subtle)] bg-[var(--card)] px-2 py-1"
+                                            type={field.toLowerCase().includes('data') ? 'date' : 'text'}
+                                            value={(row as Record<string, string>)[field] ?? ''}
+                                            onChange={(event) => updateObjectRow(campo.name, rowIndex, field, event.target.value)}
+                                          />
+                                        )}
+                                      </td>
+                                    ))}
+                                    {!isApprovalGrid && (
+                                      <td className="border border-[var(--border-subtle)] px-2 py-2 align-top">
+                                        <button type="button" className="text-xs font-semibold text-red-600" onClick={() => removeObjectRow(campo.name, rowIndex)}>Remover</button>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      }
+
                       const commonProps = {
                       id: campo.name,
                       name: campo.name,
-                      required: campo.required || isConditionalRequired,
+                      required: isCampoRequired(campo) || isConditionalRequired,
                       value,
                       onChange: (
                         e:
@@ -3019,8 +3239,8 @@ useEffect(() => {
                       ) => handleExtraChange(campo.name, e.target.value),
                       className:
                         'w-full border rounded px-3 py-2 text-sm bg-[var(--card)]',
-                      readOnly: isAutoFilled,
-                      disabled: isAutoFilled || campo.disabled,
+                      readOnly: isAutoFilled || campo.readOnly,
+                      disabled: isAutoFilled || campo.disabled || campo.readOnly,
                     };
 
                          return (
@@ -3028,7 +3248,7 @@ useEffect(() => {
                         <label className="space-y-1 text-sm block">
                           <span className="block text-xs font-semibold text-gray-700">
                             {getDisplayLabel(campo)}{' '}
-                            {campo.required && (
+                            {isCampoRequired(campo) && (
                               <span className="text-red-500">*</span>
                             )}
                           </span>
@@ -3065,7 +3285,7 @@ useEffect(() => {
                                  handleExtraChange(`${campo.name}Label`, buildCostCenterLabel(nextValue));
 
                               }}
-                              required={campo.required}
+                              required={isCampoRequired(campo)}
                               disabled={commonProps.disabled}
                               name={campo.name}
                             />

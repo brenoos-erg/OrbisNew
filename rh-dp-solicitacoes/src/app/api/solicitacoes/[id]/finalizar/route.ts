@@ -15,6 +15,30 @@ import {
 import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import { getNadaConstaPendingSectors, isNadaConstaAllSectorsCompleted, isSolicitacaoNadaConsta } from '@/lib/solicitationTypes'
 
+
+function isFilledForClosure(value: unknown) {
+  if (Array.isArray(value)) return value.length > 0
+  if (value === null || value === undefined) return false
+  return String(value).trim().length > 0
+}
+
+function getMissingRequiredEffectivenessFieldsForClosure(solicitation: { tipo?: { id?: string | null; codigo?: string | null; schemaJson?: unknown } | null; payload?: unknown }) {
+  const tipo = solicitation.tipo
+  if (tipo?.id !== 'RQ_QUA_148' && tipo?.codigo !== 'RQ.QUA.148') return []
+  const schema = tipo?.schemaJson && typeof tipo.schemaJson === 'object' && !Array.isArray(tipo.schemaJson)
+    ? tipo.schemaJson as { meta?: { closeRules?: { requiresEffectivenessVerification?: boolean } }; camposEspecificos?: Array<{ name?: string; label?: string; requiredForClosure?: boolean }> }
+    : null
+  if (schema?.meta?.closeRules?.requiresEffectivenessVerification !== true) return []
+  const payload = solicitation.payload && typeof solicitation.payload === 'object' && !Array.isArray(solicitation.payload)
+    ? solicitation.payload as { campos?: Record<string, unknown> }
+    : {}
+  const campos = payload.campos && typeof payload.campos === 'object' && !Array.isArray(payload.campos) ? payload.campos : {}
+  return (schema.camposEspecificos ?? [])
+    .filter((field) => field.requiredForClosure === true && typeof field.name === 'string')
+    .filter((field) => !isFilledForClosure(campos[field.name as string]))
+    .map((field) => field.label ?? field.name)
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -73,6 +97,14 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         { error: 'A avaliação de experiência só pode ser finalizada após conclusão do gestor e retorno ao RH.' },
+        { status: 400 },
+      )
+    }
+
+    const missingEffectivenessFields = getMissingRequiredEffectivenessFieldsForClosure(solicitation)
+    if (missingEffectivenessFields.length > 0) {
+      return NextResponse.json(
+        { error: `A Gestão de Mudanças só pode ser encerrada após preencher a Verificação de Eficácia: ${missingEffectivenessFields.join(', ')}.` },
         { status: 400 },
       )
     }
