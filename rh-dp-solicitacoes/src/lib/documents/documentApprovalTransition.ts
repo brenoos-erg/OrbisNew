@@ -264,7 +264,9 @@ export async function approveDocumentDecision(tx: Tx, input: { versionId: string
     const legacyApproval = await tx.documentApproval.findUnique({
       where: { versionId_flowItemId: { versionId: input.versionId, flowItemId: step.flowItemId } },
     })
-    if (legacyApproval && [DocumentApprovalStepStatus.APPROVED, DocumentApprovalStepStatus.WAIVED].includes(stepStatus)) {
+    const legacyStepCompleted = stepStatus === DocumentApprovalStepStatus.APPROVED
+      || stepStatus === DocumentApprovalStepStatus.WAIVED
+    if (legacyApproval && legacyStepCompleted) {
       await tx.documentApproval.update({
         where: { id: legacyApproval.id },
         data: {
