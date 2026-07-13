@@ -18,9 +18,9 @@ export function getRuleDefaults(event: DocumentNotificationEvent) {
     notifyAuthor: true,
     notifyApproverGroup: event === 'DOCUMENT_SUBMITTED_FOR_APPROVAL' || event === 'DOCUMENT_APPROVED',
     notifyQualityReviewers:
-      event === 'DOCUMENT_QUALITY_REVIEW' || event === 'DOCUMENT_EXPIRING' || event === 'DOCUMENT_EXPIRED',
-    notifyOwnerDepartment: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED',
-    notifyOwnerCostCenter: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED',
+      event === 'DOCUMENT_QUALITY_REVIEW' || event === 'DOCUMENT_AWAITING_PUBLICATION' || event === 'SEGREGATION_EXCEPTION_REQUESTED' || event === 'DOCUMENT_EXPIRING' || event === 'DOCUMENT_EXPIRED',
+    notifyOwnerDepartment: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_AWAITING_PUBLICATION' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED' || event === 'DOCUMENT_CANCELLED',
+    notifyOwnerCostCenter: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_AWAITING_PUBLICATION' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_REJECTED' || event === 'DOCUMENT_CANCELLED',
     notifyDistributionTargets: event === 'DOCUMENT_PUBLISHED' || event === 'DOCUMENT_REVISED' || event === 'DOCUMENT_DISTRIBUTED',
     fixedEmailsJson: [],
     ccEmailsJson: [],

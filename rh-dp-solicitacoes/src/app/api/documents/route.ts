@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import { NextRequest, NextResponse } from 'next/server'
 import { DocumentApprovalStatus, DocumentVersionStatus, Prisma } from '@prisma/client'
 import { requireActiveUser } from '@/lib/auth'
@@ -12,57 +10,38 @@ import {
 }  from '@/lib/iso-document-routing'
 import { resolveInitialRevisionNumber } from '@/lib/isoDocumentCreation'
 import { prisma } from '@/lib/prisma'
-import { DocumentPublishPipelineError, finalizeToPublishedPdf } from '@/lib/documents/finalizeToPublishedPdf'
-import { buildStoredDocumentFileName } from '@/lib/documents/documentStorage'
-import { resolveDocumentFamilyRule } from '@/lib/documents/documentFamilyRules'
+import { removePrivateDocumentSourceFile, savePrivateDocumentSourceFile } from '@/lib/documents/documentStorage'
 import { codeMatchesRequiredPrefix, resolveDocumentCodePrefixFromTypeCode } from '@/lib/documents/documentCodePrefix'
 import { sendDocumentNotification } from '@/lib/documents/documentNotificationService'
 import { logDocumentNotificationFailure, resolvePublicationNotificationEvent } from '@/lib/documents/documentPublicationNotification'
+import { canCreateDocument, canCreateRevision, hasDocumentPermission } from '@/lib/documents/documentRoleAccess'
+import { startDocumentApprovalFlow } from '@/lib/documents/documentApprovalTransition'
+import { DocumentPublicationError, publishDocumentVersion } from '@/lib/documents/publishDocumentVersion'
 
 function normalizeCode(raw: unknown) {
   return String(raw ?? '').trim()
 }
-async function saveUploadedDocument(file: File, documentCode: string, revisionNumber = 0) {
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'documents')
-  await fs.mkdir(uploadDir, { recursive: true })
-  const extension = path.extname(file.name || '').toLowerCase() || '.bin'
-  const safeName = buildStoredDocumentFileName(extension, 'doc')
-  const absolute = path.join(uploadDir, safeName)
-  const originalFileUrl = `/uploads/documents/${safeName}`
-  const buffer = Buffer.from(await file.arrayBuffer())
-  await fs.writeFile(absolute, buffer)
-  const familyRule = resolveDocumentFamilyRule(documentCode)
-  const shouldFinalizeToPdf = familyRule.family === 'controlled-pdf'
-  let savedFileUrl = originalFileUrl
 
-  console.info('[documents.create] upload-flow-selected', {
-    originalName: file.name,
-    safeName,
-    documentCode,
-    prefix: familyRule.prefix,
-    family: familyRule.family,
-    shouldFinalizeToPdf,
-  })
-
-  if (shouldFinalizeToPdf) {
-    savedFileUrl = await finalizeToPublishedPdf({ sourceFileUrl: originalFileUrl, documentCode, revisionNumber })
+function sanitizeCreatedDocumentForResponse<T extends { versions?: Array<Record<string, any>> }>(document: T) {
+  return {
+    ...document,
+    versions: document.versions?.map(({ sourceStorageKey, sourceFileUrl, ...version }) => ({
+      ...version,
+      sourceFileAvailable: Boolean(sourceStorageKey || sourceFileUrl),
+    })),
   }
+}
 
-  console.info('[documents.create] upload-persisted', {
-    originalName: file.name,
-    safeName,
-    family: familyRule.family,
-    originalFileUrl,
-    originalAbsolutePath: absolute,
-    originalExists: true,
-    savedFileUrl,
-  })
-
-  return savedFileUrl
+async function saveUploadedDocument(file: File, documentCode: string, revisionNumber = 0) {
+  const stored = await savePrivateDocumentSourceFile(file, 'doc')
+  console.info('[documents.create] private-source-upload-persisted', { originalName: stored.originalName, storageKey: stored.storageKey, documentCode, revisionNumber, size: stored.size })
+  return stored
 }
 
 export async function POST(req: NextRequest)   {
   let failureStage = 'request:start'
+  const privateSourceKeysToCleanup: string[] = []
+  let shouldCleanupPrivateSource = true
   try {
     failureStage = 'auth:require-active-user'
     const me = await requireActiveUser()
@@ -76,11 +55,12 @@ export async function POST(req: NextRequest)   {
       const form = await req.formData()
       const uploadedFile = form.get('file') ?? form.get('pdf')
       const code = normalizeCode(form.get('code'))
-      let fileUrl: string | null = null
+      let sourceFile: Awaited<ReturnType<typeof saveUploadedDocument>> | null = null
 
       if (uploadedFile instanceof File && uploadedFile.size > 0) {
         failureStage = 'file:save-uploaded-document'
-        fileUrl = await saveUploadedDocument(uploadedFile, code, resolveInitialRevisionNumber(form.get('revisionNumber')))
+        sourceFile = await saveUploadedDocument(uploadedFile, code, resolveInitialRevisionNumber(form.get('revisionNumber')))
+        privateSourceKeysToCleanup.push(sourceFile.storageKey)
       }
 
       payload = {
@@ -92,7 +72,11 @@ export async function POST(req: NextRequest)   {
         summary: String(form.get('summary') ?? ''),
         affectedAreasNotes: String(form.get('affectedAreasNotes') ?? ''),
         revisionReason: String(form.get('revisionReason') ?? '').trim(),
-        fileUrl,
+        sourceStorageKey: sourceFile?.storageKey ?? null,
+        sourceOriginalName: sourceFile?.originalName ?? null,
+        sourceMimeType: sourceFile?.mimeType ?? null,
+        sourceSizeBytes: sourceFile?.size ?? null,
+        sourceSha256: sourceFile?.sha256 ?? null,
         revisionNumber: form.get('revisionNumber'),
       }
     } else {
@@ -112,7 +96,7 @@ export async function POST(req: NextRequest)   {
       authorUserId: payload.authorUserId || me.id,
       revisionNumber: payload.revisionNumber ?? null,
       hasRevisionReason: Boolean(payload.revisionReason),
-      hasFileUrl: Boolean(payload.fileUrl),
+      hasFileUrl: Boolean(payload.sourceStorageKey ?? payload.fileUrl),
     })
 
 
@@ -124,7 +108,7 @@ export async function POST(req: NextRequest)   {
     }
 
     
-    if (!payload.fileUrl) {
+    if (!(payload.sourceStorageKey ?? payload.fileUrl)) {
       return NextResponse.json({ error: 'Anexe um arquivo válido: PDF, DOC, DOCX, XLS ou XLSX.' }, { status: 400 })
     }
 
@@ -170,14 +154,14 @@ export async function POST(req: NextRequest)   {
     console.info('[documents.create] payload-file-url', {
       code: payload.code,
       title: payload.title,
-      fileUrl: payload.fileUrl ?? null,
+      sourceStorageKey: payload.sourceStorageKey ?? null,
     })
 
     failureStage = 'document-type-flow:load'
     const flow = await prisma.documentTypeApprovalFlow.findMany({
       where: { documentTypeId: payload.documentTypeId, active: true },
       orderBy: { order: 'asc' },
-      select: { id: true, stepType: true },
+      include: { approverGroup: { include: { members: { include: { user: { select: { status: true } } } } } } },
     })
 
     const directPublicationJustification = String(payload.directPublicationJustification ?? '').trim()
@@ -223,6 +207,20 @@ export async function POST(req: NextRequest)   {
       },
     })
 
+    const permissionContext = { documentTypeId: payload.documentTypeId, departmentId: ownerCostCenter.departmentId ?? null, costCenterId: ownerCostCenter.id, documentFamily: String(payload.code).split('.')[1] ?? null }
+
+    if (existing && !(await canCreateRevision(me.id, { ...permissionContext, documentId: existing.id }))) {
+      return NextResponse.json({ error: 'Você não possui permissão para criar revisão neste escopo documental.' }, { status: 403 })
+    }
+    if (!existing && !(await canCreateDocument(me.id, permissionContext))) {
+      return NextResponse.json({ error: 'Você não possui permissão para criar documento neste escopo documental.' }, { status: 403 })
+    }
+    const directPublicationRequested = initialStatus === DocumentVersionStatus.PUBLICADO
+    if (directPublicationRequested && !(await hasDocumentPermission(me.id, 'CAN_DIRECT_PUBLISH', permissionContext))) {
+      return NextResponse.json({ error: 'Publicação direta exige papel e permissão CAN_DIRECT_PUBLISH.' }, { status: 403 })
+    }
+    if (directPublicationRequested) initialStatus = DocumentVersionStatus.AGUARDANDO_PUBLICACAO
+
     if (existing && !payload.revisionReason) {
       return NextResponse.json(
         { error: 'Informe o motivo da revisão para criar uma nova revisão de código existente.' },
@@ -264,21 +262,21 @@ export async function POST(req: NextRequest)   {
             documentId: existing.id,
             revisionNumber: nextRevisionNumber,
             status: initialStatus,
-            fileUrl: payload.fileUrl ?? null,
+            fileUrl: null,
+            sourceFileUrl: payload.fileUrl ?? null,
+            sourceStorageKey: payload.sourceStorageKey ?? null,
+            sourceOriginalName: payload.sourceOriginalName ?? null,
+            sourceMimeType: payload.sourceMimeType ?? null,
+            sourceSizeBytes: payload.sourceSizeBytes ?? null,
+            sourceSha256: payload.sourceSha256 ?? null,
             revisionReason: payload.revisionReason,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
             nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
-            publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,
-            isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
+            publishedAt: null,
+            isCurrentPublished: false,
           },
         })
-        if (initialStatus === DocumentVersionStatus.PUBLICADO && directPublicationJustification) {
-          await tx.documentAuditLog.create({
-            data: { documentId: existing.id, versionId: version.id, userId: me.id, action: 'DIRECT_PUBLICATION', reason: directPublicationJustification },
-          })
-        }
-
-        if (flow.length > 0) {
+        if (flow.length > 0 && !directPublicationRequested) {
           await tx.documentApproval.createMany({
             data: flow.map((item) => ({
               versionId: version.id,
@@ -286,13 +284,28 @@ export async function POST(req: NextRequest)   {
               status: DocumentApprovalStatus.PENDING,
             })),
           })
+          await startDocumentApprovalFlow(tx, { versionId: version.id, flow })
         }
 
         return version
       })
 
-      const routing = routingForStatus(initialStatus)
-      void sendDocumentNotification('DOCUMENT_CREATED', {
+      shouldCleanupPrivateSource = false
+      privateSourceKeysToCleanup.length = 0
+      if (directPublicationJustification) {
+        await sendDocumentNotification('DOCUMENT_CREATED', { documentId: existing.id, versionId: revisedVersion.id }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
+        try {
+          await publishDocumentVersion({ versionId: revisedVersion.id, actorUserId: me.id, justification: directPublicationJustification, directPublication: true })
+        } catch (error) {
+          if (error instanceof DocumentPublicationError) {
+            if (error.details?.exceptionId) return NextResponse.json({ status: 'SEGREGATION_EXCEPTION_PENDING', documentId: existing.id, versionId: revisedVersion.id, exceptionId: error.details.exceptionId, routing: routingForStatus(DocumentVersionStatus.AGUARDANDO_PUBLICACAO), message: 'Documento criado. A publicação direta aguarda aprovação da exceção.' }, { status: 202 })
+            return NextResponse.json({ error: error.message }, { status: error.status })
+          }
+          throw error
+        }
+      }
+      const routing = routingForStatus(directPublicationJustification ? DocumentVersionStatus.PUBLICADO : initialStatus)
+      if (!directPublicationJustification) void sendDocumentNotification('DOCUMENT_CREATED', {
         documentId: existing.id,
         versionId: revisedVersion.id,
       }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
@@ -303,7 +316,7 @@ export async function POST(req: NextRequest)   {
           versionId: revisedVersion.id,
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
       }
-      if (initialStatus === DocumentVersionStatus.PUBLICADO) {
+      if (directPublicationRequested) {
         const publicationEvent = resolvePublicationNotificationEvent(revisedVersion)
         void sendDocumentNotification(publicationEvent, {
           documentId: existing.id,
@@ -348,37 +361,55 @@ export async function POST(req: NextRequest)   {
           create: {
            revisionNumber: requestedInitialRevisionNumber,
             status: initialStatus,
-            fileUrl: payload.fileUrl ?? null,
+            fileUrl: null,
+            sourceFileUrl: payload.fileUrl ?? null,
+            sourceStorageKey: payload.sourceStorageKey ?? null,
+            sourceOriginalName: payload.sourceOriginalName ?? null,
+            sourceMimeType: payload.sourceMimeType ?? null,
+            sourceSizeBytes: payload.sourceSizeBytes ?? null,
+            sourceSha256: payload.sourceSha256 ?? null,
             revisionReason: null,
             expiresAt: payload.expiresAt ? new Date(payload.expiresAt) : null,
             nextReviewAt: payload.nextReviewAt ? new Date(payload.nextReviewAt) : null,
-            publishedAt: initialStatus === DocumentVersionStatus.PUBLICADO ? new Date() : null,
-            isCurrentPublished: initialStatus === DocumentVersionStatus.PUBLICADO,
+            publishedAt: null,
+            isCurrentPublished: false,
           },
         },
       },
       include: { versions: true },
     })
 
-    if (initialStatus === DocumentVersionStatus.PUBLICADO && directPublicationJustification && created.versions[0]) {
-      await prisma.documentAuditLog.create({
-        data: { documentId: created.id, versionId: created.versions[0].id, userId: me.id, action: 'DIRECT_PUBLICATION', reason: directPublicationJustification },
+    failureStage = 'documents:create-approvals'
+    if (flow.length > 0 && !directPublicationRequested && created.versions[0]) {
+      await prisma.$transaction(async (tx) => {
+        await tx.documentApproval.createMany({
+          data: flow.map((item) => ({
+            versionId: created.versions[0].id,
+            flowItemId: item.id,
+            status: DocumentApprovalStatus.PENDING,
+          })),
+        })
+        await startDocumentApprovalFlow(tx, { versionId: created.versions[0].id, flow })
       })
     }
 
-    failureStage = 'documents:create-approvals'
-    if (flow.length > 0 && created.versions[0]) {
-      await prisma.documentApproval.createMany({
-        data: flow.map((item) => ({
-          versionId: created.versions[0].id,
-          flowItemId: item.id,
-          status: DocumentApprovalStatus.PENDING,
-        })),
-      })
+    shouldCleanupPrivateSource = false
+    privateSourceKeysToCleanup.length = 0
+    if (created.versions[0] && directPublicationJustification) {
+      await sendDocumentNotification('DOCUMENT_CREATED', { documentId: created.id, versionId: created.versions[0].id }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
+      try {
+        await publishDocumentVersion({ versionId: created.versions[0].id, actorUserId: me.id, justification: directPublicationJustification, directPublication: true })
+      } catch (error) {
+        if (error instanceof DocumentPublicationError) {
+          if (error.details?.exceptionId) return NextResponse.json({ status: 'SEGREGATION_EXCEPTION_PENDING', documentId: created.id, versionId: created.versions[0].id, exceptionId: error.details.exceptionId, routing: routingForStatus(DocumentVersionStatus.AGUARDANDO_PUBLICACAO), message: 'Documento criado. A publicação direta aguarda aprovação da exceção.' }, { status: 202 })
+          return NextResponse.json({ error: error.message }, { status: error.status })
+        }
+        throw error
+      }
     }
 
     if (created.versions[0]) {
-      void sendDocumentNotification('DOCUMENT_CREATED', {
+      if (!directPublicationJustification) void sendDocumentNotification('DOCUMENT_CREATED', {
         documentId: created.id,
         versionId: created.versions[0].id,
       }).catch((error) => console.error('DOCUMENT_CREATED notification failed', error))
@@ -389,7 +420,7 @@ export async function POST(req: NextRequest)   {
           versionId: created.versions[0].id,
         }).catch((error) => console.error('DOCUMENT_SUBMITTED_FOR_APPROVAL notification failed', error))
       }
-      if (initialStatus === DocumentVersionStatus.PUBLICADO) {
+      if (directPublicationRequested) {
         const publicationEvent = resolvePublicationNotificationEvent(created.versions[0])
         void sendDocumentNotification(publicationEvent, {
           documentId: created.id,
@@ -399,11 +430,11 @@ export async function POST(req: NextRequest)   {
     }
 
    failureStage = 'response:success'
-    const routing = routingForStatus(initialStatus)
+    const routing = routingForStatus(directPublicationJustification ? DocumentVersionStatus.PUBLICADO : initialStatus)
 
      return NextResponse.json(
       {
-        ...created,
+        ...sanitizeCreatedDocumentForResponse(created),
         routing: {
           ...routing,
           message: createSuccessMessageByStatus(initialStatus),
@@ -415,16 +446,6 @@ export async function POST(req: NextRequest)   {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'O código informado já está em uso. Informe outro código.' }, { status: 409 })
     }
-    if (error instanceof DocumentPublishPipelineError) {
-      const reasonMessage = {
-        CONVERSION: 'Falha na conversão Word -> PDF. Verifique se o LibreOffice (LIBREOFFICE_PATH/SOFFICE_PATH) está instalado e acessível.',
-        NOT_FOUND: 'Falha ao localizar o arquivo enviado no servidor.',
-        WATERMARK: 'Falha ao aplicar a marca d’água no PDF final.',
-        RULE: 'Regra inválida para o tipo documental informado.',
-      }[error.reason]
-      return NextResponse.json({ error: `${reasonMessage} Detalhes: ${error.message}` }, { status: 422 })
-    }
-
     const errorMessage = error instanceof Error ? error.message : 'Erro inesperado ao criar documento.'
     console.error('[documents.create][debug] failure', {
       stage: failureStage,
@@ -432,5 +453,9 @@ export async function POST(req: NextRequest)   {
       error,
     })
     return NextResponse.json({ error: `Falha ao criar documento (${failureStage}): ${errorMessage}` }, { status: 500 })
+  } finally {
+    if (shouldCleanupPrivateSource && privateSourceKeysToCleanup.length > 0) {
+      await Promise.all(privateSourceKeysToCleanup.map((key) => removePrivateDocumentSourceFile(key).catch(() => undefined)))
+    }
   }
 }

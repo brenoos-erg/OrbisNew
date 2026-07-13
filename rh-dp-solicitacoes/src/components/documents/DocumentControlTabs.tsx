@@ -1,6 +1,6 @@
 'use client'
 
-import { BellRing, CheckCheck, ClipboardCheck, FileCheck2, Files, History } from 'lucide-react'
+import { BellRing, CheckCheck, ClipboardCheck, FileCheck2, Files, History, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ComponentType } from 'react'
@@ -14,6 +14,7 @@ const TABS: TabItem[] = [
   { href: '/dashboard/controle-documentos/historico', label: 'Histórico', icon: History },
   { href: '/dashboard/controle-documentos/notificacoes', label: 'Notificações', adminOnly: true, icon: BellRing },
   { href: '/dashboard/controle-documentos/controle-aprovadores', label: 'Controle de Aprovadores', adminOnly: true, icon: CheckCheck },
+  { href: '/dashboard/controle-documentos/papeis-responsabilidades', label: 'Papéis e Responsabilidades', icon: ShieldCheck },
 ]
 
 type Props = {

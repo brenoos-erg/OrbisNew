@@ -5,7 +5,7 @@ import { buildVersionWhere, fetchGrid, parseGridParams } from '@/lib/iso-documen
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
-  await requireActiveUser()
+  const me = await requireActiveUser()
   const parsed = parseGridParams(req.nextUrl.searchParams)
 
   const statuses = [
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   where.status = { in: statuses }
 
   const [grid, legend] = await Promise.all([
-    fetchGrid(where, parsed.page, parsed.pageSize, parsed.sortBy, parsed.sortOrder),
+    fetchGrid(where, parsed.page, parsed.pageSize, parsed.sortBy, parsed.sortOrder, undefined, undefined, me.id),
     prisma.documentVersion.groupBy({ by: ['status'], _count: { _all: true }, where: { status: { in: statuses } } }),
   ])
 
