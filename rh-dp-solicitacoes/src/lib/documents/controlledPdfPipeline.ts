@@ -20,6 +20,7 @@ type DocumentAccessResolved = {
   versionId: string
   documentId: string
   fileUrl: string
+  absolutePath?: string
   revisionNumber: number
   documentCode: string
   documentTitle: string
@@ -30,7 +31,6 @@ type DocumentAccessResolved = {
   expiresAt?: Date | null
   isCurrentPublished?: boolean
 }
-
 
 export type BuildControlledPdfResult = {
   outputBuffer: Buffer
@@ -44,7 +44,6 @@ export type BuildControlledPdfResult = {
   isPdf: boolean
   access: DocumentAccessResolved
 }
-
 
 type ControlledPdfFailureStage =
   | 'FILE_NOT_FOUND'
@@ -142,7 +141,14 @@ export async function buildControlledPdfWithDeps(
     }
   }
 
-  const pathResolution = await resolvePublicDocumentPath(access.fileUrl)
+  const pathResolution = access.absolutePath
+    ? {
+      exists: true as const,
+      resolvedFileUrl: access.fileUrl,
+      absolutePath: access.absolutePath,
+      attemptedAbsolutePaths: [access.absolutePath],
+    }
+    : await resolvePublicDocumentPath(access.fileUrl)
   const normalizedFileUrl = normalizeStoredDocumentUrl(pathResolution.resolvedFileUrl)
 
   console.info('[documents.controlled-pdf] source-path-resolution', {
@@ -343,7 +349,7 @@ export async function buildControlledPdfWithDeps(
     size: finalPdfBuffer.length,
   })
 
- return {
+  return {
     outputBuffer: finalPdfBuffer,
     outputFileName,
     mimeType: DOCUMENT_PDF_MIME,
