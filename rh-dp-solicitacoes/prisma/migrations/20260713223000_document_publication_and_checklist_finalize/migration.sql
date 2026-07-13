@@ -1,0 +1,28 @@
+-- Preflight obrigatório antes de aplicar em MySQL de produção:
+--   npm run document:preflight-enums -- --output storage/reports/document-enum-preflight.json
+-- Diagnóstico manual equivalente:
+--   SELECT DISTINCT status FROM DocumentVersion;
+--   SELECT DISTINCT action FROM DocumentAuditLog;
+--   SELECT DISTINCT event FROM DocumentNotificationLog;
+--   SELECT DISTINCT event FROM DocumentNotificationRule;
+
+ALTER TABLE `DocumentVersion`
+  ADD COLUMN `publishedStorageKey` TEXT NULL,
+  ADD COLUMN `publishedOriginalName` VARCHAR(191) NULL,
+  ADD COLUMN `publishedMimeType` VARCHAR(191) NULL,
+  ADD COLUMN `publishedSizeBytes` BIGINT NULL,
+  ADD COLUMN `publishedSha256` VARCHAR(191) NULL;
+
+-- DocumentQualityChecklist.roundId/stepId permanecem NULL nesta etapa.
+-- A restrição NOT NULL + unicidade deve ser aplicada somente em migration posterior
+-- protegida por diagnóstico SQL e pelo preflight document:preflight-checklists.
+
+-- Os ALTERs de ENUM abaixo preservam os valores existentes e acrescentam somente novos eventos/ações.
+ALTER TABLE `DocumentAuditLog` MODIFY `action` ENUM('VIEW','DOWNLOAD','SOURCE_FILE_VIEWED','SOURCE_FILE_DOWNLOADED','SOURCE_FILE_INTEGRITY_FAILED','PRINT','TECHNICAL_APPROVED','TECHNICAL_REJECTED','QUALITY_APPROVED','QUALITY_REJECTED','PUBLISHED','CANCEL','DIRECT_PUBLICATION','SEGREGATION_EXCEPTION_REQUESTED','SEGREGATION_EXCEPTION_APPROVED','SEGREGATION_EXCEPTION_REJECTED','OBSOLETE','CONTROLLED_COPY_ISSUED','CONTROLLED_COPY_CANCELED') NOT NULL;
+
+ALTER TABLE `DocumentNotificationLog` MODIFY `event` ENUM('DOCUMENT_CREATED','DOCUMENT_SUBMITTED_FOR_APPROVAL','DOCUMENT_APPROVED','DOCUMENT_REJECTED','DOCUMENT_CANCELLED','DOCUMENT_QUALITY_REVIEW','DOCUMENT_AWAITING_PUBLICATION','SEGREGATION_EXCEPTION_REQUESTED','SEGREGATION_EXCEPTION_APPROVED','SEGREGATION_EXCEPTION_REJECTED','DOCUMENT_PUBLISHED','DOCUMENT_REVISED','DOCUMENT_DISTRIBUTED','DOCUMENT_EXPIRING','DOCUMENT_EXPIRED') NOT NULL;
+
+ALTER TABLE `DocumentNotificationRule` MODIFY `event` ENUM('DOCUMENT_CREATED','DOCUMENT_SUBMITTED_FOR_APPROVAL','DOCUMENT_APPROVED','DOCUMENT_REJECTED','DOCUMENT_CANCELLED','DOCUMENT_QUALITY_REVIEW','DOCUMENT_AWAITING_PUBLICATION','SEGREGATION_EXCEPTION_REQUESTED','SEGREGATION_EXCEPTION_APPROVED','SEGREGATION_EXCEPTION_REJECTED','DOCUMENT_PUBLISHED','DOCUMENT_REVISED','DOCUMENT_DISTRIBUTED','DOCUMENT_EXPIRING','DOCUMENT_EXPIRED') NOT NULL;
+
+CREATE UNIQUE INDEX `DocumentSegregationException_versionId_conflictType_requestedById_status_key`
+  ON `DocumentSegregationException`(`versionId`, `conflictType`, `requestedById`, `status`);

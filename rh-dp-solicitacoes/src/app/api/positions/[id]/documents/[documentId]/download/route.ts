@@ -13,6 +13,7 @@ type Params = { params: Promise<{ id: string; documentId: string }> }
 export async function GET(_request: Request, { params }: Params) {
   try {
     const me = await requireActiveUser()
+    // canAccessRhPositions considera moduleLevels?.configuracoes NIVEL_3 além de RH/admin.
     if (!(await canAccessRhPositions(me, Action.VIEW))) {
       return NextResponse.json(
         { error: 'Acesso restrito ao departamento de Recursos Humanos.' },

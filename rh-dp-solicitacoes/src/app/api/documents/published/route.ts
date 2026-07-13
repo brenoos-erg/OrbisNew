@@ -11,12 +11,12 @@ import {
 } from '@/lib/iso-documents'
 
 export async function GET(req: NextRequest) {
-  await requireActiveUser()
+  const me = await requireActiveUser()
   const parsed = parseGridParams(req.nextUrl.searchParams)
   parsed.filters.status = DocumentVersionStatus.PUBLICADO
   const where = buildVersionWhere(parsed.filters)
   const fallbackWhere = parsed.filters.code ? buildVersionWhere(parsed.filters, { omitCode: true }) : undefined
-  const result = await fetchGrid(where, parsed.page, parsed.pageSize, parsed.sortBy, parsed.sortOrder, parsed.filters.code, fallbackWhere)
+  const result = await fetchGrid(where, parsed.page, parsed.pageSize, parsed.sortBy, parsed.sortOrder, parsed.filters.code, fallbackWhere, me.id)
   const debugRequested = req.nextUrl.searchParams.get('debug') === '1' || process.env.NODE_ENV === 'development'
   const code = req.nextUrl.searchParams.get('code')
   if (debugRequested && code) {

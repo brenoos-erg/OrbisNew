@@ -1,0 +1,22 @@
+const assert = require('node:assert')
+const fs = require('node:fs')
+
+const roleAccess = fs.readFileSync('src/lib/documents/documentRoleAccess.ts', 'utf8')
+assert.match(roleAccess, /normalizeDocumentRoleInput/)
+assert.match(roleAccess, /validUntil deve ser maior ou igual a validFrom/)
+assert.match(roleAccess, /scopeType === 'COST_CENTER'/)
+assert.match(roleAccess, /currentPendingApprovalStep/)
+assert.match(roleAccess, /DocumentApprovalDecisionStatus\.PENDING/)
+assert.match(roleAccess, /CAN_APPROVE_TECHNICAL/)
+assert.match(roleAccess, /CAN_APPROVE_QUALITY/)
+assert.doesNotMatch(roleAccess, /approverGroup\.members\.some/)
+assert.doesNotMatch(roleAccess, /documentApproval\.findFirst\(\{\n    where: \{ versionId, status: DocumentApprovalStatus\.PENDING/)
+
+const transition = fs.readFileSync('src/lib/documents/documentApprovalTransition.ts', 'utf8')
+assert.match(transition, /DocumentApprovalDecisionStatus\.WAIVED/)
+assert.match(transition, /DocumentApprovalRoundStatus\.PENDING/)
+assert.match(transition, /stepStatus === DocumentApprovalStepStatus\.APPROVED/)
+assert.match(transition, /Rodada reprovada/)
+assert.match(transition, /status: DocumentApprovalStepStatus\.CANCELLED/)
+
+console.log('document roles behavior checks passed')

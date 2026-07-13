@@ -25,6 +25,9 @@ type GridRow = {
   elaborador: string
   vencimento: string | null
   status: string
+  sourceFileAvailable?: boolean
+  canViewSourceFile?: boolean
+  canDownloadSourceFile?: boolean
 }
 
 type Option = { id: string; name?: string; code?: string; externalCode?: string; description?: string; fullName?: string }
@@ -77,6 +80,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
 
   const [term, setTerm] = useState<{ id: string; title: string; content: string } | null>(null)
   const [pendingAction, setPendingAction] = useState<{ versionId: string; intent: 'view' | 'download' | 'print' } | null>(null)
+  const [sourceDownload, setSourceDownload] = useState<{ row: GridRow; purpose: string; loading: boolean; error: string | null } | null>(null)
+  const [qualityChecklist, setQualityChecklist] = useState<{ row: GridRow; result: 'APPROVED' | 'REJECTED'; items: Record<string, 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL'>; notes: string; loading: boolean; error: string | null } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -322,6 +327,100 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, page, pageSize, sortBy, sortOrder, appliedFilters])
 
+
+  const requestSourceDownload = (row: GridRow) => setSourceDownload({ row, purpose: '', loading: false, error: null })
+  const defaultQualityChecklistItems = () => ({
+      codigo: 'CONFORME',
+      titulo: 'CONFORME',
+      tipo: 'CONFORME',
+      revisao: 'CONFORME',
+      arquivo: 'CONFORME',
+      legibilidade: 'CONFORME',
+      validade: 'CONFORME',
+      distribuicao: 'CONFORME',
+    }) as Record<string, 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL'>
+
+  const requestQualityChecklist = async (row: GridRow) => {
+    setQualityChecklist({ row, result: 'APPROVED', items: defaultQualityChecklistItems(), notes: '', loading: true, error: null })
+    const res = await fetch(`/api/documents/versions/${row.versionId}/quality-checklist`, { cache: 'no-store' })
+    if (!res.ok) {
+      const message = await parseApiErrorMessage(res, 'Não foi possível carregar o checklist da Qualidade.')
+      setQualityChecklist((current) => current ? { ...current, loading: false, error: message } : current)
+      return
+    }
+    const data = await parseJsonSafely<{ checklist?: { result?: 'APPROVED' | 'REJECTED'; items?: Record<string, 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL'>; notes?: string | null } }>(res)
+    setQualityChecklist({
+      row,
+      result: data?.checklist?.result === 'REJECTED' ? 'REJECTED' : 'APPROVED',
+      items: { ...defaultQualityChecklistItems(), ...(data?.checklist?.items ?? {}) },
+      notes: data?.checklist?.notes ?? '',
+      loading: false,
+      error: null,
+    })
+  }
+
+  const saveQualityChecklistDraft = async () => {
+    if (!qualityChecklist) return
+    setQualityChecklist((current) => current ? { ...current, loading: true, error: null } : current)
+    const res = await fetch(`/api/documents/versions/${qualityChecklist.row.versionId}/quality-checklist`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ notes: qualityChecklist.notes, items: qualityChecklist.items }),
+    })
+    if (!res.ok) {
+      const message = await parseApiErrorMessage(res, 'Não foi possível salvar o rascunho do checklist.')
+      setQualityChecklist((current) => current ? { ...current, loading: false, error: message } : current)
+      return
+    }
+    setQualityChecklist((current) => current ? { ...current, loading: false, error: null } : current)
+  }
+
+  const completeQualityChecklist = async (result: 'APPROVED' | 'REJECTED') => {
+    if (!qualityChecklist) return
+    setQualityChecklist((current) => current ? { ...current, result, loading: true, error: null } : current)
+    const res = await fetch(`/api/documents/versions/${qualityChecklist.row.versionId}/quality-checklist/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ result, notes: qualityChecklist.notes, items: qualityChecklist.items }),
+    })
+    if (!res.ok) {
+      const message = await parseApiErrorMessage(res, 'Não foi possível concluir o checklist da Qualidade.')
+      setQualityChecklist((current) => current ? { ...current, result, loading: false, error: message } : current)
+      return
+    }
+    setQualityChecklist(null)
+    await load()
+  }
+
+
+  const executeSourceDownload = async () => {
+    if (!sourceDownload) return
+    setSourceDownload((current) => current ? { ...current, loading: true, error: null } : current)
+    try {
+      const params = new URLSearchParams({ disposition: 'attachment' })
+      if (sourceDownload.purpose.trim()) params.set('purpose', sourceDownload.purpose.trim())
+      const res = await fetch(`/api/documents/versions/${sourceDownload.row.versionId}/source?${params.toString()}`, { cache: 'no-store' })
+      if (!res.ok) {
+        const message = await parseApiErrorMessage(res, 'Não foi possível baixar o arquivo original.')
+        throw new Error(message)
+      }
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      const contentDisposition = res.headers.get('content-disposition') ?? ''
+      const filename = decodeURIComponent(contentDisposition.match(/filename\*=UTF-8''([^;]+)/)?.[1] ?? `original-${sourceDownload.row.codigo}.bin`)
+      link.href = objectUrl
+      link.download = filename
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+      setSourceDownload(null)
+    } catch (error) {
+      setSourceDownload((current) => current ? { ...current, loading: false, error: error instanceof Error ? error.message : 'Não foi possível baixar o arquivo original.' } : current)
+    }
+  }
+
   const requestDocumentAccess = async (versionId: string, intent: 'view' | 'download' | 'print') => {
     if (!versionId) {
       alert('Não foi possível localizar a versão do documento para abrir.')
@@ -343,13 +442,16 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
   }
 
   const executeDocumentAction = async (versionId: string, intent: 'view' | 'download' | 'print') => {
-    if (intent === 'view' || intent === 'print') {
-      const search = intent === 'print' ? '?intent=print' : ''
-      router.push(`/documents/view/${encodeURIComponent(versionId)}${search}`)
+    if (intent === 'print') {
+      window.open(`/documents/view/${encodeURIComponent(versionId)}?intent=print`, '_blank')
+      return
+    }
+    if (intent === 'view') {
+      window.open(`/api/documents/versions/${encodeURIComponent(versionId)}/published?disposition=inline`, '_blank')
       return
     }
 
-    const endpoint = `/api/documents/versions/${encodeURIComponent(versionId)}/controlled?action=${intent}`
+    const endpoint = `/api/documents/versions/${encodeURIComponent(versionId)}/published?disposition=attachment`
 
     if (intent === 'download') {
       const anchor = document.createElement('a')
@@ -733,12 +835,19 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
                   <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[row.status] ?? 'bg-slate-200 text-slate-700'}`}>{row.status}</span></td>
                     <td className="space-x-2 px-3 py-3">
                     <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Visualizar</button>
-                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Download</button>
+                    <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar documento publicado</button>
+                    {row.canDownloadSourceFile ? <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100" onClick={() => requestSourceDownload(row)}><Download size={14} />Baixar arquivo original</button> : null}
                     <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100" onClick={() => requestDocumentAccess(row.versionId, 'print')}><Printer size={14} />Imprimir</button>
                     {approvalStage ? (
                       <>
-                         <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
-                        <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
+                        {approvalStage === 3 ? (
+                          <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100" onClick={() => requestQualityChecklist(row)} disabled={!canApprove}><Check size={14} />Checklist Qualidade</button>
+                        ) : (
+                          <>
+                            <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100" onClick={() => decideApproval(row.versionId, 'approve')} disabled={!canApprove}><Check size={14} />Aprovar</button>
+                            <button className="mb-1 inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100" onClick={() => decideApproval(row.versionId, 'reject')} disabled={!canApprove}><X size={14} />Reprovar</button>
+                          </>
+                        )}
                       </>
                     ) : null}
                     {canManageDocuments ? (
@@ -770,7 +879,8 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             <p className="text-xs text-slate-600">Pub: {row.dataPublicacao ? new Date(row.dataPublicacao).toLocaleDateString('pt-BR') : '-'} · Venc: {row.vencimento ? new Date(row.vencimento).toLocaleDateString('pt-BR') : '-'}</p>
             <div className="flex gap-2">
                 <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => requestDocumentAccess(row.versionId, 'view')}><Eye size={14} />Ver</button>
-              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Baixar</button>
+              <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white" onClick={() => requestDocumentAccess(row.versionId, 'download')}><Download size={14} />Publicado</button>
+              {row.canDownloadSourceFile ? <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700" onClick={() => requestSourceDownload(row)}><Download size={14} />Original</button> : null}
                <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700" onClick={() => requestDocumentAccess(row.versionId, 'print')}><Printer size={14} />Imprimir</button>
             </div>
             {canManageDocuments ? (
@@ -915,6 +1025,65 @@ export default function DocumentsGrid({ endpoint, title, fixedStatus, approvalSt
             <div className="flex justify-end gap-2">
               <button className="rounded border px-3 py-2" onClick={() => setShowCreate(false)}>Cancelar</button>
               <button className="rounded bg-orange-500 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60" disabled={creating || codeValidation.status === 'checking'} onClick={createDocument}>{creating ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {sourceDownload ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Baixar arquivo original</h2>
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Este é o arquivo original de elaboração e pode não corresponder ao documento oficial vigente. Para uso operacional, utilize exclusivamente o documento publicado e vigente.
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700">
+              <div><dt className="font-medium">Código</dt><dd>{sourceDownload.row.codigo}</dd></div>
+              <div><dt className="font-medium">Revisão</dt><dd>REV{String(sourceDownload.row.nrRevisao).padStart(2, '0')}</dd></div>
+            </dl>
+            <label className="mt-4 block text-sm font-medium text-slate-700">Finalidade do acesso</label>
+            <textarea className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" rows={3} value={sourceDownload.purpose} onChange={(event) => setSourceDownload((current) => current ? { ...current, purpose: event.target.value } : current)} placeholder="Informe a finalidade opcional para auditoria" />
+            {sourceDownload.error ? <p className="mt-2 rounded bg-rose-50 p-2 text-sm text-rose-700">{sourceDownload.error}</p> : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="rounded border px-3 py-2" onClick={() => setSourceDownload(null)} disabled={sourceDownload.loading}>Cancelar</button>
+              <button className="rounded bg-indigo-700 px-3 py-2 text-white disabled:opacity-60" onClick={executeSourceDownload} disabled={sourceDownload.loading}>{sourceDownload.loading ? 'Baixando...' : 'Confirmar download'}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {qualityChecklist ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Checklist da Qualidade</h2>
+            <p className="mt-1 text-sm text-slate-600">{qualityChecklist.row.codigo} • REV{String(qualityChecklist.row.nrRevisao).padStart(2, '0')}</p>
+            <div className="mt-4 space-y-3">
+              {Object.entries(qualityChecklist.items).map(([key, value]) => (
+                <label key={key} className="grid gap-2 rounded-lg border border-slate-200 p-3 text-sm md:grid-cols-[1fr_auto]">
+                  <span className="font-medium capitalize text-slate-700">{key.replace(/_/g, ' ')}</span>
+                  <select className="rounded border px-2 py-1" value={value} onChange={(event) => setQualityChecklist((current) => current ? { ...current, items: { ...current.items, [key]: event.target.value as 'CONFORME' | 'NAO_CONFORME' | 'NAO_APLICAVEL' } } : current)}>
+                    <option value="CONFORME">Conforme</option>
+                    <option value="NAO_CONFORME">Não conforme</option>
+                    <option value="NAO_APLICAVEL">Não aplicável</option>
+                  </select>
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-3">
+              <label className="text-sm font-medium text-slate-700">Resultado</label>
+              <select className="rounded border px-3 py-2" value={qualityChecklist.result} onChange={(event) => setQualityChecklist((current) => current ? { ...current, result: event.target.value as 'APPROVED' | 'REJECTED' } : current)}>
+                <option value="APPROVED">Aprovado</option>
+                <option value="REJECTED">Reprovado</option>
+              </select>
+              <label className="text-sm font-medium text-slate-700">Justificativa / observações</label>
+              <textarea className="rounded border px-3 py-2" rows={4} value={qualityChecklist.notes} onChange={(event) => setQualityChecklist((current) => current ? { ...current, notes: event.target.value } : current)} placeholder="Obrigatória para itens não conformes, não aplicáveis ou reprovação." />
+            </div>
+            {qualityChecklist.error ? <p className="mt-2 rounded bg-rose-50 p-2 text-sm text-rose-700">{qualityChecklist.error}</p> : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="rounded border px-3 py-2" onClick={() => setQualityChecklist(null)} disabled={qualityChecklist.loading}>Cancelar</button>
+              <button className="rounded border px-3 py-2 disabled:opacity-60" onClick={saveQualityChecklistDraft} disabled={qualityChecklist.loading}>{qualityChecklist.loading ? 'Salvando...' : 'Salvar rascunho'}</button>
+              <button className="rounded bg-rose-700 px-3 py-2 text-white disabled:opacity-60" onClick={() => completeQualityChecklist('REJECTED')} disabled={qualityChecklist.loading}>Concluir reprovado</button>
+              <button className="rounded bg-indigo-700 px-3 py-2 text-white disabled:opacity-60" onClick={() => completeQualityChecklist('APPROVED')} disabled={qualityChecklist.loading}>Concluir aprovado</button>
             </div>
           </div>
         </div>

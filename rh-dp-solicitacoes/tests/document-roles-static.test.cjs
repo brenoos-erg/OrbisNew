@@ -1,0 +1,22 @@
+const fs = require('fs')
+const assert = require('assert')
+
+const access = fs.readFileSync('src/lib/documents/documentRoleAccess.ts', 'utf8')
+const catalog = fs.readFileSync('src/lib/documents/documentRoleCatalog.ts', 'utf8')
+const rolesApi = fs.readFileSync('src/app/api/documents/roles/route.ts', 'utf8')
+const managerBlock = catalog.match(/DOCUMENT_MANAGER:\s*\[([\s\S]*?)\],\n\s*DOCUMENT_AUDITOR/)
+assert(managerBlock, 'DOCUMENT_MANAGER permission block must exist')
+for (const forbidden of ['CAN_APPROVE_TECHNICAL', 'CAN_APPROVE_QUALITY', 'CAN_PUBLISH_DOCUMENT', 'CAN_DIRECT_PUBLISH']) {
+  assert(!managerBlock[1].includes(forbidden), `DOCUMENT_MANAGER must not grant ${forbidden}`)
+}
+assert(access.includes('validUntil < validFrom'), 'date range validation must be implemented')
+assert(rolesApi.includes('Conflito de segregação exige justificativa'), 'segregation conflicts must require justification')
+assert(access.includes('context.authorUserId === userId'), 'technical approval must block self approval by default')
+assert(access.includes('DocumentApprovalDecisionStatus.PENDING'), 'approval must require a pending decision from the approval snapshot')
+assert(!access.includes('approverGroup.members.some'), 'operational approval must not use current approver-group membership')
+assert(rolesApi.includes('pageSize'), 'roles API must implement pagination')
+assert(rolesApi.includes('Atribuição duplicada'), 'roles API must block duplicates')
+assert(rolesApi.includes('createDocumentRoleAudit'), 'roles API must write audit logs')
+const matrixApi = fs.readFileSync('src/app/api/documents/roles/matrix/route.ts', 'utf8')
+assert(matrixApi.includes('requireActiveUser'), 'matrix API must require authentication')
+console.log('document roles static checks passed')

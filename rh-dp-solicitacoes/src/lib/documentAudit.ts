@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 
-export type DocumentAuditAction = 'VIEW' | 'DOWNLOAD' | 'PRINT'
+export type DocumentAuditAction = 'VIEW' | 'DOWNLOAD' | 'SOURCE_FILE_VIEWED' | 'SOURCE_FILE_DOWNLOADED' | 'SOURCE_FILE_INTEGRITY_FAILED' | 'PUBLISHED_FILE_INTEGRITY_FAILED' | 'PRINT'
 
 export async function registerDocumentAuditLog(input: {
   action: DocumentAuditAction

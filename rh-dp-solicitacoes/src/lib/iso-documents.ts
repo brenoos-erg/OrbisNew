@@ -1,5 +1,6 @@
 import { DocumentVersionStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { resolveSourceFileAccess } from '@/lib/documents/documentSourceAccess'
 
 export const ISO_GRID_SELECT = {
 id: true,
@@ -109,6 +110,7 @@ export async function fetchGrid(
   sortOrder: Prisma.SortOrder,
   codeSearch?: string,
   fallbackWhere?: Prisma.DocumentVersionWhereInput,
+  userId?: string,
 ) {
   const codeNormalized = normalizeDocumentCodeSearch(codeSearch ?? '')
   const [total, rows] = await Promise.all([
@@ -132,18 +134,17 @@ export async function fetchGrid(
     const matchedRows = fallbackRows.filter((row) => normalizeDocumentCodeSearch(row.document.code).includes(codeNormalized))
     const pagedRows = matchedRows.slice((page - 1) * pageSize, page * pageSize)
 
-    return formatGridResult(matchedRows.length, page, pageSize, pagedRows)
+    return formatGridResult(matchedRows.length, page, pageSize, pagedRows, userId)
   }
 
-  return formatGridResult(total, page, pageSize, rows)
+  return formatGridResult(total, page, pageSize, rows, userId)
 }
 
-function formatGridResult(total: number, page: number, pageSize: number, rows: Prisma.DocumentVersionGetPayload<{ select: typeof ISO_GRID_SELECT }>[]) {
-  return {
-    total,
-    page,
-    pageSize,
-    items: rows.map((row) => ({
+async function formatGridResult(total: number, page: number, pageSize: number, rows: Prisma.DocumentVersionGetPayload<{ select: typeof ISO_GRID_SELECT }>[], userId?: string) {
+  const items = await Promise.all(rows.map(async (row) => {
+    const sourceAccess = userId ? await resolveSourceFileAccess(userId, row.id, 'attachment') : null
+    const sourceFileAvailable = Boolean(sourceAccess?.sourceFileAvailable)
+    return {
       versionId: row.id,
       dataPublicacao: row.publishedAt,
       codigo: row.document.code,
@@ -162,8 +163,12 @@ function formatGridResult(total: number, page: number, pageSize: number, rows: P
       ownerDepartmentId: null,
       ownerCostCenterId: row.document.ownerCostCenter?.id ?? null,
       authorUserId: row.document.author.id,
-    })),
-  }
+      sourceFileAvailable,
+      canViewSourceFile: Boolean(sourceAccess?.canViewSourceFile),
+      canDownloadSourceFile: Boolean(sourceAccess?.canDownloadSourceFile),
+    }
+  }))
+  return { total, page, pageSize, items }
 }
 export async function explainPublishedVisibility(code: string, where: Prisma.DocumentVersionWhereInput, totalFound: number) {
   const document = await prisma.isoDocument.findFirst({

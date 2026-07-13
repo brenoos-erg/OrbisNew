@@ -105,6 +105,7 @@ model CostCenter {
   qualityActionPlansResponsible QualityActionPlan[]          @relation("QualityActionPlanResponsibleCenter")
   qualityActionPlansImpact      QualityActionPlan[]          @relation("QualityActionPlanImpactCenter")
   isoDocuments                  IsoDocument[]
+  documentRoleAssignments       DocumentRoleAssignment[]
 
   @@map("CostCenter")
 }
@@ -225,22 +226,23 @@ model TipoSolicitacaoApprover {
 }
 
 model Department {
-  id              String                     @id @default(uuid())
-  name            String
-  sigla           String                     @unique
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
-  code            String                     @unique
-  costCenters     CostCenter[]
-  modules         DepartmentModule[]
-  positions       Position[]
-  solicitations   Solicitation[]
-  workflows       SolicitationWorkflow[]
-  workflowSteps   SolicitationWorkflowStep[]
-  users           User[]
-  userDepartments UserDepartment[]
-  isoDocuments    IsoDocument[]
-  approverGroups  ApproverGroup[]
+  id                      String                     @id @default(uuid())
+  name                    String
+  sigla                   String                     @unique
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  code                    String                     @unique
+  costCenters             CostCenter[]
+  modules                 DepartmentModule[]
+  positions               Position[]
+  solicitations           Solicitation[]
+  workflows               SolicitationWorkflow[]
+  workflowSteps           SolicitationWorkflowStep[]
+  users                   User[]
+  userDepartments         UserDepartment[]
+  isoDocuments            IsoDocument[]
+  approverGroups          ApproverGroup[]
+  documentRoleAssignments DocumentRoleAssignment[]
 }
 
 model Solicitation {
@@ -430,41 +432,54 @@ model User {
   vehicleDisplacementCheckins                VehicleDisplacementCheckin[]
   vehicleStatusLogs                          VehicleStatusLog[]
   tiEquipments                               TiEquipment[]
-  documentsCreated                           Document[]                     @relation("DocumentCreatedBy")
-  documentsAssigned                          DocumentAssignment[]           @relation("DocumentAssignedTo")
-  WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                  @relation("WorkRefusal_analyzedByIdToUser")
-  WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                  @relation("WorkRefusal_createdByIdToUser")
+  documentsCreated                           Document[]                       @relation("DocumentCreatedBy")
+  documentsAssigned                          DocumentAssignment[]             @relation("DocumentAssignedTo")
+  WorkRefusal_WorkRefusal_analyzedByIdToUser WorkRefusal[]                    @relation("WorkRefusal_analyzedByIdToUser")
+  WorkRefusal_WorkRefusal_createdByIdToUser  WorkRefusal[]                    @relation("WorkRefusal_createdByIdToUser")
   WorkRefusalAttachment                      WorkRefusalAttachment[]
   WorkRefusalHistory                         WorkRefusalHistory[]
-  nonConformitiesAsRequester                 NonConformity[]                @relation("NonConformityRequester")
-  nonConformitiesAsQualityApprover           NonConformity[]                @relation("NonConformityQualityApprover")
-  nonConformitiesAsEffectivenessApprover     NonConformity[]                @relation("NonConformityEffectivenessApprover")
+  nonConformitiesAsRequester                 NonConformity[]                  @relation("NonConformityRequester")
+  nonConformitiesAsQualityApprover           NonConformity[]                  @relation("NonConformityQualityApprover")
+  nonConformitiesAsEffectivenessApprover     NonConformity[]                  @relation("NonConformityEffectivenessApprover")
   nonConformityActionItems                   NonConformityActionItem[]
-  nonConformityActionItemsCreated            NonConformityActionItem[]      @relation("NonConformityActionItemCreatedBy")
-  qualityActionPlansCreated                  QualityActionPlan[]            @relation("QualityActionPlanCreatedBy")
-  qualityActionPlansResponsible              QualityActionPlan[]            @relation("QualityActionPlanResponsible")
+  nonConformityActionItemsCreated            NonConformityActionItem[]        @relation("NonConformityActionItemCreatedBy")
+  qualityActionPlansCreated                  QualityActionPlan[]              @relation("QualityActionPlanCreatedBy")
+  qualityActionPlansResponsible              QualityActionPlan[]              @relation("QualityActionPlanResponsible")
   nonConformityAttachments                   NonConformityAttachment[]
   nonConformityComments                      NonConformityComment[]
   nonConformityTimelineEvents                NonConformityTimeline[]
-  isoDocumentsAuthored                       IsoDocument[]                  @relation("IsoDocumentAuthor")
+  isoDocumentsAuthored                       IsoDocument[]                    @relation("IsoDocumentAuthor")
   isoApproverGroupMemberships                ApproverGroupMember[]
-  isoApprovalsDecided                        DocumentApproval[]             @relation("IsoApprovalDecidedBy")
-  isoAttachmentsUploaded                     DocumentAttachment[]           @relation("IsoAttachmentUploadedBy")
+  isoApprovalsDecided                        DocumentApproval[]               @relation("IsoApprovalDecidedBy")
+  documentSourceApproverSnapshots            DocumentSourceApproverSnapshot[]
+  documentApprovalDecisions                  DocumentApprovalDecision[]       @relation("DocumentApprovalDecisionUser")
+  documentApprovalDecisionsWaived            DocumentApprovalDecision[]       @relation("DocumentApprovalDecisionWaivedBy")
+  documentQualityChecklists                  DocumentQualityChecklist[]       @relation("DocumentQualityChecklistReviewer")
+  documentSegregationExceptionsRequested     DocumentSegregationException[]   @relation("DocumentSegregationExceptionRequestedBy")
+  documentSegregationExceptionsDecided       DocumentSegregationException[]   @relation("DocumentSegregationExceptionDecidedBy")
+  isoAttachmentsUploaded                     DocumentAttachment[]             @relation("IsoAttachmentUploadedBy")
   isoDownloadLogs                            DocumentDownloadLog[]
   isoAuditLogs                               DocumentAuditLog[]
   auditLogs                                  AuditLog[]
-  permissionAuditLogsAsActor                 PermissionAuditLog[]           @relation("PermissionAuditActor")
-  permissionAuditLogsAsTarget                PermissionAuditLog[]           @relation("PermissionAuditTarget")
+  permissionAuditLogsAsActor                 PermissionAuditLog[]             @relation("PermissionAuditActor")
+  permissionAuditLogsAsTarget                PermissionAuditLog[]             @relation("PermissionAuditTarget")
   tipoSolicitacaoAuditLogs                   TipoSolicitacaoAuditLog[]
   solicitationWorkflowAuditLogs              SolicitationWorkflowAuditLog[]
   solicitationNotificationLogs               SolicitationNotificationLog[]
   isoTermAcceptances                         DocumentTermAcceptance[]
   isoTermActionAcceptances                   DocumentTermActionAcceptance[]
-  isoDistributionsCreated                    Distribution[]                 @relation("IsoDistributionCreatedBy")
+  isoDistributionsCreated                    Distribution[]                   @relation("IsoDistributionCreatedBy")
   isoDistributionTargets                     DistributionTarget[]
   isoReadReceipts                            ReadReceipt[]
-  isoPrintCopiesIssued                       PrintCopy[]                    @relation("IsoPrintCopyIssuedBy")
+  isoPrintCopiesIssued                       PrintCopy[]                      @relation("IsoPrintCopyIssuedBy")
   documentApprovalControls                   DocumentApprovalControl[]
+  documentRoleAssignments                    DocumentRoleAssignment[]         @relation("DocumentRoleAssignedUser")
+  documentRolesCreated                       DocumentRoleAssignment[]         @relation("DocumentRoleCreatedBy")
+  documentRolesUpdated                       DocumentRoleAssignment[]         @relation("DocumentRoleUpdatedBy")
+  documentRolesDisabled                      DocumentRoleAssignment[]         @relation("DocumentRoleDisabledBy")
+  documentRoleSubstitutions                  DocumentRoleAssignment[]         @relation("DocumentRoleSubstituteFor")
+  documentRoleAuditLogsAsActor               DocumentRoleAuditLog[]           @relation("DocumentRoleAuditActor")
+  documentRoleAuditLogsAsTarget              DocumentRoleAuditLog[]           @relation("DocumentRoleAuditTarget")
   isoDocumentNotificationLogs                DocumentNotificationLog[]
 
   @@map("User")
@@ -481,17 +496,19 @@ model DocumentTypeCatalog {
   documents          IsoDocument[]
   approvalFlowItems  DocumentTypeApprovalFlow[]
   notificationRules  DocumentNotificationRule[]
+  roleAssignments    DocumentRoleAssignment[]
 }
 
 model ApproverGroup {
-  id           String                     @id @default(uuid())
-  name         String
-  departmentId String?
-  createdAt    DateTime                   @default(now())
-  updatedAt    DateTime                   @updatedAt
-  department   Department?                @relation(fields: [departmentId], references: [id])
-  members      ApproverGroupMember[]
-  flowItems    DocumentTypeApprovalFlow[]
+  id              String                     @id @default(uuid())
+  name            String
+  departmentId    String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  department      Department?                @relation(fields: [departmentId], references: [id])
+  members         ApproverGroupMember[]
+  flowItems       DocumentTypeApprovalFlow[]
+  roleAssignments DocumentRoleAssignment[]
 
   @@unique([name, departmentId])
 }
@@ -507,50 +524,58 @@ model ApproverGroupMember {
 }
 
 model DocumentTypeApprovalFlow {
-  id                String                     @id @default(uuid())
-  documentTypeId    String
-  order             Int
-  stepType          DocumentFlowStepType
-  approverGroupId   String
-  active            Boolean                    @default(true)
-  documentType      DocumentTypeCatalog        @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
-  approverGroup     ApproverGroup              @relation(fields: [approverGroupId], references: [id])
-  approvals         DocumentApproval[]
-  notificationRules DocumentNotificationRule[]
+  id                      String                           @id @default(uuid())
+  documentTypeId          String
+  order                   Int
+  stepType                DocumentFlowStepType
+  approverGroupId         String
+  approvalRule            DocumentApprovalRule             @default(ALL)
+  minimumApprovals        Int?
+  active                  Boolean                          @default(true)
+  documentType            DocumentTypeCatalog              @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+  approverGroup           ApproverGroup                    @relation(fields: [approverGroupId], references: [id])
+  approvals               DocumentApproval[]
+  approvalSteps           DocumentApprovalStep[]
+  sourceApproverSnapshots DocumentSourceApproverSnapshot[]
+  notificationRules       DocumentNotificationRule[]
 
-  @@unique([documentTypeId, order])
+  @@index([documentTypeId, order])
 }
 
 model IsoDocument {
-  id                 String                    @id @default(uuid())
-  code               String
-  activeCode         String?                   @unique
-  title              String
-  documentTypeId     String
-  ownerDepartmentId  String?
-  ownerCostCenterId  String?
-  authorUserId       String
-  physicalLocation   String?
-  accessType         String
-  validityAt         DateTime?
-  summary            String?                   @db.LongText
-  affectedAreasNotes String?                   @db.LongText
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  documentType       DocumentTypeCatalog       @relation(fields: [documentTypeId], references: [id])
-  ownerDepartment    Department?               @relation(fields: [ownerDepartmentId], references: [id])
-  ownerCostCenter    CostCenter?               @relation(fields: [ownerCostCenterId], references: [id])
-  author             User                      @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
-  versions           DocumentVersion[]
-  downloadLogs       DocumentDownloadLog[]
-  auditLogs          DocumentAuditLog[]
-  distributions      Distribution[]
-  printCopies        PrintCopy[]
-  notificationLogs   DocumentNotificationLog[]
-  inactiveAt         DateTime?
-  inactiveById       String?
-  inactiveReason     String?                   @db.LongText
-  isActive           Boolean                   @default(true)
+  id                        String                         @id @default(uuid())
+  code                      String
+  activeCode                String?                        @unique
+  title                     String
+  documentTypeId            String
+  ownerDepartmentId         String?
+  ownerCostCenterId         String?
+  authorUserId              String
+  currentPublishedVersionId String?                        @unique
+  physicalLocation          String?
+  accessType                String
+  validityAt                DateTime?
+  summary                   String?                        @db.LongText
+  affectedAreasNotes        String?                        @db.LongText
+  createdAt                 DateTime                       @default(now())
+  updatedAt                 DateTime                       @updatedAt
+  documentType              DocumentTypeCatalog            @relation(fields: [documentTypeId], references: [id])
+  ownerDepartment           Department?                    @relation(fields: [ownerDepartmentId], references: [id])
+  ownerCostCenter           CostCenter?                    @relation(fields: [ownerCostCenterId], references: [id])
+  author                    User                           @relation("IsoDocumentAuthor", fields: [authorUserId], references: [id])
+  currentPublishedVersion   DocumentVersion?               @relation("IsoDocumentCurrentPublishedVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  versions                  DocumentVersion[]
+  downloadLogs              DocumentDownloadLog[]
+  auditLogs                 DocumentAuditLog[]
+  distributions             Distribution[]
+  printCopies               PrintCopy[]
+  notificationLogs          DocumentNotificationLog[]
+  roleAssignments           DocumentRoleAssignment[]
+  segregationExceptions     DocumentSegregationException[]
+  inactiveAt                DateTime?
+  inactiveById              String?
+  inactiveReason            String?                        @db.LongText
+  isActive                  Boolean                        @default(true)
 
   @@index([ownerDepartmentId])
   @@index([ownerCostCenterId])
@@ -559,31 +584,53 @@ model IsoDocument {
 }
 
 model DocumentVersion {
-  id                    String                         @id @default(uuid())
-  documentId            String
-  revisionNumber        Int
-  revisionReason        String?                        @db.LongText
-  status                DocumentVersionStatus
-  fileUrl               String?                        @db.Text
-  createdAt             DateTime                       @default(now())
-  publishedAt           DateTime?
-  expiresAt             DateTime?
-  nextReviewAt          DateTime?
-  isCurrentPublished    Boolean                        @default(false)
-  obsoleteAt            DateTime?
-  obsoleteReason        String?                        @db.LongText
-  obsoletedById         String?
-  operationalUseBlocked Boolean                        @default(false)
-  document              IsoDocument                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  approvals             DocumentApproval[]
-  attachments           DocumentAttachment[]
-  downloadLogs          DocumentDownloadLog[]
-  auditLogs             DocumentAuditLog[]
-  termActionAcceptances DocumentTermActionAcceptance[]
-  readReceipts          ReadReceipt[]
-  printCopies           PrintCopy[]
-  distributions         Distribution[]
-  notificationLogs      DocumentNotificationLog[]
+  id                      String                           @id @default(uuid())
+  documentId              String
+  revisionNumber          Int
+  revisionReason          String?                          @db.LongText
+  status                  DocumentVersionStatus
+  fileUrl                 String?                          @db.Text
+  sourceFileUrl           String?                          @db.Text
+  sourceStorageKey        String?                          @db.Text
+  sourceOriginalName      String?
+  sourceMimeType          String?
+  sourceSizeBytes         BigInt?
+  sourceSha256            String?
+  publishedFileUrl        String?                          @db.Text
+  publishedStorageKey     String?                          @db.Text
+  publishedOriginalName   String?
+  publishedMimeType       String?
+  publishedSizeBytes      BigInt?
+  publishedSha256         String?
+  createdAt               DateTime                         @default(now())
+  publishedAt             DateTime?
+  expiresAt               DateTime?
+  nextReviewAt            DateTime?
+  isCurrentPublished      Boolean                          @default(false)
+  obsoleteAt              DateTime?
+  obsoleteReason          String?                          @db.LongText
+  obsoletedById           String?
+  operationalUseBlocked   Boolean                          @default(false)
+  cancelledAt             DateTime?
+  cancelledById           String?
+  cancelReason            String?                          @db.LongText
+  replacementDocumentId   String?
+  document                IsoDocument                      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  approvals               DocumentApproval[]
+  approvalRounds          DocumentApprovalRound[]
+  approvalSteps           DocumentApprovalStep[]
+  qualityChecklists       DocumentQualityChecklist[]
+  segregationExceptions   DocumentSegregationException[]
+  currentForDocument      IsoDocument?                     @relation("IsoDocumentCurrentPublishedVersion")
+  sourceApproverSnapshots DocumentSourceApproverSnapshot[]
+  attachments             DocumentAttachment[]
+  downloadLogs            DocumentDownloadLog[]
+  auditLogs               DocumentAuditLog[]
+  termActionAcceptances   DocumentTermActionAcceptance[]
+  readReceipts            ReadReceipt[]
+  printCopies             PrintCopy[]
+  distributions           Distribution[]
+  notificationLogs        DocumentNotificationLog[]
 
   @@unique([documentId, revisionNumber])
   @@index([status, publishedAt])
@@ -604,6 +651,108 @@ model DocumentApproval {
   @@unique([versionId, flowItemId])
 }
 
+model DocumentApprovalRound {
+  id                String                      @id @default(uuid())
+  versionId         String
+  roundNumber       Int
+  status            DocumentApprovalRoundStatus @default(PENDING)
+  startedAt         DateTime                    @default(now())
+  completedAt       DateTime?
+  version           DocumentVersion             @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  qualityChecklists DocumentQualityChecklist[]
+  steps             DocumentApprovalStep[]
+
+  @@unique([versionId, roundNumber])
+  @@index([versionId, status])
+}
+
+model DocumentApprovalStep {
+  id                String                     @id @default(uuid())
+  versionId         String
+  roundId           String
+  flowItemId        String
+  order             Int
+  stepType          DocumentFlowStepType
+  approvalRule      DocumentApprovalRule
+  minimumApprovals  Int?
+  status            DocumentApprovalStepStatus @default(PENDING)
+  startedAt         DateTime                   @default(now())
+  completedAt       DateTime?
+  version           DocumentVersion            @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  round             DocumentApprovalRound      @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  flowItem          DocumentTypeApprovalFlow   @relation(fields: [flowItemId], references: [id], onDelete: Restrict)
+  decisions         DocumentApprovalDecision[]
+  qualityChecklists DocumentQualityChecklist[]
+
+  @@unique([roundId, flowItemId])
+  @@index([versionId, status, order])
+  @@index([roundId, order])
+}
+
+model DocumentApprovalDecision {
+  id          String                         @id @default(uuid())
+  stepId      String
+  userId      String
+  status      DocumentApprovalDecisionStatus @default(PENDING)
+  decidedAt   DateTime?
+  comment     String?                        @db.LongText
+  required    Boolean                        @default(true)
+  waivedAt    DateTime?
+  waivedById  String?
+  waiveReason String?                        @db.LongText
+  step        DocumentApprovalStep           @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  user        User                           @relation("DocumentApprovalDecisionUser", fields: [userId], references: [id], onDelete: Restrict)
+  waivedBy    User?                          @relation("DocumentApprovalDecisionWaivedBy", fields: [waivedById], references: [id], onDelete: SetNull)
+
+  @@unique([stepId, userId])
+  @@index([userId, status])
+}
+
+model DocumentQualityChecklist {
+  id             String                         @id @default(uuid())
+  versionId      String
+  reviewerUserId String
+  completedAt    DateTime?
+  roundId        String?
+  stepId         String?
+  result         DocumentQualityChecklistResult @default(PENDING)
+  notes          String?                        @db.LongText
+  items          Json?
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  version        DocumentVersion                @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  round          DocumentApprovalRound?         @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  step           DocumentApprovalStep?          @relation(fields: [stepId], references: [id], onDelete: SetNull)
+  reviewer       User                           @relation("DocumentQualityChecklistReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([versionId, completedAt])
+  @@index([roundId, stepId])
+  @@index([reviewerUserId])
+}
+
+model DocumentSegregationException {
+  id             String                             @id @default(uuid())
+  documentId     String
+  versionId      String
+  conflictType   DocumentSegregationConflictType
+  requestedById  String
+  requestedAt    DateTime                           @default(now())
+  justification  String                             @db.LongText
+  status         DocumentSegregationExceptionStatus @default(PENDING)
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionReason String?                            @db.LongText
+  pendingKey     String?                            @unique
+  document       IsoDocument                        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version        DocumentVersion                    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  requestedBy    User                               @relation("DocumentSegregationExceptionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy      User?                              @relation("DocumentSegregationExceptionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([versionId, conflictType, status])
+  @@index([documentId, status])
+  @@index([requestedById, status])
+}
+
 model DocumentAttachment {
   id           String          @id @default(uuid())
   versionId    String
@@ -613,6 +762,26 @@ model DocumentAttachment {
   uploadedAt   DateTime        @default(now())
   version      DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   uploadedBy   User            @relation("IsoAttachmentUploadedBy", fields: [uploadedById], references: [id])
+}
+
+model DocumentSourceApproverSnapshot {
+  id          String                     @id @default(uuid())
+  versionId   String
+  flowItemId  String
+  userId      String
+  stepType    DocumentFlowStepType
+  order       Int
+  roundNumber Int                        @default(1)
+  policy      DocumentSourceAccessPolicy @default(CURRENT_AND_HISTORICAL)
+  createdAt   DateTime                   @default(now())
+  version     DocumentVersion            @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  flowItem    DocumentTypeApprovalFlow   @relation(fields: [flowItemId], references: [id], onDelete: Restrict)
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, flowItemId, userId, roundNumber])
+  @@index([versionId, roundNumber])
+  @@index([versionId, userId])
+  @@index([flowItemId, userId])
 }
 
 model DocumentDownloadLog {
@@ -641,6 +810,7 @@ model DocumentAuditLog {
   ip         String?
   userAgent  String?
   reason     String?             @db.LongText
+  metadata   Json?
   document   IsoDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
   version    DocumentVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
   user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -690,6 +860,79 @@ model DocumentTermActionAcceptance {
   @@unique([termId, userId, versionId, intent], map: "DocumentTermActionAcceptance_unique")
   @@index([userId, intent, acceptedAt])
   @@index([versionId, intent, acceptedAt])
+}
+
+model DocumentRoleAssignment {
+  id                  String                @id @default(cuid())
+  userId              String
+  role                DocumentControlRole
+  active              Boolean               @default(true)
+  scopeType           DocumentRoleScopeType @default(GLOBAL)
+  scopeKey            String                @default("GLOBAL")
+  departmentId        String?
+  costCenterId        String?
+  documentTypeId      String?
+  documentFamily      String?
+  documentId          String?
+  approverGroupId     String?
+  validFrom           DateTime?
+  validUntil          DateTime?
+  substituteForUserId String?
+  temporaryReason     String?               @db.LongText
+  justification       String?               @db.LongText
+  createdById         String
+  createdAt           DateTime              @default(now())
+  updatedById         String?
+  updatedAt           DateTime              @updatedAt
+  disabledAt          DateTime?
+  disabledById        String?
+  disableReason       String?               @db.LongText
+  user                User                  @relation("DocumentRoleAssignedUser", fields: [userId], references: [id], onDelete: Restrict)
+  createdBy           User                  @relation("DocumentRoleCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?                 @relation("DocumentRoleUpdatedBy", fields: [updatedById], references: [id])
+  disabledBy          User?                 @relation("DocumentRoleDisabledBy", fields: [disabledById], references: [id])
+  substituteFor       User?                 @relation("DocumentRoleSubstituteFor", fields: [substituteForUserId], references: [id])
+  department          Department?           @relation(fields: [departmentId], references: [id])
+  costCenter          CostCenter?           @relation(fields: [costCenterId], references: [id])
+  documentType        DocumentTypeCatalog?  @relation(fields: [documentTypeId], references: [id])
+  document            IsoDocument?          @relation(fields: [documentId], references: [id])
+  approverGroup       ApproverGroup?        @relation(fields: [approverGroupId], references: [id])
+
+  auditLogs DocumentRoleAuditLog[]
+
+  @@unique([userId, role, scopeType, scopeKey], map: "DocumentRoleAssignment_scope_unique")
+  @@index([userId, role, active])
+  @@index([scopeType, scopeKey])
+  @@index([scopeType, departmentId, costCenterId, documentTypeId, documentId, approverGroupId])
+  @@index([validUntil, active])
+}
+
+model DocumentRoleAuditLog {
+  id                String                           @id @default(cuid())
+  assignmentId      String?
+  targetUserId      String
+  actorUserId       String
+  action            DocumentRoleAuditAction
+  roleBefore        DocumentControlRole?
+  roleAfter         DocumentControlRole?
+  permissionsBefore Json?
+  permissionsAfter  Json?
+  scopeBefore       Json?
+  scopeAfter        Json?
+  validFromBefore   DateTime?
+  validFromAfter    DateTime?
+  validUntilBefore  DateTime?
+  validUntilAfter   DateTime?
+  justification     String?                          @db.LongText
+  conflictType      DocumentSegregationConflictType?
+  createdAt         DateTime                         @default(now())
+  assignment        DocumentRoleAssignment?          @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  targetUser        User                             @relation("DocumentRoleAuditTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  actorUser         User                             @relation("DocumentRoleAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([targetUserId, createdAt])
+  @@index([assignmentId, createdAt])
+  @@index([action, createdAt])
 }
 
 model DocumentApprovalControl {
@@ -1698,6 +1941,88 @@ enum NonConformityApprovalStatus {
   REPROVADO
 }
 
+enum DocumentControlRole {
+  DOCUMENT_VIEWER
+  DOCUMENT_AUTHOR
+  DOCUMENT_REVIEWER
+  TECHNICAL_APPROVER
+  QUALITY_REVIEWER
+  DOCUMENT_PUBLISHER
+  DOCUMENT_MANAGER
+  DOCUMENT_AUDITOR
+  EXTERNAL_DOCUMENT_MANAGER
+}
+
+enum DocumentRoleScopeType {
+  GLOBAL
+  DEPARTMENT
+  COST_CENTER
+  DOCUMENT_TYPE
+  DOCUMENT_FAMILY
+  DOCUMENT
+  APPROVER_GROUP
+}
+
+enum DocumentSourceAccessPolicy {
+  CURRENT_ONLY
+  CURRENT_AND_HISTORICAL
+}
+
+enum DocumentPermission {
+  CAN_VIEW_PUBLISHED
+  CAN_VIEW_SOURCE_FILE
+  CAN_DOWNLOAD_SOURCE_FILE
+  CAN_VIEW_HISTORICAL_VERSIONS
+  CAN_VIEW_HISTORY
+  CAN_VIEW_FULL_AUDIT
+  CAN_CREATE_DOCUMENT
+  CAN_CREATE_REVISION
+  CAN_EDIT_DRAFT
+  CAN_SUBMIT_FOR_APPROVAL
+  CAN_REVIEW_CONTENT
+  CAN_APPROVE_TECHNICAL
+  CAN_REJECT_TECHNICAL
+  CAN_REVIEW_QUALITY
+  CAN_APPROVE_QUALITY
+  CAN_REJECT_QUALITY
+  CAN_PUBLISH_DOCUMENT
+  CAN_DIRECT_PUBLISH
+  CAN_CANCEL_DOCUMENT
+  CAN_INACTIVATE_DOCUMENT
+  CAN_REACTIVATE_DOCUMENT
+  CAN_DELETE_POSTING_ERROR
+  CAN_MANAGE_DOCUMENT_TYPES
+  CAN_MANAGE_APPROVAL_FLOWS
+  CAN_MANAGE_APPROVERS
+  CAN_MANAGE_DOCUMENT_ROLES
+  CAN_MANAGE_EXTERNAL_DOCUMENTS
+  CAN_RUN_DOCUMENT_AUDITS
+  CAN_EXPORT_DOCUMENT_REPORTS
+  CAN_VIEW_DOCUMENT_METRICS
+  CAN_MANAGE_VALIDITY_RULES
+  CAN_MANAGE_NOTIFICATIONS
+}
+
+enum DocumentRoleAuditAction {
+  DOCUMENT_ROLE_ASSIGNED
+  DOCUMENT_ROLE_UPDATED
+  DOCUMENT_ROLE_DISABLED
+  DOCUMENT_ROLE_REACTIVATED
+  DOCUMENT_SCOPE_CHANGED
+  DOCUMENT_VALIDITY_CHANGED
+  SEGREGATION_CONFLICT_DETECTED
+  SEGREGATION_EXCEPTION_APPROVED
+}
+
+enum DocumentSegregationConflictType {
+  SELF_TECHNICAL_APPROVAL
+  SELF_QUALITY_APPROVAL
+  SELF_PUBLICATION
+  TECHNICAL_AND_QUALITY_APPROVER
+  AUTHOR_AND_DOCUMENT_MANAGER
+  APPROVER_AND_POSTING_ERROR_DELETER
+}
+
 enum DocumentFlowStepType {
   REVIEW
   QUALITY
@@ -1710,16 +2035,60 @@ enum DocumentVersionStatus {
   EM_REVISAO
   EM_ANALISE_QUALIDADE
   AG_APROVACAO
+  AGUARDANDO_PUBLICACAO
   PUBLICADO
+  PUBLICANDO
   CANCELADO
   OBSOLETO
   VENCIDO
+}
+
+enum DocumentApprovalRule {
+  ALL
+  ANY
+  MINIMUM
 }
 
 enum DocumentApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  WAIVED
+}
+
+enum DocumentApprovalRoundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum DocumentApprovalStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  WAIVED
+}
+
+enum DocumentApprovalDecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WAIVED
+}
+
+enum DocumentQualityChecklistResult {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentSegregationExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
 }
 
 enum DocumentNotificationEvent {
@@ -1727,7 +2096,12 @@ enum DocumentNotificationEvent {
   DOCUMENT_SUBMITTED_FOR_APPROVAL
   DOCUMENT_APPROVED
   DOCUMENT_REJECTED
+  DOCUMENT_CANCELLED
   DOCUMENT_QUALITY_REVIEW
+  DOCUMENT_AWAITING_PUBLICATION
+  SEGREGATION_EXCEPTION_REQUESTED
+  SEGREGATION_EXCEPTION_APPROVED
+  SEGREGATION_EXCEPTION_REJECTED
   DOCUMENT_PUBLISHED
   DOCUMENT_REVISED
   DOCUMENT_DISTRIBUTED
@@ -1754,9 +2128,21 @@ enum DocumentNotificationStatus {
 enum DocumentAuditAction {
   VIEW
   DOWNLOAD
+  SOURCE_FILE_VIEWED
+  SOURCE_FILE_DOWNLOADED
+  SOURCE_FILE_INTEGRITY_FAILED
+  PUBLISHED_FILE_INTEGRITY_FAILED
   PRINT
+  TECHNICAL_APPROVED
+  TECHNICAL_REJECTED
+  QUALITY_APPROVED
+  QUALITY_REJECTED
+  PUBLISHED
   CANCEL
   DIRECT_PUBLICATION
+  SEGREGATION_EXCEPTION_REQUESTED
+  SEGREGATION_EXCEPTION_APPROVED
+  SEGREGATION_EXCEPTION_REJECTED
   OBSOLETE
   CONTROLLED_COPY_ISSUED
   CONTROLLED_COPY_CANCELED

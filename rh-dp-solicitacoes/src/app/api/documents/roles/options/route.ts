@@ -1,0 +1,6 @@
+import { NextResponse } from 'next/server'
+import { requireActiveUser } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { canManageDocumentRoles } from '@/lib/documents/documentRoleAccess'
+import { documentRoleApiError } from '../http'
+export async function GET() { try { const me = await requireActiveUser(); if (!(await canManageDocumentRoles(me.id, me.role))) throw new Error('Acesso negado.'); const [departments, costCenters, documentTypes, documents, approverGroups] = await Promise.all([prisma.department.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }), prisma.costCenter.findMany({ orderBy: { description: 'asc' }, select: { id: true, description: true, code: true } }), prisma.documentTypeCatalog.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, description: true } }), prisma.isoDocument.findMany({ orderBy: { code: 'asc' }, take: 200, select: { id: true, code: true, title: true } }), prisma.approverGroup.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } })]); return NextResponse.json({ departments, costCenters, documentTypes, documents, approverGroups }) } catch (error) { return documentRoleApiError(error) } }
