@@ -6,6 +6,10 @@ on:
   push:
     branches: [fix/qualidade-controle-documentos]
 
+concurrency:
+  group: quality-pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -15,3 +19,4 @@ jobs:
         working-directory: rh-dp-solicitacoes
     env:
       DATABASE_URL: mysql://test:test@127.0.0.1:3306/test
+      JWT_SECRET:
