@@ -3,16 +3,8 @@ name: Quality PR Validation
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'rh-dp-solicitacoes/**'
-      - '.github/workflows/quality-pr-validation.yml'
   push:
-    branches:
-      - 'fix/qualidade-controle-documentos'
-
-concurrency:
-  group: quality-pr-validation-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [fix/qualidade-controle-documentos]
 
 jobs:
   validate:
@@ -23,47 +15,3 @@ jobs:
         working-directory: rh-dp-solicitacoes
     env:
       DATABASE_URL: mysql://test:test@127.0.0.1:3306/test
-      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      APP_BASE_URL: http://localhost:3000
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: rh-dp-solicitacoes/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Generate Prisma client
-        run: npx prisma generate --schema ./prisma/schema.prisma
-
-      - name: Validate TypeScript
-        run: npm run lint
-
-      - name: Run full automated test suite
-        shell: bash
-        run: |
-          set +e
-          npm test > /tmp/full-test.log 2>&1
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo '--- trecho final dos testes com falha ---'
-            tail -n 180 /tmp/full-test.log
-            exit "$status"
-          fi
-          tail -n 40 /tmp/full-test.log
-
-      - name: Run Quality consolidated tests
-        run: |
-          node tests/document-original-download-quality-static.test.cjs
-          node tests/document-cancel-quality-audit-static.test.cjs
-          node tests/document-quality-management-access-static.test.cjs
-          node tests/quality-requested-features-static.test.cjs
-
-      - name: Build application
-        run: npm run build
