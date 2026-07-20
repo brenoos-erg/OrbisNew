@@ -11,6 +11,8 @@ import { isEpiUniformeReadyToForwardApproval } from '@/lib/epiUniformeFlow'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { buildDocumentUploadPaths, resolveExistingAttachmentPath } from '@/lib/files/attachmentStorage'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canExecuteSolicitationRouteAction } from '@/lib/solicitationRouteActionAuthorization'
 
 async function ensureSensitiveHiringAccess(solicitationId: string, user: { id: string; role: 'COLABORADOR' | 'RH' | 'DP' | 'ADMIN'; departmentId?: string | null }) {
   const solicitation = await prisma.solicitation.findUnique({
@@ -83,6 +85,40 @@ async function encaminharEpiParaAprovacaoComAnexo(solicitationId: string, actorI
   return { changed: true }
 }
 
+
+async function canMutateSolicitationAttachments(solicitationId: string, user: Awaited<ReturnType<typeof requireActiveUser>>) {
+  const solicitation = await prisma.solicitation.findUnique({
+    where: { id: solicitationId },
+    select: {
+      id: true,
+      tipoId: true,
+      tipo: { select: { id: true, codigo: true, nome: true } },
+      status: true,
+      solicitanteId: true,
+      approverId: true,
+      assumidaPorId: true,
+      departmentId: true,
+      costCenterId: true,
+      payload: true,
+      solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } },
+    },
+  })
+  if (!solicitation) return { ok: false as const, status: 404, error: 'Solicitação não encontrada.' }
+  const userAccess = await resolveUserAccessContext({
+    userId: user.id,
+    userLogin: user.login,
+    userEmail: user.email,
+    userFullName: user.fullName,
+    role: user.role,
+    primaryDepartmentId: user.departmentId,
+    primaryDepartment: user.department,
+  })
+  if (!canExecuteSolicitationRouteAction('anexos', userAccess, solicitation)) {
+    return { ok: false as const, status: 403, error: 'Você não possui permissão para alterar anexos desta solicitação.' }
+  }
+  return { ok: true as const }
+}
+
 async function saveFile(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer())
   const ext = path.extname(file.name) || '.bin'
@@ -100,6 +136,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (isViewerOnly) return NextResponse.json({ error: VIEWER_ONLY_ACTION_ERROR }, { status: 403 })
   const access = await ensureSensitiveHiringAccess(solicitationId, me as any)
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+  const mutationAccess = await canMutateSolicitationAttachments(solicitationId, me)
+  if (!mutationAccess.ok) return NextResponse.json({ error: mutationAccess.error }, { status: mutationAccess.status })
 
   const form = await req.formData()
   const files = form.getAll('files').filter((f): f is File => f instanceof File)
@@ -128,6 +166,8 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
 
   const access = await ensureSensitiveHiringAccess(solicitationId, me as any)
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+  const mutationAccess = await canMutateSolicitationAttachments(solicitationId, me)
+  if (!mutationAccess.ok) return NextResponse.json({ error: mutationAccess.error }, { status: mutationAccess.status })
 
   const result = await encaminharEpiParaAprovacaoComAnexo(solicitationId, me.id)
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 })
@@ -154,6 +194,8 @@ export async function DELETE(req: NextRequest) {
   for (const row of rows) {
     const access = await ensureSensitiveHiringAccess(row.solicitationId, me as any)
     if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
+    const mutationAccess = await canMutateSolicitationAttachments(row.solicitationId, me)
+    if (!mutationAccess.ok) return NextResponse.json({ error: mutationAccess.error }, { status: mutationAccess.status })
   }
   await prisma.attachment.deleteMany({ where: { id: { in: ids } } })
   for (const row of rows) {

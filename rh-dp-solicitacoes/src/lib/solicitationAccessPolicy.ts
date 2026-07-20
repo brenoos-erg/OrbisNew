@@ -437,7 +437,7 @@ export type SolicitationAccessLike = {
   assumidaPorId?: string | null
   departmentId?: string | null
   costCenterId?: string | null
-  solicitacaoSetores?: { setor?: string | null; status?: string | null; constaFlag?: unknown }[]
+  solicitacaoSetores?: { setor?: string | null; status?: string | null; constaFlag?: unknown; finalizadoEm?: Date | string | null }[]
   payload?: unknown
 }
 
@@ -451,6 +451,32 @@ function contextAllowedTipoIds(ctx: UserAccessContext) { return ctx.allowedTipoI
 function contextViewerTipoIds(ctx: UserAccessContext) { return ctx.viewerTipoIds ?? (ctx.tipoViewerTipoIds?.filter(Boolean) as string[] | undefined) ?? [] }
 function contextFinalizerTipoIds(ctx: UserAccessContext) { return ctx.finalizerTipoIds ?? (ctx.tipoFinalizerTipoIds?.filter(Boolean) as string[] | undefined) ?? [] }
 function contextActionableTipoIds(ctx: UserAccessContext) { return ctx.actionableTipoIds ?? (ctx.tipoApproverTipoIds?.filter(Boolean) as string[] | undefined) ?? [] }
+
+const CLOSED_SOLICITATION_STATUSES = new Set(['CONCLUIDA', 'CONCLUIDO', 'FINALIZADA', 'FINALIZADO', 'CANCELADA', 'CANCELADO', 'ENCERRADA', 'ENCERRADO', 'RECUSADA', 'RECUSADO', 'REPROVADA', 'REPROVADO'])
+
+function normalizePolicyStatus(status?: string | null) { return normalize(status).replace(/[\s-]+/g, '_').replace(/_+/g, '_') }
+
+export function normalizeSolicitationSectorKey(value?: string | null) { return normalize(value).replace(/[\s-]+/g, '_').replace(/_+/g, '_') }
+
+export function isSolicitationSectorActive(setor: { status?: string | null; finalizadoEm?: Date | string | null }) {
+  if (setor.finalizadoEm) return false
+  const status = normalizePolicyStatus(setor.status)
+  if (!status) return true
+  return !CLOSED_SOLICITATION_STATUSES.has(status)
+}
+
+export function getActiveSolicitationSectorKeys(solicitacaoSetores: SolicitationAccessLike['solicitacaoSetores']) {
+  return new Set(
+    (solicitacaoSetores ?? [])
+      .filter(isSolicitationSectorActive)
+      .map((s) => normalizeSolicitationSectorKey(s.setor))
+      .filter((s): s is string => Boolean(s)),
+  )
+}
+
+function isClosedSolicitationStatus(status?: string | null) {
+  return CLOSED_SOLICITATION_STATUSES.has(normalizePolicyStatus(status))
+}
 
 export async function resolveUserAccessContext(input: {
   userId: string
@@ -505,13 +531,15 @@ function canUserActAsExperienceEvaluator(ctx: UserAccessContext, solicitation: S
   )
 }
 
-function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
+export function canUserActOnCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return true
   if (isExperienceEvaluationTipo({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null })) return false
+  if (solicitation.assumidaPorId === ctx.userId) return true
   if (solicitation.departmentId && contextDepartmentIds(ctx).includes(solicitation.departmentId)) return true
-  const setores = new Set((solicitation.solicitacaoSetores ?? []).map((s) => s.setor).filter((s): s is string => Boolean(s)))
-  if (setores.size > 0 && contextSetorKeys(ctx).some((setor) => setores.has(setor))) return true
-  return Boolean(solicitation.tipoId && contextActionableTipoIds(ctx).includes(solicitation.tipoId))
+  if (solicitation.costCenterId && contextCostCenterIds(ctx).includes(solicitation.costCenterId)) return true
+  const setores = getActiveSolicitationSectorKeys(solicitation.solicitacaoSetores)
+  if (setores.size > 0 && contextSetorKeys(ctx).some((setor) => setores.has(normalizeSolicitationSectorKey(setor)))) return true
+  return false
 }
 
 function canUserActAsFinalizerForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
@@ -536,9 +564,20 @@ export function canViewSolicitation(ctx: UserAccessContext, solicitation: Solici
   return canUserViewSolicitationByFallback({ ...ctx, departmentIds: contextDepartmentIds(ctx), costCenterIds: contextCostCenterIds(ctx), nadaConstaSetores: contextSetorKeys(ctx), tipoApproverTipoIds: contextActionableTipoIds(ctx), tipoViewerTipoIds: contextViewerTipoIds(ctx), tipoFinalizerTipoIds: contextFinalizerTipoIds(ctx) }, solicitation).canView
 }
 
+export function canUserOverrideViewerOnlyForCurrentStage(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
+  if (isAdmin(ctx)) return true
+  if (solicitation.assumidaPorId === ctx.userId) return true
+  if (solicitation.solicitanteId === ctx.userId) return true
+  if (solicitation.approverId === ctx.userId) return true
+  if (canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null })) return true
+  if (canUserActAsExperienceEvaluator(ctx, solicitation)) return true
+  if (canUserActAsFinalizerForCurrentStage(ctx, solicitation)) return true
+  return false
+}
+
 export function isViewerOnlyByPolicy(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (isAdmin(ctx)) return false
-  return Boolean(solicitation.tipoId && contextViewerTipoIds(ctx).includes(solicitation.tipoId) && !contextActionableTipoIds(ctx).includes(solicitation.tipoId) && !Boolean(solicitation.tipoId && contextFinalizerTipoIds(ctx).includes(solicitation.tipoId)) && !canUserActAsExperienceEvaluator(ctx, solicitation) && !canUserActAsFinalizerForCurrentStage(ctx, solicitation) && !canUserActOnCurrentStage(ctx, { ...solicitation, tipoId: null }))
+  return Boolean(solicitation.tipoId && contextViewerTipoIds(ctx).includes(solicitation.tipoId) && !contextActionableTipoIds(ctx).includes(solicitation.tipoId) && !canUserOverrideViewerOnlyForCurrentStage(ctx, solicitation))
 }
 
 export function canAssumeSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
@@ -549,8 +588,17 @@ export function canApproveSolicitation(ctx: UserAccessContext, solicitation: Sol
   if (isAdmin(ctx)) return true
   return Boolean(canViewSolicitation(ctx, solicitation) && solicitation.tipoId && (contextActionableTipoIds(ctx).includes(solicitation.tipoId) || solicitation.approverId === ctx.userId))
 }
-export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) { return !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation) }
-export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) { return canEditSolicitation(ctx, solicitation) }
+export function canEditSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) { return !isClosedSolicitationStatus(solicitation.status) && !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation) && canUserActOnCurrentStage(ctx, solicitation) }
+export function canCommentSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
+  if (isClosedSolicitationStatus(solicitation.status)) return false
+  if (!canViewSolicitation(ctx, solicitation)) return false
+  if (isAdmin(ctx)) return true
+  if (solicitation.solicitanteId === ctx.userId) return true
+  if (solicitation.approverId === ctx.userId) return true
+  if (solicitation.assumidaPorId === ctx.userId) return true
+  if (isViewerOnlyByPolicy(ctx, solicitation)) return false
+  return canUserActOnCurrentStage(ctx, solicitation)
+}
 
 const REQUESTER_EDIT_BLOCKED_STATUSES = new Set(['CONCLUIDA', 'CONCLUIDA', 'FINALIZADA', 'FINALIZADO', 'CANCELADA', 'CANCELADO', 'ENCERRADA', 'ENCERRADO'])
 function normalizeStatusForRequesterEdit(status?: string | null) { return (status ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() }
@@ -561,7 +609,10 @@ export function canRequesterEditRq092AfterSubmit(userId: string | null | undefin
   return isRequesterEditableStatus(solicitation.status)
 }
 
-export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) { return !isViewerOnlyByPolicy(ctx, solicitation) && Boolean(ctx.hasSolicitationsModuleAccess ?? true) && canViewSolicitation(ctx, solicitation) }
+export function canCancelSolicitation(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
+  const onlyApprovalOverride = Boolean((solicitation.approverId === ctx.userId || (solicitation.tipoId && contextActionableTipoIds(ctx).includes(solicitation.tipoId))) && !canUserActOnCurrentStage(ctx, solicitation) && !canUserActAsFinalizerForCurrentStage(ctx, solicitation) && solicitation.solicitanteId !== ctx.userId && solicitation.assumidaPorId !== ctx.userId && !isAdmin(ctx))
+  return !onlyApprovalOverride && !isViewerOnlyByPolicy(ctx, solicitation) && Boolean(ctx.hasSolicitationsModuleAccess ?? true) && canViewSolicitation(ctx, solicitation)
+}
 export function canManageCancellationRequest(ctx: UserAccessContext, solicitation: SolicitationAccessLike) { return !isViewerOnlyByPolicy(ctx, solicitation) && canViewSolicitation(ctx, solicitation) && (isAdmin(ctx) || solicitation.assumidaPorId === ctx.userId || canUserActOnCurrentStage(ctx, solicitation) || canUserActAsFinalizerForCurrentStage(ctx, solicitation)) }
 export function canFinalizeNadaConstaGlobal(ctx: UserAccessContext, solicitation: SolicitationAccessLike) {
   if (!isSolicitacaoNadaConsta({ id: solicitation.tipo?.id ?? solicitation.tipoId ?? null, codigo: solicitation.tipo?.codigo ?? null, nome: solicitation.tipo?.nome ?? null })) return false

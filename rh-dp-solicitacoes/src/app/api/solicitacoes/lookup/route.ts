@@ -30,7 +30,7 @@ export const GET = withModuleLevel(
           tipo: { select: { id: true, codigo: true, nome: true } },
           assumidaPor: { select: { id: true, fullName: true } },
           department: { select: { name: true } },
-          solicitacaoSetores: { select: { setor: true } },
+          solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } },
         },
       })
 

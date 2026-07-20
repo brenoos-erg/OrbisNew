@@ -1007,14 +1007,14 @@ export function SolicitationDetailModal({
       userSectorKeys.has(activeSector as NadaConstaSetorKey)) &&
     !(activeSector === 'SAUDE' && !userIsAdmin && !userSectorKeys.has('SAUDE'))
 
-  const apiCanEdit = detail?.canEdit !== false
-  const apiCanAssume = detail?.canAssume !== false
+  const apiCanEdit = detail?.canEdit === true
+  const apiCanAssume = detail?.canAssume === true
   const apiCanApprove = detail?.canApprove === true
-  const apiCanFinalize = detail?.canFinalize !== false
+  const apiCanFinalize = detail?.canFinalize === true
   const apiCanFinalizeNadaConstaGlobal = detail?.canFinalizeNadaConstaGlobal === true
-  const apiCanCancel = detail?.canCancel !== false
+  const apiCanCancel = detail?.canCancel === true
   const apiCanManageCancellationRequest = detail?.canManageCancellationRequest === true
-  const apiCanComment = detail?.canComment !== false
+  const apiCanComment = detail?.canComment === true
   const hasPendingCancellationRequest = detail?.cancelamentoStatus === 'PENDENTE'
 
   const canEditNadaConstaSetor =
@@ -1181,6 +1181,13 @@ export function SolicitationDetailModal({
   // se canManage=false (Solicitações Enviadas) também não.
   const isViewerOnly = detail?.viewerOnly === true
   const showManagementActions = !isApprovalMode && canManage && !isViewerOnly
+  const hasAnyManagementAction =
+    apiCanAssume ||
+    apiCanEdit ||
+    apiCanComment ||
+    apiCanFinalize ||
+    apiCanCancel ||
+    apiCanManageCancellationRequest
   const userIsSstOrAdmin =
     currentUser?.role === 'ADMIN' ||
    currentUser?.departmentCode === '19' ||
@@ -1367,12 +1374,14 @@ export function SolicitationDetailModal({
   const hasAttachments = (detail?.anexos?.length ?? 0) > 0
   const canEncaminharAprovacaoEpi =
     showManagementActions &&
+    apiCanEdit &&
     isSolicitacaoEpiUniformeTipo &&
     hasAttachments &&
     !isFinalizadaOuCancelada &&
     approvalStatus === 'NAO_PRECISA'
   const canRecusarFeriasDp =
     showManagementActions &&
+    apiCanEdit &&
     isSolicitacaoFerias &&
     isDpDestino &&
     !isFinalizadaOuCancelada
@@ -3433,13 +3442,13 @@ async function handleEncaminharAprovacaoComAnexo() {
                   </div>
                 )}
 
-                {showManagementActions && detail && (
+                {showManagementActions && hasAnyManagementAction && detail && (
                   <aside className="w-full">
                     <div className="space-y-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--card-muted)] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
                     Painel de Tratativas
                   </p>
-                  {!isFinalizadaOuCancelada && (
+                  {!isFinalizadaOuCancelada && apiCanEdit && (
                     <div className="app-card-muted p-3">
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-blue-800">
                         Anexar documento para tratativa/aprovação

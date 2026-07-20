@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
-import { resolveNadaConstaSetoresByDepartment } from '@/lib/solicitationTypes'
 import { canViewSensitiveHiringRequest, getUserDepartmentIds } from '@/lib/sensitiveHiringRequests'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canExecuteSolicitationRouteAction } from '@/lib/solicitationRouteActionAuthorization'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -37,13 +38,15 @@ export async function POST(
       where: { id: solicitationId },
       select: {
         id: true,
+        tipoId: true,
         status: true,
         costCenterId: true,
         departmentId: true,
         approverId: true,
         assumidaPorId: true,
         solicitanteId: true,
-        solicitacaoSetores: { select: { setor: true } },
+        payload: true,
+        solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } },
         tipo: { select: { id: true, codigo: true, nome: true } },
       },
     })
@@ -59,33 +62,6 @@ export async function POST(
       )
     }
 
-    const [costCenterLinks, departmentLinks] = await Promise.all([
-      prisma.userCostCenter.findMany({ where: { userId: me.id }, select: { costCenterId: true } }),
-      prisma.userDepartment.findMany({
-        where: { userId: me.id },
-        select: { departmentId: true, department: { select: { code: true, name: true } } },
-      }),
-    ])
-
-    const ccIds = new Set<string>()
-    const deptIds = new Set<string>()
-
-    if (me.costCenterId) ccIds.add(me.costCenterId)
-    if (me.departmentId) deptIds.add(me.departmentId)
-    for (const link of costCenterLinks) ccIds.add(link.costCenterId)
-    for (const link of departmentLinks) deptIds.add(link.departmentId)
-
-    const setorKeys = new Set<string>()
-    for (const setor of resolveNadaConstaSetoresByDepartment(me.department)) {
-      setorKeys.add(setor)
-    }
-    for (const link of departmentLinks) {
-      for (const setor of resolveNadaConstaSetoresByDepartment(link.department)) {
-        setorKeys.add(setor)
-      }
-    }
-
-
     const userDepartmentIds = await getUserDepartmentIds(me.id, me.departmentId)
     const canViewSensitive = canViewSensitiveHiringRequest({
       user: { id: me.id, role: me.role },
@@ -100,16 +76,16 @@ export async function POST(
       isExplicitRecipient: solicitation.approverId === me.id,
     })
 
-    const canComment =
-      me.role === 'ADMIN' ||
-      solicitation.solicitanteId === me.id ||
-      solicitation.assumidaPorId === me.id ||
-      solicitation.approverId === me.id ||
-      Boolean(solicitation.costCenterId && ccIds.has(solicitation.costCenterId)) ||
-      Boolean(solicitation.departmentId && deptIds.has(solicitation.departmentId)) ||
-      solicitation.solicitacaoSetores.some((setor) => setorKeys.has(setor.setor))
-
-    const canCommentWithSensitivity = canComment && canViewSensitive
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    })
+    const canCommentWithSensitivity = canExecuteSolicitationRouteAction('comentarios', userAccess, solicitation) && canViewSensitive
 
     if (!canCommentWithSensitivity) {
       return NextResponse.json(

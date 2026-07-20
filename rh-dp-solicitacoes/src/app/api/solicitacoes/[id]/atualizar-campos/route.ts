@@ -10,6 +10,8 @@ import {
   resolveNadaConstaSetoresByDepartment,
 } from '@/lib/solicitationTypes'
 import { isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canExecuteSolicitationRouteAction } from '@/lib/solicitationRouteActionAuthorization'
 
 const normalizeConstaValue = (value: unknown): 'CONSTA' | 'NADA_CONSTA' | null => {
   if (typeof value !== 'string') return null
@@ -133,7 +135,19 @@ export async function POST(
 
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        tipoId: true,
+        tipo: { select: { id: true, codigo: true, nome: true } },
+        status: true,
+        solicitanteId: true,
+        approverId: true,
+        assumidaPorId: true,
+        departmentId: true,
+        costCenterId: true,
+        payload: true,
+        solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true, finalizadoEm: true } },
+      },
     })
     if (!solicitation) {
       return NextResponse.json(
@@ -149,6 +163,23 @@ export async function POST(
       return NextResponse.json(
         { error: 'Chamado já finalizado. Não é possível editar o setor.' },
         { status: 409 },
+      )
+    }
+
+    const userAccess = await resolveUserAccessContext({
+      userId: me.id,
+      userLogin: me.login,
+      userEmail: me.email,
+      userFullName: me.fullName,
+      role: me.role,
+      primaryDepartmentId: me.departmentId,
+      primaryDepartment: me.department,
+    })
+
+    if (!canExecuteSolicitationRouteAction('atualizarCampos', userAccess, solicitation)) {
+      return NextResponse.json(
+        { error: 'Você não possui permissão para editar esta solicitação.' },
+        { status: 403 },
       )
     }
 

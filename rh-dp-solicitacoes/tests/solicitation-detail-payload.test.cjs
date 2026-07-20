@@ -150,8 +150,9 @@ assert.equal(
 )
 
 const approverCtx = { ...viewerCtx, viewerTipoIds: [], allowedTipoIds: ['TIPO_VIEW'], actionableTipoIds: ['TIPO_VIEW'] }
-assert.equal(policy.canAssumeSolicitation(approverCtx, viewerSolicitation), true, 'aprovador continua podendo agir')
-assert.equal(policy.canEditSolicitation(approverCtx, viewerSolicitation), true, 'aprovador continua podendo editar/comentar')
+assert.equal(policy.canApproveSolicitation(approverCtx, viewerSolicitation), true, 'aprovador continua podendo aprovar')
+assert.equal(policy.canAssumeSolicitation(approverCtx, viewerSolicitation), false, 'aprovador por tipo fora do setor não assume')
+assert.equal(policy.canEditSolicitation(approverCtx, viewerSolicitation), false, 'aprovador por tipo fora do setor não edita/comenta')
 
 const adminCtx = { ...viewerCtx, role: 'ADMIN', viewerTipoIds: ['TIPO_VIEW'] }
 assert.equal(policy.canAssumeSolicitation(adminCtx, viewerSolicitation), true, 'admin continua podendo agir')
@@ -162,6 +163,7 @@ assert.match(modalSource, /apiCanAssume/, 'frontend deve ler canAssume')
 assert.match(modalSource, /apiCanComment/, 'frontend deve ler canComment')
 assert.match(modalSource, /apiCanApprove/, 'frontend deve ler canApprove')
 assert.match(modalSource, /apiCanFinalize/, 'frontend deve ler canFinalize')
+assert.match(modalSource, /const apiCanEdit = detail\?\.canEdit === true/, 'frontend deve tratar ausência de canEdit como sem permissão')
 assert.match(modalSource, /showManagementActions = !isApprovalMode && canManage && !isViewerOnly/, 'frontend deve ocultar ações para viewerOnly')
 
 console.log('solicitation-detail-payload.test.cjs ok')
