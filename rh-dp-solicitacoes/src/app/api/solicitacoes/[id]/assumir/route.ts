@@ -9,7 +9,8 @@ import { isExperienceEvaluationTipo } from '@/lib/experienceEvaluationForm'
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import crypto from 'crypto'
-import { canAssumeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canExecuteSolicitationRouteAction } from '@/lib/solicitationRouteActionAuthorization'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
 
 export async function POST(
@@ -28,7 +29,7 @@ export async function POST(
     const solic = await prisma.solicitation.findUnique({
       where: { id: solicitationId },
       include: {
-        solicitacaoSetores: { select: { setor: true } },
+        solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } },
         tipo: { select: { id: true, codigo: true, nome: true } },
       },
     })
@@ -50,7 +51,7 @@ export async function POST(
       primaryDepartment: me.department,
     })
 
-    const canAssume = canAssumeSolicitation(userAccess, {
+    const canAssume = canExecuteSolicitationRouteAction('assumir', userAccess, {
       tipoId: solic.tipoId,
       tipo: solic.tipo,
       status: solic.status,
@@ -58,6 +59,7 @@ export async function POST(
       approverId: solic.approverId,
       assumidaPorId: solic.assumidaPorId,
       departmentId: solic.departmentId,
+      costCenterId: solic.costCenterId,
       solicitacaoSetores: solic.solicitacaoSetores,
       payload: solic.payload,
     })

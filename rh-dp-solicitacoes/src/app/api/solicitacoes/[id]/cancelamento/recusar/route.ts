@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params
     const body = await req.json().catch(() => ({} as { justificativa?: string }))
     const justificativa = assertRequiredReason(body?.justificativa, 'justificativa')
-    const solicitation = await prisma.solicitation.findUnique({ where: { id }, include: { solicitacaoSetores: { select: { setor: true } } } })
+    const solicitation = await prisma.solicitation.findUnique({ where: { id }, include: { solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } } } })
     if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     if (isClosedForCancellation(solicitation.status)) return NextResponse.json({ error: 'Esta solicitação já está encerrada e não pode ser cancelada.' }, { status: 400 })
     if (solicitation.cancelamentoStatus !== 'PENDENTE') return NextResponse.json({ error: 'Não há pedido de cancelamento pendente.' }, { status: 400 })

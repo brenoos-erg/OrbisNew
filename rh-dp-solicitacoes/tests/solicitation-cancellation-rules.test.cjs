@@ -190,7 +190,7 @@ test('setor responsável aprova pedido', () => {
 })
 
 test('setor responsável recusa pedido', () => {
-  const managerCtx = ctx({ userId: 'manager', actionableTipoIds: ['tipo-visible'] })
+  const managerCtx = ctx({ userId: 'manager', userDepartmentIds: ['department-a'], actionableTipoIds: ['tipo-visible'] })
   assert.strictEqual(canManageCancellationRequest(managerCtx, solicitation({ status: 'EM_ATENDIMENTO', cancelamentoStatus: 'PENDENTE' })), true)
 })
 

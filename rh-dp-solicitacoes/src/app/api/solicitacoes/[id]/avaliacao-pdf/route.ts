@@ -61,7 +61,7 @@ export async function GET(
       include: {
         tipo: { select: { id: true, codigo: true, nome: true } },
         solicitante: { select: { fullName: true } },
-        solicitacaoSetores: { select: { setor: true } },
+        solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } },
         timelines: { select: { status: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
       },
     })

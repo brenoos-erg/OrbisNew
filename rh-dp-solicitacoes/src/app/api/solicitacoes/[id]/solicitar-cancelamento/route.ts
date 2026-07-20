@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const solicitation = await prisma.solicitation.findUnique({
       where: { id },
-      include: { solicitacaoSetores: { select: { setor: true } } },
+      include: { solicitacaoSetores: { select: { setor: true, status: true, finalizadoEm: true } } },
     })
     if (!solicitation) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 })
     if (isClosedForCancellation(solicitation.status)) return NextResponse.json({ error: CANCELLATION_CLOSED_ERROR }, { status: 400 })

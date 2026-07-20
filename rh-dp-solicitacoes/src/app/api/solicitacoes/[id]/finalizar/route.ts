@@ -8,7 +8,8 @@ import { safeUpsertSolicitationSearchIndex } from '@/lib/solicitationSearchIndex
 import { requireActiveUser } from '@/lib/auth'
 import { notifySolicitationEvent } from '@/lib/solicitationOperationalNotifications'
 import { VIEWER_ONLY_ACTION_ERROR, isViewerOnlyForSolicitation } from '@/lib/solicitationPermissionGuards'
-import { canFinalizeNadaConstaGlobal, canFinalizeSolicitation, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canFinalizeNadaConstaGlobal, resolveUserAccessContext } from '@/lib/solicitationAccessPolicy'
+import { canExecuteSolicitationRouteAction } from '@/lib/solicitationRouteActionAuthorization'
 import {
   EXPERIENCE_EVALUATION_FINALIZATION_STATUS,
 } from '@/lib/experienceEvaluation'
@@ -71,7 +72,7 @@ export async function PATCH(
             schemaJson: true,
           },
         },
-        solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true } },
+        solicitacaoSetores: { select: { setor: true, status: true, constaFlag: true, finalizadoEm: true } },
         comentarios: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
         anexos: { select: { filename: true } },
         documents: { select: { type: true, pdfUrl: true, signedPdfUrl: true } },
@@ -173,13 +174,14 @@ export async function PATCH(
       primaryDepartment: me.department,
     })
 
-    const canFinalize = canFinalizeSolicitation(userAccess, {
+    const canFinalize = canExecuteSolicitationRouteAction('finalizar', userAccess, {
       tipoId: solicitation.tipoId,
       status: solicitation.status,
       solicitanteId: solicitation.solicitanteId,
       approverId: solicitation.approverId,
       assumidaPorId: solicitation.assumidaPorId,
       departmentId: solicitation.departmentId,
+      costCenterId: solicitation.costCenterId,
       solicitacaoSetores: solicitation.solicitacaoSetores,
       payload: solicitation.payload,
       tipo: solicitation.tipo,
@@ -193,6 +195,7 @@ export async function PATCH(
       approverId: solicitation.approverId,
       assumidaPorId: solicitation.assumidaPorId,
       departmentId: solicitation.departmentId,
+      costCenterId: solicitation.costCenterId,
       solicitacaoSetores: solicitation.solicitacaoSetores,
       payload: solicitation.payload,
     })
